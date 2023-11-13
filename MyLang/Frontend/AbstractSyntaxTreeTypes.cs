@@ -11,6 +11,8 @@ public static class Indent
 public interface INode
 {
     public string GetNodeTree(ref int indent);
+
+    public void Traverse(Action<INode> action);
 }
 
 public interface IStatement : INode { }
@@ -31,6 +33,15 @@ public sealed class Program : IStatement
             builder.AppendLine(Indent.Get(indent) + statement.GetNodeTree(ref indent));
 
         return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        foreach (IStatement statement in Body)
+        {
+            statement.Traverse(action);
+            action(this);
+        }
     }
 }
 
@@ -60,6 +71,8 @@ public sealed class VariableDeclarationStatement : IStatement
 
         return builder.ToString();
     }
+
+    public void Traverse(Action<INode> action) => action(this);
 }
 
 public sealed class VariableDeclarationExpression : IExpression
@@ -91,6 +104,12 @@ public sealed class VariableDeclarationExpression : IExpression
         
         return builder.ToString();
     }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Initializer.Traverse(action);
+    }
 }
 
 public sealed class AssignmentExpression : IExpression
@@ -116,6 +135,12 @@ public sealed class AssignmentExpression : IExpression
         
         return builder.ToString();
     }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Assignment.Traverse(action);
+    }
 }
 
 public sealed class Identifier : IExpression
@@ -125,11 +150,13 @@ public sealed class Identifier : IExpression
     public string Symbol { get; }
 
     public string GetNodeTree(ref int indent) => $"<{nameof(Identifier)}>, Symbol: {Symbol}";
+    public void Traverse(Action<INode> action) => action(this);
 }
 
 public abstract class NumericLiteral : IExpression
 {
     public abstract string GetNodeTree(ref int indent);
+    public void Traverse(Action<INode> action) => action(this);
 }
 
 public sealed class Int32Literal : NumericLiteral
@@ -148,6 +175,16 @@ public sealed class Float32Literal : NumericLiteral
     public float Value { get; }
     
     public override string GetNodeTree(ref int indent) => $"<{nameof(Float32Literal)}>, Value: {Value}";
+}
+
+public sealed class StringLiteral : IExpression
+{
+    public StringLiteral(string value) => Value = value;
+    
+    public string Value { get; }
+    
+    public string GetNodeTree(ref int indent) => $"<{nameof(StringLiteral)}>, Value: {Value}";
+    public void Traverse(Action<INode> action) => action(this);
 }
 
 public sealed class BinaryExpression : IExpression
@@ -176,6 +213,13 @@ public sealed class BinaryExpression : IExpression
 
         return builder.ToString();
     }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Left.Traverse(action);
+        Right.Traverse(action);
+    }
 }
 
 public sealed class DropExpression : IExpression
@@ -195,4 +239,6 @@ public sealed class DropExpression : IExpression
         
         return builder.ToString();
     }
+
+    public void Traverse(Action<INode> action) => action(this);
 }

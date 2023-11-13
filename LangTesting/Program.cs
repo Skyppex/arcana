@@ -8,6 +8,8 @@ string text = File.ReadAllText(@"D:\Software\JetBrains Rider 2023.1.2\Projects\M
 var parser = new Parser();
 
 Scope cliScope = CreateScope();
+var typeChecker = new TypeChecker();
+TypeEnvironment typeEnvironment = TypeEnvironment.Global;
 
 while (true)
 {
@@ -26,6 +28,12 @@ while (true)
     
     MyLang.Program program = parser.CreateAST(input);
 
+    program.Traverse(node =>
+    {
+        if (node is IExpression exp and not DropExpression)
+            typeChecker.CheckType(exp, typeEnvironment);
+    });
+    
     IRuntimeValue evaluation = Interpreter.Evaluate(program, targetScope);
     Console.WriteLine(evaluation.ToString());
     
