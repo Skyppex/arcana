@@ -1,4 +1,8 @@
 ﻿using System.Globalization;
+using Monads;
+
+using static Monads.Result;
+using static Monads.Option;
 
 namespace MyLang;
 
@@ -12,7 +16,7 @@ public class Parser
     public Program CreateAST(string sourceCode)
     {
         _tokens = _lexer.Tokenize(sourceCode);
-        List<IStatement> statements = new();
+        List<Result<IStatement, string>> statements = new();
 
         while (Current() is not EndOfFileToken)
             statements.Add(ParseStatement());
@@ -22,7 +26,7 @@ public class Parser
         return program;
     }
     
-    // Orders of precedence
+    // --- Order of precedence ---
     // VariableDeclarationStatement
     // VariableDeclarationExpression
     // AssignmentExpression
@@ -33,11 +37,11 @@ public class Parser
     // AdditiveExpression
     // MultiplicativeExpression
     // UnaryExpression
-    // PrimaryExpression
+    // PrimaryExpression -- Highest precedence
     
-    private IStatement ParseStatement()
+    private Result<IStatement, string> ParseStatement()
     {
-        IStatement statement = ParseVariableDeclarationStatement();
+        Result<IStatement, string> statement = ParseVariableDeclarationStatement();
 
         if (Current() is SemiColonToken)
             Next();
@@ -45,126 +49,205 @@ public class Parser
         return statement;
     }
     
-    private IStatement ParseVariableDeclarationStatement()
+    private Result<IStatement, string> ParseVariableDeclarationStatement()
     {
-        if (Current() is not IdentifierToken type)
-            return ParseExpression();
+        IdentifierToken? ident = null;
 
-        if (ShouldNotExistBeforeSemiColon<EqualsToken>())
-            return ParseExpression();
+        if (Current() is not MutableToken)
+        {
+            if (Current() is not IdentifierToken type)
+                return ParseExpression().Map(e => e as IStatement);
+            
+            ident = type;
+        }
 
-        bool mutable = NextIs<MutToken>(out _, out _);
+        if (DoesNotExistBeforeSemiColon<EqualsToken>())
+            return ParseExpression().Map(e => e as IStatement);
+
+        bool mutable = NextIs<MutableToken>(out _, out _);
         
         if (!NextIs<IdentifierToken>(out _, out _))
-            return ParseExpression();
+            return ParseExpression().Map(e => e as IStatement);
         
         if (!mutable)
-            mutable = NextIs<MutToken>(out _, out _);
+            mutable = NextIs<MutableToken>(out _, out _);
 
-        return new VariableDeclarationStatement(type.Symbol, mutable, new Identifier(Next().Symbol));
+        return Ok<IStatement, string>(new VariableDeclarationStatement(ident!.Symbol, mutable, new Identifier(Next().Symbol)));
     }
 
-    private IExpression ParseExpression() => ParseDrop();
+    private Result<IExpression, string> ParseExpression() => ParseDrop();
 
-    private IExpression ParseDrop()
+    private Result<IExpression, string> ParseDrop()
     {
         if (Current() is not DropToken)
             return ParseAssignmentExpression();
         
         Next();
-        IToken identifier = Expect<IdentifierToken>("Expected identifier after 'drop' keyword.");
-        return new DropExpression(new Identifier(identifier.Symbol));
+        var identifier = Expect<IdentifierToken>("Expected identifier after 'drop' keyword.");
+        
+        return identifier.Map(i => new DropExpression(new Identifier(i.Symbol)) as IExpression);
     }
     
-    private IExpression ParseAssignmentExpression()
+    private Result<IExpression, string> ParseAssignmentExpression()
     {
         if (Current() is not IdentifierToken)
-            return ParseAdditiveExpression();
+            return ParseLogicalExpression();
 
-        if (!NextIs<EqualsToken>(out IToken identifierToken, out _))
-            return ParseAdditiveExpression();
+        if (!NextIs<EqualsToken>(out IToken? identifierToken, out _))
+            return ParseLogicalExpression();
 
-        return new AssignmentExpression(new Identifier(identifierToken.Symbol), ParseExpression());
+        return ParseExpression().Map(e => new AssignmentExpression(new Identifier(identifierToken!.Symbol), e) as IExpression);
     }
     
-    private IExpression ParseAdditiveExpression()
+    public Result<IExpression, string> ParseLogicalExpression()
     {
-        IExpression left = ParseMultiplicativeExpression();
+        Result<IExpression, string> left = ParseComparisonExpression();
 
-        while (Current().Symbol is TokenSymbol.ADD or TokenSymbol.SUBTRACT)
+        while (Current() is LogicalOperatorToken { Symbol: TokenSymbol.LOGICAL_AND or TokenSymbol.LOGICAL_OR })
         {
             string @operator = Next().Symbol;
-            IExpression right = ParseMultiplicativeExpression();
+            Result<IExpression, string> right = ParseComparisonExpression();
             
-            left = new BinaryExpression(left, @operator, right);
+            left = left.AndThen(l => right.Map(r => new BinaryExpression(l, @operator, r) as IExpression));
+        }
+        
+        return left;
+    }
+
+    public Result<IExpression, string> ParseComparisonExpression()
+    {
+        Result<IExpression, string> left = ParseAdditiveExpression();
+
+        while (Current() is ComparisonOperatorToken { Symbol: TokenSymbol.LOGICAL_EQUAL or TokenSymbol.LOGICAL_NOT_EQUAL or TokenSymbol.GREATER or TokenSymbol.LESS or TokenSymbol.LOGICAL_GREATER_EQUAL or TokenSymbol.LOGICAL_LESS_EQUAL })
+        {
+            string @operator = Next().Symbol;
+            Result<IExpression, string> right = ParseAdditiveExpression();
+            
+            left = left.AndThen(l => right.Map(r => new BinaryExpression(l, @operator, r) as IExpression));
+        }
+        
+        return left;
+    }
+
+    private Result<IExpression, string> ParseAdditiveExpression()
+    {
+        Result<IExpression, string> left = ParseMultiplicativeExpression();
+
+        while (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.ADD or TokenSymbol.SUBTRACT })
+        {
+            string @operator = Next().Symbol;
+            Result<IExpression, string> right = ParseMultiplicativeExpression();
+            
+            left = left.AndThen(l => right.Map(r => new BinaryExpression(l, @operator, r) as IExpression));
         }
         
         return left;
     }
     
-    private IExpression ParseMultiplicativeExpression()
+    private Result<IExpression, string> ParseMultiplicativeExpression()
     {
-        IExpression left = ParseVariableDeclarationExpression();
+        Result<IExpression, string> left = ParseVariableDeclarationExpression();
 
-        while (Current().Symbol is TokenSymbol.MULTIPLY or TokenSymbol.DIVIDE or TokenSymbol.MODULUS)
+        while (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.MULTIPLY or TokenSymbol.DIVIDE or TokenSymbol.MODULUS })
         {
             string @operator = Next().Symbol;
-            IExpression right = ParseVariableDeclarationExpression();
+            Result<IExpression, string> right = ParseVariableDeclarationExpression();
             
-            left = new BinaryExpression(left, @operator, right);
+            left = left.AndThen(l => right.Map(r => new BinaryExpression(l, @operator, r) as IExpression));
         }
         
         return left;
     }
     
-    private IExpression ParseVariableDeclarationExpression()
+    private Result<IExpression, string> ParseVariableDeclarationExpression()
     {
-        if (Current() is not IdentifierToken type)
-            return ParsePrimaryExpression();
+        if (Current() is not MutableToken and not IdentifierToken)
+            return ParseUnaryExpression();
 
-        if (!ShouldNotExistBeforeSemiColon<EqualsToken>())
-            return ParsePrimaryExpression();
-        
-        bool mutable = NextIs<MutToken>(out _, out _);
+        if (!DoesNotExistBeforeSemiColon<EqualsToken>())
+            return ParseUnaryExpression();
 
-        Next();
-        
+        bool mutable = Current() is MutableToken;
+
         if (mutable)
             Next();
-        
-        IToken identifier = Expect<IdentifierToken>($"Expected identifier after {(mutable ? "'mut'" : $"'{type.Symbol}'")} keyword.");
+
+        Result<IdentifierToken, string> typeIdentifier = 
+            Expect<IdentifierToken>($"Expected identifier{(mutable ? " after 'mut' keyword" : "")}.");
+
+        Result<IdentifierToken, string> identifier = typeIdentifier.AndThen(ti =>
+            Expect<IdentifierToken>($"Expected identifier after {(mutable ? "'mut'" : $"'{ti.Symbol}'")}."));
+
         Expect<EqualsToken>("Expected '=' after identifier.");
-        IExpression initializer = ParseExpression();
-        return new VariableDeclarationExpression(type.Symbol, mutable, new Identifier(identifier.Symbol), initializer);
+        Result<IExpression, string> initializer = ParseExpression();
+        return typeIdentifier.AndThen(ti => 
+            identifier.AndThen(id => initializer.Map(init =>
+                new VariableDeclarationExpression(ti.Symbol, mutable, new Identifier(id.Symbol), init) as IExpression)));
     }
 
-    private IExpression ParsePrimaryExpression()
+    private Result<IExpression, string> ParseUnaryExpression()
+    {
+        if (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.ADD or TokenSymbol.SUBTRACT } operatorToken)
+        {
+            Next();
+            return ParseExpression().Map(e => new UnaryExpression(operatorToken.Symbol, e) as IExpression);
+        }
+        
+        if (Current() is LogicalOperatorToken { Symbol: TokenSymbol.LOGICAL_NOT } notToken)
+        {
+            Next();
+            return ParseExpression().Map(e => new UnaryExpression(notToken.Symbol, e) as IExpression);
+        }
+        
+        if (Current() is BitwiseOperatorToken { Symbol: TokenSymbol.BITWISE_NOT } bitwiseNotToken)
+        {
+            Next();
+            return ParseExpression().Map(e => new UnaryExpression(bitwiseNotToken.Symbol, e) as IExpression);
+        }
+
+        return ParsePrimaryExpression();
+    }
+
+    private Result<IExpression, string> ParsePrimaryExpression()
     {
         IToken token = Next();
 
         switch (token)
         {
             case IdentifierToken identifierToken:
-                return new Identifier(identifierToken.Symbol);
+                return Ok<IExpression, string>(new Identifier(identifierToken.Symbol));
             
             case NumberToken numberToken:
                 string numberSymbol = numberToken.Symbol;
 
-                if (numberSymbol.Contains(TokenSymbol.DECIMAL_POINT_CHAR))
-                    return new Float32Literal(float.Parse(numberSymbol, NumberStyles.Any,
-                        CultureInfo.InvariantCulture));
+                if (numberSymbol.Contains(TokenSymbol.DECIMAL_POINT_CHAR) || numberSymbol.EndsWith(Type.f32.ToString()))
+                {
+                    if (numberSymbol.EndsWith(Type.f32.ToString()))
+                        numberSymbol = numberSymbol[..^Type.f32.ToString().Length];
+                    
+                    return Ok<IExpression, string>(new Float32Literal(float.Parse(numberSymbol, NumberStyles.Any,
+                        CultureInfo.InvariantCulture)));
+                }
 
-                return new Int32Literal(int.Parse(numberSymbol, NumberStyles.Any,
-                    CultureInfo.InvariantCulture));
+                if (numberSymbol.EndsWith(Type.i32.ToString()))
+                    numberSymbol = numberSymbol[..^Type.i32.ToString().Length];
+                
+                return Ok<IExpression, string>(new Int32Literal(int.Parse(numberSymbol, NumberStyles.Any,
+                    CultureInfo.InvariantCulture)));
+            
+            case StringToken stringToken:
+                return Ok<IExpression, string>(new StringLiteral(stringToken.Symbol));
+            
+            case BooleanToken booleanToken:
+                return Ok<IExpression, string>(new BooleanLiteral(booleanToken.Symbol == Keyword.TRUE));
             
             case OpenParenToken:
-                IExpression expression = ParseExpression();
+                Result<IExpression, string> expression = ParseExpression();
                 Next();
                 return expression;
             
             default:
-                Console.WriteLine($"Unexpected token found during parsing: {token}");
-                return null;
+                return Error<IExpression, string>($"Unexpected token found during parsing: {token}");
         }
     }
 
@@ -176,15 +259,14 @@ public class Parser
         return token;
     }
     
-    private IToken Expect<T>(string errorMessage) where T : IToken
+    private Result<T, string> Expect<T>(string errorMessage) where T : IToken
     {
         IToken token = Next();
 
-        if (token is T)
-            return token;
+        if (token is T t)
+            return Ok<T, string>(t);
         
-        Console.WriteLine($"Unexpected token found during parsing: {token}. Expected {typeof(T)} | {errorMessage}");
-        return null;
+        return Error<T, string>($"Unexpected token found during parsing: {token}. Expected {typeof(T)} | {errorMessage}");
     }
     
     private bool NextIs<T>(out IToken? token, out IToken? nextToken) where T : IToken
@@ -210,7 +292,7 @@ public class Parser
         return nextIs;
     }
 
-    private bool ShouldNotExistBeforeSemiColon<T>() where T : IToken
+    private bool DoesNotExistBeforeSemiColon<T>() where T : IToken
     {
         int currentIndex = 0;
         IToken current = _tokens[currentIndex];

@@ -10,12 +10,25 @@ public class TypeChecker
         ["*"] = new List<Type> { Type.i32, Type.f32 },
         ["/"] = new List<Type> { Type.i32, Type.f32 },
         ["%"] = new List<Type> { Type.i32, Type.f32 },
+        ["&"] = new List<Type> { Type.@bool },
+        ["|"] = new List<Type> { Type.@bool },
+        ["^"] = new List<Type> { Type.@bool },
+        ["~"] = new List<Type> { Type.i32 },
+        ["<<"] = new List<Type> { Type.i32 },
+        [">>"] = new List<Type> { Type.i32 },
+        ["=="] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@bool },
+        ["!="] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@bool },
+        ["<"] = new List<Type> { Type.i32, Type.f32 },
+        [">"] = new List<Type> { Type.i32, Type.f32 },
+        ["<="] = new List<Type> { Type.i32, Type.f32 },
+        [">="] = new List<Type> { Type.i32, Type.f32 },
+        ["&&"] = new List<Type> { Type.@bool },
+        ["||"] = new List<Type> { Type.@bool },
+        ["!"] = new List<Type> { Type.@bool },
     };
 
-    public Type CheckType(IExpression expression, TypeEnvironment? typeEnvironment = null)
+    public Type CheckType(IExpression expression, TypeEnvironment typeEnvironment)
     {
-        typeEnvironment ??= TypeEnvironment.Global;
-        
         switch (expression)
         {
             case Int32Literal:
@@ -27,31 +40,61 @@ public class TypeChecker
             case StringLiteral:
                 return Type.@string;
             
+            case BooleanLiteral:
+                return Type.@bool;
+
+            case UnaryExpression unaryExpression:
+            {
+                Type type = CheckType(unaryExpression.Operand, typeEnvironment);
+
+                if (type != Type.i32 && type != Type.f32 && type != Type.@bool)
+                    throw new InvalidOperationException($"Unary operator {unaryExpression.Operator} does not support type {type}");
+                
+                return type;
+            }
+            
             case BinaryExpression binaryExpression:
+            {
                 Type leftType = CheckType(binaryExpression.Left, typeEnvironment);
                 Type rightType = CheckType(binaryExpression.Right, typeEnvironment);
 
+                if (leftType != rightType)
+                    throw new InvalidOperationException($"Operator {binaryExpression.Operator} does not support types {leftType} and {rightType}");
+
                 List<Type> allowedTypes = s_operandTypesForOperator[binaryExpression.Operator];
+
                 if (!allowedTypes.Contains(leftType) || !allowedTypes.Contains(rightType))
                 {
                     throw new InvalidOperationException(
                         $"Operator {binaryExpression.Operator} does not support types {leftType} and {rightType}");
                 }
-                
+
                 switch (leftType, rightType)
                 {
                     case var (l, r) when (l, r) == (Type.i32, Type.i32):
                         return Type.i32;
-                    
+
                     case var (l, r) when (l, r) == (Type.f32, Type.f32):
                         return Type.f32;
-                    
+
                     case var (l, r) when (l, r) == (Type.@string, Type.@string):
                         return Type.@string;
+                    
+                    case var (l, r) when (l, r) == (Type.@bool, Type.@bool):
+                        return Type.@bool;
                 }
 
                 break;
+            }
 
+            case Identifier identifier:
+            {
+                if (typeEnvironment.Lookup(identifier.Symbol, out Type? type))
+                    return type;
+                
+                throw new InvalidOperationException($"Identifier '{identifier.Symbol}' is not defined");
+            }
+            
             case VariableDeclarationExpression variableDeclarationExpression:
             {
                 Type type = CheckType(variableDeclarationExpression.Initializer, typeEnvironment);
@@ -67,12 +110,19 @@ public class TypeChecker
                 return typeEnvironment.Define(variableDeclarationExpression.Identifier.Symbol, type);
             }
 
-            case Identifier identifier:
+            case AssignmentExpression assignmentExpression:
             {
-                if (typeEnvironment.Lookup(identifier.Symbol, out Type? type))
-                    return type;
+                Type type = CheckType(assignmentExpression.Assignment, typeEnvironment);
                 
-                throw new InvalidOperationException($"Identifier '{identifier.Symbol}' is not defined");
+                if (!typeEnvironment.Lookup(assignmentExpression.Identifier.Symbol, out Type? variableType))
+                    throw new InvalidOperationException(
+                        $"Identifier '{assignmentExpression.Identifier.Symbol}' is not defined");
+                
+                if (type != variableType)
+                    throw new InvalidOperationException(
+                        $"Variable {assignmentExpression.Identifier.Symbol} has type {variableType} but expected type {type}");
+                
+                return type;
             }
         }
 

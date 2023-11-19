@@ -9,6 +9,7 @@ public class Type : IEquatable<Type>
     public static readonly Type i32 = new("i32");
     public static readonly Type f32 = new("f32");
     public static readonly Type @string = new("string");
+    public static readonly Type @bool = new("bool");
     
     public Type(string name) => Name = name;
 

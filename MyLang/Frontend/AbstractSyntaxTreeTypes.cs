@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using Monads;
 
 namespace MyLang;
 
@@ -21,15 +22,15 @@ public interface IExpression : IStatement { }
 
 public sealed class Program : IStatement
 {
-    public Program(List<IStatement> body) => Body = body;
+    public Program(List<Result<IStatement, string>> body) => Body = body;
 
-    public List<IStatement> Body { get; }
+    public List<Result<IStatement, string>> Body { get; }
 
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
 
-        foreach (IStatement statement in Body)
+        foreach (IStatement statement in Body.Flatten())
             builder.AppendLine(Indent.Get(indent) + statement.GetNodeTree(ref indent));
 
         return builder.ToString();
@@ -37,7 +38,7 @@ public sealed class Program : IStatement
 
     public void Traverse(Action<INode> action)
     {
-        foreach (IStatement statement in Body)
+        foreach (IStatement statement in Body.Flatten())
         {
             statement.Traverse(action);
             action(this);
@@ -187,6 +188,17 @@ public sealed class StringLiteral : IExpression
     public void Traverse(Action<INode> action) => action(this);
 }
 
+public sealed class BooleanLiteral : IExpression
+{
+    public BooleanLiteral(bool value) => Value = value;
+    
+    public bool Value { get; set; }
+    
+    public string GetNodeTree(ref int indent) => $"<{nameof(BooleanLiteral)}>, Value: {Value}";
+
+    public void Traverse(Action<INode> action) => action(this);
+}
+
 public sealed class BinaryExpression : IExpression
 {
     public BinaryExpression(IExpression left, string @operator, IExpression right)
@@ -219,6 +231,37 @@ public sealed class BinaryExpression : IExpression
         action(this);
         Left.Traverse(action);
         Right.Traverse(action);
+    }
+}
+
+public sealed class UnaryExpression : IExpression
+{
+    public UnaryExpression(string @operator, IExpression operand)
+    {
+        Operator = @operator;
+        Operand = operand;
+    }
+    
+    public string Operator { get; }
+    public IExpression Operand { get; }
+    
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(UnaryExpression)}>");
+
+        indent++;
+        builder.AppendLine(Indent.Get(indent) + $"Operator: '{Operator}'");
+        builder.Append(Indent.Dash(indent) + $"Operand: {Operand.GetNodeTree(ref indent)}");
+        indent--;
+
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Operand.Traverse(action);
     }
 }
 

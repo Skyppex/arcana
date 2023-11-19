@@ -12,7 +12,7 @@ public class TypeCheckerTests
         var expression = new Int32Literal(0);
         
         // Act
-        Type type = typeChecker.CheckType(expression);
+        Type type = typeChecker.CheckType(expression, TypeEnvironment.Global);
         
         // Assert
         type.Should().Be(Type.i32);
@@ -26,7 +26,7 @@ public class TypeCheckerTests
         var expression = new Float32Literal(0f);
         
         // Act
-        Type type = typeChecker.CheckType(expression);
+        Type type = typeChecker.CheckType(expression, TypeEnvironment.Global);
         
         // Assert
         type.Should().Be(Type.f32);
@@ -40,7 +40,7 @@ public class TypeCheckerTests
         var expression = new StringLiteral("");
         
         // Act
-        Type type = typeChecker.CheckType(expression);
+        Type type = typeChecker.CheckType(expression, TypeEnvironment.Global);
         
         // Assert
         type.Should().Be(Type.@string);
@@ -57,7 +57,7 @@ public class TypeCheckerTests
         var expression = new BinaryExpression(left, @operator, right);
         
         // Act
-        Type type = typeChecker.CheckType(expression);
+        Type type = typeChecker.CheckType(expression, TypeEnvironment.Global);
         
         // Assert
         type.Should().Be(Type.i32);
@@ -75,7 +75,7 @@ public class TypeCheckerTests
         
         
         // Act
-        Type type = typeChecker.CheckType(expression);
+        Type type = typeChecker.CheckType(expression, TypeEnvironment.Global);
         
         // Assert
         type.Should().Be(Type.f32);
@@ -92,7 +92,7 @@ public class TypeCheckerTests
         var expression = new BinaryExpression(left, OPERATOR, right);
         
         // Act
-        Type type = typeChecker.CheckType(expression);
+        Type type = typeChecker.CheckType(expression, TypeEnvironment.Global);
         
         // Assert
         type.Should().Be(Type.@string);
@@ -109,7 +109,7 @@ public class TypeCheckerTests
         var expression = new BinaryExpression(left, @operator, right);
         
         // Act
-        Func<Type> type = () => typeChecker.CheckType(expression);
+        Func<Type> type = () => typeChecker.CheckType(expression, TypeEnvironment.Global);
         
         // Assert
         type.Should().Throw<InvalidOperationException>();
@@ -126,7 +126,7 @@ public class TypeCheckerTests
         var expression = new VariableDeclarationExpression(Type.i32.Name, false, identifier, initializer);
         
         // Act
-        Type type = typeChecker.CheckType(expression);
+        Type type = typeChecker.CheckType(expression, TypeEnvironment.Global);
         
         // Assert
         type.Should().Be(Type.i32);

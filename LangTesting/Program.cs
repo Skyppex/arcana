@@ -30,7 +30,7 @@ while (true)
 
     program.Traverse(node =>
     {
-        if (node is IExpression exp and not DropExpression)
+        if (node is IExpression exp)
             typeChecker.CheckType(exp, typeEnvironment);
     });
     
@@ -51,5 +51,6 @@ static Scope CreateScope()
     scope.MakeBool("false", false);
     scope.DeclareType("f32");
     scope.DeclareType("i32");
+    scope.DeclareType("bool");
     return scope;
 }
