@@ -48,7 +48,7 @@ public class TypeChecker
                 Type type = CheckType(unaryExpression.Operand, typeEnvironment);
 
                 if (type != Type.i32 && type != Type.f32 && type != Type.@bool)
-                    throw new InvalidOperationException($"Unary operator {unaryExpression.Operator} does not support type {type}");
+                    throw new InvalidOperationException($"Unary operator {unaryExpression.Operator} not supported for operand of type '{type}'");
                 
                 return type;
             }
@@ -59,14 +59,14 @@ public class TypeChecker
                 Type rightType = CheckType(binaryExpression.Right, typeEnvironment);
 
                 if (leftType != rightType)
-                    throw new InvalidOperationException($"Operator {binaryExpression.Operator} does not support types {leftType} and {rightType}");
+                    throw new InvalidOperationException($"Operator '{binaryExpression.Operator}' not supported for operands of type '{leftType}' and '{rightType}'");
 
                 List<Type> allowedTypes = s_operandTypesForOperator[binaryExpression.Operator];
 
                 if (!allowedTypes.Contains(leftType) || !allowedTypes.Contains(rightType))
                 {
                     throw new InvalidOperationException(
-                        $"Operator {binaryExpression.Operator} does not support types {leftType} and {rightType}");
+                        $"Operator {binaryExpression.Operator} not supported for operands of type '{leftType}' and '{rightType}'");
                 }
 
                 switch (leftType, rightType)
@@ -104,7 +104,7 @@ public class TypeChecker
                 if (type != expectedType)
                 {
                     throw new InvalidOperationException(
-                        $"Variable {variableDeclarationExpression.Identifier.Symbol} has type {type} but expected type {expectedType}");
+                        $"Variable {variableDeclarationExpression.Identifier.Symbol} has type '{expectedType}' but was assigned '{type}'");
                 }
                 
                 return typeEnvironment.Define(variableDeclarationExpression.Identifier.Symbol, type);
@@ -120,7 +120,7 @@ public class TypeChecker
                 
                 if (type != variableType)
                     throw new InvalidOperationException(
-                        $"Variable {assignmentExpression.Identifier.Symbol} has type {variableType} but expected type {type}");
+                        $"Variable {assignmentExpression.Identifier.Symbol} has type '{variableType}' but was assigned '{type}'");
                 
                 return type;
             }

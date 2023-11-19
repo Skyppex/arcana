@@ -9,7 +9,7 @@ var parser = new Parser();
 
 Scope cliScope = CreateScope();
 var typeChecker = new TypeChecker();
-TypeEnvironment typeEnvironment = TypeEnvironment.Global;
+TypeEnvironment typeEnvironment = TypeEnvironment.Create();
 
 while (true)
 {
@@ -19,11 +19,13 @@ while (true)
         break;
 
     Scope targetScope = cliScope;
+    TypeEnvironment targetTypeEnvironment = typeEnvironment;
     
     if (input is "read")
     {
         input = text;
         targetScope = CreateScope();
+        targetTypeEnvironment = TypeEnvironment.Create();
     }
     
     MyLang.Program program = parser.CreateAST(input);
@@ -31,10 +33,10 @@ while (true)
     program.Traverse(node =>
     {
         if (node is IExpression exp)
-            typeChecker.CheckType(exp, typeEnvironment);
+            typeChecker.CheckType(exp, targetTypeEnvironment);
     });
     
-    IRuntimeValue evaluation = Interpreter.Evaluate(program, targetScope);
+    IRuntimeValue evaluation = Interpreter.Evaluate(program, targetScope, targetTypeEnvironment);
     Console.WriteLine(evaluation.ToString());
     
     int indent = 0;
@@ -49,8 +51,5 @@ static Scope CreateScope()
     Scope scope = new();
     scope.MakeBool("true", true);
     scope.MakeBool("false", false);
-    scope.DeclareType("f32");
-    scope.DeclareType("i32");
-    scope.DeclareType("bool");
     return scope;
 }

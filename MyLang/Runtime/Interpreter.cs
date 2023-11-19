@@ -4,7 +4,7 @@ namespace MyLang.Runtime;
 
 public class Interpreter
 {
-    public static IRuntimeValue Evaluate(IStatement statement, Scope scope)
+    public static IRuntimeValue Evaluate(IStatement statement, Scope scope, TypeEnvironment typeEnvironment)
     {
         switch (statement)
         {
@@ -21,50 +21,53 @@ public class Interpreter
                 return new BooleanValue(booleanLiteral.Value);
             
             case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.ADD or TokenSymbol.SUBTRACT or TokenSymbol.BITWISE_NOT }:
-                return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope));
+                return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope, typeEnvironment));
 
             case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.LOGICAL_NOT or TokenSymbol.BITWISE_NOT }:
-                return EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope));
+                return EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope, typeEnvironment));
 
             case BinaryExpression binaryExpression:
-                return EvaluatePrimaryExpression(binaryExpression, scope);
+                return EvaluatePrimaryExpression(binaryExpression, scope, typeEnvironment);
             
             case Identifier identifier:
                 return EvaluateIdentifier(identifier, scope);
             
             case AssignmentExpression assignmentExpression:
-                return EvaluateAssignmentExpression(assignmentExpression, scope);
+                return EvaluateAssignmentExpression(assignmentExpression, scope, typeEnvironment);
             
             case VariableDeclarationStatement variableDeclarationStatement:
-                return EvaluateVariableDeclarationStatement(variableDeclarationStatement, scope);
+                return EvaluateVariableDeclarationStatement(variableDeclarationStatement, scope, typeEnvironment);
             
             case VariableDeclarationExpression variableDeclarationExpression:
-                return EvaluateVariableDeclarationExpression(variableDeclarationExpression, scope);
+                return EvaluateVariableDeclarationExpression(variableDeclarationExpression, scope, typeEnvironment);
             
             case DropExpression dropExpression:
-                return EvaluateDropExpression(dropExpression, scope);
+                return EvaluateDropExpression(dropExpression, scope, typeEnvironment);
             
             case Program program:
-                return EvaluateProgram(program, scope);
+                return EvaluateProgram(program, scope, typeEnvironment);
             
             default:
                 throw new InvalidProgramException($"The {statement.GetType()} Node has not been setup for interpretation.");
         }
     }
 
-    private static IRuntimeValue EvaluatePrimaryExpression(BinaryExpression binaryExpression, Scope scope)
+    private static IRuntimeValue EvaluatePrimaryExpression(BinaryExpression binaryExpression, Scope scope, TypeEnvironment typeEnvironment)
     {
-        IRuntimeValue lhs = Evaluate(binaryExpression.Left, scope);
-        IRuntimeValue rhs = Evaluate(binaryExpression.Right, scope);
+        IRuntimeValue lhs = Evaluate(binaryExpression.Left, scope, typeEnvironment);
+        IRuntimeValue rhs = Evaluate(binaryExpression.Right, scope, typeEnvironment);
         
         if (lhs is EmptyProgramValue || rhs is EmptyProgramValue)
             throw new InvalidProgramException("Cannot evaluate an empty program.");
 
-        if (lhs is NumberValue && rhs is NumberValue)
-            return EvaluateNumberBinaryExpression(binaryExpression, lhs, rhs);
+        if (lhs is NumberValue lhsNum && rhs is NumberValue rhsNum)
+            return EvaluateNumberBinaryExpression(binaryExpression, lhsNum, rhsNum);
         
-        if (lhs is BooleanValue && rhs is BooleanValue)
-            return EvaluateBooleanBinaryExpression(binaryExpression, lhs, rhs);
+        if (lhs is StringValue lhsStr && rhs is StringValue rhsStr)
+            return EvaluateStringBinaryExpression(binaryExpression, lhsStr, rhsStr);
+        
+        if (lhs is BooleanValue lhsBool && rhs is BooleanValue rhsBool)
+            return EvaluateBooleanBinaryExpression(binaryExpression, lhsBool, rhsBool);
         
         throw new InvalidProgramException("Cannot do a binary operation on an expression that is not a number.");
     }
@@ -104,7 +107,7 @@ public class Interpreter
             }
         }
 
-        throw new InvalidProgramException("Cannot do a unary operation on an expression that is not a number.");
+        throw new InvalidProgramException($"Cannot do a unary operation '{unaryExpression.Operator}' on an expression that is not a number.");
     }
 
     private static IRuntimeValue EvaluateBooleanUnaryExpression(UnaryExpression unaryExpression, IRuntimeValue value)
@@ -117,14 +120,14 @@ public class Interpreter
                     return new BooleanValue(!boolValue.Value);
                 
                 default:
-                    throw new InvalidProgramException($"The operator {unaryExpression.Operator} is not supported.");
+                    throw new InvalidProgramException($"The operator {unaryExpression.Operator} is not supported for booleans.");
             }
         }
 
-        throw new InvalidProgramException("Cannot do a unary operation on an expression that is not a number.");
+        throw new InvalidProgramException($"The operator {unaryExpression.Operator} is not supported for booleans.");
     }
 
-    private static IRuntimeValue EvaluateNumberBinaryExpression(BinaryExpression binaryExpression, IRuntimeValue lhs, IRuntimeValue rhs)
+    private static IRuntimeValue EvaluateNumberBinaryExpression(BinaryExpression binaryExpression, NumberValue lhs, NumberValue rhs)
     {
         if (lhs is Int32Value lhsInt32 && rhs is Int32Value rhsInt32)
         {
@@ -189,59 +192,75 @@ public class Interpreter
         throw new InvalidProgramException("Cannot do a binary operation on an expression that is not a number.");
     }
 
-    private static IRuntimeValue EvaluateBooleanBinaryExpression(BinaryExpression binaryExpression, IRuntimeValue lhs, IRuntimeValue rhs)
+    private static IRuntimeValue EvaluateStringBinaryExpression(BinaryExpression binaryExpression, StringValue lhs, StringValue rhs)
     {
-        if (lhs is BooleanValue lhsBool && rhs is BooleanValue rhsBool)
+        switch (binaryExpression.Operator)
         {
-            switch (binaryExpression.Operator)
-            {
-                case TokenSymbol.LOGICAL_AND:
-                    return new BooleanValue(lhsBool.Value && rhsBool.Value);
+            case TokenSymbol.ADD:
+                return new StringValue(lhs.Value + rhs.Value);
 
-                case TokenSymbol.LOGICAL_OR:
-                    return new BooleanValue(lhsBool.Value || rhsBool.Value);
-
-                default:
-                    throw new InvalidProgramException($"The operator {binaryExpression.Operator} is not supported.");
-            }
+            default:
+                throw new InvalidProgramException($"The operator {binaryExpression.Operator} is not supported.");
         }
-
-        throw new InvalidProgramException("Cannot do a binary operation on an expression that is not a number.");
     }
 
+    private static IRuntimeValue EvaluateBooleanBinaryExpression(BinaryExpression binaryExpression, BooleanValue lhs, BooleanValue rhs)
+    {
+        switch (binaryExpression.Operator)
+        {
+            case TokenSymbol.LOGICAL_AND:
+                return new BooleanValue(lhs.Value && rhs.Value);
+
+            case TokenSymbol.LOGICAL_OR:
+                return new BooleanValue(lhs.Value || rhs.Value);
+
+            default:
+                throw new InvalidProgramException($"The operator {binaryExpression.Operator} is not supported.");
+        }
+    }
     
     private static IRuntimeValue EvaluateIdentifier(Identifier identifier, Scope scope) => scope.Get(identifier);
 
-    private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Scope scope)
+    private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Scope scope, TypeEnvironment typeEnvironment)
     {
-        IRuntimeValue value = Evaluate(assignmentExpression.Assignment, scope);
+        IRuntimeValue value = Evaluate(assignmentExpression.Assignment, scope, typeEnvironment);
         scope.Assign(assignmentExpression.Identifier, value);
         return value;
     }
     
-    private static IRuntimeValue EvaluateVariableDeclarationStatement(VariableDeclarationStatement variableDeclarationStatement, Scope scope)
+    private static IRuntimeValue EvaluateVariableDeclarationStatement(
+        VariableDeclarationStatement variableDeclarationStatement,
+        Scope scope,
+        TypeEnvironment typeEnvironment)
     {
-        scope.ResolveTypeName(variableDeclarationStatement.TypeName);
+        if (!typeEnvironment.Lookup(variableDeclarationStatement.TypeName, out _))
+            throw new Exception($"Type '{variableDeclarationStatement.TypeName}' does not exist in current context.");
+        
         scope.Declare(variableDeclarationStatement.Identifier, variableDeclarationStatement.Mutable, Uninitialized.Instance);
         return Uninitialized.Instance;
     }
     
-    private static IRuntimeValue EvaluateVariableDeclarationExpression(VariableDeclarationExpression variableDeclarationExpression, Scope scope)
+    private static IRuntimeValue EvaluateVariableDeclarationExpression(
+        VariableDeclarationExpression variableDeclarationExpression,
+        Scope scope,
+        TypeEnvironment typeEnvironment)
     {
-        scope.ResolveTypeName(variableDeclarationExpression.TypeName);
-        IRuntimeValue value = Evaluate(variableDeclarationExpression.Initializer, scope);
+        if (!typeEnvironment.Lookup(variableDeclarationExpression.TypeName, out _))
+            throw new Exception($"Type '{variableDeclarationExpression.TypeName}' does not exist in current context.");
+
+        IRuntimeValue value = Evaluate(variableDeclarationExpression.Initializer, scope, typeEnvironment);
         scope.Declare(variableDeclarationExpression.Identifier, variableDeclarationExpression.Mutable, value);
         return value;
     }
 
-    private static IRuntimeValue EvaluateDropExpression(DropExpression dropExpression, Scope scope)
+    private static IRuntimeValue EvaluateDropExpression(DropExpression dropExpression, Scope scope, TypeEnvironment typeEnvironment)
     {
-        IRuntimeValue value = Evaluate(dropExpression.Identifier, scope);
+        IRuntimeValue value = Evaluate(dropExpression.Identifier, scope, typeEnvironment);
         scope.Drop(dropExpression.Identifier);
         return value;
     }
     
-    private static IRuntimeValue EvaluateProgram(Program program, Scope scope)
+    private static IRuntimeValue EvaluateProgram(Program program, Scope scope, TypeEnvironment typeEnvironment)
     {
         IRuntimeValue lastEvaluated = new EmptyProgramValue();
 
@@ -250,7 +269,7 @@ public class Interpreter
             IRuntimeValue evaluated = lastEvaluated;
 
             lastEvaluated = statement.Match(
-                ok: s => Evaluate(s, scope),
+                ok: s => Evaluate(s, scope, typeEnvironment),
                 error: e =>
                 {
                     Console.WriteLine($"ERROR: {e}");

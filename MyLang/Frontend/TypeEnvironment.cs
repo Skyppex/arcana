@@ -2,7 +2,7 @@
 
 public class TypeEnvironment
 {
-    public static TypeEnvironment Global => new()
+    public static TypeEnvironment Create() => new()
     {
         _types =
         {

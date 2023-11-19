@@ -4,7 +4,6 @@ public class Scope
 {
     private readonly Scope? _parent;
     private readonly Dictionary<string, Variable> _variables = new();
-    private readonly List<string> _typeNames = new();
 
     public IReadOnlyDictionary<string, IRuntimeValue> Variables
     {
@@ -65,27 +64,8 @@ public class Scope
         throw new Exception($"Variable '{name}' does not exist in this scope.");
     }
     
-    public Scope ResolveTypeName(string name)
-    {
-        if (_typeNames.Contains(name))
-            return this;
-
-        if (_parent is not null)
-            return _parent.ResolveTypeName(name);
-        
-        throw new Exception($"Type '{name}' does not exist in this scope.");
-    }
-    
     public IRuntimeValue MakeBool(string name, bool value) => Declare(new Identifier(name), false, new BooleanValue(value));
 
-    public void DeclareType(string name)
-    {
-        if (_typeNames.Contains(name))
-            throw new Exception($"Type '{name}' already exists in this scope.");
-        
-        _typeNames.Add(name);
-    }
-    
     private class Variable
     {
         public Variable(bool mutable, IRuntimeValue value)
