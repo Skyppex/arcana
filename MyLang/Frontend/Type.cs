@@ -5,17 +5,22 @@ namespace MyLang;
 
 public class Type : IEquatable<Type>
 {
-    public static readonly Type never = new("Never");
-    public static readonly Type i32 = new("i32");
-    public static readonly Type f32 = new("f32");
-    public static readonly Type @string = new("string");
-    public static readonly Type @bool = new("bool");
+    public static readonly Type never = new("Never", TypeMode.Union);
+    public static readonly Type i32 = new("i32", TypeMode.Struct);
+    public static readonly Type f32 = new("f32", TypeMode.Struct);
+    public static readonly Type @string = new("string", TypeMode.Struct);
+    public static readonly Type @bool = new("bool", TypeMode.Struct);
     
     public static readonly Type[] Numbers = { i32, f32 };
     
-    public Type(string name) => Name = name;
+    public Type(string name, TypeMode mode)
+    {
+        Name = name;
+        Mode = mode;
+    }
 
     public string Name { get; }
+    public TypeMode Mode { get; }
 
     public static Type FromString(string typeName) =>
         typeof(Type).GetFields(BindingFlags.Public | BindingFlags.Static)
@@ -24,12 +29,12 @@ public class Type : IEquatable<Type>
 
     public override string ToString() => Name;
     
-    #region Equality 
+    #region Equality
     public bool Equals(Type? other)
     {
         if (ReferenceEquals(null, other)) return false;
         if (ReferenceEquals(this, other)) return true;
-        return Name == other.Name;
+        return Name == other.Name && Mode == other.Mode;
     }
 
     public override bool Equals(object? obj)
@@ -40,10 +45,26 @@ public class Type : IEquatable<Type>
         return Equals((Type)obj);
     }
 
-    public override int GetHashCode() => Name.GetHashCode();
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Name, (int)Mode);
+    }
 
-    public static bool operator ==(Type? left, Type? right) => Equals(left, right);
+    public static bool operator ==(Type? left, Type? right)
+    {
+        return Equals(left, right);
+    }
 
-    public static bool operator !=(Type? left, Type? right) => !Equals(left, right);
+    public static bool operator !=(Type? left, Type? right)
+    {
+        return !Equals(left, right);
+    }
     #endregion
+
+    public enum TypeMode
+    {
+        Struct,
+        Union,
+        Flags,
+    }
 }

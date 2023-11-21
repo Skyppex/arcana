@@ -44,6 +44,9 @@ public class Interpreter
             case VariableDeclarationStatement variableDeclarationStatement:
                 return EvaluateVariableDeclarationStatement(variableDeclarationStatement, scope, typeEnvironment);
             
+            case StructDeclarationStatement structDeclarationStatement:
+                return EvaluateStructDeclarationStatement(structDeclarationStatement, typeEnvironment);
+            
             case IfStatement ifStatement:
                 return EvaluateIfStatement(ifStatement, scope, typeEnvironment);
             
@@ -262,6 +265,18 @@ public class Interpreter
         return Uninitialized.Instance;
     }
 
+    private static IRuntimeValue EvaluateStructDeclarationStatement(
+        StructDeclarationStatement structDeclarationStatement,
+        TypeEnvironment typeEnvironment)
+    {
+        var structName = structDeclarationStatement.TypeName;
+        if (typeEnvironment.Lookup(structName, out _))
+            throw new Exception($"Type '{structName}' already exists in current context.");
+        
+        typeEnvironment.Define(structName, new Type(structName, Type.TypeMode.Struct));
+        return NoValue.Instance;
+    }
+    
     private static IRuntimeValue EvaluateIfStatement(
         IfStatement ifStatement,
         Scope scope,

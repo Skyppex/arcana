@@ -3,7 +3,7 @@ using MyLang.Runtime;
 
 Console.WriteLine("Program started. Type 'read' to read from file, 'q' to exit.");
 
-string text = File.ReadAllText(@"D:\Software\JetBrains Rider 2023.1.2\Projects\MyLangSolution\Examples\example-code.txt");
+string text = File.ReadAllText(@"..\..\..\..\Examples\example-code.txt");
 
 var parser = new Parser();
 
@@ -32,8 +32,8 @@ while (true)
 
     program.Traverse(node =>
     {
-        if (node is IExpression exp)
-            typeChecker.CheckType(exp, targetTypeEnvironment);
+        if (node is IStatement statement)
+            typeChecker.CheckType(statement, targetTypeEnvironment);
     });
     
     IRuntimeValue evaluation = Interpreter.Evaluate(program, targetScope, targetTypeEnvironment);

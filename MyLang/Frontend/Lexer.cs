@@ -287,9 +287,6 @@ public static class Keyword
         { MUTABLE, new MutableToken() },
         { IF, new IfToken() },
         { ELSE, new ElseToken() },
-        // { STRUCT, new StructToken() },
-        // { UNION, new UnionToken() },
-        // { FLAGS, new FlagsToken() },
         // { MATCH, new MatchToken() },
         // { LOOP, new LoopToken() },
         // { FOR, new ForToken() },
@@ -297,6 +294,11 @@ public static class Keyword
         // { DO, new DoToken() },
         // { BREAK, new BreakToken() },
         // { CONTINUE, new ContinueToken() },
+        { STRUCT, new StructToken() },
+        // { UNION, new UnionToken() },
+        // { FLAGS, new FlagsToken() },
+        { PUBLIC, new AccessToken(PUBLIC) },
+        // { INTERNAL, new AccessToken(INTERNAL) },
     };
     
     // Built in functions
@@ -309,8 +311,8 @@ public static class Keyword
     // Mutability
     public const string MUTABLE = "mutable";
     
-    // // Types
-    // public const string STRUCT = "struct";
+    // Types
+    public const string STRUCT = "struct";
     // public const string UNION = "union";
     // public const string FLAGS = "flags";
     
@@ -319,13 +321,17 @@ public static class Keyword
     public const string ELSE = "else";
     // public const string MATCH = "match";
     
-    // // Loops
+    // Loops
     // public const string LOOP = "loop";
     // public const string FOR = "for";
     // public const string WHILE = "while";
     // public const string DO = "do";
     // public const string BREAK = "break";
     // public const string CONTINUE = "continue";
+    
+    // Access
+    public const string PUBLIC = "public";
+    // public const string INTERNAL = "internal";
 }
 
 public interface IToken
@@ -406,7 +412,7 @@ public sealed class QuestionToken : IToken { public string Symbol => TokenSymbol
 public sealed class ColonToken : IToken { public string Symbol => TokenSymbol.COLON; }
 public sealed class SemiColonToken : IToken { public string Symbol => TokenSymbol.SEMI_COLON; }
 
-// public sealed class StructToken : IToken { public string Symbol => Keyword.STRUCT; }
+public sealed class StructToken : IToken { public string Symbol => Keyword.STRUCT; }
 // public sealed class UnionToken : IToken { public string Symbol => Keyword.UNION; }
 // public sealed class FlagsToken : IToken { public string Symbol => Keyword.FLAGS; }
 //
@@ -420,5 +426,12 @@ public sealed class SemiColonToken : IToken { public string Symbol => TokenSymbo
 // public sealed class DoToken : IToken { public string Symbol => Keyword.DO; }
 // public sealed class BreakToken : IToken { public string Symbol => Keyword.BREAK; }
 // public sealed class ContinueToken : IToken { public string Symbol => Keyword.CONTINUE; }
+
+public sealed class AccessToken : IToken
+{
+    public AccessToken(string symbol) => Symbol = symbol;
+
+    public string Symbol { get; }
+}
 
 public sealed class EndOfFileToken : IToken { public string Symbol => string.Empty; }

@@ -121,7 +121,8 @@ public sealed class IfStatement : IStatement
         
         IStatement @else = Else.Unwrap();
         builder.AppendLine(Indent.Get(indent) + $"Else Block: {@else.GetNodeTree(ref indent)}");
-
+        indent--;
+        
         return builder.ToString();
     }
 
@@ -156,6 +157,73 @@ public sealed class IfStatement : IStatement
         
         public IExpression Condition { get; }
         public IStatement Block { get; }
+    }
+}
+
+public sealed class StructDeclarationStatement : IStatement
+{
+    public StructDeclarationStatement(Option<string> accessModifier, string typeName, IEnumerable<Field> fields)
+    {
+        AccessModifier = accessModifier;
+        TypeName = typeName;
+        Fields = fields;
+    }
+    
+    public Option<string> AccessModifier { get; }
+    public string TypeName { get; }
+    public IEnumerable<Field> Fields { get; }
+    
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(StructDeclarationStatement)}>");
+        
+        indent++;
+        builder.Append(Indent.Get(indent) + $"TypeName: {TypeName}");
+
+        if (Fields.Any())
+        {
+            builder.AppendLine();
+            builder.Append(Indent.Get(indent) + "Fields:");
+            indent++;
+            
+            foreach (Field field in Fields)
+            {
+                builder.AppendLine();
+                builder.AppendLine(Indent.Get(indent) + "Field:");
+                indent++;
+                builder.AppendLine(Indent.Get(indent) + $"AccessModifier: {field.AccessModifier}");
+                builder.AppendLine(Indent.Get(indent) + $"Mutable: {field.Mutable}");
+                builder.AppendLine(Indent.Get(indent) + $"TypeName: {field.TypeName}");
+                builder.Append(Indent.Get(indent) + $"Identifier: {field.Identifier}");
+                indent--;
+            }
+            indent--;
+        }
+        indent--;
+        
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+    }
+
+    public sealed class Field
+    {
+        public Field(Option<string> accessModifier, bool mutable, string typeName, string identifier)
+        {
+            AccessModifier = accessModifier;
+            Mutable = mutable;
+            TypeName = typeName;
+            Identifier = identifier;
+        }
+        
+        public Option<string> AccessModifier { get; }
+        public bool Mutable { get; }
+        public string TypeName { get; }
+        public string Identifier { get; }
     }
 }
 

@@ -56,34 +56,39 @@ public class Parser
     
     private Result<IStatement, string> ParseVariableDeclarationStatement()
     {
-        IdentifierToken? ident = null;
-
+        IdentifierToken? typeIdentifier = null;
+        
         if (Current() is not MutableToken)
         {
             if (Current() is not IdentifierToken type)
                 return ParseIfStatement();
             
-            ident = type;
+            typeIdentifier = type;
         }
 
-        if (DoesNotExistBeforeSemiColon<EqualsToken>())
+        if (ExistsBeforeSemiColon<EqualsToken>())
             return ParseIfStatement();
 
-        bool mutable = NextIs<MutableToken>(out _, out _);
-        
-        if (!NextIs<IdentifierToken>(out _, out _))
-            return ParseIfStatement();
-        
-        if (!mutable)
-            mutable = NextIs<MutableToken>(out _, out _);
+        bool mutable = Current() is MutableToken;
 
-        return Ok<IStatement, string>(new VariableDeclarationStatement(ident!.Symbol, mutable, new Identifier(Next().Symbol)));
+        if (mutable)
+        {
+            if (!NextIs(out _, out IdentifierToken? typeIdent, false))
+                return ParseIfStatement();
+
+            typeIdentifier ??= typeIdent;
+            Next();
+        }
+        
+        Next();
+        
+        return Ok<IStatement, string>(new VariableDeclarationStatement(typeIdentifier!.Symbol, mutable, new Identifier(Next().Symbol)));
     }
     
     private Result<IStatement, string> ParseIfStatement()
     {
         if (Current() is not IfToken)
-            return ParseExpression().Map(e => e as IStatement);
+            return ParseStructDeclarationStatement();
 
         Next();
 
@@ -171,6 +176,66 @@ public class Parser
         }
     }
 
+    private Result<IStatement, string> ParseStructDeclarationStatement()
+    {
+        Option<string> accessModifier = Option<string>.None;
+        if (Current() is AccessToken at)
+        {
+            if (!NextIs<StructToken>(out _, out _, false))
+                return ParseExpression().Map(e => e as IStatement);
+            
+            accessModifier = Some(at.Symbol);
+            Next();
+        }
+        
+        if (Current() is not StructToken)
+            return ParseExpression().Map(e => e as IStatement);
+        
+        Next();
+        
+        Result<IdentifierToken, string> structNameIdentifier = Expect<IdentifierToken>("Expected identifier after 'struct' keyword.");
+        var openCurly = Expect<OpenCulryBraceToken>("Expected '{'.");
+
+        List<Result<StructDeclarationStatement.Field, string>> fields = new();
+        
+        while (Current() is not CloseCulryBraceToken)
+            fields.Add(ParseField());
+
+        Result<CloseCulryBraceToken, string> closeCurly = Expect<CloseCulryBraceToken>("Expected '}'.");
+        
+        return structNameIdentifier.AndThen(sni =>
+            openCurly.AndThen(_ =>
+                fields.Invert().AndThen(fs =>
+                    closeCurly.Map(_ => new StructDeclarationStatement(accessModifier, sni.Symbol, fs) as IStatement))));
+        
+        Result<StructDeclarationStatement.Field, string> ParseField()
+        {
+            Option<string> accessModifier = Option<string>.None;
+            if (Current() is AccessToken at)
+            {
+                accessModifier = Some(at.Symbol);
+                Next();
+            }
+
+            bool mutable = Current() is MutableToken;
+            
+            if (mutable)
+                Next();
+
+            Result<IdentifierToken, string> typeIdentifier = Expect<IdentifierToken>("Expected identifier.");
+            Result<IdentifierToken, string> identifier = Expect<IdentifierToken>("Expected identifier after type identifier.");
+            var semi = Expect<SemiColonToken>("Expected ';'.");
+            
+            return typeIdentifier.AndThen(ti =>
+                identifier.AndThen(ident =>
+                    semi.Map(_ => new StructDeclarationStatement.Field(
+                        accessModifier,
+                        mutable,
+                        ti.Symbol,
+                        ident.Symbol))));
+        }
+    }
+    
     private Result<IExpression, string> ParseExpression() => ParseDrop();
 
     private Result<IExpression, string> ParseDrop()
@@ -275,7 +340,7 @@ public class Parser
         if (Current() is not MutableToken and not IdentifierToken)
             return ParseUnaryExpression();
 
-        if (!DoesNotExistBeforeSemiColon<EqualsToken>())
+        if (!ExistsBeforeSemiColon<EqualsToken>())
             return ParseUnaryExpression();
 
         bool mutable = Current() is MutableToken;
@@ -380,7 +445,7 @@ public class Parser
         return Error<T, string>($"Unexpected token found during parsing: {token}. Expected {typeof(T)} | {errorMessage}");
     }
     
-    private bool NextIs<T>(out IToken? token, out IToken? nextToken) where T : IToken
+    private bool NextIs<T>(out IToken? token, out T? nextToken, bool doNext = true) where T : class, IToken
     {
         if (_tokens.Count < 2)
         {
@@ -389,13 +454,18 @@ public class Parser
             return false;
         }
         
-        nextToken = _tokens[1];
-        bool nextIs = nextToken is T;
+        bool nextIs = _tokens[1] is T;
+        nextToken = nextIs ? _tokens[1] as T : null;
 
         if (nextIs)
         {
-            token = Next();
-            Next();
+            token = Current();
+            
+            if (doNext)
+            {
+                Next();
+                Next();
+            }
         }
         else
             token = null;
@@ -403,7 +473,7 @@ public class Parser
         return nextIs;
     }
 
-    private bool DoesNotExistBeforeSemiColon<T>() where T : IToken
+    private bool ExistsBeforeSemiColon<T>() where T : IToken
     {
         int currentIndex = 0;
         IToken current = _tokens[currentIndex];

@@ -27,9 +27,24 @@ public class TypeChecker
         ["!"] = new List<Type> { Type.@bool },
     };
 
-    public Type CheckType(IExpression expression, TypeEnvironment typeEnvironment)
+    public Type CheckType(IStatement statement, TypeEnvironment typeEnvironment)
     {
-        switch (expression)
+        // i32[] foo = [0, 1, 2, 3, 4, 5];
+        // m>[i32] fooPtr = >foo;
+        // a -> mut b -> IO a
+        // mut(a -> b) -> IO a
+        // a -> b
+        // let x = y;
+        // let x = &mut y;
+        // fn myNumFn = void -> num;
+        // let n = myNumFn() |> mut |> $ + 2 $ * 3; f(g(x)) == f*g (x)
+        // x = 5;
+        // let z = &y;
+        // x = 3;
+        //     r n s t .. a e c i
+        
+        
+        switch (statement)
         {
             case Int32Literal:
                 return Type.i32;
@@ -137,7 +152,7 @@ public class TypeChecker
 
                 break;
             }
-
+            
             case Identifier identifier:
             {
                 if (typeEnvironment.Lookup(identifier.Symbol, out Type? type))
@@ -160,6 +175,15 @@ public class TypeChecker
                 
                 return typeEnvironment.Define(variableDeclarationExpression.Identifier.Symbol, type);
             }
+            
+            case VariableDeclarationStatement variableDeclarationStatement:
+            {
+                if (!typeEnvironment.Lookup(variableDeclarationStatement.TypeName, out Type? type))
+                    throw new InvalidOperationException(
+                        $"Type '{variableDeclarationStatement.TypeName}' is not defined");
+                
+                return typeEnvironment.Define(variableDeclarationStatement.Identifier.Symbol, type!);
+            }
 
             case AssignmentExpression assignmentExpression:
             {
@@ -175,8 +199,13 @@ public class TypeChecker
                 
                 return type;
             }
+            
+            case Program:
+            case IfStatement:
+            case StructDeclarationStatement:
+                return Type.never;
         }
 
-        throw new InvalidOperationException($"Cannot check type of {expression.GetType()}");
+        throw new InvalidOperationException($"Cannot check type of {statement.GetType()}");
     }
 }

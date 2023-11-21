@@ -32,8 +32,9 @@ public class Scope
         string name = identifier.Symbol;
         Variable variable = Resolve(name)._variables[name];
         
-        if (!variable.Mutable)
-            throw new Exception($"Variable '{name}' is not mutable.");
+        if (variable.Value is not Uninitialized)
+            if (!variable.Mutable)
+                throw new Exception($"Variable '{name}' is not mutable.");
         
         return variable.Value = value;
     }
