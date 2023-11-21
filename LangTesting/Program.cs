@@ -28,7 +28,7 @@ while (true)
         targetTypeEnvironment = TypeEnvironment.Create();
     }
     
-    MyLang.Program program = parser.CreateAST(input);
+    MyLang.Program program = parser.CreateAst(input);
 
     program.Traverse(node =>
     {

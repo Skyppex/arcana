@@ -1,5 +1,8 @@
 ﻿using Monads;
 
+using static Monads.Result;
+using static Monads.Option;
+
 namespace MyLang.Runtime;
 
 public class Interpreter
@@ -26,8 +29,11 @@ public class Interpreter
             case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.LOGICAL_NOT or TokenSymbol.BITWISE_NOT }:
                 return EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope, typeEnvironment));
 
+            case TernaryExpression ternaryExpression:
+                return EvaluateTernaryExpression(ternaryExpression, scope, typeEnvironment);
+            
             case BinaryExpression binaryExpression:
-                return EvaluatePrimaryExpression(binaryExpression, scope, typeEnvironment);
+                return EvaluateBinaryExpression(binaryExpression, scope, typeEnvironment);
             
             case Identifier identifier:
                 return EvaluateIdentifier(identifier, scope);
@@ -37,6 +43,9 @@ public class Interpreter
             
             case VariableDeclarationStatement variableDeclarationStatement:
                 return EvaluateVariableDeclarationStatement(variableDeclarationStatement, scope, typeEnvironment);
+            
+            case IfStatement ifStatement:
+                return EvaluateIfStatement(ifStatement, scope, typeEnvironment);
             
             case VariableDeclarationExpression variableDeclarationExpression:
                 return EvaluateVariableDeclarationExpression(variableDeclarationExpression, scope, typeEnvironment);
@@ -52,7 +61,7 @@ public class Interpreter
         }
     }
 
-    private static IRuntimeValue EvaluatePrimaryExpression(BinaryExpression binaryExpression, Scope scope, TypeEnvironment typeEnvironment)
+    private static IRuntimeValue EvaluateBinaryExpression(BinaryExpression binaryExpression, Scope scope, TypeEnvironment typeEnvironment)
     {
         IRuntimeValue lhs = Evaluate(binaryExpression.Left, scope, typeEnvironment);
         IRuntimeValue rhs = Evaluate(binaryExpression.Right, scope, typeEnvironment);
@@ -145,7 +154,7 @@ public class Interpreter
                 case TokenSymbol.DIVIDE:
                     return new Int32Value(lhsInt32.Value / rhsInt32.Value); // TODO: Handle divide by zero.
 
-                case TokenSymbol.MODULUS:
+                case TokenSymbol.MODULO:
                     return new Int32Value(lhsInt32.Value % rhsInt32.Value);
                 
                 case TokenSymbol.LESS:
@@ -175,7 +184,7 @@ public class Interpreter
                 case TokenSymbol.DIVIDE:
                     return new Float32Value(lhsFloat32.Value / rhsFloat32.Value); // TODO: Handle divide by zero.
                 
-                case TokenSymbol.MODULUS:
+                case TokenSymbol.MODULO:
                     return new Float32Value(lhsFloat32.Value % rhsFloat32.Value);
 
                 case TokenSymbol.LESS:
@@ -221,6 +230,19 @@ public class Interpreter
     
     private static IRuntimeValue EvaluateIdentifier(Identifier identifier, Scope scope) => scope.Get(identifier);
 
+    private static IRuntimeValue EvaluateTernaryExpression(TernaryExpression ternaryExpression, Scope scope, TypeEnvironment typeEnvironment)
+    {
+        IRuntimeValue condition = Evaluate(ternaryExpression.Condition, scope, typeEnvironment);
+        
+        if (condition is not BooleanValue booleanValue)
+            throw new Exception($"Condition must be a boolean value, but was {condition.GetType()}.");
+
+        if (booleanValue.Value)
+            return Evaluate(ternaryExpression.True, scope, typeEnvironment);
+        
+        return Evaluate(ternaryExpression.False, scope, typeEnvironment);
+    }
+    
     private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Scope scope, TypeEnvironment typeEnvironment)
     {
         IRuntimeValue value = Evaluate(assignmentExpression.Assignment, scope, typeEnvironment);
@@ -238,6 +260,45 @@ public class Interpreter
         
         scope.Declare(variableDeclarationStatement.Identifier, variableDeclarationStatement.Mutable, Uninitialized.Instance);
         return Uninitialized.Instance;
+    }
+
+    private static IRuntimeValue EvaluateIfStatement(
+        IfStatement ifStatement,
+        Scope scope,
+        TypeEnvironment typeEnvironment)
+    {
+        IRuntimeValue condition = Evaluate(ifStatement.If.Condition, scope, typeEnvironment);
+        
+        if (condition is not BooleanValue booleanValue)
+            throw new Exception($"Condition must be a boolean value, but was {condition.GetType()}.");
+
+        if (booleanValue.Value)
+            return Evaluate(ifStatement.If.Block, new Scope(scope), typeEnvironment);
+
+        var resultOfElifs = ifStatement.ElseIfs.Match(
+            some: elifs =>
+            {
+                foreach (var elseIf in elifs)
+                {
+                    IRuntimeValue elifCondition = Evaluate(elseIf.Condition, scope, typeEnvironment);
+
+                    if (elifCondition is not BooleanValue elifBooleanValue)
+                        throw new Exception($"Condition must be a boolean value, but was {elifCondition.GetType()}.");
+
+                    if (elifBooleanValue.Value)
+                        return Some(Evaluate(elseIf.Block, new Scope(scope), typeEnvironment));
+                }
+                
+                return None<IRuntimeValue>();
+            },
+            none: () => None<IRuntimeValue>());
+        
+        if (resultOfElifs.IsSome())
+            return resultOfElifs.Unwrap();
+        
+        return ifStatement.Else.Match(
+            some: e => Evaluate(e, new Scope(scope), typeEnvironment),
+            none: () => NoValue.Instance);
     }
     
     private static IRuntimeValue EvaluateVariableDeclarationExpression(

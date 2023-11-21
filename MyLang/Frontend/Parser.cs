@@ -11,9 +11,13 @@ public class Parser
     private List<IToken> _tokens;
     private readonly Lexer _lexer;
 
-    public Parser() => _lexer = new Lexer();
+    public Parser()
+    {
+        _tokens = new List<IToken>();
+        _lexer = new Lexer();
+    }
 
-    public Program CreateAST(string sourceCode)
+    public Program CreateAst(string sourceCode)
     {
         _tokens = _lexer.Tokenize(sourceCode);
         List<Result<IStatement, string>> statements = new();
@@ -28,14 +32,15 @@ public class Parser
     
     // --- Order of precedence ---
     // VariableDeclarationStatement
-    // VariableDeclarationExpression
     // AssignmentExpression
     // MemberExpression
     // FunctionCallExpression
+    // TernaryExpression
     // LogicalExpression
     // ComparisonExpression
     // AdditiveExpression
     // MultiplicativeExpression
+    // VariableDeclarationExpression
     // UnaryExpression
     // PrimaryExpression -- Highest precedence
     
@@ -56,23 +61,114 @@ public class Parser
         if (Current() is not MutableToken)
         {
             if (Current() is not IdentifierToken type)
-                return ParseExpression().Map(e => e as IStatement);
+                return ParseIfStatement();
             
             ident = type;
         }
 
         if (DoesNotExistBeforeSemiColon<EqualsToken>())
-            return ParseExpression().Map(e => e as IStatement);
+            return ParseIfStatement();
 
         bool mutable = NextIs<MutableToken>(out _, out _);
         
         if (!NextIs<IdentifierToken>(out _, out _))
-            return ParseExpression().Map(e => e as IStatement);
+            return ParseIfStatement();
         
         if (!mutable)
             mutable = NextIs<MutableToken>(out _, out _);
 
         return Ok<IStatement, string>(new VariableDeclarationStatement(ident!.Symbol, mutable, new Identifier(Next().Symbol)));
+    }
+    
+    private Result<IStatement, string> ParseIfStatement()
+    {
+        if (Current() is not IfToken)
+            return ParseExpression().Map(e => e as IStatement);
+
+        Next();
+
+        Result<IExpression, string> ifCondition = ParseCondition();
+        Result<IStatement, string> ifBlock = ParseBlock();
+
+        List<(Result<IExpression, string> Condition, Result<IStatement, string> Block)> elseIfStatements = new();
+        
+        Option<Result<IStatement, string>> elseBlock = Option<Result<IStatement, string>>.None;
+
+        while (Current() is ElseToken)
+        {
+            Next();
+
+            if (Current() is IfToken)
+            {
+                Next();
+                Result<IExpression, string> condition = ParseCondition();                
+                Result<IStatement, string> block = ParseBlock();
+                elseIfStatements.Add((condition, block));
+                continue;
+            }
+            
+            elseBlock = Some(ParseBlock());
+        }
+
+        if (elseIfStatements.Count == 0 && elseBlock.IsNone())
+        {
+            return ifCondition.AndThen(ifc => ifBlock.Map(ifb => new IfStatement(new IfStatement.ConditionBlock(ifc, ifb),
+                None<IEnumerable<IfStatement.ConditionBlock>>(),
+                None<IStatement>()) as IStatement));
+        }
+        
+        if (elseIfStatements.Count > 0 && elseBlock.IsNone())
+        {
+            return ifCondition.AndThen(ifc => ifBlock.AndThen(ifb => elseIfStatements.Select(elif =>
+            {
+                return elif.Condition.AndThen(elifc =>
+                    elif.Block.Map(elifb => new IfStatement.ConditionBlock(elifc, elifb)));
+            }).Invert().Map(cbs =>
+                new IfStatement(new IfStatement.ConditionBlock(ifc, ifb),
+                    Some(cbs), None<IStatement>()) as IStatement)));
+        }
+
+        if (elseIfStatements.Count == 0 && elseBlock.IsSome())
+        {
+            return ifCondition.AndThen(ifc => ifBlock.AndThen(ifb => elseBlock.Unwrap().Map(eb =>
+                new IfStatement(new IfStatement.ConditionBlock(ifc, ifb),
+                    None<IEnumerable<IfStatement.ConditionBlock>>(), Some(eb)) as IStatement)));
+        }
+        
+        return ifCondition.AndThen(ifc => ifBlock.AndThen(ifb => elseIfStatements.Select(elif =>
+        {
+            return elif.Condition.AndThen(elifc =>
+                elif.Block.Map(elifb => new IfStatement.ConditionBlock(elifc, elifb)));
+        }).Invert().AndThen(cbs =>
+            elseBlock.Unwrap().Map(eb =>
+                new IfStatement(new IfStatement.ConditionBlock(ifc, ifb),
+                    Some(cbs), Some(eb)) as IStatement))));
+
+        Result<IExpression, string> ParseCondition()
+        {
+            Result<IExpression, string> condition;
+
+            if (Current() is OpenParenToken)
+            {
+                Next();
+                condition = ParseExpression();
+                Expect<CloseParenToken>("Expected ')'.");
+            }
+            else
+            {
+                condition = ParseExpression();
+            }
+
+            return condition;
+        }
+
+        Result<IStatement, string> ParseBlock()
+        {
+            Expect<OpenCulryBraceToken>("Expected '{'.");
+            Result<IStatement, string> thenStatement = ParseStatement();
+            Expect<CloseCulryBraceToken>("Expected '}'.");
+            return thenStatement;
+        }
     }
 
     private Result<IExpression, string> ParseExpression() => ParseDrop();
@@ -83,7 +179,7 @@ public class Parser
             return ParseAssignmentExpression();
         
         Next();
-        var identifier = Expect<IdentifierToken>("Expected identifier after 'drop' keyword.");
+        Result<IdentifierToken, string> identifier = Expect<IdentifierToken>("Expected identifier after 'drop' keyword.");
         
         return identifier.Map(i => new DropExpression(new Identifier(i.Symbol)) as IExpression);
     }
@@ -91,15 +187,30 @@ public class Parser
     private Result<IExpression, string> ParseAssignmentExpression()
     {
         if (Current() is not IdentifierToken)
-            return ParseLogicalExpression();
+            return ParseTernaryExpression();
 
         if (!NextIs<EqualsToken>(out IToken? identifierToken, out _))
-            return ParseLogicalExpression();
+            return ParseTernaryExpression();
 
         return ParseExpression().Map(e => new AssignmentExpression(new Identifier(identifierToken!.Symbol), e) as IExpression);
     }
-    
-    public Result<IExpression, string> ParseLogicalExpression()
+
+    private Result<IExpression, string> ParseTernaryExpression()
+    {
+        Result<IExpression, string> condition = ParseLogicalExpression();
+
+        if (Current() is not QuestionToken)
+            return condition;
+
+        Next();
+        Result<IExpression, string> thenExpression = ParseLogicalExpression();
+        Expect<ColonToken>("Expected ':'.");
+        Result<IExpression, string> elseExpression = ParseLogicalExpression();
+        
+        return condition.AndThen(c => thenExpression.AndThen(t => elseExpression.Map(e => new TernaryExpression(c, t, e) as IExpression)));
+    }
+
+    private Result<IExpression, string> ParseLogicalExpression()
     {
         Result<IExpression, string> left = ParseComparisonExpression();
 
@@ -114,7 +225,7 @@ public class Parser
         return left;
     }
 
-    public Result<IExpression, string> ParseComparisonExpression()
+    private Result<IExpression, string> ParseComparisonExpression()
     {
         Result<IExpression, string> left = ParseAdditiveExpression();
 
@@ -148,7 +259,7 @@ public class Parser
     {
         Result<IExpression, string> left = ParseVariableDeclarationExpression();
 
-        while (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.MULTIPLY or TokenSymbol.DIVIDE or TokenSymbol.MODULUS })
+        while (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.MULTIPLY or TokenSymbol.DIVIDE or TokenSymbol.MODULO })
         {
             string @operator = Next().Symbol;
             Result<IExpression, string> right = ParseVariableDeclarationExpression();
@@ -243,7 +354,7 @@ public class Parser
             
             case OpenParenToken:
                 Result<IExpression, string> expression = ParseExpression();
-                Next();
+                Expect<CloseParenToken>("Expected ')'.");
                 return expression;
             
             default:

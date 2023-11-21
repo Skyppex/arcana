@@ -76,6 +76,89 @@ public sealed class VariableDeclarationStatement : IStatement
     public void Traverse(Action<INode> action) => action(this);
 }
 
+public sealed class IfStatement : IStatement
+{
+    public IfStatement(ConditionBlock @if, Option<IEnumerable<ConditionBlock>> elseIfs, Option<IStatement> @else)
+    {
+        If = @if;
+        ElseIfs = elseIfs;
+        Else = @else;
+    }
+    
+    public ConditionBlock If { get; }
+
+    public Option<IEnumerable<ConditionBlock>> ElseIfs { get; }
+    
+    public Option<IStatement> Else { get; }
+    
+    
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(IfStatement)}>");
+        
+        indent++;
+        builder.AppendLine(Indent.Get(indent) + $"If: {If.Condition.GetNodeTree(ref indent)}");
+        indent++;
+        builder.AppendLine(Indent.Get(indent) + $"Block: {If.Block.GetNodeTree(ref indent)}");
+        indent--;
+
+        if (ElseIfs.IsSome())
+        {
+            List<ConditionBlock> elseIfs = ElseIfs.Unwrap().ToList();
+
+            foreach (ConditionBlock elseIf in elseIfs)
+            {
+                builder.AppendLine(Indent.Get(indent) + $"ElseIf: {elseIf.Condition.GetNodeTree(ref indent)}");
+                indent++;
+                builder.AppendLine(Indent.Get(indent) + $"Block: {elseIf.Block.GetNodeTree(ref indent)}");
+                indent--;
+            }
+        }
+
+        if (!Else.IsSome())
+            return builder.ToString();
+        
+        IStatement @else = Else.Unwrap();
+        builder.AppendLine(Indent.Get(indent) + $"Else Block: {@else.GetNodeTree(ref indent)}");
+
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        If.Condition.Traverse(action);
+        If.Block.Traverse(action);
+
+        if (ElseIfs.IsSome())
+        {
+            List<ConditionBlock> elseIfs = ElseIfs.Unwrap().ToList();
+
+            foreach (ConditionBlock elseIf in elseIfs)
+            {
+                elseIf.Condition.Traverse(action);
+                elseIf.Block.Traverse(action);
+            }
+        }
+
+        if (Else.IsSome())
+            Else.Unwrap().Traverse(action);
+    }
+
+    public sealed class ConditionBlock
+    {
+        public ConditionBlock(IExpression condition, IStatement block)
+        {
+            Condition = condition;
+            Block = block;
+        }
+        
+        public IExpression Condition { get; }
+        public IStatement Block { get; }
+    }
+}
+
 public sealed class VariableDeclarationExpression : IExpression
 {
     public VariableDeclarationExpression(string typeName, bool mutable, Identifier identifier, IExpression initializer)
@@ -265,6 +348,42 @@ public sealed class UnaryExpression : IExpression
     }
 }
 
+public sealed class TernaryExpression : IExpression
+{
+    public TernaryExpression(IExpression condition, IExpression @true, IExpression @false)
+    {
+        Condition = condition;
+        True = @true;
+        False = @false;
+    }
+    
+    public IExpression Condition { get; }
+    public IExpression True { get; }
+    public IExpression False { get; }
+    
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(TernaryExpression)}>");
+
+        indent++;
+        builder.AppendLine(Indent.Dash(indent) + $"Condition: {Condition.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"Then: {True.GetNodeTree(ref indent)}");
+        builder.Append(Indent.Dash(indent) + $"Else: {False.GetNodeTree(ref indent)}");
+        indent--;
+
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Condition.Traverse(action);
+        True.Traverse(action);
+        False.Traverse(action);
+    }
+}
+
 public sealed class DropExpression : IExpression
 {
     public DropExpression(Identifier identifier) => Identifier = identifier;
@@ -283,5 +402,9 @@ public sealed class DropExpression : IExpression
         return builder.ToString();
     }
 
-    public void Traverse(Action<INode> action) => action(this);
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Identifier.Traverse(action);
+    }
 }

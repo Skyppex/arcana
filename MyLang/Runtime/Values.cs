@@ -7,11 +7,16 @@ public abstract class NumberValue : IRuntimeValue
     public abstract object Boxed { get; }
 }
 
-public class Uninitialized : IRuntimeValue
+public sealed class Uninitialized : IRuntimeValue
 {
     public static readonly Uninitialized Instance = new();
-
     private Uninitialized() { }
+}
+
+public sealed class NoValue : IRuntimeValue
+{
+    public static readonly NoValue Instance = new();
+    private NoValue() { }
 }
 
 public class Int32Value : NumberValue

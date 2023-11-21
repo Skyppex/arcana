@@ -181,6 +181,21 @@ public static class ResultExtensions
         return None<T>();
     }
 
+    public static Result<IEnumerable<T>, TError> Invert<T, TError>(this IEnumerable<Result<T, TError>> results)
+    {
+        var okResults = new List<T>();
+        
+        foreach (Result<T, TError> result in results)
+        {
+            if (result.IsError())
+                return Result.Error<IEnumerable<T>, TError>(result.Error);
+
+            okResults.Add(result.Value!);
+        }
+
+        return Result.Ok<IEnumerable<T>, TError>(okResults);
+    }
+    
     public static Result<T, TError> Flatten<T, TError>(this Result<Result<T, TError>, TError> result) =>
             result.Match(
                 ok: r => r,

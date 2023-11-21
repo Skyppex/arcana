@@ -23,6 +23,26 @@ public class Lexer
                     chars.Dequeue();
                     break;
                 
+                case TokenSymbol.OPEN_BRACE_CHAR:
+                    tokens.Add(new OpenBraceToken());
+                    chars.Dequeue();
+                    break;
+                
+                case TokenSymbol.CLOSE_BRACE_CHAR:
+                    tokens.Add(new CloseBraceToken());
+                    chars.Dequeue();
+                    break;
+                
+                case TokenSymbol.OPEN_CURLY_BRACE_CHAR:
+                    tokens.Add(new OpenCulryBraceToken());
+                    chars.Dequeue();
+                    break;
+                
+                case TokenSymbol.CLOSE_CURLY_BRACE_CHAR:
+                    tokens.Add(new CloseCulryBraceToken());
+                    chars.Dequeue();
+                    break;
+                
                 case TokenSymbol.ADD_CHAR or TokenSymbol.SUBTRACT_CHAR or TokenSymbol.MULTIPLY_CHAR or TokenSymbol.DIVIDE_CHAR or TokenSymbol.MODULUS_CHAR: 
                     tokens.Add(new ArithmeticOperatorToken(chars.Dequeue().ToString()));
                     break;
@@ -170,7 +190,7 @@ public static class TokenSymbol
     public const string SUBTRACT = "-";
     public const string MULTIPLY = "*";
     public const string DIVIDE = "/";
-    public const string MODULUS = "%";
+    public const string MODULO = "%";
     
     // Bitwise operators
     public const char AND_CHAR = '&';
@@ -185,14 +205,14 @@ public static class TokenSymbol
     
     // Logical operators
     public const char LOGICAL_NOT_CHAR = '!';
-    public const char GREATER_CHAR = '<';
-    public const char LESS_CHAR = '>';
+    public const char LESS_CHAR = '<';
+    public const char GREATER_CHAR = '>';
     
     public const string LOGICAL_AND = "&&";
     public const string LOGICAL_OR = "||";
     public const string LOGICAL_NOT = "!";
-    public const string GREATER = "<";
-    public const string LESS = ">";
+    public const string LESS = "<";
+    public const string GREATER = ">";
     public const string LOGICAL_EQUAL = "==";
     public const string LOGICAL_NOT_EQUAL = "!=";
     public const string LOGICAL_GREATER_EQUAL = ">=";
@@ -206,6 +226,8 @@ public static class TokenSymbol
     public const char CLOSE_PAREN_CHAR = ')';
     public const char OPEN_BRACE_CHAR = '[';
     public const char CLOSE_BRACE_CHAR = ']';
+    public const char OPEN_CURLY_BRACE_CHAR = '{';
+    public const char CLOSE_CURLY_BRACE_CHAR = '}';
     public const char OPEN_ANGLE_BRACKET_CHAR = '<';
     public const char CLOSE_ANGLE_BRACKET_CHAR = '>';
     public const char STRING_DELIMITER_CHAR = '"';
@@ -215,6 +237,8 @@ public static class TokenSymbol
     public const string CLOSE_PAREN = ")";
     public const string OPEN_BRACE = "[";
     public const string CLOSE_BRACE = "]";
+    public const string OPEN_CURLY_BRACE = "{";
+    public const string CLOSE_CURLY_BRACE = "}";
     public const string OPEN_ANGLE_BRACKET = "<";
     public const string CLOSE_ANGLE_BRACKET = ">";
     public const string STRING_DELIMITER = "\"";
@@ -261,11 +285,11 @@ public static class Keyword
         { TRUE, new BooleanToken(TRUE) },
         { FALSE, new BooleanToken(FALSE) },
         { MUTABLE, new MutableToken() },
+        { IF, new IfToken() },
+        { ELSE, new ElseToken() },
         // { STRUCT, new StructToken() },
         // { UNION, new UnionToken() },
         // { FLAGS, new FlagsToken() },
-        // { IF, new IfToken() },
-        // { ELSE, new ElseToken() },
         // { MATCH, new MatchToken() },
         // { LOOP, new LoopToken() },
         // { FOR, new ForToken() },
@@ -289,12 +313,12 @@ public static class Keyword
     // public const string STRUCT = "struct";
     // public const string UNION = "union";
     // public const string FLAGS = "flags";
-    //
-    // // Branching
-    // public const string IF = "if";
-    // public const string ELSE = "else";
+    
+    // Branching
+    public const string IF = "if";
+    public const string ELSE = "else";
     // public const string MATCH = "match";
-    //
+    
     // // Loops
     // public const string LOOP = "loop";
     // public const string FOR = "for";
@@ -314,6 +338,9 @@ public interface IToken
 
 public sealed class DropToken : IToken { public string Symbol => Keyword.DROP; }
 public sealed class MutableToken : IToken { public string Symbol => Keyword.MUTABLE; }
+
+public sealed class IfToken : IToken { public string Symbol => Keyword.IF; }
+public sealed class ElseToken : IToken { public string Symbol => Keyword.ELSE; }
 
 public sealed class NumberToken : IToken
 {
@@ -369,6 +396,8 @@ public sealed class OpenParenToken : IToken { public string Symbol => TokenSymbo
 public sealed class CloseParenToken : IToken { public string Symbol => TokenSymbol.CLOSE_PAREN; }
 public sealed class OpenBraceToken : IToken { public string Symbol => TokenSymbol.OPEN_BRACE; }
 public sealed class CloseBraceToken : IToken { public string Symbol => TokenSymbol.CLOSE_BRACE; }
+public sealed class OpenCulryBraceToken : IToken { public string Symbol => TokenSymbol.OPEN_CURLY_BRACE; }
+public sealed class CloseCulryBraceToken : IToken { public string Symbol => TokenSymbol.CLOSE_CURLY_BRACE; }
 
 public sealed class DelimiterToken : IToken { public string Symbol => TokenSymbol.ARRAY_DELIMITER; }
 public sealed class DecimalPointToken : IToken { public string Symbol => TokenSymbol.DECIMAL_POINT; }

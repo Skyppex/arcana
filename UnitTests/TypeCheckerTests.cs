@@ -136,7 +136,6 @@ public class TypeCheckerTests
     public void identifier_expression_defined_as_i32_should_have_type_i32()
     {
         // Arrange
-        int value = 0;
         var typeChecker = new TypeChecker();
         var identifier = new Identifier("x");
         var typeEnvironment = new TypeEnvironment();

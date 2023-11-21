@@ -11,6 +11,8 @@ public class Type : IEquatable<Type>
     public static readonly Type @string = new("string");
     public static readonly Type @bool = new("bool");
     
+    public static readonly Type[] Numbers = { i32, f32 };
+    
     public Type(string name) => Name = name;
 
     public string Name { get; }

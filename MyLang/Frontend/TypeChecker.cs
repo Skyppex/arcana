@@ -53,6 +53,26 @@ public class TypeChecker
                 return type;
             }
             
+            case TernaryExpression ternaryExpression:
+            {
+                Type conditionType = CheckType(ternaryExpression.Condition, typeEnvironment);
+                Type trueType = CheckType(ternaryExpression.True, typeEnvironment);
+                Type falseType = CheckType(ternaryExpression.False, typeEnvironment);
+
+                if (conditionType != Type.@bool)
+                    throw new InvalidOperationException($"Ternary operator condition must be of type '{Type.@bool}' but was '{conditionType}'");
+                
+                if (trueType != falseType)
+                    throw new InvalidOperationException($"Ternary operator true and false expressions must be of the same type but were '{trueType}' and '{falseType}'");
+                
+                return trueType;
+            }
+            
+            case DropExpression dropExpression:
+            {
+                return CheckType(dropExpression.Identifier, typeEnvironment);
+            }
+            
             case BinaryExpression binaryExpression:
             {
                 Type leftType = CheckType(binaryExpression.Left, typeEnvironment);
@@ -69,19 +89,50 @@ public class TypeChecker
                         $"Operator {binaryExpression.Operator} not supported for operands of type '{leftType}' and '{rightType}'");
                 }
 
-                switch (leftType, rightType)
+                switch (binaryExpression.Operator)
                 {
-                    case var (l, r) when (l, r) == (Type.i32, Type.i32):
-                        return Type.i32;
+                    case TokenSymbol.LOGICAL_AND or TokenSymbol.LOGICAL_OR:
+                    {
+                        if (leftType != Type.@bool || rightType != Type.@bool)
+                        {
+                            throw new InvalidOperationException(
+                                $"Operator {binaryExpression.Operator} not supported for operands of type '{leftType}' and '{rightType}'");
+                        }
 
-                    case var (l, r) when (l, r) == (Type.f32, Type.f32):
-                        return Type.f32;
-
-                    case var (l, r) when (l, r) == (Type.@string, Type.@string):
-                        return Type.@string;
-                    
-                    case var (l, r) when (l, r) == (Type.@bool, Type.@bool):
                         return Type.@bool;
+                    }
+                    
+                    case TokenSymbol.LOGICAL_EQUAL or TokenSymbol.LOGICAL_NOT_EQUAL or TokenSymbol.GREATER or TokenSymbol.LESS or TokenSymbol.LOGICAL_GREATER_EQUAL or TokenSymbol.LOGICAL_LESS_EQUAL:
+                    {
+                        if (!Type.Numbers.Contains(leftType) || !Type.Numbers.Contains(rightType))
+                        {
+                            throw new InvalidOperationException(
+                                $"Operator {binaryExpression.Operator} not supported for operands of type '{leftType}' and '{rightType}'");
+                        }
+
+                        return Type.@bool;
+                    }
+                    
+                    case TokenSymbol.ADD or TokenSymbol.SUBTRACT or TokenSymbol.MULTIPLY or TokenSymbol.DIVIDE
+                     or TokenSymbol.MODULO:
+                    {
+                        switch (leftType, rightType)
+                        {
+                            case var (l, r) when (l, r) == (Type.i32, Type.i32):
+                                return Type.i32;
+
+                            case var (l, r) when (l, r) == (Type.f32, Type.f32):
+                                return Type.f32;
+
+                            case var (l, r) when (l, r) == (Type.@string, Type.@string):
+                                return Type.@string;
+                            
+                            case var (l, r) when (l, r) == (Type.@bool, Type.@bool):
+                                return Type.@bool;
+                        }
+
+                        break;
+                    }
                 }
 
                 break;
