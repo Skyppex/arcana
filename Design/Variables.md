@@ -34,18 +34,20 @@
 `"Hello World"` String literal -> Expression \
 `r"Hello {name}"` Interpolated string literal -> Expression \
 `r#"Hello "World""#` Raw string literal -> Expression \
+
+Raw interpolated string literal -> Expression
 ```
 r"Hello
 ---"World"
 -"
 ```
-Raw interpolated string literal -> Expression
+
+Raw multiline string literal with different delimiters -> Expression
 ```
 r#"Hello
 ---"World"
 --"#
 ```
-Raw multiline string literal with different delimiters -> Expression
 
 ### Struct literals
 
@@ -56,3 +58,9 @@ struct Foo {
     f32 baz;
 }
 ```
+
+The struct literal syntax is as follows:
+```
+Foo { bar: 5, baz: 10 }
+```
+This is assignable to a value of type Foo

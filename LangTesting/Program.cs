@@ -1,7 +1,7 @@
 ﻿using MyLang;
 using MyLang.Runtime;
 
-Console.WriteLine("Program started. Type 'read' to read from file, 'q' to exit.");
+Console.WriteLine("Program started. Type 'read' to read from file, 'q' to exit, 'notree' to disable the AST print, 'tree' to toggle it back on.");
 
 string text = File.ReadAllText(@"..\..\..\..\Examples\example-code.txt");
 
@@ -10,6 +10,7 @@ var parser = new Parser();
 Scope cliScope = CreateScope();
 var typeChecker = new TypeChecker();
 TypeEnvironment typeEnvironment = TypeEnvironment.Create();
+bool printTree = true;
 
 while (true)
 {
@@ -17,6 +18,17 @@ while (true)
 
     if (input is null or "q")
         break;
+
+    switch (input)
+    {
+        case "notree":
+            printTree = false;
+            continue;
+        
+        case "tree":
+            printTree = true;
+            continue;
+    }
 
     Scope targetScope = cliScope;
     TypeEnvironment targetTypeEnvironment = typeEnvironment;
@@ -40,8 +52,12 @@ while (true)
     Console.WriteLine(evaluation.ToString());
     
     int indent = 0;
-    Console.WriteLine(program.GetNodeTree(ref indent));
-    Console.WriteLine();
+    
+    if (printTree)
+    {
+        Console.WriteLine(program.GetNodeTree(ref indent));
+        Console.WriteLine();
+    }
 }
 
 Console.WriteLine("Program ended.");

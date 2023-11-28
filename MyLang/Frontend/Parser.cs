@@ -181,14 +181,14 @@ public class Parser
         if (Current() is AccessToken at)
         {
             if (!NextIs<AccessToken, StructToken>(out _, out _, false))
-                return ParseExpression().Map(e => e as IStatement);
+                return ParseUnionDeclarationStatement();
             
             accessModifier = Some(at.Symbol);
             Next();
         }
         
         if (Current() is not StructToken)
-            return ParseExpression().Map(e => e as IStatement);
+            return ParseUnionDeclarationStatement();
         
         Next();
         
@@ -235,6 +235,82 @@ public class Parser
         }
     }
     
+    private Result<IStatement, string> ParseUnionDeclarationStatement()
+    {
+        Option<string> accessModifier = Option<string>.None;
+        if (Current() is AccessToken at)
+        {
+            if (!NextIs<AccessToken, UnionToken>(out _, out _, false))
+                return ParseExpression().Map(e => e as IStatement);
+            
+            accessModifier = Some(at.Symbol);
+            Next();
+        }
+        
+        if (Current() is not UnionToken)
+            return ParseExpression().Map(e => e as IStatement);
+        
+        Next();
+        
+        Result<IdentifierToken, string> unionNameIdentifier = Expect<IdentifierToken>("Expected identifier after 'union' keyword.");
+        
+        var openCurly = Expect<OpenBlockToken>("Expected '{'.");
+        List<Result<UnionDeclarationStatement.Member, string>> members = new();
+        
+        while (Current() is not CloseBlockToken)
+            members.Add(ParseMember());
+
+        Result<CloseBlockToken, string> closeCurly = Expect<CloseBlockToken>("Expected '}'.");
+        
+        return unionNameIdentifier.AndThen(sni =>
+            openCurly.AndThen(_ =>
+                members.Invert().AndThen(ms =>
+                    closeCurly.Map(_ => new UnionDeclarationStatement(accessModifier, sni.Symbol, ms) as IStatement))));
+        
+        Result<UnionDeclarationStatement.Member, string> ParseMember()
+        {
+            Result<IdentifierToken, string> identifier = Expect<IdentifierToken>("Expected identifier.");
+
+            if (Current() is not OpenParenToken)
+            {
+                Result<SemiColonToken, string> semiColon = Expect<SemiColonToken>("Expected ';'.");
+                return semiColon.AndThen(_ => identifier.Map(ident => new UnionDeclarationStatement.Member(ident.Symbol, new List<UnionDeclarationStatement.Member.Field>())));
+            }
+
+            Next();
+            List<Result<UnionDeclarationStatement.Member.Field, string>> fields = new();
+
+            bool delimiter = true;
+            
+            while (delimiter && Current() is not CloseParenToken)
+                fields.Add(ParseField());
+            
+            Result<CloseParenToken, string> close = Expect<CloseParenToken>("Expected ')'.");
+            Result<SemiColonToken, string> semi = Expect<SemiColonToken>("Expected ';'.");
+            
+            return identifier.AndThen(ident =>
+                fields.Invert().AndThen(fs =>
+                    close.AndThen(_ => 
+                        semi.Map(_ => new UnionDeclarationStatement.Member(ident.Symbol, fs.ToList())))));
+
+            Result<UnionDeclarationStatement.Member.Field, string> ParseField()
+            {
+                Result<IdentifierToken, string> typeIdentifier = Expect<IdentifierToken>("Expected identifier.");
+                Result<IdentifierToken, string> fieldIdentifier = Expect<IdentifierToken>("Expected identifier after type identifier.");
+                
+                if (Current() is CommaToken)
+                    Next();
+                else
+                    delimiter = false;
+
+                return typeIdentifier.AndThen(ti =>
+                    fieldIdentifier.Map(fi => new UnionDeclarationStatement.Member.Field(
+                        ti.Symbol,
+                        fi.Symbol)));
+            }
+        }
+    }
+    
     private Result<IExpression, string> ParseExpression() => ParseDrop();
 
     private Result<IExpression, string> ParseDrop()
@@ -263,7 +339,7 @@ public class Parser
     private Result<IExpression, string> ParseStructLiteralExpression()
     {
         if (!NextIs<IdentifierToken, OpenBlockToken>(out IdentifierToken? typeIdentifier, out _))
-            return ParseAssignmentExpression();
+            return ParseUnionLiteralExpression();
 
         List<Result<StructLiteral.FieldInitializer, string>> fieldInitializers = new();
         
@@ -284,7 +360,7 @@ public class Parser
             Result<ColonToken, string> colon = Expect<ColonToken>("Expected ':'.");
             Result<IExpression, string> initializer = ParseExpression();
 
-            if (Current() is StructLiteralDelimiterToken)
+            if (Current() is CommaToken)
                 Next();
             else
                 delimiter = false;
@@ -293,6 +369,47 @@ public class Parser
                 .AndThen(fi => colon
                     .AndThen(_ => initializer
                         .Map(init => new StructLiteral.FieldInitializer(fi.Symbol, init))));
+        }
+    }
+
+    private Result<IExpression, string> ParseUnionLiteralExpression()
+    {
+        if (!NextIs<IdentifierToken, MemberAccessorToken, IdentifierToken>(out IdentifierToken? typeIdentifier, out _, out IdentifierToken? memberIdentifier))
+            return ParseAssignmentExpression();
+
+        if (Current() is not OpenParenToken)
+            return Ok<IExpression, string>(new UnionLiteral(typeIdentifier!.Symbol, memberIdentifier!.Symbol, new List<UnionLiteral.FieldInitializer>()));
+
+        Next();
+        
+        List<Result<UnionLiteral.FieldInitializer, string>> fieldInitializers = new();
+        
+        bool delimiter = true;
+        
+        while (delimiter && Current() is IdentifierToken)
+            fieldInitializers.Add(ParseFieldInitializer());
+
+        Result<CloseParenToken, string> closeBlock = Expect<CloseParenToken>("Expected ')'.");
+        
+        return fieldInitializers.Invert()
+            .AndThen(fi => closeBlock
+                .Map(_ => new UnionLiteral(typeIdentifier!.Symbol, memberIdentifier!.Symbol, fi.ToList()) as IExpression));
+
+        Result<UnionLiteral.FieldInitializer, string> ParseFieldInitializer()
+        {
+            Result<IdentifierToken, string> fieldIdentifier = Expect<IdentifierToken>("Expected field identifier.");
+            Result<ColonToken, string> colon = Expect<ColonToken>("Expected ':'.");
+            Result<IExpression, string> initializer = ParseExpression();
+
+            if (Current() is CommaToken)
+                Next();
+            else
+                delimiter = false;
+
+            return fieldIdentifier
+                .AndThen(fi => colon
+                    .AndThen(_ => initializer
+                        .Map(init => new UnionLiteral.FieldInitializer(fi.Symbol, init))));
         }
     }
 
@@ -520,6 +637,81 @@ public class Parser
             token = null;
         
         return nextIs;
+    }
+
+    private bool NextIs<T1, T2, T3>(out T1? token, out T2? nextToken, out T3? nextNextToken, bool doNext = true)
+        where T1 : class, IToken
+        where T2 : class, IToken
+        where T3 : class, IToken
+    {
+        if (_tokens.Count < 3)
+        {
+            token = null;
+            nextToken = null;
+            nextNextToken = null;
+            return false;
+        }
+        
+        bool nextIs = _tokens[1] is T2;
+        bool nextNextIs = _tokens[2] is T3;
+        nextToken = nextIs ? _tokens[1] as T2 : null;
+        nextNextToken = nextNextIs ? _tokens[2] as T3 : null;
+
+        if (nextIs && nextNextIs)
+        {
+            token = Current() as T1;
+
+            if (!doNext)
+                return nextIs;
+            
+            Next();
+            Next();
+            Next();
+        }
+        else
+            token = null;
+        
+        return nextIs && nextNextIs;
+    }
+
+    private bool NextIs<T1, T2, T3, T4>(out T1? token, out T2? nextToken, out T3? nextNextToken, out T4? nextNextNextToken, bool doNext = true)
+        where T1 : class, IToken
+        where T2 : class, IToken
+        where T3 : class, IToken
+        where T4 : class, IToken
+    {
+        if (_tokens.Count < 3)
+        {
+            token = null;
+            nextToken = null;
+            nextNextToken = null;
+            nextNextNextToken = null;
+            return false;
+        }
+        
+        bool nextIs = _tokens[1] is T2;
+        bool nextNextIs = _tokens[2] is T3;
+        bool nextNextNextIs = _tokens[3] is T4;
+        nextToken = nextIs ? _tokens[1] as T2 : null;
+        nextNextToken = nextNextIs ? _tokens[2] as T3 : null;
+        nextNextNextToken = nextNextNextIs ? _tokens[3] as T4 : null;
+
+        if (nextIs && nextNextIs && nextNextNextIs)
+        {
+            token = Current() as T1;
+
+            if (!doNext)
+                return nextIs;
+            
+            Next();
+            Next();
+            Next();
+            Next();
+        }
+        else
+            token = null;
+        
+        return nextIs && nextNextIs && nextNextNextIs;
     }
 
     private bool ExistsBeforeSemiColon<T>() where T : IToken

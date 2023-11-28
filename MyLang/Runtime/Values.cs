@@ -1,4 +1,6 @@
-﻿namespace MyLang.Runtime;
+﻿using MyLang.Models;
+
+namespace MyLang.Runtime;
 
 public interface IRuntimeValue { }
 
@@ -38,22 +40,49 @@ public class Float32Value : NumberValue
 public class StringValue : IRuntimeValue
 {
     public StringValue(string value) => Value = value;
-    public string Value { get; init; }
+    public string Value { get; }
     public override string ToString() => Value;
 }
 
 public class BooleanValue : IRuntimeValue
 {
     public BooleanValue(bool value) => Value = value;
-    public bool Value { get; init; }
+    public bool Value { get; }
     public override string ToString() => Value.ToString();
 }
 
 public class StructValue : IRuntimeValue
 {
-    public StructValue(Dictionary<string, IRuntimeValue> fields) => Fields = fields;
+    public StructValue(string typeName, Dictionary<string, IRuntimeValue> fields)
+    {
+        TypeName = typeName;
+        Fields = fields;
+    }
+
+    public string TypeName { get; }
     public Dictionary<string, IRuntimeValue> Fields { get; }
+    
     public override string ToString() => $"{{{string.Join(", ", Fields.Select(kv => $"{kv.Key}: {kv.Value}"))}}}";
+}
+
+public class UnionValue : IRuntimeValue
+{
+    public UnionValue(UnionMember unionMember, Dictionary<string, IRuntimeValue> fields)
+    {
+        UnionMember = unionMember;
+        Fields = fields;
+    }
+
+    public UnionMember UnionMember { get; }
+    public Dictionary<string, IRuntimeValue> Fields { get; }
+
+    public override string ToString()
+    {
+        if (Fields.Count <= 0)
+            return $"{UnionMember}";
+        
+        return $"{UnionMember}({string.Join(", ", Fields.Select(kv => $"{kv.Key}: {kv.Value}"))})";
+    } 
 }
 
 public class EmptyProgramValue : IRuntimeValue { }

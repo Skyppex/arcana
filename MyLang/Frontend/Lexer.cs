@@ -13,6 +13,11 @@ public class Lexer
         {
             switch (c)
             {
+                case TokenSymbol.MEMBER_ACCESSOR_CHAR:
+                    tokens.Add(new MemberAccessorToken());
+                    chars.Dequeue();
+                    break;
+                
                 case TokenSymbol.OPEN_PAREN_CHAR:
                     tokens.Add(new OpenParenToken());
                     chars.Dequeue();
@@ -63,7 +68,7 @@ public class Lexer
                     break;
                 
                 case TokenSymbol.STRUCT_LITERAL_DELIMITER_CHAR:
-                    tokens.Add(new StructLiteralDelimiterToken());
+                    tokens.Add(new CommaToken());
                     chars.Dequeue();
                     break;
                 
@@ -263,6 +268,7 @@ public static class TokenSymbol
 
     public const string ARRAY_DELIMITER = ",";
     public const string STRUCT_LITERAL_DELIMITER = ",";
+    public const string UNION_FIELD_DELIMITER = ",";
     public const string FUNCTION_ARGUMENT_DELIMITER = ",";
     public const string GENERIC_ARGUMENT_DELIMITER = ",";
     public const string MODULE_OR_TYPE_ACCESSOR = ".";
@@ -302,7 +308,7 @@ public static class Keyword
         // { BREAK, new BreakToken() },
         // { CONTINUE, new ContinueToken() },
         { STRUCT, new StructToken() },
-        // { UNION, new UnionToken() },
+        { UNION, new UnionToken() },
         // { FLAGS, new FlagsToken() },
         { PUBLIC, new AccessToken(PUBLIC) },
         // { INTERNAL, new AccessToken(INTERNAL) },
@@ -320,7 +326,7 @@ public static class Keyword
     
     // Types
     public const string STRUCT = "struct";
-    // public const string UNION = "union";
+    public const string UNION = "union";
     // public const string FLAGS = "flags";
     
     // Branching
@@ -413,21 +419,24 @@ public sealed class OpenBlockToken : IToken { public string Symbol => TokenSymbo
 public sealed class CloseBlockToken : IToken { public string Symbol => TokenSymbol.CLOSE_CURLY_BRACE; }
 
 public sealed class ArrayDelimiterToken : IToken { public string Symbol => TokenSymbol.ARRAY_DELIMITER; }
-public sealed class StructLiteralDelimiterToken : IToken { public string Symbol => TokenSymbol.STRUCT_LITERAL_DELIMITER; }
+public sealed class CommaToken : IToken { public string Symbol => TokenSymbol.STRUCT_LITERAL_DELIMITER; }
+public sealed class UnionFieldDelimiterToken : IToken { public string Symbol => TokenSymbol.UNION_FIELD_DELIMITER; }
 public sealed class DecimalPointToken : IToken { public string Symbol => TokenSymbol.DECIMAL_POINT; }
+
+public sealed class MemberAccessorToken : IToken { public string Symbol => TokenSymbol.MEMBER_ACCESSOR; }
 
 public sealed class QuestionToken : IToken { public string Symbol => TokenSymbol.QUESTION; }
 public sealed class ColonToken : IToken { public string Symbol => TokenSymbol.COLON; }
 public sealed class SemiColonToken : IToken { public string Symbol => TokenSymbol.SEMI_COLON; }
 
 public sealed class StructToken : IToken { public string Symbol => Keyword.STRUCT; }
-// public sealed class UnionToken : IToken { public string Symbol => Keyword.UNION; }
+public sealed class UnionToken : IToken { public string Symbol => Keyword.UNION; }
 // public sealed class FlagsToken : IToken { public string Symbol => Keyword.FLAGS; }
-//
+
 // public sealed class IfToken : IToken { public string Symbol => Keyword.IF; }
 // public sealed class ElseToken : IToken { public string Symbol => Keyword.ELSE; }
 // public sealed class MatchToken : IToken { public string Symbol => Keyword.MATCH; }
-//
+
 // public sealed class LoopToken : IToken { public string Symbol => Keyword.LOOP; }
 // public sealed class ForToken : IToken { public string Symbol => Keyword.FOR; }
 // public sealed class WhileToken : IToken { public string Symbol => Keyword.WHILE; }

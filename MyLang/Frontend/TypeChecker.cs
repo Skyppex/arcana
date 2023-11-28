@@ -46,7 +46,7 @@ public class TypeChecker
             case StructLiteral structLiteral:
             {
                 if (!typeEnvironment.Lookup(structLiteral.Identifier, out Type? type))
-                    throw new Exception($"Type with name '{structLiteral.Identifier}' is not defined.");
+                    throw new Exception($"Struct with name '{structLiteral.Identifier}' is not defined.");
 
                 List<Type> fieldTypes = type!.Fields.Values.ToList();
                 
@@ -57,7 +57,30 @@ public class TypeChecker
                     Type initializerType = CheckType(fieldInitializer.Initializer, typeEnvironment);
 
                     if (fieldTypes.Count < i)
-                        throw new Exception($"Struct '{type.Name}' does not contain {i + 1} field.");
+                        throw new Exception($"Struct '{type.Name}' does not contain {i + 1} fields.");
+
+                    if (fieldTypes[i] != initializerType)
+                        throw new Exception($"Initializer for field '{type.Fields.Keys.ToList()[i]}' is not of type '{fieldTypes[i]}'.");
+                }
+
+                return type;
+            }
+            
+            case UnionLiteral unionLiteral:
+            {
+                if (!typeEnvironment.Lookup(unionLiteral.Identifier, out Type? type))
+                    throw new Exception($"Union with name '{unionLiteral.Identifier}' is not defined.");
+
+                List<Type> fieldTypes = type!.Fields[unionLiteral.Member].Fields.Values.ToList();
+                
+                for (int i = 0; i < unionLiteral.FieldInitializers.Count; i++)
+                {
+                    UnionLiteral.FieldInitializer fieldInitializer = unionLiteral.FieldInitializers[i];
+                    
+                    Type initializerType = CheckType(fieldInitializer.Initializer, typeEnvironment);
+
+                    if (fieldTypes.Count < i)
+                        throw new Exception($"Union member '{unionLiteral.Identifier}{TokenSymbol.MEMBER_ACCESSOR}{unionLiteral.Member}' does not contain {i + 1} fields.");
 
                     if (fieldTypes[i] != initializerType)
                         throw new Exception($"Initializer for field '{type.Fields.Keys.ToList()[i]}' is not of type '{fieldTypes[i]}'.");
@@ -231,10 +254,30 @@ public class TypeChecker
                 
                 return Type.statement;
             }
+
+            case UnionDeclarationStatement unionDeclarationStatement:
+            {
+                if (typeEnvironment.IsDefined(unionDeclarationStatement.TypeName))
+                    throw new Exception($"Type '{unionDeclarationStatement.TypeName}' already exists in current context.");
+                
+                unionDeclarationStatement.Members.ToList()
+                    .ForEach(m =>
+                    {
+                        m.Fields.ForEach(f =>
+                        {
+                            if (typeEnvironment.IsDefined(f.TypeName))
+                                return;
+                            
+                            throw new Exception($"Type '{f.TypeName}' doesn't exist in current context.");
+                        });
+                    });
+                
+                return Type.statement;
+            }
             
             case Program:
             case IfStatement:
-                return Type.never;
+                return Type.statement;
         }
 
         throw new InvalidOperationException($"Cannot check type of {statement.GetType()}");

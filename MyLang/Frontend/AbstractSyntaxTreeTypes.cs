@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Monads;
+using MyLang.Models;
 
 namespace MyLang;
 
@@ -227,6 +228,90 @@ public sealed class StructDeclarationStatement : IStatement
     }
 }
 
+public sealed class UnionDeclarationStatement : IStatement
+{
+    public UnionDeclarationStatement(Option<string> accessModifier, string typeName, IEnumerable<Member> members)
+    {
+        AccessModifier = accessModifier;
+        TypeName = typeName;
+        Members = members;
+    }
+    
+    public Option<string> AccessModifier { get; }
+    public string TypeName { get; }
+    public IEnumerable<Member> Members { get; }
+    
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(StructDeclarationStatement)}>");
+        
+        indent++;
+        builder.Append(Indent.Get(indent) + $"{nameof(TypeName)}: {TypeName}");
+
+        if (Members.Any())
+        {
+            builder.AppendLine();
+            builder.Append(Indent.Dash(indent) + $"{nameof(Members)}:");
+
+            indent++;
+            foreach (Member member in Members)
+            {
+                builder.AppendLine();
+                builder.AppendLine(Indent.Dash(indent) + $"{nameof(Member)}: {nameof(member.Identifier)}: {member.Identifier}");
+                
+                if (member.Fields.Count == 0)
+                    continue;
+                
+                indent++;
+                builder.Append(Indent.Dash(indent) + $"{nameof(member.Fields)}:");
+                indent++;
+                foreach (Member.Field field in member.Fields)
+                {
+                    builder.AppendLine();
+                    builder.AppendLine(Indent.Dash(indent) + $"{nameof(Member.Field)}:");
+                    indent++;
+                    builder.AppendLine(Indent.Get(indent) + $"{nameof(field.TypeName)}: {field.TypeName}");
+                    builder.Append(Indent.Get(indent) + $"{nameof(field.Identifier)}: {field.Identifier}");
+                    indent--;
+                }
+                indent--;
+                indent--;
+            }
+            indent--;
+        }
+        indent--;
+        
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action) => action(this);
+
+    public sealed class Member
+    {
+        public Member(string identifier, List<Field> fields)
+        {
+            Identifier = identifier;
+            Fields = fields;
+        }
+        
+        public string Identifier { get; }
+        public List<Field> Fields { get; }
+
+        public sealed class Field
+        {
+            public Field(string typeName, string identifier)
+            {
+                TypeName = typeName;
+                Identifier = identifier;
+            }
+
+            public string TypeName { get; }
+            public string Identifier { get; }
+        }
+    }
+}
+
 public sealed class VariableDeclarationExpression : IExpression
 {
     public VariableDeclarationExpression(string typeName, bool mutable, Identifier identifier, IExpression initializer)
@@ -368,6 +453,66 @@ public sealed class StructLiteral : IExpression
 
         indent++;
         builder.Append(Indent.Get(indent) + $"{nameof(Identifier)}: {Identifier}");
+
+        foreach (FieldInitializer fieldInitializer in FieldInitializers)
+        {
+            builder.AppendLine();
+            builder.AppendLine(Indent.Get(indent) + $"{nameof(FieldInitializer)}: ");
+            indent++;
+
+            builder.AppendLine(Indent.Get(indent) + $"{nameof(fieldInitializer.FieldIdentifier)}: {fieldInitializer.FieldIdentifier}");
+            builder.Append(Indent.Get(indent) + $"{nameof(fieldInitializer.Initializer)}: {fieldInitializer.Initializer.GetNodeTree(ref indent)}");
+            
+            indent--;
+        }
+        
+        indent--;
+        
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+
+        foreach (FieldInitializer fieldInitializer in FieldInitializers)
+            fieldInitializer.Initializer.Traverse(action);
+    }
+
+    public sealed class FieldInitializer
+    {
+        public FieldInitializer(string fieldIdentifier, IExpression initializer)
+        {
+            FieldIdentifier = fieldIdentifier;
+            Initializer = initializer;
+        }
+        
+        public string FieldIdentifier { get; }
+        public IExpression Initializer { get; }
+    }
+}
+
+public sealed class UnionLiteral : IExpression
+{
+    public UnionLiteral(string identifier, string member, List<FieldInitializer> fieldInitializers)
+    {
+        UnionMember = new UnionMember(identifier, member);
+        FieldInitializers = fieldInitializers;
+    }
+    
+    public UnionMember UnionMember { get; }
+    public List<FieldInitializer> FieldInitializers { get; }
+
+    public string Identifier => UnionMember.TypeName;
+    public string Member => UnionMember.MemberName;
+    
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(StructLiteral)}>");
+
+        indent++;
+        builder.Append(Indent.Get(indent) + $"{nameof(UnionMember)}: {UnionMember}");
 
         foreach (FieldInitializer fieldInitializer in FieldInitializers)
         {

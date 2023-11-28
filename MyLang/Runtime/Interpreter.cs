@@ -1,5 +1,5 @@
 ﻿using Monads;
-
+using MyLang.Models;
 using static Monads.Result;
 using static Monads.Option;
 
@@ -26,6 +26,9 @@ public class Interpreter
             case StructLiteral structLiteral:
                 return EvaluateStructLiteral(structLiteral, scope, typeEnvironment);
             
+            case UnionLiteral unionLiteral:
+                return EvaluateUnionLiteral(unionLiteral, scope, typeEnvironment);
+            
             case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.ADD or TokenSymbol.SUBTRACT or TokenSymbol.BITWISE_NOT }:
                 return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope, typeEnvironment));
 
@@ -49,6 +52,9 @@ public class Interpreter
             
             case StructDeclarationStatement structDeclarationStatement:
                 return EvaluateStructDeclarationStatement(structDeclarationStatement, typeEnvironment);
+            
+            case UnionDeclarationStatement unionDeclarationStatement:
+                return EvaluateUnionDeclarationStatement(unionDeclarationStatement, typeEnvironment);
             
             case IfStatement ifStatement:
                 return EvaluateIfStatement(ifStatement, scope, typeEnvironment);
@@ -74,7 +80,14 @@ public class Interpreter
         StructLiteral structLiteral,
         Scope scope,
         TypeEnvironment typeEnvironment) =>
-        new StructValue(structLiteral.FieldInitializers
+        new StructValue(structLiteral.Identifier, structLiteral.FieldInitializers
+            .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, scope, typeEnvironment)));
+
+    private static IRuntimeValue EvaluateUnionLiteral(
+        UnionLiteral unionLiteral,
+        Scope scope,
+        TypeEnvironment typeEnvironment) =>
+        new UnionValue(unionLiteral.UnionMember, unionLiteral.FieldInitializers
             .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, scope, typeEnvironment)));
 
     private static IRuntimeValue EvaluateBinaryExpression(BinaryExpression binaryExpression, Scope scope, TypeEnvironment typeEnvironment)
@@ -303,6 +316,32 @@ public class Interpreter
         return NoValue.Instance;
     }
     
+    private static IRuntimeValue EvaluateUnionDeclarationStatement(
+        UnionDeclarationStatement unionDeclarationStatement,
+        TypeEnvironment typeEnvironment)
+    {
+        string structName = unionDeclarationStatement.TypeName;
+        
+        if (typeEnvironment.Lookup(structName, out _))
+            throw new Exception($"Type '{structName}' already exists in current context.");
+        
+        typeEnvironment.Define(
+            unionDeclarationStatement.TypeName,
+            new Type(unionDeclarationStatement.TypeName,
+                Type.TypeMode.Union,
+                unionDeclarationStatement.Members
+                    .ToDictionary(m => m.Identifier, m => new Type(m.Identifier, Type.TypeMode.Struct, m.Fields
+                        .ToDictionary(f => f.Identifier, f =>
+                        {
+                            if (typeEnvironment.Lookup(f.TypeName, out Type? fieldType))
+                                return fieldType!;
+
+                            throw new Exception($"Type '{f.TypeName}' doesn't exist in current context.");
+                        })))));
+        
+        return NoValue.Instance;
+    }
+
     private static IRuntimeValue EvaluateIfStatement(
         IfStatement ifStatement,
         Scope scope,
