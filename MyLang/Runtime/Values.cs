@@ -49,4 +49,11 @@ public class BooleanValue : IRuntimeValue
     public override string ToString() => Value.ToString();
 }
 
+public class StructValue : IRuntimeValue
+{
+    public StructValue(Dictionary<string, IRuntimeValue> fields) => Fields = fields;
+    public Dictionary<string, IRuntimeValue> Fields { get; }
+    public override string ToString() => $"{{{string.Join(", ", Fields.Select(kv => $"{kv.Key}: {kv.Value}"))}}}";
+}
+
 public class EmptyProgramValue : IRuntimeValue { }

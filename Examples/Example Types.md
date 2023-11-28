@@ -1,8 +1,14 @@
+Public struct declaration -> Statement
 ```
-public struct Foo { // public struct declaration -> Statement
+public struct Foo {
     public i32 bar; // public immutable i32 bar
     public mutable i32 baz; // public mutable i32 baz
 }
+```
+
+Struct literal -> Expression
+```
+Foo { bar: 5, baz: 10 }
 ```
 
 Private tuple struct declaration with a field of type Foo called foo -> Statement

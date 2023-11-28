@@ -65,9 +65,9 @@ public sealed class VariableDeclarationStatement : IStatement
         builder.AppendLine($"<{nameof(VariableDeclarationStatement)}>");
         
         indent++;
-        builder.AppendLine(Indent.Get(indent) + $"TypeName: {TypeName}");
-        builder.AppendLine(Indent.Get(indent) + $"Mutable: {Mutable}");
-        builder.Append(Indent.Get(indent) + $"Identifier: {Identifier.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(TypeName)}: {TypeName}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Mutable)}: {Mutable}");
+        builder.Append(Indent.Get(indent) + $"{nameof(Identifier)}: {Identifier.GetNodeTree(ref indent)}");
         indent--;
 
         return builder.ToString();
@@ -98,9 +98,9 @@ public sealed class IfStatement : IStatement
         builder.AppendLine($"<{nameof(IfStatement)}>");
         
         indent++;
-        builder.AppendLine(Indent.Get(indent) + $"If: {If.Condition.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(If)}: {If.Condition.GetNodeTree(ref indent)}");
         indent++;
-        builder.AppendLine(Indent.Get(indent) + $"Block: {If.Block.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(If.Block)}: {If.Block.GetNodeTree(ref indent)}");
         indent--;
 
         if (ElseIfs.IsSome())
@@ -111,7 +111,7 @@ public sealed class IfStatement : IStatement
             {
                 builder.AppendLine(Indent.Get(indent) + $"ElseIf: {elseIf.Condition.GetNodeTree(ref indent)}");
                 indent++;
-                builder.AppendLine(Indent.Get(indent) + $"Block: {elseIf.Block.GetNodeTree(ref indent)}");
+                builder.AppendLine(Indent.Get(indent) + $"{nameof(elseIf.Block)}: {elseIf.Block.GetNodeTree(ref indent)}");
                 indent--;
             }
         }
@@ -120,7 +120,7 @@ public sealed class IfStatement : IStatement
             return builder.ToString();
         
         IStatement @else = Else.Unwrap();
-        builder.AppendLine(Indent.Get(indent) + $"Else Block: {@else.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Else)} Block: {@else.GetNodeTree(ref indent)}");
         indent--;
         
         return builder.ToString();
@@ -179,23 +179,23 @@ public sealed class StructDeclarationStatement : IStatement
         builder.AppendLine($"<{nameof(StructDeclarationStatement)}>");
         
         indent++;
-        builder.Append(Indent.Get(indent) + $"TypeName: {TypeName}");
+        builder.Append(Indent.Get(indent) + $"{nameof(TypeName)}: {TypeName}");
 
         if (Fields.Any())
         {
             builder.AppendLine();
-            builder.Append(Indent.Get(indent) + "Fields:");
+            builder.Append(Indent.Get(indent) + $"{nameof(Fields)}:");
             indent++;
             
             foreach (Field field in Fields)
             {
                 builder.AppendLine();
-                builder.AppendLine(Indent.Get(indent) + "Field:");
+                builder.AppendLine(Indent.Get(indent) + $"{nameof(Field)}:");
                 indent++;
-                builder.AppendLine(Indent.Get(indent) + $"AccessModifier: {field.AccessModifier}");
-                builder.AppendLine(Indent.Get(indent) + $"Mutable: {field.Mutable}");
-                builder.AppendLine(Indent.Get(indent) + $"TypeName: {field.TypeName}");
-                builder.Append(Indent.Get(indent) + $"Identifier: {field.Identifier}");
+                builder.AppendLine(Indent.Get(indent) + $"{nameof(field.AccessModifier)}: {field.AccessModifier}");
+                builder.AppendLine(Indent.Get(indent) + $"{nameof(field.Mutable)}: {field.Mutable}");
+                builder.AppendLine(Indent.Get(indent) + $"{nameof(field.TypeName)}: {field.TypeName}");
+                builder.Append(Indent.Get(indent) + $"{nameof(field.Identifier)}: {field.Identifier}");
                 indent--;
             }
             indent--;
@@ -248,10 +248,10 @@ public sealed class VariableDeclarationExpression : IExpression
         builder.AppendLine($"<{nameof(VariableDeclarationExpression)}>");
         
         indent++;
-        builder.AppendLine(Indent.Get(indent) + $"TypeName: {TypeName}");
-        builder.AppendLine(Indent.Get(indent) + $"Mutable: {Mutable}");
-        builder.AppendLine(Indent.Get(indent) + $"Identifier: {Identifier.GetNodeTree(ref indent)}");
-        builder.Append(Indent.Dash(indent) + $"Initializer: {Initializer.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(TypeName)}: {TypeName}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Mutable)}: {Mutable}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Identifier)}: {Identifier.GetNodeTree(ref indent)}");
+        builder.Append(Indent.Dash(indent) + $"{nameof(Initializer)}: {Initializer.GetNodeTree(ref indent)}");
         indent--;
         
         return builder.ToString();
@@ -281,8 +281,8 @@ public sealed class AssignmentExpression : IExpression
         builder.AppendLine($"<{nameof(AssignmentExpression)}>");
         
         indent++;
-        builder.AppendLine(Indent.Get(indent) + $"Identifier: {Identifier.GetNodeTree(ref indent)}");
-        builder.Append(Indent.Dash(indent) + $"Assignment: {Assignment.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Identifier)}: {Identifier.GetNodeTree(ref indent)}");
+        builder.Append(Indent.Dash(indent) + $"{nameof(Assignment)}: {Assignment.GetNodeTree(ref indent)}");
         indent--;
         
         return builder.ToString();
@@ -301,7 +301,7 @@ public sealed class Identifier : IExpression
     
     public string Symbol { get; }
 
-    public string GetNodeTree(ref int indent) => $"<{nameof(Identifier)}>, Symbol: {Symbol}";
+    public string GetNodeTree(ref int indent) => $"<{nameof(Identifier)}>, {nameof(Symbol)}: {Symbol}";
     public void Traverse(Action<INode> action) => action(this);
 }
 
@@ -317,7 +317,7 @@ public sealed class Int32Literal : NumericLiteral
     
     public int Value { get; }
 
-    public override string GetNodeTree(ref int indent) => $"<{nameof(Int32Literal)}>, Value: {Value}";
+    public override string GetNodeTree(ref int indent) => $"<{nameof(Int32Literal)}>, {nameof(Value)}: {Value}";
 }
 
 public sealed class Float32Literal : NumericLiteral
@@ -326,7 +326,7 @@ public sealed class Float32Literal : NumericLiteral
     
     public float Value { get; }
     
-    public override string GetNodeTree(ref int indent) => $"<{nameof(Float32Literal)}>, Value: {Value}";
+    public override string GetNodeTree(ref int indent) => $"<{nameof(Float32Literal)}>, {nameof(Value)}: {Value}";
 }
 
 public sealed class StringLiteral : IExpression
@@ -335,7 +335,7 @@ public sealed class StringLiteral : IExpression
     
     public string Value { get; }
     
-    public string GetNodeTree(ref int indent) => $"<{nameof(StringLiteral)}>, Value: {Value}";
+    public string GetNodeTree(ref int indent) => $"<{nameof(StringLiteral)}>, {nameof(Value)}: {Value}";
     public void Traverse(Action<INode> action) => action(this);
 }
 
@@ -345,9 +345,66 @@ public sealed class BooleanLiteral : IExpression
     
     public bool Value { get; set; }
     
-    public string GetNodeTree(ref int indent) => $"<{nameof(BooleanLiteral)}>, Value: {Value}";
+    public string GetNodeTree(ref int indent) => $"<{nameof(BooleanLiteral)}>, {nameof(Value)}: {Value}";
 
     public void Traverse(Action<INode> action) => action(this);
+}
+
+public sealed class StructLiteral : IExpression
+{
+    public StructLiteral(string identifier, List<FieldInitializer> fieldInitializers)
+    {
+        Identifier = identifier;
+        FieldInitializers = fieldInitializers;
+    }
+    
+    public string Identifier { get; }
+    public List<FieldInitializer> FieldInitializers { get; }
+    
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(StructLiteral)}>");
+
+        indent++;
+        builder.Append(Indent.Get(indent) + $"{nameof(Identifier)}: {Identifier}");
+
+        foreach (FieldInitializer fieldInitializer in FieldInitializers)
+        {
+            builder.AppendLine();
+            builder.AppendLine(Indent.Get(indent) + $"{nameof(FieldInitializer)}: ");
+            indent++;
+
+            builder.AppendLine(Indent.Get(indent) + $"{nameof(fieldInitializer.FieldIdentifier)}: {fieldInitializer.FieldIdentifier}");
+            builder.Append(Indent.Get(indent) + $"{nameof(fieldInitializer.Initializer)}: {fieldInitializer.Initializer.GetNodeTree(ref indent)}");
+            
+            indent--;
+        }
+        
+        indent--;
+        
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+
+        foreach (FieldInitializer fieldInitializer in FieldInitializers)
+            fieldInitializer.Initializer.Traverse(action);
+    }
+
+    public sealed class FieldInitializer
+    {
+        public FieldInitializer(string fieldIdentifier, IExpression initializer)
+        {
+            FieldIdentifier = fieldIdentifier;
+            Initializer = initializer;
+        }
+        
+        public string FieldIdentifier { get; }
+        public IExpression Initializer { get; }
+    }
 }
 
 public sealed class BinaryExpression : IExpression
@@ -369,9 +426,9 @@ public sealed class BinaryExpression : IExpression
         builder.AppendLine($"<{nameof(BinaryExpression)}>");
 
         indent++;
-        builder.AppendLine(Indent.Dash(indent) + $"Left: {Left.GetNodeTree(ref indent)}");
-        builder.AppendLine(Indent.Get(indent) + $"Operator: '{Operator}'");
-        builder.Append(Indent.Dash(indent) + $"Right: {Right.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Dash(indent) + $"{nameof(Left)}: {Left.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Operator)}: '{Operator}'");
+        builder.Append(Indent.Dash(indent) + $"{nameof(Right)}: {Right.GetNodeTree(ref indent)}");
         indent--;
 
         return builder.ToString();
@@ -402,8 +459,8 @@ public sealed class UnaryExpression : IExpression
         builder.AppendLine($"<{nameof(UnaryExpression)}>");
 
         indent++;
-        builder.AppendLine(Indent.Get(indent) + $"Operator: '{Operator}'");
-        builder.Append(Indent.Dash(indent) + $"Operand: {Operand.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Operator)}: '{Operator}'");
+        builder.Append(Indent.Dash(indent) + $"{nameof(Operand)}: {Operand.GetNodeTree(ref indent)}");
         indent--;
 
         return builder.ToString();
@@ -418,16 +475,16 @@ public sealed class UnaryExpression : IExpression
 
 public sealed class TernaryExpression : IExpression
 {
-    public TernaryExpression(IExpression condition, IExpression @true, IExpression @false)
+    public TernaryExpression(IExpression condition, IExpression then, IExpression @else)
     {
         Condition = condition;
-        True = @true;
-        False = @false;
+        Then = then;
+        Else = @else;
     }
     
     public IExpression Condition { get; }
-    public IExpression True { get; }
-    public IExpression False { get; }
+    public IExpression Then { get; }
+    public IExpression Else { get; }
     
     public string GetNodeTree(ref int indent)
     {
@@ -435,9 +492,9 @@ public sealed class TernaryExpression : IExpression
         builder.AppendLine($"<{nameof(TernaryExpression)}>");
 
         indent++;
-        builder.AppendLine(Indent.Dash(indent) + $"Condition: {Condition.GetNodeTree(ref indent)}");
-        builder.AppendLine(Indent.Get(indent) + $"Then: {True.GetNodeTree(ref indent)}");
-        builder.Append(Indent.Dash(indent) + $"Else: {False.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Dash(indent) + $"{nameof(Condition)}: {Condition.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Then)}: {Then.GetNodeTree(ref indent)}");
+        builder.Append(Indent.Dash(indent) + $"{nameof(Else)}: {Else.GetNodeTree(ref indent)}");
         indent--;
 
         return builder.ToString();
@@ -447,8 +504,32 @@ public sealed class TernaryExpression : IExpression
     {
         action(this);
         Condition.Traverse(action);
-        True.Traverse(action);
-        False.Traverse(action);
+        Then.Traverse(action);
+        Else.Traverse(action);
+    }
+}
+
+public sealed class BlockExpression : IExpression
+{
+    public BlockExpression(IExpression expression) => Expression = expression;
+    public IExpression Expression { get; }
+
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(BlockExpression)}>");
+
+        indent++;
+        builder.Append(Indent.Get(indent) + $"{nameof(Expression)}: {Expression.GetNodeTree(ref indent)}");
+        indent--;
+        
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Expression.Traverse(action);
     }
 }
 
@@ -464,7 +545,7 @@ public sealed class DropExpression : IExpression
         builder.AppendLine($"<{nameof(DropExpression)}>");
         
         indent++;
-        builder.Append(Indent.Get(indent) + $"Identifier: {Identifier.GetNodeTree(ref indent)}");
+        builder.Append(Indent.Get(indent) + $"{nameof(Identifier)}: {Identifier.GetNodeTree(ref indent)}");
         indent--;
         
         return builder.ToString();

@@ -4,7 +4,7 @@ public class TypeEnvironment
 {
     public static TypeEnvironment Create() => new()
     {
-        _types =
+        _typesByName =
         {
             ["never"] = Type.never,
             ["i32"] = Type.i32,
@@ -14,11 +14,11 @@ public class TypeEnvironment
         }
     };
     
-    private readonly Dictionary<string, Type> _types;
+    private readonly Dictionary<string, Type> _typesByName;
     
     public TypeEnvironment(TypeEnvironment? parent = null)
     {
-        _types = new Dictionary<string, Type>();
+        _typesByName = new Dictionary<string, Type>();
         Parent = parent;
     }
 
@@ -26,13 +26,15 @@ public class TypeEnvironment
     
     public Type Define(string name, Type type)
     {
-        _types[name] = type;
+        _typesByName[name] = type;
         return type;
     }
     
+    public bool IsDefined(string name) => _typesByName.ContainsKey(name);
+    
     public bool Lookup(string name, out Type? type)
     {
-        if (_types.TryGetValue(name, out Type? t))
+        if (_typesByName.TryGetValue(name, out Type? t))
         {
             type = t;
             return true;

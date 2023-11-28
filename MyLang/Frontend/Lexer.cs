@@ -34,12 +34,12 @@ public class Lexer
                     break;
                 
                 case TokenSymbol.OPEN_CURLY_BRACE_CHAR:
-                    tokens.Add(new OpenCulryBraceToken());
+                    tokens.Add(new OpenBlockToken());
                     chars.Dequeue();
                     break;
                 
                 case TokenSymbol.CLOSE_CURLY_BRACE_CHAR:
-                    tokens.Add(new CloseCulryBraceToken());
+                    tokens.Add(new CloseBlockToken());
                     chars.Dequeue();
                     break;
                 
@@ -59,6 +59,11 @@ public class Lexer
                 
                 case TokenSymbol.SEMI_COLON_CHAR:
                     tokens.Add(new SemiColonToken());
+                    chars.Dequeue();
+                    break;
+                
+                case TokenSymbol.STRUCT_LITERAL_DELIMITER_CHAR:
+                    tokens.Add(new StructLiteralDelimiterToken());
                     chars.Dequeue();
                     break;
                 
@@ -246,6 +251,7 @@ public static class TokenSymbol
 
     // Punctuation
     public const char ARRAY_DELIMITER_CHAR = ',';
+    public const char STRUCT_LITERAL_DELIMITER_CHAR = ',';
     public const char FUNCTION_ARGUMENT_DELIMITER_CHAR = ',';
     public const char GENERIC_ARGUMENT_DELIMITER_CHAR = ',';
     public const char MODULE_OR_TYPE_ACCESSOR_CHAR = '.';
@@ -256,6 +262,7 @@ public static class TokenSymbol
     public const char SEMI_COLON_CHAR = ';';
 
     public const string ARRAY_DELIMITER = ",";
+    public const string STRUCT_LITERAL_DELIMITER = ",";
     public const string FUNCTION_ARGUMENT_DELIMITER = ",";
     public const string GENERIC_ARGUMENT_DELIMITER = ",";
     public const string MODULE_OR_TYPE_ACCESSOR = ".";
@@ -402,10 +409,11 @@ public sealed class OpenParenToken : IToken { public string Symbol => TokenSymbo
 public sealed class CloseParenToken : IToken { public string Symbol => TokenSymbol.CLOSE_PAREN; }
 public sealed class OpenBraceToken : IToken { public string Symbol => TokenSymbol.OPEN_BRACE; }
 public sealed class CloseBraceToken : IToken { public string Symbol => TokenSymbol.CLOSE_BRACE; }
-public sealed class OpenCulryBraceToken : IToken { public string Symbol => TokenSymbol.OPEN_CURLY_BRACE; }
-public sealed class CloseCulryBraceToken : IToken { public string Symbol => TokenSymbol.CLOSE_CURLY_BRACE; }
+public sealed class OpenBlockToken : IToken { public string Symbol => TokenSymbol.OPEN_CURLY_BRACE; }
+public sealed class CloseBlockToken : IToken { public string Symbol => TokenSymbol.CLOSE_CURLY_BRACE; }
 
-public sealed class DelimiterToken : IToken { public string Symbol => TokenSymbol.ARRAY_DELIMITER; }
+public sealed class ArrayDelimiterToken : IToken { public string Symbol => TokenSymbol.ARRAY_DELIMITER; }
+public sealed class StructLiteralDelimiterToken : IToken { public string Symbol => TokenSymbol.STRUCT_LITERAL_DELIMITER; }
 public sealed class DecimalPointToken : IToken { public string Symbol => TokenSymbol.DECIMAL_POINT; }
 
 public sealed class QuestionToken : IToken { public string Symbol => TokenSymbol.QUESTION; }

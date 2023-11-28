@@ -29,21 +29,6 @@ public class TypeChecker
 
     public Type CheckType(IStatement statement, TypeEnvironment typeEnvironment)
     {
-        // i32[] foo = [0, 1, 2, 3, 4, 5];
-        // m>[i32] fooPtr = >foo;
-        // a -> mut b -> IO a
-        // mut(a -> b) -> IO a
-        // a -> b
-        // let x = y;
-        // let x = &mut y;
-        // fn myNumFn = void -> num;
-        // let n = myNumFn() |> mut |> $ + 2 $ * 3; f(g(x)) == f*g (x)
-        // x = 5;
-        // let z = &y;
-        // x = 3;
-        //     r n s t .. a e c i
-        
-        
         switch (statement)
         {
             case Int32Literal:
@@ -58,6 +43,29 @@ public class TypeChecker
             case BooleanLiteral:
                 return Type.@bool;
 
+            case StructLiteral structLiteral:
+            {
+                if (!typeEnvironment.Lookup(structLiteral.Identifier, out Type? type))
+                    throw new Exception($"Type with name '{structLiteral.Identifier}' is not defined.");
+
+                List<Type> fieldTypes = type!.Fields.Values.ToList();
+                
+                for (int i = 0; i < structLiteral.FieldInitializers.Count; i++)
+                {
+                    StructLiteral.FieldInitializer fieldInitializer = structLiteral.FieldInitializers[i];
+                    
+                    Type initializerType = CheckType(fieldInitializer.Initializer, typeEnvironment);
+
+                    if (fieldTypes.Count < i)
+                        throw new Exception($"Struct '{type.Name}' does not contain {i + 1} field.");
+
+                    if (fieldTypes[i] != initializerType)
+                        throw new Exception($"Initializer for field '{type.Fields.Keys.ToList()[i]}' is not of type '{fieldTypes[i]}'.");
+                }
+
+                return type;
+            }
+            
             case UnaryExpression unaryExpression:
             {
                 Type type = CheckType(unaryExpression.Operand, typeEnvironment);
@@ -71,8 +79,8 @@ public class TypeChecker
             case TernaryExpression ternaryExpression:
             {
                 Type conditionType = CheckType(ternaryExpression.Condition, typeEnvironment);
-                Type trueType = CheckType(ternaryExpression.True, typeEnvironment);
-                Type falseType = CheckType(ternaryExpression.False, typeEnvironment);
+                Type trueType = CheckType(ternaryExpression.Then, typeEnvironment);
+                Type falseType = CheckType(ternaryExpression.Else, typeEnvironment);
 
                 if (conditionType != Type.@bool)
                     throw new InvalidOperationException($"Ternary operator condition must be of type '{Type.@bool}' but was '{conditionType}'");
@@ -158,14 +166,16 @@ public class TypeChecker
                 if (typeEnvironment.Lookup(identifier.Symbol, out Type? type))
                     return type;
                 
-                throw new InvalidOperationException($"Identifier '{identifier.Symbol}' is not defined");
+                throw new InvalidOperationException($"Identifier '{identifier.Symbol}' doesn't exist in current context.");
             }
             
             case VariableDeclarationExpression variableDeclarationExpression:
             {
                 Type type = CheckType(variableDeclarationExpression.Initializer, typeEnvironment);
 
-                var expectedType = Type.FromString(variableDeclarationExpression.TypeName);
+                if (!typeEnvironment.Lookup(variableDeclarationExpression.TypeName, out Type? expectedType))
+                    throw new InvalidOperationException(
+                        $"Type '{variableDeclarationExpression.TypeName}' doesn't exist in current context.");
                 
                 if (type != expectedType)
                 {
@@ -180,7 +190,7 @@ public class TypeChecker
             {
                 if (!typeEnvironment.Lookup(variableDeclarationStatement.TypeName, out Type? type))
                     throw new InvalidOperationException(
-                        $"Type '{variableDeclarationStatement.TypeName}' is not defined");
+                        $"Type '{variableDeclarationStatement.TypeName}' doesn't exist in current context.");
                 
                 return typeEnvironment.Define(variableDeclarationStatement.Identifier.Symbol, type!);
             }
@@ -191,7 +201,7 @@ public class TypeChecker
                 
                 if (!typeEnvironment.Lookup(assignmentExpression.Identifier.Symbol, out Type? variableType))
                     throw new InvalidOperationException(
-                        $"Identifier '{assignmentExpression.Identifier.Symbol}' is not defined");
+                        $"Identifier '{assignmentExpression.Identifier.Symbol}' doesn't exist in current context.");
                 
                 if (type != variableType)
                     throw new InvalidOperationException(
@@ -199,10 +209,31 @@ public class TypeChecker
                 
                 return type;
             }
+
+            case BlockExpression blockExpression:
+            {
+                return CheckType(blockExpression.Expression, typeEnvironment);
+            }
+
+            case StructDeclarationStatement structDeclarationStatement:
+            {
+                if (typeEnvironment.IsDefined(structDeclarationStatement.TypeName))
+                    throw new Exception($"Type '{structDeclarationStatement.TypeName}' already exists in current context.");
+
+                structDeclarationStatement.Fields.ToList()
+                    .ForEach(f =>
+                    {
+                        if (typeEnvironment.IsDefined(f.TypeName))
+                            return;
+
+                        throw new Exception($"Type '{f.TypeName}' doesn't exist in current context.");
+                    });
+                
+                return Type.statement;
+            }
             
             case Program:
             case IfStatement:
-            case StructDeclarationStatement:
                 return Type.never;
         }
 

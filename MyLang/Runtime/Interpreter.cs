@@ -23,6 +23,9 @@ public class Interpreter
             case BooleanLiteral booleanLiteral:
                 return new BooleanValue(booleanLiteral.Value);
             
+            case StructLiteral structLiteral:
+                return EvaluateStructLiteral(structLiteral, scope, typeEnvironment);
+            
             case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.ADD or TokenSymbol.SUBTRACT or TokenSymbol.BITWISE_NOT }:
                 return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope, typeEnvironment));
 
@@ -53,6 +56,9 @@ public class Interpreter
             case VariableDeclarationExpression variableDeclarationExpression:
                 return EvaluateVariableDeclarationExpression(variableDeclarationExpression, scope, typeEnvironment);
             
+            case BlockExpression blockExpression:
+                return EvaluateBlockExpression(blockExpression, scope, typeEnvironment);
+            
             case DropExpression dropExpression:
                 return EvaluateDropExpression(dropExpression, scope, typeEnvironment);
             
@@ -63,6 +69,13 @@ public class Interpreter
                 throw new InvalidProgramException($"The {statement.GetType()} Node has not been setup for interpretation.");
         }
     }
+
+    private static IRuntimeValue EvaluateStructLiteral(
+        StructLiteral structLiteral,
+        Scope scope,
+        TypeEnvironment typeEnvironment) =>
+        new StructValue(structLiteral.FieldInitializers
+            .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, scope, typeEnvironment)));
 
     private static IRuntimeValue EvaluateBinaryExpression(BinaryExpression binaryExpression, Scope scope, TypeEnvironment typeEnvironment)
     {
@@ -241,9 +254,9 @@ public class Interpreter
             throw new Exception($"Condition must be a boolean value, but was {condition.GetType()}.");
 
         if (booleanValue.Value)
-            return Evaluate(ternaryExpression.True, scope, typeEnvironment);
+            return Evaluate(ternaryExpression.Then, new Scope(scope), typeEnvironment);
         
-        return Evaluate(ternaryExpression.False, scope, typeEnvironment);
+        return Evaluate(ternaryExpression.Else, new Scope(scope), typeEnvironment);
     }
     
     private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Scope scope, TypeEnvironment typeEnvironment)
@@ -269,11 +282,24 @@ public class Interpreter
         StructDeclarationStatement structDeclarationStatement,
         TypeEnvironment typeEnvironment)
     {
-        var structName = structDeclarationStatement.TypeName;
+        string structName = structDeclarationStatement.TypeName;
+        
         if (typeEnvironment.Lookup(structName, out _))
             throw new Exception($"Type '{structName}' already exists in current context.");
         
-        typeEnvironment.Define(structName, new Type(structName, Type.TypeMode.Struct));
+        typeEnvironment.Define(
+            structDeclarationStatement.TypeName,
+            new Type(structDeclarationStatement.TypeName,
+                Type.TypeMode.Struct,
+                structDeclarationStatement.Fields
+                    .ToDictionary(f => f.Identifier, f =>
+                    {
+                        if (typeEnvironment.Lookup(f.TypeName, out Type? fieldType))
+                            return fieldType!;
+
+                        throw new Exception($"Type '{f.TypeName}' doesn't exist in current context.");
+                    })));
+        
         return NoValue.Instance;
     }
     
@@ -328,6 +354,12 @@ public class Interpreter
         scope.Declare(variableDeclarationExpression.Identifier, variableDeclarationExpression.Mutable, value);
         return value;
     }
+
+    private static IRuntimeValue EvaluateBlockExpression(
+        BlockExpression blockExpression,
+        Scope scope,
+        TypeEnvironment typeEnvironment) =>
+        Evaluate(blockExpression.Expression, scope, typeEnvironment);
 
     private static IRuntimeValue EvaluateDropExpression(DropExpression dropExpression, Scope scope, TypeEnvironment typeEnvironment)
     {

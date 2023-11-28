@@ -31,6 +31,13 @@ public static class OptionExtensions
         return option.IsSome() ? some(option.Value!) : none();
     }
     
+    public static TResult Match<T, TResult>(this Option<T> option, Func<T, TResult> some, TResult none)
+    {
+        ArgumentNullException.ThrowIfNull(some, nameof(some));
+        ArgumentNullException.ThrowIfNull(none, nameof(none));
+        return option.IsSome() ? some(option.Value!) : none;
+    }
+
     public static void Match<T>(this Option<T> option, Action<T> some, Action none)
     {
         ArgumentNullException.ThrowIfNull(some, nameof(some));

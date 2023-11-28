@@ -1,6 +1,5 @@
 ﻿using System.Globalization;
 using Monads;
-
 using static Monads.Result;
 using static Monads.Option;
 
@@ -65,18 +64,18 @@ public class Parser
             
             typeIdentifier = type;
         }
-
+        
         if (ExistsBeforeSemiColon<EqualsToken>())
             return ParseIfStatement();
-
+        
         bool mutable = Current() is MutableToken;
+        
+        if (!NextIs<MutableToken, IdentifierToken>(out _, out IdentifierToken? typeIdentIfMut, false) && !mutable)
+            return ParseIfStatement();
 
         if (mutable)
         {
-            if (!NextIs(out _, out IdentifierToken? typeIdent, false))
-                return ParseIfStatement();
-
-            typeIdentifier ??= typeIdent;
+            typeIdentifier = typeIdentIfMut!;
             Next();
         }
         
@@ -169,9 +168,9 @@ public class Parser
 
         Result<IStatement, string> ParseBlock()
         {
-            Expect<OpenCulryBraceToken>("Expected '{'.");
+            Expect<OpenBlockToken>("Expected '{'.");
             Result<IStatement, string> thenStatement = ParseStatement();
-            Expect<CloseCulryBraceToken>("Expected '}'.");
+            Expect<CloseBlockToken>("Expected '}'.");
             return thenStatement;
         }
     }
@@ -181,7 +180,7 @@ public class Parser
         Option<string> accessModifier = Option<string>.None;
         if (Current() is AccessToken at)
         {
-            if (!NextIs<StructToken>(out _, out _, false))
+            if (!NextIs<AccessToken, StructToken>(out _, out _, false))
                 return ParseExpression().Map(e => e as IStatement);
             
             accessModifier = Some(at.Symbol);
@@ -194,14 +193,14 @@ public class Parser
         Next();
         
         Result<IdentifierToken, string> structNameIdentifier = Expect<IdentifierToken>("Expected identifier after 'struct' keyword.");
-        var openCurly = Expect<OpenCulryBraceToken>("Expected '{'.");
+        var openCurly = Expect<OpenBlockToken>("Expected '{'.");
 
         List<Result<StructDeclarationStatement.Field, string>> fields = new();
         
-        while (Current() is not CloseCulryBraceToken)
+        while (Current() is not CloseBlockToken)
             fields.Add(ParseField());
 
-        Result<CloseCulryBraceToken, string> closeCurly = Expect<CloseCulryBraceToken>("Expected '}'.");
+        Result<CloseBlockToken, string> closeCurly = Expect<CloseBlockToken>("Expected '}'.");
         
         return structNameIdentifier.AndThen(sni =>
             openCurly.AndThen(_ =>
@@ -241,20 +240,68 @@ public class Parser
     private Result<IExpression, string> ParseDrop()
     {
         if (Current() is not DropToken)
-            return ParseAssignmentExpression();
+            return ParseBlock();
         
         Next();
         Result<IdentifierToken, string> identifier = Expect<IdentifierToken>("Expected identifier after 'drop' keyword.");
         
         return identifier.Map(i => new DropExpression(new Identifier(i.Symbol)) as IExpression);
     }
+
+    private Result<IExpression, string> ParseBlock()
+    {
+        if (Current() is not OpenBlockToken)
+            return ParseStructLiteralExpression();
+
+        Next();
+        var expression = ParseExpression();
+        var closeBlock = Expect<CloseBlockToken>("Expected '}'.");
+        
+        return expression.AndThen(e => closeBlock.Map(_ => new BlockExpression(e) as IExpression));
+    }
     
+    private Result<IExpression, string> ParseStructLiteralExpression()
+    {
+        if (!NextIs<IdentifierToken, OpenBlockToken>(out IdentifierToken? typeIdentifier, out _))
+            return ParseAssignmentExpression();
+
+        List<Result<StructLiteral.FieldInitializer, string>> fieldInitializers = new();
+        
+        bool delimiter = true;
+        
+        while (delimiter && Current() is IdentifierToken)
+            fieldInitializers.Add(ParseFieldInitializer());
+
+        Result<CloseBlockToken, string> closeBlock = Expect<CloseBlockToken>("Expected '}'.");
+        
+        return fieldInitializers.Invert()
+            .AndThen(fi => closeBlock
+            .Map(_ => new StructLiteral(typeIdentifier!.Symbol, fi.ToList()) as IExpression));
+
+        Result<StructLiteral.FieldInitializer, string> ParseFieldInitializer()
+        {
+            Result<IdentifierToken, string> fieldIdentifier = Expect<IdentifierToken>("Expected field identifier.");
+            Result<ColonToken, string> colon = Expect<ColonToken>("Expected ':'.");
+            Result<IExpression, string> initializer = ParseExpression();
+
+            if (Current() is StructLiteralDelimiterToken)
+                Next();
+            else
+                delimiter = false;
+
+            return fieldIdentifier
+                .AndThen(fi => colon
+                    .AndThen(_ => initializer
+                        .Map(init => new StructLiteral.FieldInitializer(fi.Symbol, init))));
+        }
+    }
+
     private Result<IExpression, string> ParseAssignmentExpression()
     {
         if (Current() is not IdentifierToken)
             return ParseTernaryExpression();
 
-        if (!NextIs<EqualsToken>(out IToken? identifierToken, out _))
+        if (!NextIs<IdentifierToken, EqualsToken>(out IdentifierToken? identifierToken, out _))
             return ParseTernaryExpression();
 
         return ParseExpression().Map(e => new AssignmentExpression(new Identifier(identifierToken!.Symbol), e) as IExpression);
@@ -445,7 +492,9 @@ public class Parser
         return Error<T, string>($"Unexpected token found during parsing: {token}. Expected {typeof(T)} | {errorMessage}");
     }
     
-    private bool NextIs<T>(out IToken? token, out T? nextToken, bool doNext = true) where T : class, IToken
+    private bool NextIs<T1, T2>(out T1? token, out T2? nextToken, bool doNext = true)
+        where T1 : class, IToken
+        where T2 : class, IToken
     {
         if (_tokens.Count < 2)
         {
@@ -454,18 +503,18 @@ public class Parser
             return false;
         }
         
-        bool nextIs = _tokens[1] is T;
-        nextToken = nextIs ? _tokens[1] as T : null;
+        bool nextIs = _tokens[1] is T2;
+        nextToken = nextIs ? _tokens[1] as T2 : null;
 
         if (nextIs)
         {
-            token = Current();
+            token = Current() as T1;
+
+            if (!doNext)
+                return nextIs;
             
-            if (doNext)
-            {
-                Next();
-                Next();
-            }
+            Next();
+            Next();
         }
         else
             token = null;
