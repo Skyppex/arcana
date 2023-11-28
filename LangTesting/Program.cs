@@ -42,14 +42,21 @@ while (true)
     
     MyLang.Program program = parser.CreateAst(input);
 
-    program.Traverse(node =>
+    try
     {
-        if (node is IStatement statement)
-            typeChecker.CheckType(statement, targetTypeEnvironment);
-    });
-    
-    IRuntimeValue evaluation = Interpreter.Evaluate(program, targetScope, targetTypeEnvironment);
-    Console.WriteLine(evaluation.ToString());
+        program.Traverse(node =>
+        {
+            if (node is IStatement statement)
+                typeChecker.CheckType(statement, targetTypeEnvironment);
+        });
+        
+        IRuntimeValue evaluation = Interpreter.Evaluate(program, targetScope, targetTypeEnvironment);
+        Console.WriteLine(evaluation.ToString());
+    }
+    catch (Exception e)
+    {
+        Console.WriteLine(e.Message);
+    }
     
     int indent = 0;
     

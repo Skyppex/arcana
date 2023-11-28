@@ -509,7 +509,7 @@ public sealed class UnionLiteral : IExpression
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
-        builder.AppendLine($"<{nameof(StructLiteral)}>");
+        builder.AppendLine($"<{nameof(UnionLiteral)}>");
 
         indent++;
         builder.Append(Indent.Get(indent) + $"{nameof(UnionMember)}: {UnionMember}");
@@ -549,6 +549,83 @@ public sealed class UnionLiteral : IExpression
         
         public string FieldIdentifier { get; }
         public IExpression Initializer { get; }
+    }
+}
+
+public sealed class MemberExpression : IExpression
+{
+    public MemberExpression(IExpression @object, IExpression member)
+    {
+        Object = @object;
+        Member = member;
+    }
+
+    public IExpression Object { get; }
+    public IExpression Member { get; }
+    
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(MemberExpression)}>");
+
+        indent++;
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Object)}: {Object.GetNodeTree(ref indent)}");
+        builder.Append(Indent.Get(indent) + $"{nameof(Member)}: {Member.GetNodeTree(ref indent)}");
+        indent--;
+
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Object.Traverse(action);
+        Member.Traverse(action);
+    }
+}
+
+public sealed class CallExpression : IExpression
+{
+    public CallExpression(IExpression caller, List<IExpression> arguments)
+    {
+        Caller = caller;
+        Arguments = arguments;
+    }
+
+    public IExpression Caller { get; }
+    public List<IExpression> Arguments { get; }
+    
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(CallExpression)}>");
+
+        indent++;
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Caller)}: {Caller.GetNodeTree(ref indent)}");
+
+        if (Arguments.Any())
+        {
+            builder.AppendLine(Indent.Dash(indent) + $"{nameof(Arguments)}:");
+            indent++;
+            
+            foreach (IExpression argument in Arguments)
+                builder.AppendLine(Indent.Get(indent) + $"{argument.GetNodeTree(ref indent)}");
+            
+            indent--;
+        }
+        
+        indent--;
+        
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Caller.Traverse(action);
+
+        foreach (IExpression argument in Arguments)
+            argument.Traverse(action);
     }
 }
 

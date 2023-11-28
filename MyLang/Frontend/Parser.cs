@@ -32,8 +32,6 @@ public class Parser
     // --- Order of precedence ---
     // VariableDeclarationStatement
     // AssignmentExpression
-    // MemberExpression
-    // FunctionCallExpression
     // TernaryExpression
     // LogicalExpression
     // ComparisonExpression
@@ -41,6 +39,8 @@ public class Parser
     // MultiplicativeExpression
     // VariableDeclarationExpression
     // UnaryExpression
+    // MemberExpression
+    // FunctionCallExpression
     // PrimaryExpression -- Highest precedence
     
     private Result<IStatement, string> ParseStatement()
@@ -339,7 +339,7 @@ public class Parser
     private Result<IExpression, string> ParseStructLiteralExpression()
     {
         if (!NextIs<IdentifierToken, OpenBlockToken>(out IdentifierToken? typeIdentifier, out _))
-            return ParseUnionLiteralExpression();
+            return ParseAssignmentExpression();
 
         List<Result<StructLiteral.FieldInitializer, string>> fieldInitializers = new();
         
@@ -371,47 +371,47 @@ public class Parser
                         .Map(init => new StructLiteral.FieldInitializer(fi.Symbol, init))));
         }
     }
-
-    private Result<IExpression, string> ParseUnionLiteralExpression()
-    {
-        if (!NextIs<IdentifierToken, MemberAccessorToken, IdentifierToken>(out IdentifierToken? typeIdentifier, out _, out IdentifierToken? memberIdentifier))
-            return ParseAssignmentExpression();
-
-        if (Current() is not OpenParenToken)
-            return Ok<IExpression, string>(new UnionLiteral(typeIdentifier!.Symbol, memberIdentifier!.Symbol, new List<UnionLiteral.FieldInitializer>()));
-
-        Next();
-        
-        List<Result<UnionLiteral.FieldInitializer, string>> fieldInitializers = new();
-        
-        bool delimiter = true;
-        
-        while (delimiter && Current() is IdentifierToken)
-            fieldInitializers.Add(ParseFieldInitializer());
-
-        Result<CloseParenToken, string> closeBlock = Expect<CloseParenToken>("Expected ')'.");
-        
-        return fieldInitializers.Invert()
-            .AndThen(fi => closeBlock
-                .Map(_ => new UnionLiteral(typeIdentifier!.Symbol, memberIdentifier!.Symbol, fi.ToList()) as IExpression));
-
-        Result<UnionLiteral.FieldInitializer, string> ParseFieldInitializer()
-        {
-            Result<IdentifierToken, string> fieldIdentifier = Expect<IdentifierToken>("Expected field identifier.");
-            Result<ColonToken, string> colon = Expect<ColonToken>("Expected ':'.");
-            Result<IExpression, string> initializer = ParseExpression();
-
-            if (Current() is CommaToken)
-                Next();
-            else
-                delimiter = false;
-
-            return fieldIdentifier
-                .AndThen(fi => colon
-                    .AndThen(_ => initializer
-                        .Map(init => new UnionLiteral.FieldInitializer(fi.Symbol, init))));
-        }
-    }
+    //
+    // private Result<IExpression, string> ParseUnionLiteralExpression()
+    // {
+    //     if (!NextIs<IdentifierToken, MemberAccessorToken, IdentifierToken>(out IdentifierToken? typeIdentifier, out _, out IdentifierToken? memberIdentifier))
+    //         return ParseAssignmentExpression();
+    //
+    //     if (Current() is not OpenParenToken)
+    //         return Ok<IExpression, string>(new UnionLiteral(typeIdentifier!.Symbol, memberIdentifier!.Symbol, new List<UnionLiteral.FieldInitializer>()));
+    //
+    //     Next();
+    //     
+    //     List<Result<UnionLiteral.FieldInitializer, string>> fieldInitializers = new();
+    //     
+    //     bool delimiter = true;
+    //     
+    //     while (delimiter && Current() is IdentifierToken)
+    //         fieldInitializers.Add(ParseFieldInitializer());
+    //
+    //     Result<CloseParenToken, string> closeBlock = Expect<CloseParenToken>("Expected ')'.");
+    //     
+    //     return fieldInitializers.Invert()
+    //         .AndThen(fi => closeBlock
+    //             .Map(_ => new UnionLiteral(typeIdentifier!.Symbol, memberIdentifier!.Symbol, fi.ToList()) as IExpression));
+    //
+    //     Result<UnionLiteral.FieldInitializer, string> ParseFieldInitializer()
+    //     {
+    //         Result<IdentifierToken, string> fieldIdentifier = Expect<IdentifierToken>("Expected field identifier.");
+    //         Result<ColonToken, string> colon = Expect<ColonToken>("Expected ':'.");
+    //         Result<IExpression, string> initializer = ParseExpression();
+    //
+    //         if (Current() is CommaToken)
+    //             Next();
+    //         else
+    //             delimiter = false;
+    //
+    //         return fieldIdentifier
+    //             .AndThen(fi => colon
+    //                 .AndThen(_ => initializer
+    //                     .Map(init => new UnionLiteral.FieldInitializer(fi.Symbol, init))));
+    //     }
+    // }
 
     private Result<IExpression, string> ParseAssignmentExpression()
     {
@@ -545,7 +545,65 @@ public class Parser
             return ParseExpression().Map(e => new UnaryExpression(bitwiseNotToken.Symbol, e) as IExpression);
         }
 
-        return ParsePrimaryExpression();
+        return ParseCallMemberExpression();
+    }
+
+    private Result<IExpression, string> ParseCallMemberExpression()
+    {
+        var member = ParseMemberExpression();
+
+        if (Current() is OpenParenToken)
+            return ParseCallExpression(member);
+
+        return member;
+    }
+
+    private Result<IExpression, string> ParseCallExpression(Result<IExpression, string> caller)
+    {
+        Result<List<IExpression>, string> arguments = ParseArgs();
+        Result<IExpression, string> call = caller.AndThen(c => arguments.Map(args => new CallExpression(c, args) as IExpression));
+
+        if (Current() is OpenParenToken)
+            call = ParseCallExpression(call);
+        
+        return call;
+    }
+
+    private Result<List<IExpression>, string> ParseArgs()
+    {
+        Result<OpenParenToken, string> open = Expect<OpenParenToken>("Expected '('.");
+        Result<List<IExpression>, string> args = Current() is CloseParenToken ? new() : ParseArgsList();
+        Result<CloseParenToken, string> close = Expect<CloseParenToken>("Expected ')'.");
+        return open.AndThen(_ => args.AndThen(a => close.Map(_ => a)));
+    }
+
+    private Result<List<IExpression>, string> ParseArgsList()
+    {
+        Result<List<IExpression>, string> args = ParseExpression().Map(e => new List<IExpression> { e });
+
+        while (Current() is CommaToken && TryNext(out _))
+            args = args.AndThen(a => ParseExpression().Map(e => a.Append(e).ToList()));
+
+        return args;
+    }
+
+    private Result<IExpression, string> ParseMemberExpression()
+    {
+        Result<IExpression, string> expression = ParsePrimaryExpression();
+
+        while (Current() is MemberAccessorToken)
+        {
+            Next();
+
+            if (Current() is not IdentifierToken)
+                return Error<IExpression, string>("Expected identifier after '.'.");
+                
+            // Expression is an Identifier here
+            Result<Identifier, string> property = ParsePrimaryExpression().Map(e => (Identifier)e);
+            expression = expression.AndThen(e => property.Map(p => new MemberExpression(e, p) as IExpression));
+        }
+
+        return expression;
     }
 
     private Result<IExpression, string> ParsePrimaryExpression()
@@ -599,6 +657,19 @@ public class Parser
         return token;
     }
     
+    private bool TryNext(out IToken? next)
+    {
+        if (_tokens.Count == 0)
+        {
+            next = null;
+            return false;
+        }
+
+        next = _tokens[0];
+        _tokens.RemoveAt(0);
+        return true;
+    }
+
     private Result<T, string> Expect<T>(string errorMessage) where T : IToken
     {
         IToken token = Next();

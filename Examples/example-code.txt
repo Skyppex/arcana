@@ -1,3 +1,7 @@
 union Option { Some(f32 x); None; }
 Option num = Option.Some(x: 5.0);
 Option num2 = Option.None;
+
+struct Point { f32 x; f32 y; }
+Point p = Point { x: 1.0, y: 2.0 };
+p.x.y = 3.0;
