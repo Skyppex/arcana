@@ -15,12 +15,12 @@ public class TypeEnvironment
     };
     
     private readonly Dictionary<string, Type> _typesByName;
-    private readonly Dictionary<string, Type> _variableTypesByName;
+    private readonly Dictionary<string, Type> _typesByVariableName;
     
     public TypeEnvironment(TypeEnvironment? parent = null)
     {
         _typesByName = new Dictionary<string, Type>();
-        _variableTypesByName = new Dictionary<string, Type>();
+        _typesByVariableName = new Dictionary<string, Type>();
         Parent = parent;
     }
 
@@ -34,14 +34,14 @@ public class TypeEnvironment
 
     public Type DefineVariable(string name, Type type)
     {
-        _variableTypesByName[name] = type;
+        _typesByVariableName[name] = type;
         return type;
     }
     
     public Type DefineVariable(KeyValuePair<string, Type> field) => DefineVariable(field.Key, field.Value);
 
     public bool IsTypeDefined(string name) => _typesByName.ContainsKey(name);
-    public bool IsVariableDefined(string name) => _variableTypesByName.ContainsKey(name);
+    public bool IsVariableDefined(string name) => _typesByVariableName.ContainsKey(name);
     
     // public bool LookupType(string name, out Type? type)
     // {
@@ -92,18 +92,26 @@ public class TypeEnvironment
         return false;
     }
     
-    public bool LookupVariable(string name, out Type? type)
+    public bool LookupVariable(string name, out Type? type, Type? accessorRootType = null)
     {
-        if (_variableTypesByName.TryGetValue(name, out Type? t))
-        {
-            type = t;
-            return true;
-        }
+        // a.b.c
 
-        if (Parent?.LookupVariable(name, out t) ?? false)
+        if (accessorRootType is null)
         {
-            type = t;
-            return true;
+            if (_typesByVariableName.TryGetValue(name, out Type? t))
+            {
+                type = t;
+                return true;
+            }
+
+            if (Parent?.LookupVariable(name, out t, accessorRootType) ?? false)
+            {
+                type = t;
+                return true;
+            }
+
+            type = null;
+            return false;
         }
 
         type = null;

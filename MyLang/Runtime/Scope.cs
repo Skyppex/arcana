@@ -29,15 +29,27 @@ public class Scope
         return value;
     }
     
-    public IRuntimeValue Assign(Identifier identifier, IRuntimeValue value)
+    public IRuntimeValue Assign(MemberExpression member, IRuntimeValue value)
     {
-        string name = identifier.Symbol;
-        Variable variable = Resolve(name)._variables[name];
-        
-        if (variable.Value is not Uninitialized && !variable.Mutable)
-            throw new Exception($"Variable '{name}' is not mutable.");
-        
-        return variable.Value = value;
+        switch (member)
+        {
+            case Identifier identifier:
+            {
+                string name = identifier.Symbol;
+                Variable variable = Resolve(name)._variables[name];
+            
+                if (variable.Value is not Uninitialized && !variable.Mutable)
+                    throw new Exception($"Variable '{name}' is not mutable.");
+            
+                return variable.Value = value;
+            }
+
+            case MemberAccessExpression memberAccess:
+                return Assign(memberAccess.Member, value);
+
+            default:
+                throw new Exception($"Invalid member expression: {member}");
+        }
     }
 
     public IRuntimeValue Get(Identifier identifier)

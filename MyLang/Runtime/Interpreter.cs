@@ -41,7 +41,7 @@ public class Interpreter
             case BinaryExpression binaryExpression:
                 return EvaluateBinaryExpression(binaryExpression, scope);
             
-            case MemberExpression memberExpression:
+            case MemberAccessExpression memberExpression:
                 return EvaluateMemberExpression(memberExpression, scope);
             
             case Identifier identifier:
@@ -83,7 +83,12 @@ public class Interpreter
         StructLiteral structLiteral,
         Scope scope) =>
         new StructValue(structLiteral.Identifier, structLiteral.FieldInitializers
-            .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, scope)));
+            .ToDictionary(f => f.FieldIdentifier, f =>
+            {
+                IRuntimeValue value = Evaluate(f.Initializer, scope);
+                scope.Declare(new Identifier($"{structLiteral.Identifier}.{f.FieldIdentifier}"), true, value);
+                return value;
+            }));
 
     private static IRuntimeValue EvaluateUnionLiteral(
         UnionLiteral unionLiteral,
@@ -258,10 +263,20 @@ public class Interpreter
         }
     }
 
-    private static IRuntimeValue EvaluateMemberExpression(MemberExpression memberExpression, Scope scope)
+    private static IRuntimeValue EvaluateMemberExpression(MemberAccessExpression memberAccessExpression, Scope scope)
     {
-        Evaluate(memberExpression.Object, scope);
-        return Evaluate(memberExpression.Member, scope);
+        IRuntimeValue objectValue = Evaluate(memberAccessExpression.Object, scope);
+
+        switch (objectValue)
+        {
+            case StructValue structValue when structValue.Fields.TryGetValue(memberAccessExpression.Member.Symbol, out IRuntimeValue? value):
+                return value;
+            
+            case UnionValue unionValue when unionValue.Fields.TryGetValue(memberAccessExpression.Member.Symbol, out IRuntimeValue? value):
+                return value;
+        }
+        
+        throw new Exception($"Member '{memberAccessExpression.Member.Symbol}' does not exist on type '{objectValue.GetType()}'.");
     }
     
     private static IRuntimeValue EvaluateIdentifier(Identifier identifier, Scope scope) => scope.Get(identifier);
@@ -282,7 +297,7 @@ public class Interpreter
     private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Scope scope)
     {
         IRuntimeValue value = Evaluate(assignmentExpression.Assignment, scope);
-        scope.Assign(assignmentExpression.Identifier, value);
+        scope.Assign(assignmentExpression.Member, value);
         return value;
     }
     

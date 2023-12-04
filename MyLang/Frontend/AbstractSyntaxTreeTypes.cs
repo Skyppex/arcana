@@ -351,13 +351,13 @@ public sealed class VariableDeclarationExpression : IExpression
 
 public sealed class AssignmentExpression : IExpression
 {
-    public AssignmentExpression(Identifier identifier, IExpression assignment)
+    public AssignmentExpression(MemberExpression member, IExpression assignment)
     {
-        Identifier = identifier;
+        Member = member;
         Assignment = assignment;
     }
     
-    public Identifier Identifier { get; }
+    public MemberExpression Member { get; }
     public IExpression Assignment { get; }
     
     public string GetNodeTree(ref int indent)
@@ -366,7 +366,7 @@ public sealed class AssignmentExpression : IExpression
         builder.AppendLine($"<{nameof(AssignmentExpression)}>");
         
         indent++;
-        builder.AppendLine(Indent.Get(indent) + $"{nameof(Identifier)}: {Identifier.GetNodeTree(ref indent)}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(Member)}: {Member.GetNodeTree(ref indent)}");
         builder.Append(Indent.Dash(indent) + $"{nameof(Assignment)}: {Assignment.GetNodeTree(ref indent)}");
         indent--;
         
@@ -380,14 +380,21 @@ public sealed class AssignmentExpression : IExpression
     }
 }
 
-public sealed class Identifier : IExpression
+public abstract class MemberExpression : IExpression
+{
+    public abstract string Symbol { get; }
+    public abstract string GetNodeTree(ref int indent);
+    public abstract void Traverse(Action<INode> action);
+}
+
+public sealed class Identifier : MemberExpression
 {
     public Identifier(string symbol) => Symbol = symbol;
     
-    public string Symbol { get; }
+    public override string Symbol { get; }
 
-    public string GetNodeTree(ref int indent) => $"<{nameof(Identifier)}>, {nameof(Symbol)}: {Symbol}";
-    public void Traverse(Action<INode> action) => action(this);
+    public override string GetNodeTree(ref int indent) => $"<{nameof(Identifier)}>, {nameof(Symbol)}: {Symbol}";
+    public override void Traverse(Action<INode> action) => action(this);
 }
 
 public abstract class NumericLiteral : IExpression
@@ -552,21 +559,22 @@ public sealed class UnionLiteral : IExpression
     }
 }
 
-public sealed class MemberExpression : IExpression
+public sealed class MemberAccessExpression : MemberExpression
 {
-    public MemberExpression(IExpression @object, IExpression member)
+    public MemberAccessExpression(IExpression @object, MemberExpression member)
     {
         Object = @object;
         Member = member;
     }
 
     public IExpression Object { get; }
-    public IExpression Member { get; }
+    public MemberExpression Member { get; }
+    public override string Symbol => Member.Symbol;
     
-    public string GetNodeTree(ref int indent)
+    public override string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
-        builder.AppendLine($"<{nameof(MemberExpression)}>");
+        builder.AppendLine($"<{nameof(MemberAccessExpression)}>");
 
         indent++;
         builder.AppendLine(Indent.Get(indent) + $"{nameof(Object)}: {Object.GetNodeTree(ref indent)}");
@@ -576,10 +584,10 @@ public sealed class MemberExpression : IExpression
         return builder.ToString();
     }
 
-    public void Traverse(Action<INode> action)
+    public override void Traverse(Action<INode> action)
     {
         action(this);
-        // Object.Traverse(action);
+        Object.Traverse(action);
         // Member.Traverse(action);
     }
 }
@@ -594,7 +602,8 @@ public sealed class CallExpression : IExpression
 
     public IExpression Caller { get; }
     public List<IExpression> Arguments { get; }
-    
+
+
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();

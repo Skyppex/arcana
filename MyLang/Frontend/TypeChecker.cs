@@ -192,7 +192,7 @@ public class TypeChecker
                 throw new InvalidOperationException($"Identifier '{identifier.Symbol}' doesn't exist in current context.");
             }
 
-            case MemberExpression memberExpression:
+            case MemberAccessExpression memberExpression:
             {
                 Type type = CheckType(memberExpression.Object, typeEnvironment);
 
@@ -213,8 +213,8 @@ public class TypeChecker
                             return fieldType;
                         }
                         
-                        case CallExpression callExpression:
-                            return CheckType(callExpression, typeEnvironment);
+                        // case CallExpression callExpression:
+                        //     return CheckType(callExpression, typeEnvironment);
                     }
                 }
 
@@ -260,14 +260,16 @@ public class TypeChecker
             case AssignmentExpression assignmentExpression:
             {
                 Type type = CheckType(assignmentExpression.Assignment, typeEnvironment);
-                
-                if (!typeEnvironment.LookupType(assignmentExpression.Identifier.Symbol, out Type? variableType))
+
+                Type accessorRootType = CheckType(assignmentExpression.Member, typeEnvironment);
+
+                if (!typeEnvironment.LookupVariable(assignmentExpression.Member.Symbol, out Type? variableType, accessorRootType))
                     throw new InvalidOperationException(
-                        $"Identifier '{assignmentExpression.Identifier.Symbol}' doesn't exist in current context.");
+                        $"Identifier '{assignmentExpression.Member.Symbol}' doesn't exist in current context.");
                 
                 if (type != variableType)
                     throw new InvalidOperationException(
-                        $"Variable {assignmentExpression.Identifier.Symbol} has type '{variableType}' but was assigned '{type}'");
+                        $"Variable {assignmentExpression.Member.Symbol} has type '{variableType}' but was assigned '{type}'");
                 
                 return type;
             }

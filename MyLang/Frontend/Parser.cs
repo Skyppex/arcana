@@ -418,10 +418,16 @@ public class Parser
         if (Current() is not IdentifierToken)
             return ParseTernaryExpression();
 
-        if (!NextIs<IdentifierToken, EqualsToken>(out IdentifierToken? identifierToken, out _))
+        if (!ExistsBeforeSemiColon<EqualsToken>())
             return ParseTernaryExpression();
 
-        return ParseExpression().Map(e => new AssignmentExpression(new Identifier(identifierToken!.Symbol), e) as IExpression);
+        if (NextIs<IdentifierToken, IdentifierToken>(out _, out _, doNext: false))
+            return ParseTernaryExpression();
+        
+        Result<IExpression, string> member = ParseMemberAccessExpression();
+        Result<EqualsToken, string> equals = Expect<EqualsToken>("Expected '='.");
+        
+        return member.Map(m => (MemberExpression)m).AndThen(m => equals.AndThen(_ => ParseExpression().Map(e => new AssignmentExpression(m, e) as IExpression)));
     }
 
     private Result<IExpression, string> ParseTernaryExpression()
@@ -550,7 +556,7 @@ public class Parser
 
     private Result<IExpression, string> ParseCallMemberExpression()
     {
-        var member = ParseMemberExpression();
+        var member = ParseMemberAccessExpression();
 
         if (Current() is OpenParenToken)
             return ParseCallExpression(member);
@@ -587,7 +593,7 @@ public class Parser
         return args;
     }
 
-    private Result<IExpression, string> ParseMemberExpression()
+    private Result<IExpression, string> ParseMemberAccessExpression()
     {
         Result<IExpression, string> expression = ParsePrimaryExpression();
 
@@ -600,7 +606,7 @@ public class Parser
             
             // Expression is an Identifier here
             Result<Identifier, string> property = ParsePrimaryExpression().Map(e => (Identifier)e);
-            expression = expression.AndThen(e => property.Map(p => new MemberExpression(e, p) as IExpression));
+            expression = expression.AndThen(e => property.Map(p => new MemberAccessExpression(e, p) as IExpression));
         }
 
         return expression;

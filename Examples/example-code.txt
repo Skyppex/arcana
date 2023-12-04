@@ -1,9 +1,5 @@
-struct C {i32 x;}
-struct B {C c;}
-struct A {B b;}
+struct Point {i32 x; i32 y;};
 
-C c1 = C {x:1};
-B b1 = B {c:c1};
-A a1 = A {b:b1};
+mutable Point point = Point {x:0, y:1};
 
-a1.b.c.x;
+point.x = 5;
