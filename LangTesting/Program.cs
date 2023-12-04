@@ -50,7 +50,7 @@ while (true)
                 typeChecker.CheckType(statement, targetTypeEnvironment);
         });
         
-        IRuntimeValue evaluation = Interpreter.Evaluate(program, targetScope, targetTypeEnvironment);
+        IRuntimeValue evaluation = Interpreter.Evaluate(program, targetScope);
         Console.WriteLine(evaluation.ToString());
     }
     catch (Exception e)

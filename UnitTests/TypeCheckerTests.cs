@@ -139,7 +139,7 @@ public class TypeCheckerTests
         var typeChecker = new TypeChecker();
         var identifier = new Identifier("x");
         var typeEnvironment = new TypeEnvironment();
-        typeEnvironment.Define(identifier.Symbol, Type.i32);
+        typeEnvironment.DefineVariable(identifier.Symbol, Type.i32);
         
         // Act
         Type type = typeChecker.CheckType(identifier, typeEnvironment);

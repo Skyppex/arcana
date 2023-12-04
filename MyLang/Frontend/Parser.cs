@@ -597,7 +597,7 @@ public class Parser
 
             if (Current() is not IdentifierToken)
                 return Error<IExpression, string>("Expected identifier after '.'.");
-                
+            
             // Expression is an Identifier here
             Result<Identifier, string> property = ParsePrimaryExpression().Map(e => (Identifier)e);
             expression = expression.AndThen(e => property.Map(p => new MemberExpression(e, p) as IExpression));

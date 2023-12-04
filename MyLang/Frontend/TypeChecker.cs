@@ -45,7 +45,7 @@ public class TypeChecker
 
             case StructLiteral structLiteral:
             {
-                if (!typeEnvironment.Lookup(structLiteral.Identifier, out Type? type))
+                if (!typeEnvironment.LookupType(structLiteral.Identifier, out StructType? type))
                     throw new Exception($"Struct with name '{structLiteral.Identifier}' is not defined.");
 
                 List<Type> fieldTypes = type!.Fields.Values.ToList();
@@ -68,10 +68,10 @@ public class TypeChecker
             
             case UnionLiteral unionLiteral:
             {
-                if (!typeEnvironment.Lookup(unionLiteral.Identifier, out Type? type))
+                if (!typeEnvironment.LookupType(unionLiteral.Identifier, out UnionType? type))
                     throw new Exception($"Union with name '{unionLiteral.Identifier}' is not defined.");
 
-                List<Type> fieldTypes = type!.Fields[unionLiteral.Member].Fields.Values.ToList();
+                List<Type> fieldTypes = type!.Members[unionLiteral.Member].Select(pair => pair.Value).ToList();
                 
                 for (int i = 0; i < unionLiteral.FieldInitializers.Count; i++)
                 {
@@ -83,7 +83,7 @@ public class TypeChecker
                         throw new Exception($"Union member '{unionLiteral.Identifier}{TokenSymbol.MEMBER_ACCESSOR}{unionLiteral.Member}' does not contain {i + 1} fields.");
 
                     if (fieldTypes[i] != initializerType)
-                        throw new Exception($"Initializer for field '{type.Fields.Keys.ToList()[i]}' is not of type '{fieldTypes[i]}'.");
+                        throw new Exception($"Initializer for field '{type}.{fieldTypes[i]}' is not of type '{fieldTypes[i]}'.");
                 }
 
                 return type;
@@ -186,17 +186,56 @@ public class TypeChecker
             
             case Identifier identifier:
             {
-                if (typeEnvironment.Lookup(identifier.Symbol, out Type? type))
-                    return type;
+                if (typeEnvironment.LookupVariable(identifier.Symbol, out Type? type))
+                    return type!;
                 
                 throw new InvalidOperationException($"Identifier '{identifier.Symbol}' doesn't exist in current context.");
+            }
+
+            case MemberExpression memberExpression:
+            {
+                Type type = CheckType(memberExpression.Object, typeEnvironment);
+
+                if (type is StructType structType)
+                {
+                    switch (memberExpression.Member)
+                    {
+                        case Identifier identifier:
+                        {
+                            if (!structType.Fields.ContainsKey(identifier.Symbol))
+                                throw new InvalidOperationException($"Struct '{structType.Name}' doesn't contain field '{identifier.Symbol}'");
+                            
+                            Type fieldType = structType.Fields[identifier.Symbol];
+                            
+                            if (!typeEnvironment.LookupType<Type>(fieldType.Name, out _))
+                                throw new InvalidOperationException($"Type '{fieldType.Name}' doesn't exist in current context.");
+
+                            return fieldType;
+                        }
+                        
+                        case CallExpression callExpression:
+                            return CheckType(callExpression, typeEnvironment);
+                    }
+                }
+
+                break;
+            }
+
+            case CallExpression callExpression:
+            {
+                Type type = CheckType(callExpression.Caller, typeEnvironment);
+
+                foreach (IExpression argument in callExpression.Arguments)
+                    CheckType(argument, typeEnvironment);
+
+                return type; // TODO: Return type of function instead of caller type
             }
             
             case VariableDeclarationExpression variableDeclarationExpression:
             {
                 Type type = CheckType(variableDeclarationExpression.Initializer, typeEnvironment);
 
-                if (!typeEnvironment.Lookup(variableDeclarationExpression.TypeName, out Type? expectedType))
+                if (!typeEnvironment.LookupType(variableDeclarationExpression.TypeName, out Type? expectedType))
                     throw new InvalidOperationException(
                         $"Type '{variableDeclarationExpression.TypeName}' doesn't exist in current context.");
                 
@@ -206,23 +245,23 @@ public class TypeChecker
                         $"Variable {variableDeclarationExpression.Identifier.Symbol} has type '{expectedType}' but was assigned '{type}'");
                 }
                 
-                return typeEnvironment.Define(variableDeclarationExpression.Identifier.Symbol, type);
+                return typeEnvironment.DefineVariable(variableDeclarationExpression.Identifier.Symbol, type);
             }
             
             case VariableDeclarationStatement variableDeclarationStatement:
             {
-                if (!typeEnvironment.Lookup(variableDeclarationStatement.TypeName, out Type? type))
+                if (!typeEnvironment.LookupType(variableDeclarationStatement.TypeName, out Type? type))
                     throw new InvalidOperationException(
                         $"Type '{variableDeclarationStatement.TypeName}' doesn't exist in current context.");
                 
-                return typeEnvironment.Define(variableDeclarationStatement.Identifier.Symbol, type!);
+                return typeEnvironment.DefineVariable(variableDeclarationStatement.Identifier.Symbol, type!);
             }
 
             case AssignmentExpression assignmentExpression:
             {
                 Type type = CheckType(assignmentExpression.Assignment, typeEnvironment);
                 
-                if (!typeEnvironment.Lookup(assignmentExpression.Identifier.Symbol, out Type? variableType))
+                if (!typeEnvironment.LookupType(assignmentExpression.Identifier.Symbol, out Type? variableType))
                     throw new InvalidOperationException(
                         $"Identifier '{assignmentExpression.Identifier.Symbol}' doesn't exist in current context.");
                 
@@ -240,24 +279,22 @@ public class TypeChecker
 
             case StructDeclarationStatement structDeclarationStatement:
             {
-                if (typeEnvironment.IsDefined(structDeclarationStatement.TypeName))
+                if (typeEnvironment.IsTypeDefined(structDeclarationStatement.TypeName))
                     throw new Exception($"Type '{structDeclarationStatement.TypeName}' already exists in current context.");
 
-                structDeclarationStatement.Fields.ToList()
-                    .ForEach(f =>
+                return typeEnvironment.DefineType(new StructType(structDeclarationStatement.TypeName,
+                    structDeclarationStatement.Fields.ToDictionary(f => f.Identifier, f =>
                     {
-                        if (typeEnvironment.IsDefined(f.TypeName))
-                            return;
-
+                        if (typeEnvironment.LookupType(f.TypeName, out Type? type))
+                            return type!;
+                        
                         throw new Exception($"Type '{f.TypeName}' doesn't exist in current context.");
-                    });
-                
-                return Type.statement;
+                    })));
             }
 
             case UnionDeclarationStatement unionDeclarationStatement:
             {
-                if (typeEnvironment.IsDefined(unionDeclarationStatement.TypeName))
+                if (typeEnvironment.IsTypeDefined(unionDeclarationStatement.TypeName))
                     throw new Exception($"Type '{unionDeclarationStatement.TypeName}' already exists in current context.");
                 
                 unionDeclarationStatement.Members.ToList()
@@ -265,14 +302,14 @@ public class TypeChecker
                     {
                         m.Fields.ForEach(f =>
                         {
-                            if (typeEnvironment.IsDefined(f.TypeName))
+                            if (typeEnvironment.IsTypeDefined(f.TypeName))
                                 return;
                             
                             throw new Exception($"Type '{f.TypeName}' doesn't exist in current context.");
                         });
                     });
                 
-                return Type.statement;
+                return typeEnvironment.DefineType(new UnionType(unionDeclarationStatement.TypeName));
             }
             
             case Program:

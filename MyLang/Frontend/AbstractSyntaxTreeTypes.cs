@@ -579,8 +579,8 @@ public sealed class MemberExpression : IExpression
     public void Traverse(Action<INode> action)
     {
         action(this);
-        Object.Traverse(action);
-        Member.Traverse(action);
+        // Object.Traverse(action);
+        // Member.Traverse(action);
     }
 }
 

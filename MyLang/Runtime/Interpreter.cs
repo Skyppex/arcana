@@ -7,7 +7,7 @@ namespace MyLang.Runtime;
 
 public class Interpreter
 {
-    public static IRuntimeValue Evaluate(IStatement statement, Scope scope, TypeEnvironment typeEnvironment)
+    public static IRuntimeValue Evaluate(IStatement statement, Scope scope)
     {
         switch (statement)
         {
@@ -24,52 +24,55 @@ public class Interpreter
                 return new BooleanValue(booleanLiteral.Value);
             
             case StructLiteral structLiteral:
-                return EvaluateStructLiteral(structLiteral, scope, typeEnvironment);
+                return EvaluateStructLiteral(structLiteral, scope);
             
             case UnionLiteral unionLiteral:
-                return EvaluateUnionLiteral(unionLiteral, scope, typeEnvironment);
+                return EvaluateUnionLiteral(unionLiteral, scope);
             
             case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.ADD or TokenSymbol.SUBTRACT or TokenSymbol.BITWISE_NOT }:
-                return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope, typeEnvironment));
+                return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope));
 
             case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.LOGICAL_NOT or TokenSymbol.BITWISE_NOT }:
-                return EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope, typeEnvironment));
+                return EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope));
 
             case TernaryExpression ternaryExpression:
-                return EvaluateTernaryExpression(ternaryExpression, scope, typeEnvironment);
+                return EvaluateTernaryExpression(ternaryExpression, scope);
             
             case BinaryExpression binaryExpression:
-                return EvaluateBinaryExpression(binaryExpression, scope, typeEnvironment);
+                return EvaluateBinaryExpression(binaryExpression, scope);
+            
+            case MemberExpression memberExpression:
+                return EvaluateMemberExpression(memberExpression, scope);
             
             case Identifier identifier:
                 return EvaluateIdentifier(identifier, scope);
             
             case AssignmentExpression assignmentExpression:
-                return EvaluateAssignmentExpression(assignmentExpression, scope, typeEnvironment);
+                return EvaluateAssignmentExpression(assignmentExpression, scope);
             
             case VariableDeclarationStatement variableDeclarationStatement:
-                return EvaluateVariableDeclarationStatement(variableDeclarationStatement, scope, typeEnvironment);
+                return EvaluateVariableDeclarationStatement(variableDeclarationStatement, scope);
             
-            case StructDeclarationStatement structDeclarationStatement:
-                return EvaluateStructDeclarationStatement(structDeclarationStatement, typeEnvironment);
+            case StructDeclarationStatement:
+                return EvaluateStructDeclarationStatement();
             
-            case UnionDeclarationStatement unionDeclarationStatement:
-                return EvaluateUnionDeclarationStatement(unionDeclarationStatement, typeEnvironment);
+            case UnionDeclarationStatement:
+                return EvaluateUnionDeclarationStatement();
             
             case IfStatement ifStatement:
-                return EvaluateIfStatement(ifStatement, scope, typeEnvironment);
+                return EvaluateIfStatement(ifStatement, scope);
             
             case VariableDeclarationExpression variableDeclarationExpression:
-                return EvaluateVariableDeclarationExpression(variableDeclarationExpression, scope, typeEnvironment);
+                return EvaluateVariableDeclarationExpression(variableDeclarationExpression, scope);
             
             case BlockExpression blockExpression:
-                return EvaluateBlockExpression(blockExpression, scope, typeEnvironment);
+                return EvaluateBlockExpression(blockExpression, scope);
             
             case DropExpression dropExpression:
-                return EvaluateDropExpression(dropExpression, scope, typeEnvironment);
+                return EvaluateDropExpression(dropExpression, scope);
             
             case Program program:
-                return EvaluateProgram(program, scope, typeEnvironment);
+                return EvaluateProgram(program, scope);
             
             default:
                 throw new InvalidProgramException($"The {statement.GetType()} Node has not been setup for interpretation.");
@@ -78,22 +81,20 @@ public class Interpreter
 
     private static IRuntimeValue EvaluateStructLiteral(
         StructLiteral structLiteral,
-        Scope scope,
-        TypeEnvironment typeEnvironment) =>
+        Scope scope) =>
         new StructValue(structLiteral.Identifier, structLiteral.FieldInitializers
-            .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, scope, typeEnvironment)));
+            .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, scope)));
 
     private static IRuntimeValue EvaluateUnionLiteral(
         UnionLiteral unionLiteral,
-        Scope scope,
-        TypeEnvironment typeEnvironment) =>
+        Scope scope) =>
         new UnionValue(unionLiteral.UnionMember, unionLiteral.FieldInitializers
-            .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, scope, typeEnvironment)));
+            .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, scope)));
 
-    private static IRuntimeValue EvaluateBinaryExpression(BinaryExpression binaryExpression, Scope scope, TypeEnvironment typeEnvironment)
+    private static IRuntimeValue EvaluateBinaryExpression(BinaryExpression binaryExpression, Scope scope)
     {
-        IRuntimeValue lhs = Evaluate(binaryExpression.Left, scope, typeEnvironment);
-        IRuntimeValue rhs = Evaluate(binaryExpression.Right, scope, typeEnvironment);
+        IRuntimeValue lhs = Evaluate(binaryExpression.Left, scope);
+        IRuntimeValue rhs = Evaluate(binaryExpression.Right, scope);
         
         if (lhs is EmptyProgramValue || rhs is EmptyProgramValue)
             throw new InvalidProgramException("Cannot evaluate an empty program.");
@@ -256,117 +257,70 @@ public class Interpreter
                 throw new InvalidProgramException($"The operator {binaryExpression.Operator} is not supported.");
         }
     }
+
+    private static IRuntimeValue EvaluateMemberExpression(MemberExpression memberExpression, Scope scope)
+    {
+        Evaluate(memberExpression.Object, scope);
+        return Evaluate(memberExpression.Member, scope);
+    }
     
     private static IRuntimeValue EvaluateIdentifier(Identifier identifier, Scope scope) => scope.Get(identifier);
 
-    private static IRuntimeValue EvaluateTernaryExpression(TernaryExpression ternaryExpression, Scope scope, TypeEnvironment typeEnvironment)
+    private static IRuntimeValue EvaluateTernaryExpression(TernaryExpression ternaryExpression, Scope scope)
     {
-        IRuntimeValue condition = Evaluate(ternaryExpression.Condition, scope, typeEnvironment);
+        IRuntimeValue condition = Evaluate(ternaryExpression.Condition, scope);
         
         if (condition is not BooleanValue booleanValue)
             throw new Exception($"Condition must be a boolean value, but was {condition.GetType()}.");
 
         if (booleanValue.Value)
-            return Evaluate(ternaryExpression.Then, new Scope(scope), typeEnvironment);
+            return Evaluate(ternaryExpression.Then, new Scope(scope));
         
-        return Evaluate(ternaryExpression.Else, new Scope(scope), typeEnvironment);
+        return Evaluate(ternaryExpression.Else, new Scope(scope));
     }
     
-    private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Scope scope, TypeEnvironment typeEnvironment)
+    private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Scope scope)
     {
-        IRuntimeValue value = Evaluate(assignmentExpression.Assignment, scope, typeEnvironment);
+        IRuntimeValue value = Evaluate(assignmentExpression.Assignment, scope);
         scope.Assign(assignmentExpression.Identifier, value);
         return value;
     }
     
     private static IRuntimeValue EvaluateVariableDeclarationStatement(
         VariableDeclarationStatement variableDeclarationStatement,
-        Scope scope,
-        TypeEnvironment typeEnvironment)
+        Scope scope)
     {
-        if (!typeEnvironment.Lookup(variableDeclarationStatement.TypeName, out _))
-            throw new Exception($"Type '{variableDeclarationStatement.TypeName}' does not exist in current context.");
-        
         scope.Declare(variableDeclarationStatement.Identifier, variableDeclarationStatement.Mutable, Uninitialized.Instance);
         return Uninitialized.Instance;
     }
 
-    private static IRuntimeValue EvaluateStructDeclarationStatement(
-        StructDeclarationStatement structDeclarationStatement,
-        TypeEnvironment typeEnvironment)
-    {
-        string structName = structDeclarationStatement.TypeName;
-        
-        if (typeEnvironment.Lookup(structName, out _))
-            throw new Exception($"Type '{structName}' already exists in current context.");
-        
-        typeEnvironment.Define(
-            structDeclarationStatement.TypeName,
-            new Type(structDeclarationStatement.TypeName,
-                Type.TypeMode.Struct,
-                structDeclarationStatement.Fields
-                    .ToDictionary(f => f.Identifier, f =>
-                    {
-                        if (typeEnvironment.Lookup(f.TypeName, out Type? fieldType))
-                            return fieldType!;
-
-                        throw new Exception($"Type '{f.TypeName}' doesn't exist in current context.");
-                    })));
-        
-        return NoValue.Instance;
-    }
-    
-    private static IRuntimeValue EvaluateUnionDeclarationStatement(
-        UnionDeclarationStatement unionDeclarationStatement,
-        TypeEnvironment typeEnvironment)
-    {
-        string structName = unionDeclarationStatement.TypeName;
-        
-        if (typeEnvironment.Lookup(structName, out _))
-            throw new Exception($"Type '{structName}' already exists in current context.");
-        
-        typeEnvironment.Define(
-            unionDeclarationStatement.TypeName,
-            new Type(unionDeclarationStatement.TypeName,
-                Type.TypeMode.Union,
-                unionDeclarationStatement.Members
-                    .ToDictionary(m => m.Identifier, m => new Type(m.Identifier, Type.TypeMode.Struct, m.Fields
-                        .ToDictionary(f => f.Identifier, f =>
-                        {
-                            if (typeEnvironment.Lookup(f.TypeName, out Type? fieldType))
-                                return fieldType!;
-
-                            throw new Exception($"Type '{f.TypeName}' doesn't exist in current context.");
-                        })))));
-        
-        return NoValue.Instance;
-    }
+    private static IRuntimeValue EvaluateStructDeclarationStatement() => NoValue.Instance;
+    private static IRuntimeValue EvaluateUnionDeclarationStatement() => NoValue.Instance;
 
     private static IRuntimeValue EvaluateIfStatement(
         IfStatement ifStatement,
-        Scope scope,
-        TypeEnvironment typeEnvironment)
+        Scope scope)
     {
-        IRuntimeValue condition = Evaluate(ifStatement.If.Condition, scope, typeEnvironment);
+        IRuntimeValue condition = Evaluate(ifStatement.If.Condition, scope);
         
         if (condition is not BooleanValue booleanValue)
             throw new Exception($"Condition must be a boolean value, but was {condition.GetType()}.");
 
         if (booleanValue.Value)
-            return Evaluate(ifStatement.If.Block, new Scope(scope), typeEnvironment);
+            return Evaluate(ifStatement.If.Block, new Scope(scope));
 
         var resultOfElifs = ifStatement.ElseIfs.Match(
             some: elifs =>
             {
                 foreach (var elseIf in elifs)
                 {
-                    IRuntimeValue elifCondition = Evaluate(elseIf.Condition, scope, typeEnvironment);
+                    IRuntimeValue elifCondition = Evaluate(elseIf.Condition, scope);
 
                     if (elifCondition is not BooleanValue elifBooleanValue)
                         throw new Exception($"Condition must be a boolean value, but was {elifCondition.GetType()}.");
 
                     if (elifBooleanValue.Value)
-                        return Some(Evaluate(elseIf.Block, new Scope(scope), typeEnvironment));
+                        return Some(Evaluate(elseIf.Block, new Scope(scope)));
                 }
                 
                 return None<IRuntimeValue>();
@@ -377,37 +331,32 @@ public class Interpreter
             return resultOfElifs.Unwrap();
         
         return ifStatement.Else.Match(
-            some: e => Evaluate(e, new Scope(scope), typeEnvironment),
+            some: e => Evaluate(e, new Scope(scope)),
             none: () => NoValue.Instance);
     }
     
     private static IRuntimeValue EvaluateVariableDeclarationExpression(
         VariableDeclarationExpression variableDeclarationExpression,
-        Scope scope,
-        TypeEnvironment typeEnvironment)
+        Scope scope)
     {
-        if (!typeEnvironment.Lookup(variableDeclarationExpression.TypeName, out _))
-            throw new Exception($"Type '{variableDeclarationExpression.TypeName}' does not exist in current context.");
-
-        IRuntimeValue value = Evaluate(variableDeclarationExpression.Initializer, scope, typeEnvironment);
+        IRuntimeValue value = Evaluate(variableDeclarationExpression.Initializer, scope);
         scope.Declare(variableDeclarationExpression.Identifier, variableDeclarationExpression.Mutable, value);
         return value;
     }
 
     private static IRuntimeValue EvaluateBlockExpression(
         BlockExpression blockExpression,
-        Scope scope,
-        TypeEnvironment typeEnvironment) =>
-        Evaluate(blockExpression.Expression, scope, typeEnvironment);
+        Scope scope) =>
+        Evaluate(blockExpression.Expression, scope);
 
-    private static IRuntimeValue EvaluateDropExpression(DropExpression dropExpression, Scope scope, TypeEnvironment typeEnvironment)
+    private static IRuntimeValue EvaluateDropExpression(DropExpression dropExpression, Scope scope)
     {
-        IRuntimeValue value = Evaluate(dropExpression.Identifier, scope, typeEnvironment);
+        IRuntimeValue value = Evaluate(dropExpression.Identifier, scope);
         scope.Drop(dropExpression.Identifier);
         return value;
     }
     
-    private static IRuntimeValue EvaluateProgram(Program program, Scope scope, TypeEnvironment typeEnvironment)
+    private static IRuntimeValue EvaluateProgram(Program program, Scope scope)
     {
         IRuntimeValue lastEvaluated = new EmptyProgramValue();
 
@@ -416,7 +365,7 @@ public class Interpreter
             IRuntimeValue evaluated = lastEvaluated;
 
             lastEvaluated = statement.Match(
-                ok: s => Evaluate(s, scope, typeEnvironment),
+                ok: s => Evaluate(s, scope),
                 error: e =>
                 {
                     Console.WriteLine($"ERROR: {e}");

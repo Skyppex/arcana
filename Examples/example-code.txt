@@ -1,7 +1,9 @@
-union Option { Some(f32 x); None; }
-Option num = Option.Some(x: 5.0);
-Option num2 = Option.None;
+struct C {i32 x;}
+struct B {C c;}
+struct A {B b;}
 
-struct Point { f32 x; f32 y; }
-Point p = Point { x: 1.0, y: 2.0 };
-p.x.y = 3.0;
+C c1 = C {x:1};
+B b1 = B {c:c1};
+A a1 = A {b:b1};
+
+a1.b.c.x;

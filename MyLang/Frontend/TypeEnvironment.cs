@@ -15,32 +15,92 @@ public class TypeEnvironment
     };
     
     private readonly Dictionary<string, Type> _typesByName;
+    private readonly Dictionary<string, Type> _variableTypesByName;
     
     public TypeEnvironment(TypeEnvironment? parent = null)
     {
         _typesByName = new Dictionary<string, Type>();
+        _variableTypesByName = new Dictionary<string, Type>();
         Parent = parent;
     }
 
     public TypeEnvironment? Parent { get; }
     
-    public Type Define(string name, Type type)
+    public Type DefineType(Type type)
     {
-        _typesByName[name] = type;
+        _typesByName[type.Name] = type;
+        return type;
+    }
+
+    public Type DefineVariable(string name, Type type)
+    {
+        _variableTypesByName[name] = type;
         return type;
     }
     
-    public bool IsDefined(string name) => _typesByName.ContainsKey(name);
+    public Type DefineVariable(KeyValuePair<string, Type> field) => DefineVariable(field.Key, field.Value);
+
+    public bool IsTypeDefined(string name) => _typesByName.ContainsKey(name);
+    public bool IsVariableDefined(string name) => _variableTypesByName.ContainsKey(name);
     
-    public bool Lookup(string name, out Type? type)
+    // public bool LookupType(string name, out Type? type)
+    // {
+    //     if (_typesByName.TryGetValue(name, out Type? t))
+    //     {
+    //         type = t;
+    //         return true;
+    //     }
+    //
+    //     if (Parent?.LookupType(name, out t) ?? false)
+    //     {
+    //         type = t;
+    //         return true;
+    //     }
+    //
+    //     type = null;
+    //     return false;
+    // }
+
+    public bool LookupType<T>(string name, out T? type)
+        where T : Type
     {
         if (_typesByName.TryGetValue(name, out Type? t))
+        {
+            if (t is T value)
+            {
+                type = value;
+                return true;
+            }
+
+            type = null;
+            return false;
+        }
+
+        if (Parent?.LookupType(name, out t) ?? false)
+        {
+            if (t is T value)
+            {
+                type = value;
+                return true;
+            }
+            
+            type = null;
+            return false;
+        }
+
+        type = null;
+        return false;
+    }
+    
+    public bool LookupVariable(string name, out Type? type)
+    {
+        if (_variableTypesByName.TryGetValue(name, out Type? t))
         {
             type = t;
             return true;
         }
 
-        if (Parent?.Lookup(name, out t) ?? false)
+        if (Parent?.LookupVariable(name, out t) ?? false)
         {
             type = t;
             return true;
