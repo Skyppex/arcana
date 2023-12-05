@@ -77,7 +77,7 @@ The syntax allows for trailing commas in structs, arrays and unions.
 
 Here are our models in pseudo code:
 ```
-type MyStruct = {
+struct MyStruct {
     nullValue: null,
     boolValue: boolean,
     numberValue: number,
@@ -85,7 +85,7 @@ type MyStruct = {
     structValue: Option<MyStruct>,
 }
 
-type Option<T> = {
+union Option<T> {
     Some(T),
     None,
 }
