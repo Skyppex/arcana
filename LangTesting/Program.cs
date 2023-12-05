@@ -1,5 +1,6 @@
 ﻿using MyLang;
 using MyLang.Runtime;
+using Environment = MyLang.Runtime.Environment;
 
 Console.WriteLine("Program started. Type 'read' to read from file, 'q' to exit, 'notree' to disable the AST print, 'tree' to toggle it back on.");
 
@@ -7,7 +8,7 @@ string text = File.ReadAllText(@"..\..\..\..\Examples\example-code.txt");
 
 var parser = new Parser();
 
-Scope cliScope = CreateScope();
+Environment cliEnvironment = CreateScope();
 var typeChecker = new TypeChecker();
 TypeEnvironment typeEnvironment = TypeEnvironment.Create();
 bool printTree = true;
@@ -30,13 +31,13 @@ while (true)
             continue;
     }
 
-    Scope targetScope = cliScope;
+    Environment targetEnvironment = cliEnvironment;
     TypeEnvironment targetTypeEnvironment = typeEnvironment;
     
     if (input is "read")
     {
         input = text;
-        targetScope = CreateScope();
+        targetEnvironment = CreateScope();
         targetTypeEnvironment = TypeEnvironment.Create();
     }
     
@@ -50,8 +51,12 @@ while (true)
                 typeChecker.CheckType(statement, targetTypeEnvironment);
         });
         
-        IRuntimeValue evaluation = Interpreter.Evaluate(program, targetScope);
+        IRuntimeValue evaluation = Interpreter.Evaluate(program, targetEnvironment);
         Console.WriteLine(evaluation.ToString());
+        Console.WriteLine();
+        
+        foreach (KeyValuePair<string, IRuntimeValue> variable in targetEnvironment.Variables)
+            Console.WriteLine($"{variable.Key} = {variable.Value}");
     }
     catch (Exception e)
     {
@@ -69,10 +74,10 @@ while (true)
 
 Console.WriteLine("Program ended.");
 
-static Scope CreateScope()
+static Environment CreateScope()
 {
-    Scope scope = new();
-    scope.MakeBool("true", true);
-    scope.MakeBool("false", false);
-    return scope;
+    Environment environment = new();
+    environment.MakeBool("true", true);
+    environment.MakeBool("false", false);
+    return environment;
 }

@@ -752,16 +752,31 @@ public sealed class TernaryExpression : IExpression
 
 public sealed class BlockExpression : IExpression
 {
-    public BlockExpression(IExpression expression) => Expression = expression;
-    public IExpression Expression { get; }
+    public BlockExpression(List<IStatement> statements) => Statements = statements;
+    public List<IStatement> Statements { get; }
 
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
-        builder.AppendLine($"<{nameof(BlockExpression)}>");
+        builder.Append($"<{nameof(BlockExpression)}> {nameof(Statements)}:");
 
         indent++;
-        builder.Append(Indent.Get(indent) + $"{nameof(Expression)}: {Expression.GetNodeTree(ref indent)}");
+
+        if (Statements.Any())
+        {
+            indent++;
+            
+            foreach (IStatement statement in Statements)
+            {
+                builder.AppendLine();
+                builder.Append(Indent.Get(indent) + $"{statement.GetNodeTree(ref indent)}");
+            }
+
+            indent--;
+        }
+        else
+            builder.Append(" None");
+        
         indent--;
         
         return builder.ToString();
@@ -770,7 +785,9 @@ public sealed class BlockExpression : IExpression
     public void Traverse(Action<INode> action)
     {
         action(this);
-        Expression.Traverse(action);
+        
+        foreach (IStatement statememnt in Statements)
+            statememnt.Traverse(action);
     }
 }
 

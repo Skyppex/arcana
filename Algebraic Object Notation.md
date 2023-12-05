@@ -35,9 +35,9 @@ A collection of key-value pairs -> `{ "key": "value" }`
 ### Union
 
 A union is a collection where only one value can be present at a time. It is represented as a struct with a special key called `type` that specifies the type of the union.
+`type1` is one of the discriminants.
 ```
-union {
-    "type": "type1",
+#type1 {
     "key": "value"
 }
 ```
@@ -70,5 +70,52 @@ The syntax allows for trailing commas in structs, arrays and unions.
 {
     "key": "value",
     "key2": "value2",
+}
+```
+
+### Examples
+
+Here are our models in pseudo code:
+```
+type MyStruct = {
+    nullValue: null,
+    boolValue: boolean,
+    numberValue: number,
+    stringValue: string,
+    structValue: Option<MyStruct>,
+}
+
+type Option<T> = {
+    Some(T),
+    None,
+}
+```
+
+Here are some representations of MyStruct with some sample values:
+
+```aon
+{
+  "nullValue": null,
+  "boolValue": true,
+  "numberValue": 14,
+  "stringValue": "Foo",
+  "structValue": #some {
+    "nullValue": null,
+    "boolValue": false,
+    "numberValue": -1.618,
+    "stringValue": "Bar",
+    "structValue": #none {}
+  }
+}
+```
+
+If a union variant has no fields, the braces can be omitted:
+```aon
+{
+  "nullValue": null,
+  "boolValue": false,
+  "numberValue": -1.618,
+  "stringValue": "Bar",
+  "structValue": #none
 }
 ```

@@ -288,7 +288,12 @@ public class TypeChecker
 
             case BlockExpression blockExpression:
             {
-                return CheckType(blockExpression.Expression, typeEnvironment);
+                var lastType = Type.never;
+                
+                foreach (IStatement stmt in blockExpression.Statements)
+                    lastType = CheckType(stmt, new TypeEnvironment(typeEnvironment));
+                
+                return lastType;
             }
 
             case StructDeclarationStatement structDeclarationStatement:

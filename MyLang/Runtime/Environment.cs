@@ -1,8 +1,8 @@
 ﻿namespace MyLang.Runtime;
 
-public class Scope
+public class Environment
 {
-    private readonly Scope? _parent;
+    private readonly Environment? _parent;
     private readonly Dictionary<string, Variable> _variables = new();
 
     public IReadOnlyDictionary<string, IRuntimeValue> Variables
@@ -14,7 +14,7 @@ public class Scope
         }
     } 
     
-    public Scope(Scope? parent = null) => _parent = parent;
+    public Environment(Environment? parent = null) => _parent = parent;
     
     public bool HasDefinedVariable(string name) => _variables.ContainsKey(name);
     public bool HasDefinedVariable(Identifier identifier) => HasDefinedVariable(identifier.Symbol);
@@ -67,7 +67,7 @@ public class Scope
             : throw new Exception($"Variable '{name}' does not exist.");
     }
 
-    public Scope Resolve(string name)
+    public Environment Resolve(string name)
     {
         if (_variables.ContainsKey(name))
             return this;

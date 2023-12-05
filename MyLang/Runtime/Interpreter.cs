@@ -7,7 +7,7 @@ namespace MyLang.Runtime;
 
 public class Interpreter
 {
-    public static IRuntimeValue Evaluate(IStatement statement, Scope scope)
+    public static IRuntimeValue Evaluate(IStatement statement, Environment environment)
     {
         switch (statement)
         {
@@ -27,34 +27,34 @@ public class Interpreter
                 return new BooleanValue(booleanLiteral.Value);
             
             case StructLiteral structLiteral:
-                return EvaluateStructLiteral(structLiteral, scope);
+                return EvaluateStructLiteral(structLiteral, environment);
             
             case UnionLiteral unionLiteral:
-                return EvaluateUnionLiteral(unionLiteral, scope);
+                return EvaluateUnionLiteral(unionLiteral, environment);
             
             case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.ADD or TokenSymbol.SUBTRACT or TokenSymbol.BITWISE_NOT }:
-                return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope));
+                return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, environment));
 
             case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.LOGICAL_NOT or TokenSymbol.BITWISE_NOT }:
-                return EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, scope));
+                return EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, environment));
 
             case TernaryExpression ternaryExpression:
-                return EvaluateTernaryExpression(ternaryExpression, scope);
+                return EvaluateTernaryExpression(ternaryExpression, environment);
             
             case BinaryExpression binaryExpression:
-                return EvaluateBinaryExpression(binaryExpression, scope);
+                return EvaluateBinaryExpression(binaryExpression, environment);
             
             case MemberAccessExpression memberExpression:
-                return EvaluateMemberExpression(memberExpression, scope);
+                return EvaluateMemberExpression(memberExpression, environment);
             
             case Identifier identifier:
-                return EvaluateIdentifier(identifier, scope);
+                return EvaluateIdentifier(identifier, environment);
             
             case AssignmentExpression assignmentExpression:
-                return EvaluateAssignmentExpression(assignmentExpression, scope);
+                return EvaluateAssignmentExpression(assignmentExpression, environment);
             
             case VariableDeclarationStatement variableDeclarationStatement:
-                return EvaluateVariableDeclarationStatement(variableDeclarationStatement, scope);
+                return EvaluateVariableDeclarationStatement(variableDeclarationStatement, environment);
             
             case StructDeclarationStatement:
                 return EvaluateStructDeclarationStatement();
@@ -63,19 +63,19 @@ public class Interpreter
                 return EvaluateUnionDeclarationStatement();
             
             case IfStatement ifStatement:
-                return EvaluateIfStatement(ifStatement, scope);
+                return EvaluateIfStatement(ifStatement, environment);
             
             case VariableDeclarationExpression variableDeclarationExpression:
-                return EvaluateVariableDeclarationExpression(variableDeclarationExpression, scope);
+                return EvaluateVariableDeclarationExpression(variableDeclarationExpression, environment);
             
             case BlockExpression blockExpression:
-                return EvaluateBlockExpression(blockExpression, scope);
+                return EvaluateBlockExpression(blockExpression, environment);
             
             case DropExpression dropExpression:
-                return EvaluateDropExpression(dropExpression, scope);
+                return EvaluateDropExpression(dropExpression, environment);
             
             case Program program:
-                return EvaluateProgram(program, scope);
+                return EvaluateProgram(program, environment);
             
             default:
                 throw new InvalidProgramException($"The {statement.GetType()} Node has not been setup for interpretation.");
@@ -84,25 +84,25 @@ public class Interpreter
 
     private static IRuntimeValue EvaluateStructLiteral(
         StructLiteral structLiteral,
-        Scope scope) =>
+        Environment environment) =>
         new StructValue(structLiteral.Identifier, structLiteral.FieldInitializers
             .ToDictionary(f => f.FieldIdentifier, f =>
             {
-                IRuntimeValue value = Evaluate(f.Initializer, scope);
-                scope.Declare(new Identifier($"{structLiteral.Identifier}.{f.FieldIdentifier}"), true, value);
+                IRuntimeValue value = Evaluate(f.Initializer, environment);
+                environment.Declare(new Identifier($"{structLiteral.Identifier}.{f.FieldIdentifier}"), true, value);
                 return value;
             }));
 
     private static IRuntimeValue EvaluateUnionLiteral(
         UnionLiteral unionLiteral,
-        Scope scope) =>
+        Environment environment) =>
         new UnionValue(unionLiteral.UnionMember, unionLiteral.FieldInitializers
-            .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, scope)));
+            .ToDictionary(f => f.FieldIdentifier, f => Evaluate(f.Initializer, environment)));
 
-    private static IRuntimeValue EvaluateBinaryExpression(BinaryExpression binaryExpression, Scope scope)
+    private static IRuntimeValue EvaluateBinaryExpression(BinaryExpression binaryExpression, Environment environment)
     {
-        IRuntimeValue lhs = Evaluate(binaryExpression.Left, scope);
-        IRuntimeValue rhs = Evaluate(binaryExpression.Right, scope);
+        IRuntimeValue lhs = Evaluate(binaryExpression.Left, environment);
+        IRuntimeValue rhs = Evaluate(binaryExpression.Right, environment);
         
         if (lhs is EmptyProgramValue || rhs is EmptyProgramValue)
             throw new InvalidProgramException("Cannot evaluate an empty program.");
@@ -266,9 +266,9 @@ public class Interpreter
         }
     }
 
-    private static IRuntimeValue EvaluateMemberExpression(MemberAccessExpression memberAccessExpression, Scope scope)
+    private static IRuntimeValue EvaluateMemberExpression(MemberAccessExpression memberAccessExpression, Environment environment)
     {
-        IRuntimeValue objectValue = Evaluate(memberAccessExpression.Object, scope);
+        IRuntimeValue objectValue = Evaluate(memberAccessExpression.Object, environment);
 
         switch (objectValue)
         {
@@ -282,33 +282,33 @@ public class Interpreter
         throw new Exception($"Member '{memberAccessExpression.Member.Symbol}' does not exist on type '{objectValue.GetType()}'.");
     }
     
-    private static IRuntimeValue EvaluateIdentifier(Identifier identifier, Scope scope) => scope.Get(identifier);
+    private static IRuntimeValue EvaluateIdentifier(Identifier identifier, Environment environment) => environment.Get(identifier);
 
-    private static IRuntimeValue EvaluateTernaryExpression(TernaryExpression ternaryExpression, Scope scope)
+    private static IRuntimeValue EvaluateTernaryExpression(TernaryExpression ternaryExpression, Environment environment)
     {
-        IRuntimeValue condition = Evaluate(ternaryExpression.Condition, scope);
+        IRuntimeValue condition = Evaluate(ternaryExpression.Condition, environment);
         
         if (condition is not BooleanValue booleanValue)
             throw new Exception($"Condition must be a boolean value, but was {condition.GetType()}.");
 
         if (booleanValue.Value)
-            return Evaluate(ternaryExpression.Then, new Scope(scope));
+            return Evaluate(ternaryExpression.Then, new Environment(environment));
         
-        return Evaluate(ternaryExpression.Else, new Scope(scope));
+        return Evaluate(ternaryExpression.Else, new Environment(environment));
     }
     
-    private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Scope scope)
+    private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Environment environment)
     {
-        IRuntimeValue value = Evaluate(assignmentExpression.Assignment, scope);
-        scope.Assign(assignmentExpression.Member, value);
+        IRuntimeValue value = Evaluate(assignmentExpression.Assignment, environment);
+        environment.Assign(assignmentExpression.Member, value);
         return value;
     }
     
     private static IRuntimeValue EvaluateVariableDeclarationStatement(
         VariableDeclarationStatement variableDeclarationStatement,
-        Scope scope)
+        Environment environment)
     {
-        scope.Declare(variableDeclarationStatement.Identifier, variableDeclarationStatement.Mutable, Uninitialized.Instance);
+        environment.Declare(variableDeclarationStatement.Identifier, variableDeclarationStatement.Mutable, Uninitialized.Instance);
         return Uninitialized.Instance;
     }
 
@@ -317,28 +317,28 @@ public class Interpreter
 
     private static IRuntimeValue EvaluateIfStatement(
         IfStatement ifStatement,
-        Scope scope)
+        Environment environment)
     {
-        IRuntimeValue condition = Evaluate(ifStatement.If.Condition, scope);
+        IRuntimeValue condition = Evaluate(ifStatement.If.Condition, environment);
         
         if (condition is not BooleanValue booleanValue)
             throw new Exception($"Condition must be a boolean value, but was {condition.GetType()}.");
 
         if (booleanValue.Value)
-            return Evaluate(ifStatement.If.Block, new Scope(scope));
+            return Evaluate(ifStatement.If.Block, new Environment(environment));
 
         var resultOfElifs = ifStatement.ElseIfs.Match(
             some: elifs =>
             {
                 foreach (var elseIf in elifs)
                 {
-                    IRuntimeValue elifCondition = Evaluate(elseIf.Condition, scope);
+                    IRuntimeValue elifCondition = Evaluate(elseIf.Condition, environment);
 
                     if (elifCondition is not BooleanValue elifBooleanValue)
                         throw new Exception($"Condition must be a boolean value, but was {elifCondition.GetType()}.");
 
                     if (elifBooleanValue.Value)
-                        return Some(Evaluate(elseIf.Block, new Scope(scope)));
+                        return Some(Evaluate(elseIf.Block, new Environment(environment)));
                 }
                 
                 return None<IRuntimeValue>();
@@ -349,32 +349,39 @@ public class Interpreter
             return resultOfElifs.Unwrap();
         
         return ifStatement.Else.Match(
-            some: e => Evaluate(e, new Scope(scope)),
+            some: e => Evaluate(e, new Environment(environment)),
             none: () => NoValue.Instance);
     }
     
     private static IRuntimeValue EvaluateVariableDeclarationExpression(
         VariableDeclarationExpression variableDeclarationExpression,
-        Scope scope)
+        Environment environment)
     {
-        IRuntimeValue value = Evaluate(variableDeclarationExpression.Initializer, scope);
-        scope.Declare(variableDeclarationExpression.Identifier, variableDeclarationExpression.Mutable, value);
+        IRuntimeValue value = Evaluate(variableDeclarationExpression.Initializer, environment);
+        environment.Declare(variableDeclarationExpression.Identifier, variableDeclarationExpression.Mutable, value);
         return value;
     }
 
     private static IRuntimeValue EvaluateBlockExpression(
         BlockExpression blockExpression,
-        Scope scope) =>
-        Evaluate(blockExpression.Expression, scope);
-
-    private static IRuntimeValue EvaluateDropExpression(DropExpression dropExpression, Scope scope)
+        Environment environment)
     {
-        IRuntimeValue value = Evaluate(dropExpression.Identifier, scope);
-        scope.Drop(dropExpression.Identifier);
+        IRuntimeValue lastEvaluated = NoValue.Instance;
+
+        foreach (IStatement statement in blockExpression.Statements)
+            lastEvaluated = Evaluate(statement, new Environment(environment));
+
+        return lastEvaluated;
+    }
+
+    private static IRuntimeValue EvaluateDropExpression(DropExpression dropExpression, Environment environment)
+    {
+        IRuntimeValue value = Evaluate(dropExpression.Identifier, environment);
+        environment.Drop(dropExpression.Identifier);
         return value;
     }
     
-    private static IRuntimeValue EvaluateProgram(Program program, Scope scope)
+    private static IRuntimeValue EvaluateProgram(Program program, Environment environment)
     {
         IRuntimeValue lastEvaluated = new EmptyProgramValue();
 
@@ -383,7 +390,7 @@ public class Interpreter
             IRuntimeValue evaluated = lastEvaluated;
 
             lastEvaluated = statement.Match(
-                ok: s => Evaluate(s, scope),
+                ok: s => Evaluate(s, environment),
                 error: e =>
                 {
                     Console.WriteLine($"ERROR: {e}");

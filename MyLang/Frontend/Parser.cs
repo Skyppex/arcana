@@ -330,10 +330,14 @@ public class Parser
             return ParseStructLiteralExpression();
 
         Next();
-        var expression = ParseExpression();
+
+        var statements = new List<Result<IStatement, string>>();
+        while (Current() is not CloseBlockToken)
+            statements.Add(ParseStatement());
+        
         var closeBlock = Expect<CloseBlockToken>("Expected '}'.");
         
-        return expression.AndThen(e => closeBlock.Map(_ => new BlockExpression(e) as IExpression));
+        return statements.Invert().AndThen(s => closeBlock.Map(_ => new BlockExpression(s.ToList()) as IExpression));
     }
     
     private Result<IExpression, string> ParseStructLiteralExpression()
