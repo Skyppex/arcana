@@ -19,6 +19,9 @@ public class Interpreter
             
             case StringLiteral stringLiteral:
                 return new StringValue(stringLiteral.Value);
+
+            case CharLiteral charLiteral:
+                return new CharValue(charLiteral.Value);
             
             case BooleanLiteral booleanLiteral:
                 return new BooleanValue(booleanLiteral.Value);
@@ -107,8 +110,8 @@ public class Interpreter
         if (lhs is NumberValue lhsNum && rhs is NumberValue rhsNum)
             return EvaluateNumberBinaryExpression(binaryExpression, lhsNum, rhsNum);
         
-        if (lhs is StringValue lhsStr && rhs is StringValue rhsStr)
-            return EvaluateStringBinaryExpression(binaryExpression, lhsStr, rhsStr);
+        if (lhs is TextValue lhsTxt && rhs is TextValue rhsTxt)
+            return EvaluateTextBinaryExpression(binaryExpression, lhsTxt, rhsTxt);
         
         if (lhs is BooleanValue lhsBool && rhs is BooleanValue rhsBool)
             return EvaluateBooleanBinaryExpression(binaryExpression, lhsBool, rhsBool);
@@ -236,12 +239,12 @@ public class Interpreter
         throw new InvalidProgramException("Cannot do a binary operation on an expression that is not a number.");
     }
 
-    private static IRuntimeValue EvaluateStringBinaryExpression(BinaryExpression binaryExpression, StringValue lhs, StringValue rhs)
+    private static IRuntimeValue EvaluateTextBinaryExpression(BinaryExpression binaryExpression, TextValue lhs, TextValue rhs)
     {
         switch (binaryExpression.Operator)
         {
             case TokenSymbol.ADD:
-                return new StringValue(lhs.Value + rhs.Value);
+                return new StringValue(lhs.Text + rhs.Text);
 
             default:
                 throw new InvalidProgramException($"The operator {binaryExpression.Operator} is not supported.");

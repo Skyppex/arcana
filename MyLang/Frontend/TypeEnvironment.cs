@@ -10,6 +10,7 @@ public class TypeEnvironment
             ["i32"] = Type.i32,
             ["f32"] = Type.f32,
             ["string"] = Type.@string,
+            ["char"] = Type.@char,
             ["bool"] = Type.@bool,
         }
     };

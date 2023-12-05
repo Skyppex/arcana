@@ -128,6 +128,19 @@ public class Lexer
             return;
         }
 
+        if (c is TokenSymbol.CHAR_DELIMITER_CHAR)
+        {
+            StringBuilder builder = new();
+            chars.Dequeue(); // Skip the opening quote
+
+            while (chars.TryPeek(out char nextChar) && nextChar != TokenSymbol.CHAR_DELIMITER_CHAR)
+                builder.Append(chars.Dequeue());
+            
+            chars.Dequeue(); // Skip the closing quote
+            tokens.Add(new CharToken(builder.ToString()));
+            return;
+        }
+
         if (c is TokenSymbol.AND_CHAR or TokenSymbol.OR_CHAR or TokenSymbol.BITWISE_XOR_CHAR or TokenSymbol.BITWISE_NOT_CHAR)
         {
             if (c is TokenSymbol.BITWISE_XOR_CHAR or TokenSymbol.BITWISE_NOT_CHAR)
@@ -370,6 +383,12 @@ public sealed class NumberToken : IToken
 public sealed class StringToken : IToken
 {
     public StringToken(string symbol) => Symbol = symbol;     
+    public string Symbol { get; }
+}
+
+public sealed class CharToken : IToken
+{
+    public CharToken(string symbol) => Symbol = symbol;     
     public string Symbol { get; }
 }
 

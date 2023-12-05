@@ -431,6 +431,16 @@ public sealed class StringLiteral : IExpression
     public void Traverse(Action<INode> action) => action(this);
 }
 
+public sealed class CharLiteral : IExpression
+{
+    public CharLiteral(char value) => Value = value;
+    
+    public char Value { get; }
+    
+    public string GetNodeTree(ref int indent) => $"<{nameof(CharLiteral)}>, {nameof(Value)}: {Value}";
+    public void Traverse(Action<INode> action) => action(this);
+}
+
 public sealed class BooleanLiteral : IExpression
 {
     public BooleanLiteral(bool value) => Value = value;

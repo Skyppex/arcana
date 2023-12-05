@@ -642,6 +642,12 @@ public class Parser
             case StringToken stringToken:
                 return Ok<IExpression, string>(new StringLiteral(stringToken.Symbol));
             
+            case CharToken charToken:
+                if (!char.TryParse(charToken.Symbol, out char value))
+                    return Error<IExpression, string>("Could not parse char.");
+                    
+                return Ok<IExpression, string>(new CharLiteral(value));
+            
             case BooleanToken booleanToken:
                 return Ok<IExpression, string>(new BooleanLiteral(booleanToken.Symbol == Keyword.TRUE));
             

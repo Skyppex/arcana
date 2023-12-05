@@ -37,11 +37,25 @@ public class Float32Value : NumberValue
     public override string ToString() => Value.ToString();
 }
 
-public class StringValue : IRuntimeValue
+public abstract class TextValue : IRuntimeValue
+{
+    public abstract string Text { get; }
+} 
+
+public class StringValue : TextValue
 {
     public StringValue(string value) => Value = value;
     public string Value { get; }
     public override string ToString() => Value;
+    public override string Text => Value;
+}
+
+public class CharValue : TextValue
+{
+    public CharValue(char value) => Value = value;
+    public char Value { get; }
+    public override string ToString() => Value.ToString();
+    public override string Text => Value.ToString();
 }
 
 public class BooleanValue : IRuntimeValue

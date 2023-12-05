@@ -5,7 +5,7 @@ public class TypeChecker
 {
     private static readonly Dictionary<string, List<Type>> s_operandTypesForOperator = new()
     {
-        ["+"] = new List<Type> { Type.i32, Type.f32, Type.@string },
+        ["+"] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@char },
         ["-"] = new List<Type> { Type.i32, Type.f32 },
         ["*"] = new List<Type> { Type.i32, Type.f32 },
         ["/"] = new List<Type> { Type.i32, Type.f32 },
@@ -16,8 +16,8 @@ public class TypeChecker
         ["~"] = new List<Type> { Type.i32 },
         ["<<"] = new List<Type> { Type.i32 },
         [">>"] = new List<Type> { Type.i32 },
-        ["=="] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@bool },
-        ["!="] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@bool },
+        ["=="] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@bool, Type.@char },
+        ["!="] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@bool, Type.@char },
         ["<"] = new List<Type> { Type.i32, Type.f32 },
         [">"] = new List<Type> { Type.i32, Type.f32 },
         ["<="] = new List<Type> { Type.i32, Type.f32 },
@@ -39,6 +39,9 @@ public class TypeChecker
             
             case StringLiteral:
                 return Type.@string;
+            
+            case CharLiteral:
+                return Type.@char;
             
             case BooleanLiteral:
                 return Type.@bool;
@@ -123,9 +126,9 @@ public class TypeChecker
             {
                 Type leftType = CheckType(binaryExpression.Left, typeEnvironment);
                 Type rightType = CheckType(binaryExpression.Right, typeEnvironment);
-
-                if (leftType != rightType)
-                    throw new InvalidOperationException($"Operator '{binaryExpression.Operator}' not supported for operands of type '{leftType}' and '{rightType}'");
+                
+                // if (leftType != rightType)
+                //     throw new InvalidOperationException($"Operator '{binaryExpression.Operator}' not supported for operands of type '{leftType}' and '{rightType}'");
 
                 List<Type> allowedTypes = s_operandTypesForOperator[binaryExpression.Operator];
 
@@ -173,6 +176,15 @@ public class TypeChecker
                             case var (l, r) when (l, r) == (Type.@string, Type.@string):
                                 return Type.@string;
                             
+                            case var (l, r) when (l, r) == (Type.@char, Type.@char):
+                                return Type.@string;
+
+                            case var (l, r) when (l, r) == (Type.@string, Type.@char):
+                                return Type.@string;
+
+                            case var (l, r) when (l, r) == (Type.@char, Type.@string):
+                                return Type.@string;
+
                             case var (l, r) when (l, r) == (Type.@bool, Type.@bool):
                                 return Type.@bool;
                         }

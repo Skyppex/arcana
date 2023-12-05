@@ -10,6 +10,7 @@ public abstract class Type
     public static readonly Type i32 = new StructType("i32");
     public static readonly Type f32 = new StructType("f32");
     public static readonly Type @string = new StructType("string");
+    public static readonly Type @char = new StructType("char");
     public static readonly Type @bool = new StructType("bool");
     
     public static readonly Type[] Numbers = { i32, f32 };
