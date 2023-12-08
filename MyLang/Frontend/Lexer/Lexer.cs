@@ -1,5 +1,7 @@
 ﻿using System.Text;
 
+using Monads;
+
 namespace MyLang;
 
 public class Lexer
@@ -7,73 +9,75 @@ public class Lexer
     public List<IToken> Tokenize(string sourceCode)
     {
         var tokens = new List<IToken>();
-        var chars = new Queue<char>(sourceCode);
+        var cursor = new Cursor(sourceCode);
 
-        while (chars.TryPeek(out char c))
+        while (!cursor.IsEndOfFile())
         {
+            var c = cursor.First();
+            
             switch (c)
             {
                 case TokenSymbol.MEMBER_ACCESSOR_CHAR:
                     tokens.Add(new MemberAccessorToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.OPEN_PAREN_CHAR:
                     tokens.Add(new OpenParenToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.CLOSE_PAREN_CHAR:
                     tokens.Add(new CloseParenToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.OPEN_BRACE_CHAR:
                     tokens.Add(new OpenBraceToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.CLOSE_BRACE_CHAR:
                     tokens.Add(new CloseBraceToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.OPEN_CURLY_BRACE_CHAR:
                     tokens.Add(new OpenBlockToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.CLOSE_CURLY_BRACE_CHAR:
                     tokens.Add(new CloseBlockToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.ADD_CHAR or TokenSymbol.SUBTRACT_CHAR or TokenSymbol.MULTIPLY_CHAR or TokenSymbol.DIVIDE_CHAR or TokenSymbol.MODULUS_CHAR: 
-                    tokens.Add(new ArithmeticOperatorToken(chars.Dequeue().ToString()));
+                    tokens.Add(new ArithmeticOperatorToken(cursor.Bump().ToString()));
                     break;
                 
                 case TokenSymbol.QUESTION_CHAR:
                     tokens.Add(new QuestionToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.COLON_CHAR:
                     tokens.Add(new ColonToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.SEMI_COLON_CHAR:
                     tokens.Add(new SemiColonToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 case TokenSymbol.STRUCT_LITERAL_DELIMITER_CHAR:
                     tokens.Add(new CommaToken());
-                    chars.Dequeue();
+                    cursor.Bump();
                     break;
                 
                 default:
-                    HandleMultiCharToken(c, chars, tokens);
+                    HandleMultiCharToken(c, cursor, tokens);
                     break;
             }
         }
@@ -82,25 +86,42 @@ public class Lexer
         return tokens;
     }
     
-    private void HandleMultiCharToken(char c, Queue<char> chars, List<IToken> tokens)
+    private void HandleMultiCharToken(char c, Cursor cursor, List<IToken> tokens)
     {
-        if (IsDigit(c) || c is TokenSymbol.DECIMAL_POINT_CHAR)
+        if (IsNumericConstantFirst(c))
         {
             StringBuilder builder = new();
+            builder.Append(c);
+            
+            char @base = 'd';
+            
+            if (IsNumberBasePrefixFirst(cursor.First()))
+            {
+                var second = cursor.Second(); // Read the second character of the prefix
 
-            while (chars.TryPeek(out char nextChar) && (IsDigit(nextChar) || nextChar is TokenSymbol.DECIMAL_POINT_CHAR || IsLetter(nextChar)))
-                builder.Append(chars.Dequeue());
+                if (IsNumberBasePrefixSecond(second))
+                {
+                    @base = second;
+                    cursor.Bump(); // Skip the first 0
+                }
+            }
+            
+            cursor.Bump(); // Skip 
+            
+            
+            while (IsNumberBasePrefixSecond(cursor.First()))
+                builder.Append(cursor.Bump().Unwrap());
         
-            tokens.Add(new NumberToken(builder.ToString()));
+            tokens.Add(new NumberToken(@base, builder.ToString()));
             return;
         }
 
-        if (IsLetter(c))
+        if (IsIdentifierFirst(c))
         {
             StringBuilder builder = new();
 
-            while (chars.TryPeek(out char nextChar) && IsAlphaNumeric(nextChar))
-                builder.Append(chars.Dequeue());
+            while (IsIdentifierContinue(cursor.First()))
+                builder.Append(cursor.Bump().Unwrap());
         
             // Check for reserved keywords
             string symbol = builder.ToString();
@@ -118,12 +139,12 @@ public class Lexer
         if (c is TokenSymbol.STRING_DELIMITER_CHAR)
         {
             StringBuilder builder = new();
-            chars.Dequeue(); // Skip the opening quote
+            cursor.Bump(); // Skip the opening quote
 
-            while (chars.TryPeek(out char nextChar) && nextChar != TokenSymbol.STRING_DELIMITER_CHAR)
-                builder.Append(chars.Dequeue());
+            while (cursor.First() != TokenSymbol.STRING_DELIMITER_CHAR)
+                builder.Append(cursor.Bump().Unwrap());
             
-            chars.Dequeue(); // Skip the closing quote
+            cursor.Bump(); // Skip the closing quote
             tokens.Add(new StringToken(builder.ToString()));
             return;
         }
@@ -131,12 +152,12 @@ public class Lexer
         if (c is TokenSymbol.CHAR_DELIMITER_CHAR)
         {
             StringBuilder builder = new();
-            chars.Dequeue(); // Skip the opening quote
+            cursor.Bump(); // Skip the opening quote
 
-            while (chars.TryPeek(out char nextChar) && nextChar != TokenSymbol.CHAR_DELIMITER_CHAR)
-                builder.Append(chars.Dequeue());
+            while (cursor.First() != TokenSymbol.CHAR_DELIMITER_CHAR)
+                builder.Append(cursor.Bump());
             
-            chars.Dequeue(); // Skip the closing quote
+            cursor.Bump(); // Skip the closing quote
             tokens.Add(new CharToken(builder.ToString()));
             return;
         }
@@ -145,29 +166,29 @@ public class Lexer
         {
             if (c is TokenSymbol.BITWISE_XOR_CHAR or TokenSymbol.BITWISE_NOT_CHAR)
             {
-                chars.Dequeue();
+                cursor.Bump();
                 tokens.Add(new BitwiseOperatorToken(c.ToString()));
                 return;
             }
 
-            char previousChar = chars.Dequeue();
+            cursor.Bump();
 
-            if (chars.TryPeek(out char nextChar) && nextChar == previousChar)
+            if (cursor.First() == c)
             {
-                chars.Dequeue();
-                tokens.Add(new LogicalOperatorToken($"{previousChar}{nextChar}"));
+                cursor.Bump();
+                tokens.Add(new LogicalOperatorToken($"{c}{c}"));
                 return;
             }
         }
         
         if (c is TokenSymbol.EQUALS_CHAR or TokenSymbol.GREATER_CHAR or TokenSymbol.LESS_CHAR or TokenSymbol.LOGICAL_NOT_CHAR)
         {
-            char previousChar = chars.Dequeue();
+            cursor.Bump();
 
-            if (chars.TryPeek(out char nextChar) && nextChar == TokenSymbol.EQUALS_CHAR)
+            if (cursor.First() == TokenSymbol.EQUALS_CHAR)
             {
-                chars.Dequeue();
-                tokens.Add(new ComparisonOperatorToken($"{previousChar}{nextChar}"));
+                cursor.Bump();
+                tokens.Add(new ComparisonOperatorToken($"{c}{TokenSymbol.EQUALS_CHAR}"));
                 return;
             }
 
@@ -177,24 +198,32 @@ public class Lexer
                 return;
             }
             
-            tokens.Add(c is TokenSymbol.EQUALS_CHAR ? new EqualsToken() : new ComparisonOperatorToken(previousChar.ToString()));
+            tokens.Add(c is TokenSymbol.EQUALS_CHAR ? new EqualsToken() : new ComparisonOperatorToken(c.ToString()));
             return;
         }
         
-        if (IsSkippable(c))
+        if (IsWhitespace(c))
         {
-            chars.Dequeue();
+            cursor.Bump();
             return;
         }
         
         Console.WriteLine($"Unrecognized character found in source: {c}");
     }
+
+    public static bool IsIdentifierFirst(char c) => IsLetter(c) || c == '_';
+    public static bool IsIdentifierContinue(char c) => IsAlphaNumeric(c) || c == '_';
     
-    private static bool IsSkippable(char c) => c is TokenSymbol.SPACE_CHAR 
-     or TokenSymbol.NEW_LINE_CHAR or 
-        TokenSymbol.TAB_CHAR or 
+    public static bool IsWhitespace(char c) => c is
+        TokenSymbol.SPACE_CHAR or
+        TokenSymbol.NEW_LINE_CHAR or
+        TokenSymbol.TAB_CHAR or
         TokenSymbol.RETURN_CHAR;
     
+    public static bool IsNumericConstantFirst(char c) => IsDigit(c) || c == TokenSymbol.DECIMAL_POINT_CHAR;
+    public static bool IsNumberBasePrefixFirst(char c) => c is '0';
+    public static bool IsNumberBasePrefixSecond(char c) => c is 'b' or 'x' or 'd' or 'o' or 'h';
+
     private static bool IsLetter(char c) => char.IsLetter(c);
     private static bool IsDigit(char c) => char.IsDigit(c);
     private static bool IsAlphaNumeric(char c) => IsLetter(c) || IsDigit(c);
@@ -202,6 +231,8 @@ public class Lexer
 
 public static class TokenSymbol
 {
+    public const char ENF_OF_FILE_CHAR = '\0';
+    
     // Arithmetic operators
     public const char ADD_CHAR = '+';
     public const char SUBTRACT_CHAR = '-';
@@ -363,6 +394,7 @@ public static class Keyword
 public interface IToken
 {
     public string Symbol { get; }
+    public int Length => Symbol.Length;
     
     // ReSharper disable once ReturnTypeCanBeNotNullable
     public string? ToString() => Symbol;
@@ -376,7 +408,13 @@ public sealed class ElseToken : IToken { public string Symbol => Keyword.ELSE; }
 
 public sealed class NumberToken : IToken
 {
-    public NumberToken(string symbol) => Symbol = symbol;     
+    public NumberToken(char @base, string symbol)
+    {
+        Base = @base;
+        Symbol = symbol;
+    }
+
+    public char Base { get; }
     public string Symbol { get; }
 }
 
