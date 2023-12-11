@@ -83,7 +83,7 @@ public class TypeChecker
                     Type initializerType = CheckType(fieldInitializer.Initializer, typeEnvironment);
 
                     if (fieldTypes.Count < i)
-                        throw new Exception($"Union member '{unionLiteral.Identifier}{TokenSymbol.MEMBER_ACCESSOR}{unionLiteral.Member}' does not contain {i + 1} fields.");
+                        throw new Exception($"Union member '{unionLiteral.Identifier}{TokenSymbol.PERIOD}{unionLiteral.Member}' does not contain {i + 1} fields.");
 
                     if (fieldTypes[i] != initializerType)
                         throw new Exception($"Initializer for field '{type}.{fieldTypes[i]}' is not of type '{fieldTypes[i]}'.");
@@ -162,8 +162,8 @@ public class TypeChecker
                         return Type.@bool;
                     }
                     
-                    case TokenSymbol.ADD or TokenSymbol.SUBTRACT or TokenSymbol.MULTIPLY or TokenSymbol.DIVIDE
-                     or TokenSymbol.MODULO:
+                    case TokenSymbol.PLUS or TokenSymbol.MINUS or TokenSymbol.STAR or TokenSymbol.SLASH
+                     or TokenSymbol.PERCENT:
                     {
                         switch (leftType, rightType)
                         {

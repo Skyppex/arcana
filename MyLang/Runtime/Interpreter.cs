@@ -32,10 +32,10 @@ public class Interpreter
             case UnionLiteral unionLiteral:
                 return EvaluateUnionLiteral(unionLiteral, environment);
             
-            case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.ADD or TokenSymbol.SUBTRACT or TokenSymbol.BITWISE_NOT }:
+            case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.PLUS or TokenSymbol.MINUS or TokenSymbol.TILDE }:
                 return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, environment));
 
-            case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.LOGICAL_NOT or TokenSymbol.BITWISE_NOT }:
+            case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.EXCLAMATION or TokenSymbol.TILDE }:
                 return EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, environment));
 
             case TernaryExpression ternaryExpression:
@@ -125,13 +125,13 @@ public class Interpreter
         {
             switch (unaryExpression.Operator)
             {
-                case TokenSymbol.ADD:
+                case TokenSymbol.PLUS:
                     return new Int32Value(int32Value.Value);
                 
-                case TokenSymbol.SUBTRACT:
+                case TokenSymbol.MINUS:
                     return new Int32Value(-int32Value.Value);
                 
-                case TokenSymbol.BITWISE_NOT:
+                case TokenSymbol.TILDE:
                     return new Int32Value(~int32Value.Value);
 
                 default:
@@ -143,10 +143,10 @@ public class Interpreter
         {
             switch (unaryExpression.Operator)
             {
-                case TokenSymbol.ADD:
+                case TokenSymbol.PLUS:
                     return new Float32Value(float32Value.Value);
                 
-                case TokenSymbol.SUBTRACT:
+                case TokenSymbol.MINUS:
                     return new Float32Value(-float32Value.Value);
                 
                 default:
@@ -163,7 +163,7 @@ public class Interpreter
         {
             switch (unaryExpression.Operator)
             {
-                case TokenSymbol.LOGICAL_NOT:
+                case TokenSymbol.EXCLAMATION:
                     return new BooleanValue(!boolValue.Value);
                 
                 default:
@@ -180,19 +180,19 @@ public class Interpreter
         {
             switch (binaryExpression.Operator)
             {
-                case TokenSymbol.ADD:
+                case TokenSymbol.PLUS:
                     return new Int32Value(lhsInt32.Value + rhsInt32.Value);
 
-                case TokenSymbol.SUBTRACT:
+                case TokenSymbol.MINUS:
                     return new Int32Value(lhsInt32.Value - rhsInt32.Value);
 
-                case TokenSymbol.MULTIPLY:
+                case TokenSymbol.STAR:
                     return new Int32Value(lhsInt32.Value * rhsInt32.Value);
 
-                case TokenSymbol.DIVIDE:
+                case TokenSymbol.SLASH:
                     return new Int32Value(lhsInt32.Value / rhsInt32.Value); // TODO: Handle divide by zero.
 
-                case TokenSymbol.MODULO:
+                case TokenSymbol.PERCENT:
                     return new Int32Value(lhsInt32.Value % rhsInt32.Value);
                 
                 case TokenSymbol.LESS:
@@ -210,19 +210,19 @@ public class Interpreter
         {
             switch (binaryExpression.Operator)
             {
-                case TokenSymbol.ADD:
+                case TokenSymbol.PLUS:
                     return new Float32Value(lhsFloat32.Value + rhsFloat32.Value);
 
-                case TokenSymbol.SUBTRACT:
+                case TokenSymbol.MINUS:
                     return new Float32Value(lhsFloat32.Value - rhsFloat32.Value);
 
-                case TokenSymbol.MULTIPLY:
+                case TokenSymbol.STAR:
                     return new Float32Value(lhsFloat32.Value * rhsFloat32.Value);
 
-                case TokenSymbol.DIVIDE:
+                case TokenSymbol.SLASH:
                     return new Float32Value(lhsFloat32.Value / rhsFloat32.Value); // TODO: Handle divide by zero.
                 
-                case TokenSymbol.MODULO:
+                case TokenSymbol.PERCENT:
                     return new Float32Value(lhsFloat32.Value % rhsFloat32.Value);
 
                 case TokenSymbol.LESS:
@@ -243,7 +243,7 @@ public class Interpreter
     {
         switch (binaryExpression.Operator)
         {
-            case TokenSymbol.ADD:
+            case TokenSymbol.PLUS:
                 return new StringValue(lhs.Text + rhs.Text);
 
             default:

@@ -1,6 +1,7 @@
 ﻿using System.Text;
 
 using Monads;
+using static Monads.Option;
 
 namespace MyLang;
 
@@ -17,7 +18,7 @@ public class Lexer
             
             switch (c)
             {
-                case TokenSymbol.MEMBER_ACCESSOR_CHAR:
+                case TokenSymbol.PERIOD_CHAR:
                     tokens.Add(new MemberAccessorToken());
                     cursor.Bump();
                     break;
@@ -52,7 +53,7 @@ public class Lexer
                     cursor.Bump();
                     break;
                 
-                case TokenSymbol.ADD_CHAR or TokenSymbol.SUBTRACT_CHAR or TokenSymbol.MULTIPLY_CHAR or TokenSymbol.DIVIDE_CHAR or TokenSymbol.MODULUS_CHAR: 
+                case TokenSymbol.PLUS_CHAR or TokenSymbol.MINUS_CHAR or TokenSymbol.STAR_CHAR or TokenSymbol.SLASH_CHAR or TokenSymbol.PERCENT_CHAR: 
                     tokens.Add(new ArithmeticOperatorToken(cursor.Bump().ToString()));
                     break;
                 
@@ -71,7 +72,7 @@ public class Lexer
                     cursor.Bump();
                     break;
                 
-                case TokenSymbol.STRUCT_LITERAL_DELIMITER_CHAR:
+                case TokenSymbol.COMMA_CHAR:
                     tokens.Add(new CommaToken());
                     cursor.Bump();
                     break;
@@ -136,35 +137,64 @@ public class Lexer
             return;
         }
 
-        if (c is TokenSymbol.STRING_DELIMITER_CHAR)
+        if (c is TokenSymbol.DOUBLE_QUOTE_CHAR)
         {
             StringBuilder builder = new();
             cursor.Bump(); // Skip the opening quote
 
-            while (cursor.First() != TokenSymbol.STRING_DELIMITER_CHAR)
+            while (cursor.First() != TokenSymbol.DOUBLE_QUOTE_CHAR)
+            {
+                if (cursor.First() is TokenSymbol.BACKSLASH_CHAR)
+                {
+                    EscapableInString(cursor.Second())
+                        .Match(
+                            some: character =>
+                            {
+                                builder.Append(character);
+                                cursor.Bump();
+                                cursor.Bump();
+                            },
+                            none: () => builder.Append(cursor.Bump().Unwrap()));
+                    
+                    continue;
+                }
+                
                 builder.Append(cursor.Bump().Unwrap());
+            }
             
             cursor.Bump(); // Skip the closing quote
             tokens.Add(new StringToken(builder.ToString()));
             return;
         }
 
-        if (c is TokenSymbol.CHAR_DELIMITER_CHAR)
+        if (c is TokenSymbol.SINGLE_QUOTE_CHAR)
         {
             StringBuilder builder = new();
             cursor.Bump(); // Skip the opening quote
-
-            while (cursor.First() != TokenSymbol.CHAR_DELIMITER_CHAR)
-                builder.Append(cursor.Bump());
             
-            cursor.Bump(); // Skip the closing quote
+            if (cursor.First() is TokenSymbol.BACKSLASH_CHAR)
+            {
+                EscapableInChar(cursor.Second())
+                    .Match(
+                        some: character =>
+                        {
+                            builder.Append(character);
+                            cursor.Bump();
+                            cursor.Bump();
+                        },
+                        none: () => builder.Append(cursor.Bump().Unwrap()));
+            }
+            else
+                builder.Append(cursor.Bump().Unwrap());
+
+            cursor.Bump().UnwrapOrElse(() => throw new Exception("Expected '")); // Skip the closing quote
             tokens.Add(new CharToken(builder.ToString()));
             return;
         }
 
-        if (c is TokenSymbol.AND_CHAR or TokenSymbol.OR_CHAR or TokenSymbol.BITWISE_XOR_CHAR or TokenSymbol.BITWISE_NOT_CHAR)
+        if (c is TokenSymbol.AMPERSAND_CHAR or TokenSymbol.PIPE_CHAR or TokenSymbol.HAT_CHAR or TokenSymbol.TILDE_CHAR)
         {
-            if (c is TokenSymbol.BITWISE_XOR_CHAR or TokenSymbol.BITWISE_NOT_CHAR)
+            if (c is TokenSymbol.HAT_CHAR or TokenSymbol.TILDE_CHAR)
             {
                 cursor.Bump();
                 tokens.Add(new BitwiseOperatorToken(c.ToString()));
@@ -181,7 +211,7 @@ public class Lexer
             }
         }
         
-        if (c is TokenSymbol.EQUALS_CHAR or TokenSymbol.GREATER_CHAR or TokenSymbol.LESS_CHAR or TokenSymbol.LOGICAL_NOT_CHAR)
+        if (c is TokenSymbol.EQUALS_CHAR or TokenSymbol.GREATER_CHAR or TokenSymbol.LESS_CHAR or TokenSymbol.EXCLAMATION_CHAR)
         {
             cursor.Bump();
 
@@ -192,9 +222,9 @@ public class Lexer
                 return;
             }
 
-            if (c is TokenSymbol.LOGICAL_NOT_CHAR)
+            if (c is TokenSymbol.EXCLAMATION_CHAR)
             {
-                tokens.Add(new LogicalOperatorToken(TokenSymbol.LOGICAL_NOT));
+                tokens.Add(new LogicalOperatorToken(TokenSymbol.EXCLAMATION));
                 return;
             }
             
@@ -220,9 +250,37 @@ public class Lexer
         TokenSymbol.TAB_CHAR or
         TokenSymbol.RETURN_CHAR;
     
-    public static bool IsNumericConstantFirst(char c) => IsDigit(c) || c == TokenSymbol.DECIMAL_POINT_CHAR;
+    public static bool IsNumericConstantFirst(char c) => IsDigit(c) || c == TokenSymbol.PERIOD_CHAR;
     public static bool IsNumberBasePrefixFirst(char c) => c is '0';
     public static bool IsNumberBasePrefixSecond(char c) => c is 'b' or 'x' or 'd' or 'o' or 'h';
+
+    public static Option<char> EscapableInString(char c) => AlwaysEscapable(c)
+        .Or(c switch
+        {
+            '"' => Some(TokenSymbol.DOUBLE_QUOTE_CHAR),
+            _ => None<char>()
+        });
+
+    public static Option<char> EscapableInChar(char c) => AlwaysEscapable(c)
+        .Or(c switch
+        {
+            '\'' => Some(TokenSymbol.SINGLE_QUOTE_CHAR),
+            _ => None<char>()
+        });
+
+    public static Option<char> AlwaysEscapable(char c) => c switch
+    {
+        '0' => Some(TokenSymbol.ENF_OF_FILE_CHAR),
+        'a' => Some('\a'),
+        'b' => Some('\b'),
+        'f' => Some('\f'),
+        'n' => Some(TokenSymbol.NEW_LINE_CHAR),
+        'r' => Some(TokenSymbol.RETURN_CHAR),
+        't' => Some(TokenSymbol.TAB_CHAR),
+        'v' => Some('\v'),
+        '\\' => Some(TokenSymbol.BACKSLASH_CHAR),
+        _ => None<char>()
+    };
 
     private static bool IsLetter(char c) => char.IsLetter(c);
     private static bool IsDigit(char c) => char.IsDigit(c);
@@ -234,37 +292,37 @@ public static class TokenSymbol
     public const char ENF_OF_FILE_CHAR = '\0';
     
     // Arithmetic operators
-    public const char ADD_CHAR = '+';
-    public const char SUBTRACT_CHAR = '-';
-    public const char MULTIPLY_CHAR = '*';
-    public const char DIVIDE_CHAR = '/';
-    public const char MODULUS_CHAR = '%';
+    public const char PLUS_CHAR = '+';
+    public const char MINUS_CHAR = '-';
+    public const char STAR_CHAR = '*';
+    public const char SLASH_CHAR = '/';
+    public const char PERCENT_CHAR = '%';
     
-    public const string ADD = "+";
-    public const string SUBTRACT = "-";
-    public const string MULTIPLY = "*";
-    public const string DIVIDE = "/";
-    public const string MODULO = "%";
+    public const string PLUS = "+";
+    public const string MINUS = "-";
+    public const string STAR = "*";
+    public const string SLASH = "/";
+    public const string PERCENT = "%";
     
     // Bitwise operators
-    public const char AND_CHAR = '&';
-    public const char OR_CHAR = '|';
-    public const char BITWISE_XOR_CHAR = '^';
-    public const char BITWISE_NOT_CHAR = '~';
+    public const char AMPERSAND_CHAR = '&';
+    public const char PIPE_CHAR = '|';
+    public const char HAT_CHAR = '^';
+    public const char TILDE_CHAR = '~';
     
-    public const string BITWISE_AND = "&";
-    public const string BITWISE_OR = "|";
-    public const string BITWISE_XOR = "^";
-    public const string BITWISE_NOT = "~";
+    public const string AMPERSAND = "&";
+    public const string PIPE = "|";
+    public const string HAT = "^";
+    public const string TILDE = "~";
     
     // Logical operators
-    public const char LOGICAL_NOT_CHAR = '!';
+    public const char EXCLAMATION_CHAR = '!';
     public const char LESS_CHAR = '<';
     public const char GREATER_CHAR = '>';
     
     public const string LOGICAL_AND = "&&";
     public const string LOGICAL_OR = "||";
-    public const string LOGICAL_NOT = "!";
+    public const string EXCLAMATION = "!";
     public const string LESS = "<";
     public const string GREATER = ">";
     public const string LOGICAL_EQUAL = "==";
@@ -282,10 +340,9 @@ public static class TokenSymbol
     public const char CLOSE_BRACE_CHAR = ']';
     public const char OPEN_CURLY_BRACE_CHAR = '{';
     public const char CLOSE_CURLY_BRACE_CHAR = '}';
-    public const char OPEN_ANGLE_BRACKET_CHAR = '<';
-    public const char CLOSE_ANGLE_BRACKET_CHAR = '>';
-    public const char STRING_DELIMITER_CHAR = '"';
-    public const char CHAR_DELIMITER_CHAR = '\'';
+    public const char DOUBLE_QUOTE_CHAR = '"';
+    public const char SINGLE_QUOTE_CHAR = '\'';
+    public const char BACKSLASH_CHAR = '\\';
 
     public const string OPEN_PAREN = "(";
     public const string CLOSE_PAREN = ")";
@@ -293,31 +350,19 @@ public static class TokenSymbol
     public const string CLOSE_BRACE = "]";
     public const string OPEN_CURLY_BRACE = "{";
     public const string CLOSE_CURLY_BRACE = "}";
-    public const string OPEN_ANGLE_BRACKET = "<";
-    public const string CLOSE_ANGLE_BRACKET = ">";
-    public const string STRING_DELIMITER = "\"";
-    public const string CHAR_DELIMITER = "'";
+    public const string DOUBLE_QUOTE = "\"";
+    public const string SINGLE_QUOTE = "'";
+    public const string BACKSLASH = "\\";
 
     // Punctuation
-    public const char ARRAY_DELIMITER_CHAR = ',';
-    public const char STRUCT_LITERAL_DELIMITER_CHAR = ',';
-    public const char FUNCTION_ARGUMENT_DELIMITER_CHAR = ',';
-    public const char GENERIC_ARGUMENT_DELIMITER_CHAR = ',';
-    public const char MODULE_OR_TYPE_ACCESSOR_CHAR = '.';
-    public const char MEMBER_ACCESSOR_CHAR = '.';
-    public const char DECIMAL_POINT_CHAR = '.';
+    public const char COMMA_CHAR = ',';
+    public const char PERIOD_CHAR = '.';
     public const char QUESTION_CHAR = '?';
     public const char COLON_CHAR = ':';
     public const char SEMI_COLON_CHAR = ';';
 
-    public const string ARRAY_DELIMITER = ",";
-    public const string STRUCT_LITERAL_DELIMITER = ",";
-    public const string UNION_FIELD_DELIMITER = ",";
-    public const string FUNCTION_ARGUMENT_DELIMITER = ",";
-    public const string GENERIC_ARGUMENT_DELIMITER = ",";
-    public const string MODULE_OR_TYPE_ACCESSOR = ".";
-    public const string MEMBER_ACCESSOR = ".";
-    public const string DECIMAL_POINT = ".";
+    public const string COMMA = ",";
+    public const string PERIOD = ".";
     public const string QUESTION = "?";
     public const string COLON = ":";
     public const string SEMI_COLON = ";";
@@ -475,12 +520,12 @@ public sealed class CloseBraceToken : IToken { public string Symbol => TokenSymb
 public sealed class OpenBlockToken : IToken { public string Symbol => TokenSymbol.OPEN_CURLY_BRACE; }
 public sealed class CloseBlockToken : IToken { public string Symbol => TokenSymbol.CLOSE_CURLY_BRACE; }
 
-public sealed class ArrayDelimiterToken : IToken { public string Symbol => TokenSymbol.ARRAY_DELIMITER; }
-public sealed class CommaToken : IToken { public string Symbol => TokenSymbol.STRUCT_LITERAL_DELIMITER; }
-public sealed class UnionFieldDelimiterToken : IToken { public string Symbol => TokenSymbol.UNION_FIELD_DELIMITER; }
-public sealed class DecimalPointToken : IToken { public string Symbol => TokenSymbol.DECIMAL_POINT; }
+public sealed class ArrayDelimiterToken : IToken { public string Symbol => TokenSymbol.COMMA; }
+public sealed class CommaToken : IToken { public string Symbol => TokenSymbol.COMMA; }
+public sealed class UnionFieldDelimiterToken : IToken { public string Symbol => TokenSymbol.COMMA; }
+public sealed class DecimalPointToken : IToken { public string Symbol => TokenSymbol.PERIOD; }
 
-public sealed class MemberAccessorToken : IToken { public string Symbol => TokenSymbol.MEMBER_ACCESSOR; }
+public sealed class MemberAccessorToken : IToken { public string Symbol => TokenSymbol.PERIOD; }
 
 public sealed class QuestionToken : IToken { public string Symbol => TokenSymbol.QUESTION; }
 public sealed class ColonToken : IToken { public string Symbol => TokenSymbol.COLON; }

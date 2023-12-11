@@ -427,7 +427,7 @@ public sealed class StringLiteral : IExpression
     
     public string Value { get; }
     
-    public string GetNodeTree(ref int indent) => $"<{nameof(StringLiteral)}>, {nameof(Value)}: {Value}";
+    public string GetNodeTree(ref int indent) => $"<{nameof(StringLiteral)}>, {nameof(Value)}: \"{Value.ToLiteral()}\"";
     public void Traverse(Action<INode> action) => action(this);
 }
 
@@ -437,7 +437,7 @@ public sealed class CharLiteral : IExpression
     
     public char Value { get; }
     
-    public string GetNodeTree(ref int indent) => $"<{nameof(CharLiteral)}>, {nameof(Value)}: {Value}";
+    public string GetNodeTree(ref int indent) => $"<{nameof(CharLiteral)}>, {nameof(Value)}: '{Value.ToLiteral()}'";
     public void Traverse(Action<INode> action) => action(this);
 }
 

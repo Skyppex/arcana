@@ -65,6 +65,14 @@ public flags Foo { // The underlying type here ends up being u8
 }
 ```
 
+### Using flags
+
+Needed checks:
+- Check if all of a set of flags are set
+- Check if any of a set of flags are set
+- Check if all of a set of flags are not set
+- Check if any of a set of flags are not set
+
 ## Implementation Blocks for Types
 
 Implementation blocks are used to implement functions or traits for types.

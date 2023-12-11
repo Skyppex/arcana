@@ -216,22 +216,25 @@ public class Parser
                 Next();
             }
 
+            Result<IdentifierToken, string> identifier = Expect<IdentifierToken>("Expected identifier.");
+            Result<ColonToken, string> colon = Expect<ColonToken>("Expected ':'.");
+            
             bool mutable = Current() is MutableToken;
             
             if (mutable)
                 Next();
-
-            Result<IdentifierToken, string> typeIdentifier = Expect<IdentifierToken>("Expected identifier.");
-            Result<IdentifierToken, string> identifier = Expect<IdentifierToken>("Expected identifier after type identifier.");
-            var semi = Expect<SemiColonToken>("Expected ';'.");
             
-            return typeIdentifier.AndThen(ti =>
-                identifier.AndThen(ident =>
-                    semi.Map(_ => new StructDeclarationStatement.Field(
-                        accessModifier,
-                        mutable,
-                        ti.Symbol,
-                        ident.Symbol))));
+            Result<IdentifierToken, string> typeIdentifier = Expect<IdentifierToken>("Expected type identifier.");
+            Result<SemiColonToken, string> semi = Expect<SemiColonToken>("Expected ';'.");
+            
+            return identifier.AndThen(i =>
+                colon.AndThen(_ =>
+                    typeIdentifier.AndThen(ti =>
+                        semi.Map(_ => new StructDeclarationStatement.Field(
+                            accessModifier,
+                            mutable,
+                            ti.Symbol,
+                            i.Symbol)))));
         }
     }
     
@@ -295,18 +298,20 @@ public class Parser
 
             Result<UnionDeclarationStatement.Member.Field, string> ParseField()
             {
-                Result<IdentifierToken, string> typeIdentifier = Expect<IdentifierToken>("Expected identifier.");
-                Result<IdentifierToken, string> fieldIdentifier = Expect<IdentifierToken>("Expected identifier after type identifier.");
+                Result<IdentifierToken, string> fieldIdentifier = Expect<IdentifierToken>("Expected identifier.");
+                Result<ColonToken, string> colon = Expect<ColonToken>("Expected ':'.");
+                Result<IdentifierToken, string> typeIdentifier = Expect<IdentifierToken>("Expected type identifier.");
                 
                 if (Current() is CommaToken)
                     Next();
                 else
                     delimiter = false;
 
-                return typeIdentifier.AndThen(ti =>
-                    fieldIdentifier.Map(fi => new UnionDeclarationStatement.Member.Field(
-                        ti.Symbol,
-                        fi.Symbol)));
+                return fieldIdentifier.AndThen(fi =>
+                    colon.AndThen(_ =>
+                        typeIdentifier.Map(ti => new UnionDeclarationStatement.Member.Field(
+                            ti.Symbol,
+                            fi.Symbol))));
             }
         }
     }
@@ -483,7 +488,7 @@ public class Parser
     {
         Result<IExpression, string> left = ParseMultiplicativeExpression();
 
-        while (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.ADD or TokenSymbol.SUBTRACT })
+        while (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.PLUS or TokenSymbol.MINUS })
         {
             string @operator = Next().Symbol;
             Result<IExpression, string> right = ParseMultiplicativeExpression();
@@ -498,7 +503,7 @@ public class Parser
     {
         Result<IExpression, string> left = ParseVariableDeclarationExpression();
 
-        while (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.MULTIPLY or TokenSymbol.DIVIDE or TokenSymbol.MODULO })
+        while (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.STAR or TokenSymbol.SLASH or TokenSymbol.PERCENT })
         {
             string @operator = Next().Symbol;
             Result<IExpression, string> right = ParseVariableDeclarationExpression();
@@ -537,19 +542,19 @@ public class Parser
 
     private Result<IExpression, string> ParseUnaryExpression()
     {
-        if (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.ADD or TokenSymbol.SUBTRACT } operatorToken)
+        if (Current() is ArithmeticOperatorToken { Symbol: TokenSymbol.PLUS or TokenSymbol.MINUS } operatorToken)
         {
             Next();
             return ParseExpression().Map(e => new UnaryExpression(operatorToken.Symbol, e) as IExpression);
         }
         
-        if (Current() is LogicalOperatorToken { Symbol: TokenSymbol.LOGICAL_NOT } notToken)
+        if (Current() is LogicalOperatorToken { Symbol: TokenSymbol.EXCLAMATION } notToken)
         {
             Next();
             return ParseExpression().Map(e => new UnaryExpression(notToken.Symbol, e) as IExpression);
         }
         
-        if (Current() is BitwiseOperatorToken { Symbol: TokenSymbol.BITWISE_NOT } bitwiseNotToken)
+        if (Current() is BitwiseOperatorToken { Symbol: TokenSymbol.TILDE } bitwiseNotToken)
         {
             Next();
             return ParseExpression().Map(e => new UnaryExpression(bitwiseNotToken.Symbol, e) as IExpression);
@@ -628,7 +633,7 @@ public class Parser
             case NumberToken numberToken:
                 string numberSymbol = numberToken.Symbol;
 
-                if (numberSymbol.Contains(TokenSymbol.DECIMAL_POINT_CHAR) || numberSymbol.EndsWith(Type.f32.ToString()))
+                if (numberSymbol.Contains(TokenSymbol.PERIOD_CHAR) || numberSymbol.EndsWith(Type.f32.ToString()))
                 {
                     if (numberSymbol.EndsWith(Type.f32.ToString()))
                         numberSymbol = numberSymbol[..^Type.f32.ToString().Length];
@@ -688,10 +693,13 @@ public class Parser
 
     private Result<T, string> Expect<T>(string errorMessage) where T : IToken
     {
-        IToken token = Next();
+        IToken token = Current();
 
         if (token is T t)
+        {
+            Next();   
             return Ok<T, string>(t);
+        }
         
         return Error<T, string>($"Unexpected token found during parsing: {token}. Expected {typeof(T)} | {errorMessage}");
     }

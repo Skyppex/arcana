@@ -30,9 +30,9 @@
 `0.0f128` f128 literal -> Expression \
 `true` Boolean literal -> Expression \
 `false` Boolean literal -> Expression \
-`'c'` Character literal -> Expression
+`'c'` Character literal -> Expression \
 `"Hello World"` String literal -> Expression \
-`r"Hello {name}"` Interpolated string literal -> Expression \
+`i"Hello {name}"` Interpolated string literal -> Expression \
 `r#"Hello "World""#` Raw string literal -> Expression \
 
 Raw interpolated string literal -> Expression
@@ -54,8 +54,8 @@ r#"Hello
 Given the following struct:
 ```
 struct Foo {
-    i32 bar;
-    f32 baz;
+    bar: i32;
+    baz: f32;
 }
 ```
 

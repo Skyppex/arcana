@@ -95,24 +95,16 @@ public class TypeEnvironment
     
     public bool LookupVariable(string name, out Type? type, Type? accessorRootType = null)
     {
-        // a.b.c
-
-        if (accessorRootType is null)
+        if (_typesByVariableName.TryGetValue(name, out Type? t))
         {
-            if (_typesByVariableName.TryGetValue(name, out Type? t))
-            {
-                type = t;
-                return true;
-            }
+            type = t;
+            return true;
+        }
 
-            if (Parent?.LookupVariable(name, out t, accessorRootType) ?? false)
-            {
-                type = t;
-                return true;
-            }
-
-            type = null;
-            return false;
+        if (Parent?.LookupVariable(name, out t, accessorRootType) ?? false)
+        {
+            type = t;
+            return true;
         }
 
         type = null;

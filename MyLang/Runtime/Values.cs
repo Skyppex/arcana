@@ -47,6 +47,7 @@ public class StringValue : TextValue
     public StringValue(string value) => Value = value;
     public string Value { get; }
     public override string ToString() => Value;
+
     public override string Text => Value;
 }
 
