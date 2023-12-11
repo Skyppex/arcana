@@ -110,7 +110,7 @@ public class Lexer
             cursor.Bump(); // Skip 
             
             
-            while (IsNumberBasePrefixSecond(cursor.First()))
+            while (IsNumericConstantContinue(cursor.First()))
                 builder.Append(cursor.Bump().Unwrap());
         
             tokens.Add(new NumberToken(@base, builder.ToString()));
@@ -237,6 +237,13 @@ public class Lexer
             cursor.Bump();
             return;
         }
+
+        // if (c is TokenSymbol.PERIOD_CHAR)
+        // {
+        //     tokens.Add(new MemberAccessorToken());
+        //     cursor.Bump();
+        //     return;
+        // }
         
         Console.WriteLine($"Unrecognized character found in source: {c}");
     }
@@ -251,6 +258,7 @@ public class Lexer
         TokenSymbol.RETURN_CHAR;
     
     public static bool IsNumericConstantFirst(char c) => IsDigit(c) || c == TokenSymbol.PERIOD_CHAR;
+    public static bool IsNumericConstantContinue(char c) => IsDigit(c) || c == TokenSymbol.PERIOD_CHAR;
     public static bool IsNumberBasePrefixFirst(char c) => c is '0';
     public static bool IsNumberBasePrefixSecond(char c) => c is 'b' or 'x' or 'd' or 'o' or 'h';
 

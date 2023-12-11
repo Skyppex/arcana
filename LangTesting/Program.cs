@@ -1,4 +1,5 @@
-﻿using MyLang;
+﻿using System.Text;
+using MyLang;
 using MyLang.Runtime;
 using Environment = MyLang.Runtime.Environment;
 
@@ -34,11 +35,27 @@ while (true)
     Environment targetEnvironment = cliEnvironment;
     TypeEnvironment targetTypeEnvironment = typeEnvironment;
     
-    if (input is "read")
+    if (input is "readonly")
     {
         input = text;
         targetEnvironment = CreateScope();
         targetTypeEnvironment = TypeEnvironment.Create();
+    }
+
+    if (input is "read")
+        input = text;
+
+    if (input.StartsWith("read "))
+    {
+        string[] fileNames = input.Remove(0, 5).Split(' ');
+
+        if (fileNames.Length is 1 && fileNames[0] is "lib" or "library")
+        {
+            string[] files = Directory.GetFiles(@"..\..\..\..\Library");
+            input = ParseLibrary(files.Select(Path.GetFileNameWithoutExtension).ToArray()!);
+        }
+        else
+            input = ParseLibrary(fileNames);
     }
     
     MyLang.Program program = parser.CreateAst(input);
@@ -80,4 +97,17 @@ static Environment CreateScope()
     environment.MakeBool("true", true);
     environment.MakeBool("false", false);
     return environment;
+}
+
+string ParseLibrary(string[] strings)
+{
+    StringBuilder stringBuilder = new();
+
+    foreach (string fileName in strings)
+    {
+        Console.WriteLine("Reading file: " + fileName);
+        stringBuilder.AppendLine(File.ReadAllText($@"..\..\..\..\Library\{fileName}.txt"));
+    }
+
+    return stringBuilder.ToString();
 }

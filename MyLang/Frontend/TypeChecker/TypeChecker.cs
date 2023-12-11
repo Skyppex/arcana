@@ -127,9 +127,6 @@ public class TypeChecker
                 Type leftType = CheckType(binaryExpression.Left, typeEnvironment);
                 Type rightType = CheckType(binaryExpression.Right, typeEnvironment);
                 
-                // if (leftType != rightType)
-                //     throw new InvalidOperationException($"Operator '{binaryExpression.Operator}' not supported for operands of type '{leftType}' and '{rightType}'");
-
                 List<Type> allowedTypes = s_operandTypesForOperator[binaryExpression.Operator];
 
                 if (!allowedTypes.Contains(leftType) || !allowedTypes.Contains(rightType))
@@ -288,7 +285,7 @@ public class TypeChecker
 
             case BlockExpression blockExpression:
             {
-                var lastType = Type.never;
+                Type lastType = Type.never;
                 
                 foreach (IStatement stmt in blockExpression.Statements)
                     lastType = CheckType(stmt, new TypeEnvironment(typeEnvironment));
@@ -328,7 +325,15 @@ public class TypeChecker
                         });
                     });
                 
-                return typeEnvironment.DefineType(new UnionType(unionDeclarationStatement.TypeName));
+                return typeEnvironment.DefineType(new UnionType(unionDeclarationStatement.TypeName, unionDeclarationStatement.Members
+                    .ToDictionary(m => m.Identifier, m => m.Fields
+                        .ToDictionary(f => f.Identifier, f =>
+                        {
+                            if (typeEnvironment.LookupType(f.TypeName, out Type? type))
+                                return type;
+
+                            return Type.never;
+                        }))!));
             }
             
             case Program:

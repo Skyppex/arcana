@@ -85,11 +85,11 @@ public class Interpreter
     private static IRuntimeValue EvaluateStructLiteral(
         StructLiteral structLiteral,
         Environment environment) =>
-        new StructValue(structLiteral.Identifier, structLiteral.FieldInitializers
+        new StructValue(structLiteral.FieldInitializers
             .ToDictionary(f => f.FieldIdentifier, f =>
             {
                 IRuntimeValue value = Evaluate(f.Initializer, environment);
-                environment.Declare(new Identifier($"{structLiteral.Identifier}.{f.FieldIdentifier}"), true, value);
+                // environment.Declare(new Identifier($"{structLiteral.Identifier}.{f.FieldIdentifier}"), true, value);
                 return value;
             }));
 

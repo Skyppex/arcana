@@ -46,17 +46,17 @@ public class StringValue : TextValue
 {
     public StringValue(string value) => Value = value;
     public string Value { get; }
-    public override string ToString() => Value;
+    public override string ToString() => $"\"{Value}\"";
 
-    public override string Text => Value;
+    public override string Text => ToString();
 }
 
 public class CharValue : TextValue
 {
     public CharValue(char value) => Value = value;
     public char Value { get; }
-    public override string ToString() => Value.ToString();
-    public override string Text => Value.ToString();
+    public override string ToString() => $"'{Value.ToString()}'";
+    public override string Text => ToString();
 }
 
 public class BooleanValue : IRuntimeValue
@@ -68,13 +68,8 @@ public class BooleanValue : IRuntimeValue
 
 public class StructValue : IRuntimeValue
 {
-    public StructValue(string typeName, Dictionary<string, IRuntimeValue> fields)
-    {
-        TypeName = typeName;
-        Fields = fields;
-    }
+    public StructValue(Dictionary<string, IRuntimeValue> fields) => Fields = fields;
 
-    public string TypeName { get; }
     public Dictionary<string, IRuntimeValue> Fields { get; }
     
     public override string ToString() => $"{{{string.Join(", ", Fields.Select(kv => $"{kv.Key}: {kv.Value}"))}}}";
