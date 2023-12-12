@@ -1,30 +1,32 @@
-﻿
-namespace MyLang;
+﻿using MyLang.Frontend.Lexer;
+using MyLang.Frontend.Parser;
+
+namespace MyLang.Frontend.TypeChecker;
 
 public class TypeChecker
 {
     private static readonly Dictionary<string, List<Type>> s_operandTypesForOperator = new()
     {
-        ["+"] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@char },
-        ["-"] = new List<Type> { Type.i32, Type.f32 },
-        ["*"] = new List<Type> { Type.i32, Type.f32 },
-        ["/"] = new List<Type> { Type.i32, Type.f32 },
-        ["%"] = new List<Type> { Type.i32, Type.f32 },
-        ["&"] = new List<Type> { Type.@bool },
-        ["|"] = new List<Type> { Type.@bool },
-        ["^"] = new List<Type> { Type.@bool },
-        ["~"] = new List<Type> { Type.i32 },
-        ["<<"] = new List<Type> { Type.i32 },
-        [">>"] = new List<Type> { Type.i32 },
-        ["=="] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@bool, Type.@char },
-        ["!="] = new List<Type> { Type.i32, Type.f32, Type.@string, Type.@bool, Type.@char },
-        ["<"] = new List<Type> { Type.i32, Type.f32 },
-        [">"] = new List<Type> { Type.i32, Type.f32 },
-        ["<="] = new List<Type> { Type.i32, Type.f32 },
-        [">="] = new List<Type> { Type.i32, Type.f32 },
-        ["&&"] = new List<Type> { Type.@bool },
-        ["||"] = new List<Type> { Type.@bool },
-        ["!"] = new List<Type> { Type.@bool },
+        ["+"] = [Type.i32, Type.f32, Type.@string, Type.@char],
+        ["-"] = [Type.i32, Type.f32],
+        ["*"] = [Type.i32, Type.f32],
+        ["/"] = [Type.i32, Type.f32],
+        ["%"] = [Type.i32, Type.f32],
+        ["&"] = [Type.@bool],
+        ["|"] = [Type.@bool],
+        ["^"] = [Type.@bool],
+        ["~"] = [Type.i32],
+        ["<<"] = [Type.i32],
+        [">>"] = [Type.i32],
+        ["=="] = [Type.i32, Type.f32, Type.@string, Type.@bool, Type.@char],
+        ["!="] = [Type.i32, Type.f32, Type.@string, Type.@bool, Type.@char],
+        ["<"] = [Type.i32, Type.f32],
+        [">"] = [Type.i32, Type.f32],
+        ["<="] = [Type.i32, Type.f32],
+        [">="] = [Type.i32, Type.f32],
+        ["&&"] = [Type.@bool],
+        ["||"] = [Type.@bool],
+        ["!"] = [Type.@bool],
     };
 
     public Type CheckType(IStatement statement, TypeEnvironment typeEnvironment)

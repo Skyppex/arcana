@@ -1,4 +1,7 @@
-using Type = MyLang.Type;
+using MyLang.Frontend.Parser;
+using MyLang.Frontend.TypeChecker;
+
+using Type = MyLang.Frontend.TypeChecker.Type;
 
 namespace TestProject1;
 

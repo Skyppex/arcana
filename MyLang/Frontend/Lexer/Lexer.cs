@@ -1,9 +1,9 @@
 ﻿using System.Text;
-
 using Monads;
+
 using static Monads.Option;
 
-namespace MyLang;
+namespace MyLang.Frontend.Lexer;
 
 public class Lexer
 {
@@ -54,7 +54,7 @@ public class Lexer
                     break;
                 
                 case TokenSymbol.PLUS_CHAR or TokenSymbol.MINUS_CHAR or TokenSymbol.STAR_CHAR or TokenSymbol.SLASH_CHAR or TokenSymbol.PERCENT_CHAR: 
-                    tokens.Add(new ArithmeticOperatorToken(cursor.Bump().ToString()));
+                    tokens.Add(new ArithmeticOperatorToken(cursor.Bump().ToString()!));
                     break;
                 
                 case TokenSymbol.QUESTION_CHAR:
@@ -248,35 +248,35 @@ public class Lexer
         Console.WriteLine($"Unrecognized character found in source: {c}");
     }
 
-    public static bool IsIdentifierFirst(char c) => IsLetter(c) || c == '_';
-    public static bool IsIdentifierContinue(char c) => IsAlphaNumeric(c) || c == '_';
-    
-    public static bool IsWhitespace(char c) => c is
+    private static bool IsIdentifierFirst(char c) => IsLetter(c) || c == '_';
+    private static bool IsIdentifierContinue(char c) => IsAlphaNumeric(c) || c == '_';
+
+    private static bool IsWhitespace(char c) => c is
         TokenSymbol.SPACE_CHAR or
         TokenSymbol.NEW_LINE_CHAR or
         TokenSymbol.TAB_CHAR or
         TokenSymbol.RETURN_CHAR;
-    
-    public static bool IsNumericConstantFirst(char c) => IsDigit(c) || c == TokenSymbol.PERIOD_CHAR;
-    public static bool IsNumericConstantContinue(char c) => IsDigit(c) || c == TokenSymbol.PERIOD_CHAR;
-    public static bool IsNumberBasePrefixFirst(char c) => c is '0';
-    public static bool IsNumberBasePrefixSecond(char c) => c is 'b' or 'x' or 'd' or 'o' or 'h';
 
-    public static Option<char> EscapableInString(char c) => AlwaysEscapable(c)
+    private static bool IsNumericConstantFirst(char c) => IsDigit(c) || c == TokenSymbol.PERIOD_CHAR;
+    private static bool IsNumericConstantContinue(char c) => IsDigit(c) || c == TokenSymbol.PERIOD_CHAR;
+    private static bool IsNumberBasePrefixFirst(char c) => c is '0';
+    private static bool IsNumberBasePrefixSecond(char c) => c is 'b' or 'x' or 'd' or 'o' or 'h';
+
+    private static Option<char> EscapableInString(char c) => AlwaysEscapable(c)
         .Or(c switch
         {
             '"' => Some(TokenSymbol.DOUBLE_QUOTE_CHAR),
             _ => None<char>()
         });
 
-    public static Option<char> EscapableInChar(char c) => AlwaysEscapable(c)
+    private static Option<char> EscapableInChar(char c) => AlwaysEscapable(c)
         .Or(c switch
         {
             '\'' => Some(TokenSymbol.SINGLE_QUOTE_CHAR),
             _ => None<char>()
         });
 
-    public static Option<char> AlwaysEscapable(char c) => c switch
+    private static Option<char> AlwaysEscapable(char c) => c switch
     {
         '0' => Some(TokenSymbol.ENF_OF_FILE_CHAR),
         'a' => Some('\a'),
@@ -459,64 +459,50 @@ public sealed class MutableToken : IToken { public string Symbol => Keyword.MUTA
 public sealed class IfToken : IToken { public string Symbol => Keyword.IF; }
 public sealed class ElseToken : IToken { public string Symbol => Keyword.ELSE; }
 
-public sealed class NumberToken : IToken
+public sealed class NumberToken(char @base, string symbol) : IToken
 {
-    public NumberToken(char @base, string symbol)
-    {
-        Base = @base;
-        Symbol = symbol;
-    }
-
-    public char Base { get; }
-    public string Symbol { get; }
+    public char Base { get; } = @base;
+    public string Symbol { get; } = symbol;
 }
 
-public sealed class StringToken : IToken
+public sealed class StringToken(string symbol) : IToken
 {
-    public StringToken(string symbol) => Symbol = symbol;     
-    public string Symbol { get; }
+    public string Symbol { get; } = symbol;
 }
 
-public sealed class CharToken : IToken
+public sealed class CharToken(string symbol) : IToken
 {
-    public CharToken(string symbol) => Symbol = symbol;     
-    public string Symbol { get; }
+    public string Symbol { get; } = symbol;
 }
 
-public sealed class BooleanToken : IToken
+public sealed class BooleanToken(string symbol) : IToken
 {
-    public BooleanToken(string symbol) => Symbol = symbol;     
-    public string Symbol { get; }
+    public string Symbol { get; } = symbol;
 }
 
-public sealed class IdentifierToken : IToken
+public sealed class IdentifierToken(string symbol) : IToken
 {
-    public IdentifierToken(string symbol) => Symbol = symbol;     
-    public string Symbol { get; }
+    public string Symbol { get; } = symbol;
 }
 
-public sealed class ArithmeticOperatorToken : IToken
+public sealed class ArithmeticOperatorToken(string symbol) : IToken
 {
-    public ArithmeticOperatorToken(string symbol) => Symbol = symbol; 
-    public string Symbol { get; }
+    public string Symbol { get; } = symbol;
 }
 
-public sealed class BitwiseOperatorToken : IToken
+public sealed class BitwiseOperatorToken(string symbol) : IToken
 {
-    public BitwiseOperatorToken(string symbol) => Symbol = symbol; 
-    public string Symbol { get; }
+    public string Symbol { get; } = symbol;
 }
 
-public sealed class LogicalOperatorToken : IToken
+public sealed class LogicalOperatorToken(string symbol) : IToken
 {
-    public LogicalOperatorToken(string symbol) => Symbol = symbol; 
-    public string Symbol { get; }
+    public string Symbol { get; } = symbol;
 }
 
-public sealed class ComparisonOperatorToken : IToken
+public sealed class ComparisonOperatorToken(string symbol) : IToken
 {
-    public ComparisonOperatorToken(string symbol) => Symbol = symbol; 
-    public string Symbol { get; }
+    public string Symbol { get; } = symbol;
 }
 
 public sealed class EqualsToken : IToken { public string Symbol => TokenSymbol.EQUALS; }
@@ -554,11 +540,9 @@ public sealed class UnionToken : IToken { public string Symbol => Keyword.UNION;
 // public sealed class BreakToken : IToken { public string Symbol => Keyword.BREAK; }
 // public sealed class ContinueToken : IToken { public string Symbol => Keyword.CONTINUE; }
 
-public sealed class AccessToken : IToken
+public sealed class AccessToken(string symbol) : IToken
 {
-    public AccessToken(string symbol) => Symbol = symbol;
-
-    public string Symbol { get; }
+    public string Symbol { get; } = symbol;
 }
 
 public sealed class EndOfFileToken : IToken { public string Symbol => string.Empty; }

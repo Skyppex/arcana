@@ -8,4 +8,9 @@ struct P {
     y: Option;
 }
 
+struct P2 {
+    x: f32;
+    y: P2;
+}
+
 P p = P {x: 5.5, y: Option::Some(x: 1.1)}

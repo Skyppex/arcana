@@ -1,8 +1,9 @@
 ﻿using System.Text;
 using Monads;
+
 using MyLang.Models;
 
-namespace MyLang;
+namespace MyLang.Frontend.Parser;
 
 public static class Indent
 {
@@ -17,15 +18,13 @@ public interface INode
     public void Traverse(Action<INode> action);
 }
 
-public interface IStatement : INode { }
+public interface IStatement : INode;
 
-public interface IExpression : IStatement { }
+public interface IExpression : IStatement;
 
-public sealed class Program : IStatement
+public sealed class Program(List<Result<IStatement, string>> body) : IStatement
 {
-    public Program(List<Result<IStatement, string>> body) => Body = body;
-
-    public List<Result<IStatement, string>> Body { get; }
+    public List<Result<IStatement, string>> Body { get; } = body;
 
     public string GetNodeTree(ref int indent)
     {
@@ -47,18 +46,11 @@ public sealed class Program : IStatement
     }
 }
 
-public sealed class VariableDeclarationStatement : IStatement
+public sealed class VariableDeclarationStatement(string typeName, bool mutable, Identifier identifier) : IStatement
 {
-    public VariableDeclarationStatement(string typeName, bool mutable, Identifier identifier)
-    {
-        TypeName = typeName;
-        Mutable = mutable;
-        Identifier = identifier;
-    }
-
-    public string TypeName { get; }
-    public bool Mutable { get; }
-    public Identifier Identifier { get; }
+    public string TypeName { get; } = typeName;
+    public bool Mutable { get; } = mutable;
+    public Identifier Identifier { get; } = identifier;
 
     public string GetNodeTree(ref int indent)
     {
@@ -77,22 +69,18 @@ public sealed class VariableDeclarationStatement : IStatement
     public void Traverse(Action<INode> action) => action(this);
 }
 
-public sealed class IfStatement : IStatement
+public sealed class IfStatement(
+    IfStatement.ConditionBlock @if,
+    Option<IEnumerable<IfStatement.ConditionBlock>> elseIfs,
+    Option<IExpression> @else)
+    : IStatement
 {
-    public IfStatement(ConditionBlock @if, Option<IEnumerable<ConditionBlock>> elseIfs, Option<IStatement> @else)
-    {
-        If = @if;
-        ElseIfs = elseIfs;
-        Else = @else;
-    }
-    
-    public ConditionBlock If { get; }
+    public ConditionBlock If { get; } = @if;
 
-    public Option<IEnumerable<ConditionBlock>> ElseIfs { get; }
-    
-    public Option<IStatement> Else { get; }
-    
-    
+    public Option<IEnumerable<ConditionBlock>> ElseIfs { get; } = elseIfs;
+
+    public Option<IExpression> Else { get; } = @else;
+
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
@@ -120,7 +108,7 @@ public sealed class IfStatement : IStatement
         if (!Else.IsSome())
             return builder.ToString();
         
-        IStatement @else = Else.Unwrap();
+        IExpression @else = Else.Unwrap();
         builder.AppendLine(Indent.Get(indent) + $"{nameof(Else)} Block: {@else.GetNodeTree(ref indent)}");
         indent--;
         
@@ -148,32 +136,23 @@ public sealed class IfStatement : IStatement
             Else.Unwrap().Traverse(action);
     }
 
-    public sealed class ConditionBlock
+    public sealed class ConditionBlock(IExpression condition, IExpression block)
     {
-        public ConditionBlock(IExpression condition, IStatement block)
-        {
-            Condition = condition;
-            Block = block;
-        }
-        
-        public IExpression Condition { get; }
-        public IStatement Block { get; }
+        public IExpression Condition { get; } = condition;
+        public IExpression Block { get; } = block;
     }
 }
 
-public sealed class StructDeclarationStatement : IStatement
+public sealed class StructDeclarationStatement(
+    Option<string> accessModifier,
+    string typeName,
+    IEnumerable<StructDeclarationStatement.Field> fields)
+    : IStatement
 {
-    public StructDeclarationStatement(Option<string> accessModifier, string typeName, IEnumerable<Field> fields)
-    {
-        AccessModifier = accessModifier;
-        TypeName = typeName;
-        Fields = fields;
-    }
-    
-    public Option<string> AccessModifier { get; }
-    public string TypeName { get; }
-    public IEnumerable<Field> Fields { get; }
-    
+    public Option<string> AccessModifier { get; } = accessModifier;
+    public string TypeName { get; } = typeName;
+    public IEnumerable<Field> Fields { get; } = fields;
+
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
@@ -211,36 +190,25 @@ public sealed class StructDeclarationStatement : IStatement
         action(this);
     }
 
-    public sealed class Field
+    public sealed class Field(Option<string> accessModifier, bool mutable, string typeName, string identifier)
     {
-        public Field(Option<string> accessModifier, bool mutable, string typeName, string identifier)
-        {
-            AccessModifier = accessModifier;
-            Mutable = mutable;
-            TypeName = typeName;
-            Identifier = identifier;
-        }
-        
-        public Option<string> AccessModifier { get; }
-        public bool Mutable { get; }
-        public string TypeName { get; }
-        public string Identifier { get; }
+        public Option<string> AccessModifier { get; } = accessModifier;
+        public bool Mutable { get; } = mutable;
+        public string TypeName { get; } = typeName;
+        public string Identifier { get; } = identifier;
     }
 }
 
-public sealed class UnionDeclarationStatement : IStatement
+public sealed class UnionDeclarationStatement(
+    Option<string> accessModifier,
+    string typeName,
+    IEnumerable<UnionDeclarationStatement.Member> members)
+    : IStatement
 {
-    public UnionDeclarationStatement(Option<string> accessModifier, string typeName, IEnumerable<Member> members)
-    {
-        AccessModifier = accessModifier;
-        TypeName = typeName;
-        Members = members;
-    }
-    
-    public Option<string> AccessModifier { get; }
-    public string TypeName { get; }
-    public IEnumerable<Member> Members { get; }
-    
+    public Option<string> AccessModifier { get; } = accessModifier;
+    public string TypeName { get; } = typeName;
+    public IEnumerable<Member> Members { get; } = members;
+
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
@@ -287,45 +255,30 @@ public sealed class UnionDeclarationStatement : IStatement
 
     public void Traverse(Action<INode> action) => action(this);
 
-    public sealed class Member
+    public sealed class Member(string identifier, List<Member.Field> fields)
     {
-        public Member(string identifier, List<Field> fields)
-        {
-            Identifier = identifier;
-            Fields = fields;
-        }
-        
-        public string Identifier { get; }
-        public List<Field> Fields { get; }
+        public string Identifier { get; } = identifier;
+        public List<Field> Fields { get; } = fields;
 
-        public sealed class Field
+        public sealed class Field(string typeName, string identifier)
         {
-            public Field(string typeName, string identifier)
-            {
-                TypeName = typeName;
-                Identifier = identifier;
-            }
-
-            public string TypeName { get; }
-            public string Identifier { get; }
+            public string TypeName { get; } = typeName;
+            public string Identifier { get; } = identifier;
         }
     }
 }
 
-public sealed class VariableDeclarationExpression : IExpression
+public sealed class VariableDeclarationExpression(
+    string typeName,
+    bool mutable,
+    Identifier identifier,
+    IExpression initializer)
+    : IExpression
 {
-    public VariableDeclarationExpression(string typeName, bool mutable, Identifier identifier, IExpression initializer)
-    {
-        TypeName = typeName;
-        Mutable = mutable;
-        Identifier = identifier;
-        Initializer = initializer;
-    }
-
-    public string TypeName { get; }
-    public bool Mutable { get; }
-    public Identifier Identifier { get; }
-    public IExpression Initializer { get; }
+    public string TypeName { get; } = typeName;
+    public bool Mutable { get; } = mutable;
+    public Identifier Identifier { get; } = identifier;
+    public IExpression Initializer { get; } = initializer;
 
     public string GetNodeTree(ref int indent)
     {
@@ -349,17 +302,11 @@ public sealed class VariableDeclarationExpression : IExpression
     }
 }
 
-public sealed class AssignmentExpression : IExpression
+public sealed class AssignmentExpression(MemberExpression member, IExpression assignment) : IExpression
 {
-    public AssignmentExpression(MemberExpression member, IExpression assignment)
-    {
-        Member = member;
-        Assignment = assignment;
-    }
-    
-    public MemberExpression Member { get; }
-    public IExpression Assignment { get; }
-    
+    public MemberExpression Member { get; } = member;
+    public IExpression Assignment { get; } = assignment;
+
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
@@ -387,11 +334,9 @@ public abstract class MemberExpression : IExpression
     public abstract void Traverse(Action<INode> action);
 }
 
-public sealed class Identifier : MemberExpression
+public sealed class Identifier(string symbol) : MemberExpression
 {
-    public Identifier(string symbol) => Symbol = symbol;
-    
-    public override string Symbol { get; }
+    public override string Symbol { get; } = symbol;
 
     public override string GetNodeTree(ref int indent) => $"<{nameof(Identifier)}>, {nameof(Symbol)}: {Symbol}";
     public override void Traverse(Action<INode> action) => action(this);
@@ -403,66 +348,51 @@ public abstract class NumericLiteral : IExpression
     public void Traverse(Action<INode> action) => action(this);
 }
 
-public sealed class Int32Literal : NumericLiteral
+public sealed class Int32Literal(int value) : NumericLiteral
 {
-    public Int32Literal(int value) => Value = value;
-    
-    public int Value { get; }
+    public int Value { get; } = value;
 
     public override string GetNodeTree(ref int indent) => $"<{nameof(Int32Literal)}>, {nameof(Value)}: {Value}";
 }
 
-public sealed class Float32Literal : NumericLiteral
+public sealed class Float32Literal(float value) : NumericLiteral
 {
-    public Float32Literal(float value) => Value = value;
-    
-    public float Value { get; }
-    
+    public float Value { get; } = value;
+
     public override string GetNodeTree(ref int indent) => $"<{nameof(Float32Literal)}>, {nameof(Value)}: {Value}";
 }
 
-public sealed class StringLiteral : IExpression
+public sealed class StringLiteral(string value) : IExpression
 {
-    public StringLiteral(string value) => Value = value;
-    
-    public string Value { get; }
-    
+    public string Value { get; } = value;
+
     public string GetNodeTree(ref int indent) => $"<{nameof(StringLiteral)}>, {nameof(Value)}: \"{Value.ToLiteral()}\"";
     public void Traverse(Action<INode> action) => action(this);
 }
 
-public sealed class CharLiteral : IExpression
+public sealed class CharLiteral(char value) : IExpression
 {
-    public CharLiteral(char value) => Value = value;
-    
-    public char Value { get; }
-    
+    public char Value { get; } = value;
+
     public string GetNodeTree(ref int indent) => $"<{nameof(CharLiteral)}>, {nameof(Value)}: '{Value.ToLiteral()}'";
     public void Traverse(Action<INode> action) => action(this);
 }
 
-public sealed class BooleanLiteral : IExpression
+public sealed class BooleanLiteral(bool value) : IExpression
 {
-    public BooleanLiteral(bool value) => Value = value;
-    
-    public bool Value { get; set; }
-    
+    public bool Value { get; } = value;
+
     public string GetNodeTree(ref int indent) => $"<{nameof(BooleanLiteral)}>, {nameof(Value)}: {Value}";
 
     public void Traverse(Action<INode> action) => action(this);
 }
 
-public sealed class StructLiteral : IExpression
+public sealed class StructLiteral(string identifier, List<StructLiteral.FieldInitializer> fieldInitializers)
+    : IExpression
 {
-    public StructLiteral(string identifier, List<FieldInitializer> fieldInitializers)
-    {
-        Identifier = identifier;
-        FieldInitializers = fieldInitializers;
-    }
-    
-    public string Identifier { get; }
-    public List<FieldInitializer> FieldInitializers { get; }
-    
+    public string Identifier { get; } = identifier;
+    public List<FieldInitializer> FieldInitializers { get; } = fieldInitializers;
+
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
@@ -496,29 +426,21 @@ public sealed class StructLiteral : IExpression
             fieldInitializer.Initializer.Traverse(action);
     }
 
-    public sealed class FieldInitializer
+    public sealed class FieldInitializer(string fieldIdentifier, IExpression initializer)
     {
-        public FieldInitializer(string fieldIdentifier, IExpression initializer)
-        {
-            FieldIdentifier = fieldIdentifier;
-            Initializer = initializer;
-        }
-        
-        public string FieldIdentifier { get; }
-        public IExpression Initializer { get; }
+        public string FieldIdentifier { get; } = fieldIdentifier;
+        public IExpression Initializer { get; } = initializer;
     }
 }
 
-public sealed class UnionLiteral : IExpression
+public sealed class UnionLiteral(
+    string identifier,
+    string member,
+    List<UnionLiteral.FieldInitializer> fieldInitializers)
+    : IExpression
 {
-    public UnionLiteral(string identifier, string member, List<FieldInitializer> fieldInitializers)
-    {
-        UnionMember = new UnionMember(identifier, member);
-        FieldInitializers = fieldInitializers;
-    }
-    
-    public UnionMember UnionMember { get; }
-    public List<FieldInitializer> FieldInitializers { get; }
+    public UnionMember UnionMember { get; } = new(identifier, member);
+    public List<FieldInitializer> FieldInitializers { get; } = fieldInitializers;
 
     public string Identifier => UnionMember.TypeName;
     public string Member => UnionMember.MemberName;
@@ -556,29 +478,17 @@ public sealed class UnionLiteral : IExpression
             fieldInitializer.Initializer.Traverse(action);
     }
 
-    public sealed class FieldInitializer
+    public sealed class FieldInitializer(string fieldIdentifier, IExpression initializer)
     {
-        public FieldInitializer(string fieldIdentifier, IExpression initializer)
-        {
-            FieldIdentifier = fieldIdentifier;
-            Initializer = initializer;
-        }
-        
-        public string FieldIdentifier { get; }
-        public IExpression Initializer { get; }
+        public string FieldIdentifier { get; } = fieldIdentifier;
+        public IExpression Initializer { get; } = initializer;
     }
 }
 
-public sealed class MemberAccessExpression : MemberExpression
+public sealed class MemberAccessExpression(IExpression @object, MemberExpression member) : MemberExpression
 {
-    public MemberAccessExpression(IExpression @object, MemberExpression member)
-    {
-        Object = @object;
-        Member = member;
-    }
-
-    public IExpression Object { get; }
-    public MemberExpression Member { get; }
+    public IExpression Object { get; } = @object;
+    public MemberExpression Member { get; } = member;
     public override string Symbol => Member.Symbol;
     
     public override string GetNodeTree(ref int indent)
@@ -602,17 +512,10 @@ public sealed class MemberAccessExpression : MemberExpression
     }
 }
 
-public sealed class CallExpression : IExpression
+public sealed class CallExpression(IExpression caller, List<IExpression> arguments) : IExpression
 {
-    public CallExpression(IExpression caller, List<IExpression> arguments)
-    {
-        Caller = caller;
-        Arguments = arguments;
-    }
-
-    public IExpression Caller { get; }
-    public List<IExpression> Arguments { get; }
-
+    public IExpression Caller { get; } = caller;
+    public List<IExpression> Arguments { get; } = arguments;
 
     public string GetNodeTree(ref int indent)
     {
@@ -648,19 +551,12 @@ public sealed class CallExpression : IExpression
     }
 }
 
-public sealed class BinaryExpression : IExpression
+public sealed class BinaryExpression(IExpression left, string @operator, IExpression right) : IExpression
 {
-    public BinaryExpression(IExpression left, string @operator, IExpression right)
-    {
-        Left = left;
-        Operator = @operator;
-        Right = right;
-    }
-    
-    public IExpression Left { get; }
-    public string Operator { get; }
-    public IExpression Right { get; }
-    
+    public IExpression Left { get; } = left;
+    public string Operator { get; } = @operator;
+    public IExpression Right { get; } = right;
+
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
@@ -683,17 +579,11 @@ public sealed class BinaryExpression : IExpression
     }
 }
 
-public sealed class UnaryExpression : IExpression
+public sealed class UnaryExpression(string @operator, IExpression operand) : IExpression
 {
-    public UnaryExpression(string @operator, IExpression operand)
-    {
-        Operator = @operator;
-        Operand = operand;
-    }
-    
-    public string Operator { get; }
-    public IExpression Operand { get; }
-    
+    public string Operator { get; } = @operator;
+    public IExpression Operand { get; } = operand;
+
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
@@ -714,19 +604,12 @@ public sealed class UnaryExpression : IExpression
     }
 }
 
-public sealed class TernaryExpression : IExpression
+public sealed class TernaryExpression(IExpression condition, IExpression then, IExpression @else) : IExpression
 {
-    public TernaryExpression(IExpression condition, IExpression then, IExpression @else)
-    {
-        Condition = condition;
-        Then = then;
-        Else = @else;
-    }
-    
-    public IExpression Condition { get; }
-    public IExpression Then { get; }
-    public IExpression Else { get; }
-    
+    public IExpression Condition { get; } = condition;
+    public IExpression Then { get; } = then;
+    public IExpression Else { get; } = @else;
+
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
@@ -750,10 +633,9 @@ public sealed class TernaryExpression : IExpression
     }
 }
 
-public sealed class BlockExpression : IExpression
+public sealed class BlockExpression(List<IStatement> statements) : IExpression
 {
-    public BlockExpression(List<IStatement> statements) => Statements = statements;
-    public List<IStatement> Statements { get; }
+    public List<IStatement> Statements { get; } = statements;
 
     public string GetNodeTree(ref int indent)
     {
@@ -786,17 +668,15 @@ public sealed class BlockExpression : IExpression
     {
         action(this);
         
-        foreach (IStatement statememnt in Statements)
-            statememnt.Traverse(action);
+        foreach (IStatement statement in Statements)
+            statement.Traverse(action);
     }
 }
 
-public sealed class DropExpression : IExpression
+public sealed class DropExpression(Identifier identifier) : IExpression
 {
-    public DropExpression(Identifier identifier) => Identifier = identifier;
+    public Identifier Identifier { get; } = identifier;
 
-    public Identifier Identifier { get; }
-        
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();

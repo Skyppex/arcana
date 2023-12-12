@@ -1,6 +1,6 @@
-﻿namespace MyLang;
+﻿namespace MyLang.Frontend.TypeChecker;
 
-public class TypeEnvironment
+public class TypeEnvironment(TypeEnvironment? parent = null)
 {
     public static TypeEnvironment Create() => new()
     {
@@ -15,18 +15,11 @@ public class TypeEnvironment
         }
     };
     
-    private readonly Dictionary<string, Type> _typesByName;
-    private readonly Dictionary<string, Type> _typesByVariableName;
-    
-    public TypeEnvironment(TypeEnvironment? parent = null)
-    {
-        _typesByName = new Dictionary<string, Type>();
-        _typesByVariableName = new Dictionary<string, Type>();
-        Parent = parent;
-    }
+    private readonly Dictionary<string, Type> _typesByName = new();
+    private readonly Dictionary<string, Type> _typesByVariableName = new();
 
-    public TypeEnvironment? Parent { get; }
-    
+    private TypeEnvironment? Parent { get; } = parent;
+
     public Type DefineType(Type type)
     {
         _typesByName[type.Name] = type;
@@ -44,24 +37,6 @@ public class TypeEnvironment
     public bool IsTypeDefined(string name) => _typesByName.ContainsKey(name);
     public bool IsVariableDefined(string name) => _typesByVariableName.ContainsKey(name);
     
-    // public bool LookupType(string name, out Type? type)
-    // {
-    //     if (_typesByName.TryGetValue(name, out Type? t))
-    //     {
-    //         type = t;
-    //         return true;
-    //     }
-    //
-    //     if (Parent?.LookupType(name, out t) ?? false)
-    //     {
-    //         type = t;
-    //         return true;
-    //     }
-    //
-    //     type = null;
-    //     return false;
-    // }
-
     public bool LookupType<T>(string name, out T? type)
         where T : Type
     {

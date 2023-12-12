@@ -1,85 +1,54 @@
 ﻿using Monads;
-using MyLang.Models;
-using static Monads.Result;
+
+using MyLang.Frontend.Lexer;
+using MyLang.Frontend.Parser;
 using static Monads.Option;
 
 namespace MyLang.Runtime;
 
-public class Interpreter
+public static class Interpreter
 {
     public static IRuntimeValue Evaluate(IStatement statement, Environment environment)
     {
-        switch (statement)
+        return statement switch
         {
-            case Int32Literal numericLiteral:
-                return new Int32Value(numericLiteral.Value);
-            
-            case Float32Literal numericLiteral:
-                return new Float32Value(numericLiteral.Value);
-            
-            case StringLiteral stringLiteral:
-                return new StringValue(stringLiteral.Value);
-
-            case CharLiteral charLiteral:
-                return new CharValue(charLiteral.Value);
-            
-            case BooleanLiteral booleanLiteral:
-                return new BooleanValue(booleanLiteral.Value);
-            
-            case StructLiteral structLiteral:
-                return EvaluateStructLiteral(structLiteral, environment);
-            
-            case UnionLiteral unionLiteral:
-                return EvaluateUnionLiteral(unionLiteral, environment);
-            
-            case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.PLUS or TokenSymbol.MINUS or TokenSymbol.TILDE }:
-                return EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, environment));
-
-            case UnaryExpression unaryExpression when unaryExpression is { Operator: TokenSymbol.EXCLAMATION or TokenSymbol.TILDE }:
-                return EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, environment));
-
-            case TernaryExpression ternaryExpression:
-                return EvaluateTernaryExpression(ternaryExpression, environment);
-            
-            case BinaryExpression binaryExpression:
-                return EvaluateBinaryExpression(binaryExpression, environment);
-            
-            case MemberAccessExpression memberExpression:
-                return EvaluateMemberExpression(memberExpression, environment);
-            
-            case Identifier identifier:
-                return EvaluateIdentifier(identifier, environment);
-            
-            case AssignmentExpression assignmentExpression:
-                return EvaluateAssignmentExpression(assignmentExpression, environment);
-            
-            case VariableDeclarationStatement variableDeclarationStatement:
-                return EvaluateVariableDeclarationStatement(variableDeclarationStatement, environment);
-            
-            case StructDeclarationStatement:
-                return EvaluateStructDeclarationStatement();
-            
-            case UnionDeclarationStatement:
-                return EvaluateUnionDeclarationStatement();
-            
-            case IfStatement ifStatement:
-                return EvaluateIfStatement(ifStatement, environment);
-            
-            case VariableDeclarationExpression variableDeclarationExpression:
-                return EvaluateVariableDeclarationExpression(variableDeclarationExpression, environment);
-            
-            case BlockExpression blockExpression:
-                return EvaluateBlockExpression(blockExpression, environment);
-            
-            case DropExpression dropExpression:
-                return EvaluateDropExpression(dropExpression, environment);
-            
-            case Program program:
-                return EvaluateProgram(program, environment);
-            
-            default:
-                throw new InvalidProgramException($"The {statement.GetType()} Node has not been setup for interpretation.");
-        }
+            Int32Literal numericLiteral => new Int32Value(numericLiteral.Value),
+            Float32Literal numericLiteral => new Float32Value(numericLiteral.Value),
+            StringLiteral stringLiteral => new StringValue(stringLiteral.Value),
+            CharLiteral charLiteral => new CharValue(charLiteral.Value),
+            BooleanLiteral booleanLiteral => new BooleanValue(booleanLiteral.Value),
+            StructLiteral structLiteral => EvaluateStructLiteral(structLiteral, environment),
+            UnionLiteral unionLiteral => EvaluateUnionLiteral(unionLiteral, environment),
+            UnaryExpression unaryExpression when unaryExpression is
+            {
+                Operator: TokenSymbol.PLUS or TokenSymbol.MINUS or TokenSymbol.TILDE
+            } => EvaluateNumberUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, environment)),
+            UnaryExpression unaryExpression when unaryExpression is
+            {
+                Operator: TokenSymbol.EXCLAMATION or TokenSymbol.TILDE
+            } => EvaluateBooleanUnaryExpression(unaryExpression, Evaluate(unaryExpression.Operand, environment)),
+            TernaryExpression ternaryExpression => EvaluateTernaryExpression(ternaryExpression, environment),
+            BinaryExpression binaryExpression => EvaluateBinaryExpression(binaryExpression, environment),
+            MemberAccessExpression memberExpression => EvaluateMemberExpression(memberExpression, environment),
+            Identifier identifier => EvaluateIdentifier(identifier, environment),
+            AssignmentExpression assignmentExpression => EvaluateAssignmentExpression(
+                assignmentExpression,
+                environment),
+            VariableDeclarationStatement variableDeclarationStatement => EvaluateVariableDeclarationStatement(
+                variableDeclarationStatement,
+                environment),
+            StructDeclarationStatement => EvaluateStructDeclarationStatement(),
+            UnionDeclarationStatement => EvaluateUnionDeclarationStatement(),
+            IfStatement ifStatement => EvaluateIfStatement(ifStatement, environment),
+            VariableDeclarationExpression variableDeclarationExpression => EvaluateVariableDeclarationExpression(
+                variableDeclarationExpression,
+                environment),
+            BlockExpression blockExpression => EvaluateBlockExpression(blockExpression, environment),
+            DropExpression dropExpression => EvaluateDropExpression(dropExpression, environment),
+            Program program => EvaluateProgram(program, environment),
+            _ => throw new InvalidProgramException(
+                $"The {statement.GetType()} Node has not been setup for interpretation.")
+        };
     }
 
     private static IRuntimeValue EvaluateStructLiteral(
@@ -343,7 +312,7 @@ public class Interpreter
                 
                 return None<IRuntimeValue>();
             },
-            none: () => None<IRuntimeValue>());
+            none: None<IRuntimeValue>);
         
         if (resultOfElifs.IsSome())
             return resultOfElifs.Unwrap();

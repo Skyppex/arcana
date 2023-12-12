@@ -1,20 +1,20 @@
 ﻿using System.Globalization;
+
 using Monads;
+
+using MyLang.Frontend.Lexer;
+
 using static Monads.Result;
 using static Monads.Option;
 
-namespace MyLang;
+using Type = MyLang.Frontend.TypeChecker.Type;
+
+namespace MyLang.Frontend.Parser;
 
 public class Parser
 {
-    private List<IToken> _tokens;
-    private readonly Lexer _lexer;
-
-    public Parser()
-    {
-        _tokens = new List<IToken>();
-        _lexer = new Lexer();
-    }
+    private List<IToken> _tokens = new();
+    private readonly Lexer.Lexer _lexer = new();
 
     public Program CreateAst(string sourceCode)
     {
@@ -92,11 +92,11 @@ public class Parser
         Next();
 
         Result<IExpression, string> ifCondition = ParseCondition();
-        Result<IStatement, string> ifBlock = ParseBlock();
+        Result<IExpression, string> ifBlock = ParseBlock();
 
-        List<(Result<IExpression, string> Condition, Result<IStatement, string> Block)> elseIfStatements = new();
+        List<(Result<IExpression, string> Condition, Result<IExpression, string> Block)> elseIfStatements = new();
         
-        Option<Result<IStatement, string>> elseBlock = Option<Result<IStatement, string>>.None;
+        Option<Result<IExpression, string>> elseBlock = Option<Result<IExpression, string>>.None;
 
         while (Current() is ElseToken)
         {
@@ -106,7 +106,7 @@ public class Parser
             {
                 Next();
                 Result<IExpression, string> condition = ParseCondition();                
-                Result<IStatement, string> block = ParseBlock();
+                Result<IExpression, string> block = ParseBlock();
                 elseIfStatements.Add((condition, block));
                 continue;
             }
@@ -118,7 +118,7 @@ public class Parser
         {
             return ifCondition.AndThen(ifc => ifBlock.Map(ifb => new IfStatement(new IfStatement.ConditionBlock(ifc, ifb),
                 None<IEnumerable<IfStatement.ConditionBlock>>(),
-                None<IStatement>()) as IStatement));
+                None<IExpression>()) as IStatement));
         }
         
         if (elseIfStatements.Count > 0 && elseBlock.IsNone())
@@ -129,7 +129,7 @@ public class Parser
                     elif.Block.Map(elifb => new IfStatement.ConditionBlock(elifc, elifb)));
             }).Invert().Map(cbs =>
                 new IfStatement(new IfStatement.ConditionBlock(ifc, ifb),
-                    Some(cbs), None<IStatement>()) as IStatement)));
+                    Some(cbs), None<IExpression>()) as IStatement)));
         }
 
         if (elseIfStatements.Count == 0 && elseBlock.IsSome())
@@ -164,14 +164,6 @@ public class Parser
             }
 
             return condition;
-        }
-
-        Result<IStatement, string> ParseBlock()
-        {
-            Expect<OpenBlockToken>("Expected '{'.");
-            Result<IStatement, string> thenStatement = ParseStatement();
-            Expect<CloseBlockToken>("Expected '}'.");
-            return thenStatement;
         }
     }
 

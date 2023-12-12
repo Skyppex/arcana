@@ -1,9 +1,10 @@
 ﻿using System.Reflection;
+
 // ReSharper disable InconsistentNaming
 
-namespace MyLang;
+namespace MyLang.Frontend.TypeChecker;
 
-public abstract class Type
+public abstract class Type(string name)
 {
     public static readonly Type statement = new UnionType("Statement");
     public static readonly Type never = new UnionType("never");
@@ -15,9 +16,7 @@ public abstract class Type
     
     public static readonly Type[] Numbers = { i32, f32 };
 
-    protected Type(string name) => Name = name;
-
-    public string Name { get; }
+    public string Name { get; } = name;
 
     public static Type FromString(string typeName) =>
         typeof(Type).GetFields(BindingFlags.Public | BindingFlags.Static)

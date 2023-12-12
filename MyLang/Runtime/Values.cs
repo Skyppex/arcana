@@ -1,13 +1,12 @@
-﻿using MyLang.Models;
+﻿using System.Globalization;
+
+using MyLang.Models;
 
 namespace MyLang.Runtime;
 
-public interface IRuntimeValue { }
+public interface IRuntimeValue;
 
-public abstract class NumberValue : IRuntimeValue
-{
-    public abstract object Boxed { get; }
-}
+public abstract class NumberValue : IRuntimeValue;
 
 public sealed class Uninitialized : IRuntimeValue
 {
@@ -21,20 +20,16 @@ public sealed class NoValue : IRuntimeValue
     private NoValue() { }
 }
 
-public class Int32Value : NumberValue
+public class Int32Value(int value) : NumberValue
 {
-    public Int32Value(int value) => Value = value;
-    public int Value { get; }
-    public override object Boxed => Value;
+    public int Value { get; } = value;
     public override string ToString() => Value.ToString();
 }
 
-public class Float32Value : NumberValue
+public class Float32Value(float value) : NumberValue
 {
-    public Float32Value(float value) => Value = value;
-    public float Value { get; }
-    public override object Boxed => Value;
-    public override string ToString() => Value.ToString();
+    public float Value { get; } = value;
+    public override string ToString() => Value.ToString(CultureInfo.InvariantCulture);
 }
 
 public abstract class TextValue : IRuntimeValue
@@ -42,49 +37,39 @@ public abstract class TextValue : IRuntimeValue
     public abstract string Text { get; }
 } 
 
-public class StringValue : TextValue
+public class StringValue(string value) : TextValue
 {
-    public StringValue(string value) => Value = value;
-    public string Value { get; }
+    public string Value { get; } = value;
     public override string ToString() => $"\"{Value}\"";
 
     public override string Text => ToString();
 }
 
-public class CharValue : TextValue
+public class CharValue(char value) : TextValue
 {
-    public CharValue(char value) => Value = value;
-    public char Value { get; }
+    public char Value { get; } = value;
     public override string ToString() => $"'{Value.ToString()}'";
     public override string Text => ToString();
 }
 
-public class BooleanValue : IRuntimeValue
+public class BooleanValue(bool value) : IRuntimeValue
 {
-    public BooleanValue(bool value) => Value = value;
-    public bool Value { get; }
+    public bool Value { get; } = value;
     public override string ToString() => Value.ToString();
 }
 
-public class StructValue : IRuntimeValue
+public class StructValue(Dictionary<string, IRuntimeValue> fields) : IRuntimeValue
 {
-    public StructValue(Dictionary<string, IRuntimeValue> fields) => Fields = fields;
+    public Dictionary<string, IRuntimeValue> Fields { get; } = fields;
 
-    public Dictionary<string, IRuntimeValue> Fields { get; }
-    
     public override string ToString() => $"{{{string.Join(", ", Fields.Select(kv => $"{kv.Key}: {kv.Value}"))}}}";
 }
 
-public class UnionValue : IRuntimeValue
+public class UnionValue(UnionMember unionMember, Dictionary<string, IRuntimeValue> fields)
+    : IRuntimeValue
 {
-    public UnionValue(UnionMember unionMember, Dictionary<string, IRuntimeValue> fields)
-    {
-        UnionMember = unionMember;
-        Fields = fields;
-    }
-
-    public UnionMember UnionMember { get; }
-    public Dictionary<string, IRuntimeValue> Fields { get; }
+    public UnionMember UnionMember { get; } = unionMember;
+    public Dictionary<string, IRuntimeValue> Fields { get; } = fields;
 
     public override string ToString()
     {
@@ -95,4 +80,4 @@ public class UnionValue : IRuntimeValue
     } 
 }
 
-public class EmptyProgramValue : IRuntimeValue { }
+public class EmptyProgramValue : IRuntimeValue;

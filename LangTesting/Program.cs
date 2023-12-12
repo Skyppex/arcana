@@ -1,5 +1,7 @@
 ﻿using System.Text;
 using MyLang;
+using MyLang.Frontend.Parser;
+using MyLang.Frontend.TypeChecker;
 using MyLang.Runtime;
 using Environment = MyLang.Runtime.Environment;
 
@@ -58,7 +60,7 @@ while (true)
             input = ParseLibrary(fileNames);
     }
     
-    MyLang.Program program = parser.CreateAst(input);
+    MyLang.Frontend.Parser.Program program = parser.CreateAst(input);
 
     try
     {

@@ -1,21 +1,14 @@
 ﻿using Monads;
+
 using static Monads.Option;
 
-namespace MyLang;
+namespace MyLang.Frontend.Lexer;
 
-public class Cursor
+public class Cursor(string sourceCode)
 {
-    private readonly Queue<char> _chars;
-    private int _lengthRemaining;
-    private char _previous;
-    
-    public Cursor(string sourceCode)
-    {
-        _chars = new Queue<char>(sourceCode);
-        _lengthRemaining = sourceCode.Length;
-        _previous = TokenSymbol.ENF_OF_FILE_CHAR;
-    }
-    
+    private readonly Queue<char> _chars = new Queue<char>(sourceCode);
+    private int _lengthRemaining = sourceCode.Length;
+
     public override string ToString() => _chars.Aggregate(string.Empty, (current, c) => current + c);
     
     public char First() => _chars.TryPeek(out char c) ? c : TokenSymbol.ENF_OF_FILE_CHAR;
@@ -38,7 +31,6 @@ public class Cursor
     {
         if (_chars.TryDequeue(out char c))
         {
-            _previous = c;
             return Some(c);
         }
 
