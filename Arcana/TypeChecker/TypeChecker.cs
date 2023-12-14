@@ -338,7 +338,7 @@ public class TypeChecker
                         }))!));
             }
             
-            case Program:
+            case ProgramStatement:
             case IfStatement:
                 return Type.statement;
         }

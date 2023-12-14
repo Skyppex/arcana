@@ -1,10 +1,10 @@
 ﻿using System.Text;
 using Arcana;
-using Arcana.Interpreter;
+using Mage.Interpreter;
 using Arcana.Parser;
 using Arcana.TypeChecker;
 
-using Environment = Arcana.Interpreter.Environment;
+using Environment = Mage.Interpreter.Environment;
 
 Console.WriteLine("Program started. Type 'read' to read from file, 'q' to exit, 'notree' to disable the AST print, 'tree' to toggle it back on.");
 
@@ -61,17 +61,17 @@ while (true)
             input = ParseLibrary(fileNames);
     }
     
-    Arcana.Parser.Program program = parser.CreateAst(input);
+    Arcana.Parser.ProgramStatement programStatement = parser.CreateAst(input);
 
     try
     {
-        program.Traverse(node =>
+        programStatement.Traverse(node =>
         {
             if (node is IStatement statement)
                 typeChecker.CheckType(statement, targetTypeEnvironment);
         });
         
-        IRuntimeValue evaluation = Interpreter.Evaluate(program, targetEnvironment);
+        IRuntimeValue evaluation = Interpreter.Evaluate(programStatement, targetEnvironment);
         Console.WriteLine(evaluation.ToString());
         Console.WriteLine();
 
@@ -87,7 +87,7 @@ while (true)
     
     if (printTree)
     {
-        Console.Write(program.GetNodeTree(ref indent));
+        Console.Write(programStatement.GetNodeTree(ref indent));
     }
 }
 

@@ -21,7 +21,7 @@ public interface IStatement : INode;
 
 public interface IExpression : IStatement;
 
-public sealed class Program(List<Result<IStatement, string>> body) : IStatement
+public sealed class ProgramStatement(List<Result<IStatement, string>> body) : IStatement
 {
     public List<Result<IStatement, string>> Body { get; } = body;
 

@@ -2,7 +2,7 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Arcana", "Arcana\Arcana.csproj", "{0E146921-F7D6-498C-958D-9EC7DD5597B2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArcanaTesting", "ArcanaTesting\ArcanaTesting.csproj", "{84D98656-B402-4721-A129-1B8E209D2739}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mage", "Mage\Mage.csproj", "{84D98656-B402-4721-A129-1B8E209D2739}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "UnitTests\UnitTests.csproj", "{4F167FE7-715A-4176-B4EC-AD7F9BD14CDE}"
 EndProject

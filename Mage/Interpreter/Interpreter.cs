@@ -1,9 +1,10 @@
-﻿using Arcana.Lexer;
+﻿using Arcana;
+using Arcana.Lexer;
 using Arcana.Parser;
 
 using static Arcana.Option;
 
-namespace Arcana.Interpreter;
+namespace Mage.Interpreter;
 
 public static class Interpreter
 {
@@ -44,7 +45,7 @@ public static class Interpreter
                 environment),
             BlockExpression blockExpression => EvaluateBlockExpression(blockExpression, environment),
             DropExpression dropExpression => EvaluateDropExpression(dropExpression, environment),
-            Program program => EvaluateProgram(program, environment),
+            ProgramStatement program => EvaluateProgram(program, environment),
             _ => throw new InvalidProgramException(
                 $"The {statement.GetType()} Node has not been setup for interpretation.")
         };
@@ -397,7 +398,7 @@ public static class Interpreter
         return value;
     }
     
-    private static IRuntimeValue EvaluateProgram(Program program, Environment environment)
+    private static IRuntimeValue EvaluateProgram(ProgramStatement program, Environment environment)
     {
         IRuntimeValue lastEvaluated = new EmptyProgramValue();
 

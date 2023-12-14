@@ -12,7 +12,7 @@ public class Parser
     private List<IToken> _tokens = new();
     private readonly Lexer.Lexer _lexer = new();
 
-    public Program CreateAst(string sourceCode)
+    public ProgramStatement CreateAst(string sourceCode)
     {
         _tokens = _lexer.Tokenize(sourceCode);
         List<Result<IStatement, string>> statements = new();
@@ -20,7 +20,7 @@ public class Parser
         while (Current() is not EndOfFileToken)
             statements.Add(ParseStatement());
         
-        var program = new Program(statements);
+        var program = new ProgramStatement(statements);
 
         return program;
     }

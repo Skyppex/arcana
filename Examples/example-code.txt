@@ -4,7 +4,7 @@ if (mutable i32 num = 9) > 9  {
     num = 7;
 }
 
-if (mutable i32 num2 = a.b.c.d.value) < 0 {
+if (mutable i32 num2 = 5) < 0 {
     num2 = 2;
 } else if false {
     i32 num3 = 3;

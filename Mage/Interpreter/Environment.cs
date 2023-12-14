@@ -1,6 +1,6 @@
 ﻿using Arcana.Parser;
 
-namespace Arcana.Interpreter;
+namespace Mage.Interpreter;
 
 public class Environment
 {

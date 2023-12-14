@@ -2,7 +2,7 @@
 
 using Arcana.Models;
 
-namespace Arcana.Interpreter;
+namespace Mage.Interpreter;
 
 public interface IRuntimeValue;
 
