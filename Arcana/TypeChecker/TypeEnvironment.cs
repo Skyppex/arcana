@@ -1,4 +1,4 @@
-﻿namespace MyLang.TypeChecker;
+﻿namespace Arcana.TypeChecker;
 
 public class TypeEnvironment(TypeEnvironment? parent = null)
 {

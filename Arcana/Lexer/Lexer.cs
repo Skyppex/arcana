@@ -1,8 +1,8 @@
 ﻿using System.Text;
 
-using static MyLang.Option;
+using static Arcana.Option;
 
-namespace MyLang.Lexer;
+namespace Arcana.Lexer;
 
 public class Lexer
 {

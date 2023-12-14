@@ -1,6 +1,6 @@
-using static MyLang.Option;
+using static Arcana.Option;
 
-namespace MyLang;
+namespace Arcana;
 
 public static class Result
 {

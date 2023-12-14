@@ -21,7 +21,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\MyLang\MyLang.csproj" />
+      <ProjectReference Include="..\Arcana\Arcana.csproj" />
     </ItemGroup>
 
     <ItemGroup>

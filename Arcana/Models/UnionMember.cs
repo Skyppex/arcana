@@ -1,4 +1,4 @@
-namespace MyLang.Models;
+namespace Arcana.Models;
 
 public readonly struct UnionMember(string typeName, string memberName)
 {

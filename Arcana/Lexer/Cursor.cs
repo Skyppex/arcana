@@ -1,6 +1,6 @@
-﻿using static MyLang.Option;
+﻿using static Arcana.Option;
 
-namespace MyLang.Lexer;
+namespace Arcana.Lexer;
 
 public class Cursor(string sourceCode)
 {

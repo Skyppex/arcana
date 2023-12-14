@@ -1,13 +1,11 @@
 ﻿using System.Globalization;
 
-using MyLang.Lexer;
+using Arcana.Lexer;
 
-using static MyLang.Result;
-using static MyLang.Option;
+using static Arcana.Result;
+using static Arcana.Option;
 
-using Type = MyLang.TypeChecker.Type;
-
-namespace MyLang.Parser;
+namespace Arcana.Parser;
 
 public class Parser
 {
@@ -181,7 +179,7 @@ public class Parser
         
         Result<StructDeclarationStatement.Field, string> ParseField()
         {
-            Option<string> accessModifier = Option<string>.None;
+            var accessModifier = Option<string>.None;
             if (Current() is AccessToken at)
             {
                 accessModifier = Some(at.Symbol);
@@ -605,17 +603,17 @@ public class Parser
             case NumberToken numberToken:
                 string numberSymbol = numberToken.Symbol;
 
-                if (numberSymbol.Contains(TokenSymbol.PERIOD_CHAR) || numberSymbol.EndsWith(Type.f32.ToString()))
+                if (numberSymbol.Contains(TokenSymbol.PERIOD_CHAR) || numberSymbol.EndsWith(TypeChecker.Type.f32.ToString()))
                 {
-                    if (numberSymbol.EndsWith(Type.f32.ToString()))
-                        numberSymbol = numberSymbol[..^Type.f32.ToString().Length];
+                    if (numberSymbol.EndsWith(TypeChecker.Type.f32.ToString()))
+                        numberSymbol = numberSymbol[..^TypeChecker.Type.f32.ToString().Length];
                     
                     return Ok<IExpression, string>(new Float32Literal(float.Parse(numberSymbol, NumberStyles.Any,
                         CultureInfo.InvariantCulture)));
                 }
 
-                if (numberSymbol.EndsWith(Type.i32.ToString()))
-                    numberSymbol = numberSymbol[..^Type.i32.ToString().Length];
+                if (numberSymbol.EndsWith(TypeChecker.Type.i32.ToString()))
+                    numberSymbol = numberSymbol[..^TypeChecker.Type.i32.ToString().Length];
                 
                 return Ok<IExpression, string>(new Int32Literal(int.Parse(numberSymbol, NumberStyles.Any,
                     CultureInfo.InvariantCulture)));

@@ -1,6 +1,6 @@
-﻿using MyLang.Parser;
+﻿using Arcana.Parser;
 
-namespace MyLang.Interpreter;
+namespace Arcana.Interpreter;
 
 public class Environment
 {

@@ -2,7 +2,7 @@
 
 // ReSharper disable InconsistentNaming
 
-namespace MyLang.TypeChecker;
+namespace Arcana.TypeChecker;
 
 public abstract class Type(string name)
 {

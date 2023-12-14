@@ -1,15 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <OutputType>Exe</OutputType>
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
+        <RootNamespace>Arcana</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\MyLang\MyLang.csproj" />
+      <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
     </ItemGroup>
 
 </Project>

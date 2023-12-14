@@ -1,9 +1,9 @@
-﻿using MyLang.Lexer;
-using MyLang.Parser;
+﻿using Arcana.Lexer;
+using Arcana.Parser;
 
-using static MyLang.Option;
+using static Arcana.Option;
 
-namespace MyLang.Interpreter;
+namespace Arcana.Interpreter;
 
 public static class Interpreter
 {

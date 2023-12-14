@@ -1,8 +1,8 @@
 ﻿using System.Globalization;
 
-using MyLang.Models;
+using Arcana.Models;
 
-namespace MyLang.Interpreter;
+namespace Arcana.Interpreter;
 
 public interface IRuntimeValue;
 

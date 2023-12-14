@@ -1,7 +1,7 @@
-﻿using MyLang.Lexer;
-using MyLang.Parser;
+﻿using Arcana.Lexer;
+using Arcana.Parser;
 
-namespace MyLang.TypeChecker;
+namespace Arcana.TypeChecker;
 
 public class TypeChecker
 {

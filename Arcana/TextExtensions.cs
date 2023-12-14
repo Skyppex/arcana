@@ -1,4 +1,4 @@
-﻿namespace MyLang;
+﻿namespace Arcana;
 
 public static class TextExtensions
 {

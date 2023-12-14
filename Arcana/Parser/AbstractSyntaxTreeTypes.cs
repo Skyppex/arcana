@@ -1,8 +1,8 @@
 ﻿using System.Text;
 
-using MyLang.Models;
+using Arcana.Models;
 
-namespace MyLang.Parser;
+namespace Arcana.Parser;
 
 public static class Indent
 {
