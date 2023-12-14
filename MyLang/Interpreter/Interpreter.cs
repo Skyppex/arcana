@@ -103,7 +103,7 @@ public static class Interpreter
                     return new Int32Value(~int32Value.Value);
 
                 default:
-                    throw new InvalidProgramException($"The operator {unaryExpression.Operator} is not supported.");
+                    throw new InvalidProgramException($"The unary operator {unaryExpression.Operator} is not supported.");
             }
         }
 
@@ -118,7 +118,7 @@ public static class Interpreter
                     return new Float32Value(-float32Value.Value);
                 
                 default:
-                    throw new InvalidProgramException($"The operator {unaryExpression.Operator} is not supported.");
+                    throw new InvalidProgramException($"The unary operator {unaryExpression.Operator} is not supported.");
             }
         }
 
@@ -135,11 +135,11 @@ public static class Interpreter
                     return new BooleanValue(!boolValue.Value);
                 
                 default:
-                    throw new InvalidProgramException($"The operator {unaryExpression.Operator} is not supported for booleans.");
+                    throw new InvalidProgramException($"The unary operator {unaryExpression.Operator} is not supported for booleans.");
             }
         }
 
-        throw new InvalidProgramException($"The operator {unaryExpression.Operator} is not supported for booleans.");
+        throw new InvalidProgramException($"The unary operator {unaryExpression.Operator} is not supported for booleans.");
     }
 
     private static IRuntimeValue EvaluateNumberBinaryExpression(BinaryExpression binaryExpression, NumberValue lhs, NumberValue rhs)
@@ -168,9 +168,21 @@ public static class Interpreter
 
                 case TokenSymbol.GREATER:
                     return new BooleanValue(lhsInt32.Value > rhsInt32.Value);
+
+                case TokenSymbol.LOGICAL_LESS_EQUAL:
+                    return new BooleanValue(lhsInt32.Value <= rhsInt32.Value);
                 
+                case TokenSymbol.LOGICAL_GREATER_EQUAL:
+                    return new BooleanValue(lhsInt32.Value >= rhsInt32.Value);
+                    
+                case TokenSymbol.LOGICAL_EQUAL:
+                    return new BooleanValue(lhsInt32.Value == rhsInt32.Value);
+            
+                case TokenSymbol.LOGICAL_NOT_EQUAL:
+                    return new BooleanValue(lhsInt32.Value != rhsInt32.Value);
+
                 default:
-                    throw new InvalidProgramException($"The operator {binaryExpression.Operator} is not supported.");
+                    throw new InvalidProgramException($"The binary operator {binaryExpression.Operator} is not supported.");
             }
         }
 
@@ -199,8 +211,20 @@ public static class Interpreter
                 case TokenSymbol.GREATER:
                     return new BooleanValue(lhsFloat32.Value > rhsFloat32.Value);
 
+                case TokenSymbol.LOGICAL_LESS_EQUAL:
+                    return new BooleanValue(lhsFloat32.Value <= rhsFloat32.Value);
+                
+                case TokenSymbol.LOGICAL_GREATER_EQUAL:
+                    return new BooleanValue(lhsFloat32.Value >= rhsFloat32.Value);
+                    
+                case TokenSymbol.LOGICAL_EQUAL:
+                    return new BooleanValue(lhsFloat32.Value == rhsFloat32.Value);
+            
+                case TokenSymbol.LOGICAL_NOT_EQUAL:
+                    return new BooleanValue(lhsFloat32.Value != rhsFloat32.Value);
+                
                 default:
-                    throw new InvalidProgramException($"The operator {binaryExpression.Operator} is not supported.");
+                    throw new InvalidProgramException($"The binary operator {binaryExpression.Operator} is not supported.");
             }
         }
 
@@ -213,9 +237,15 @@ public static class Interpreter
         {
             case TokenSymbol.PLUS:
                 return new StringValue(lhs.Text + rhs.Text);
+            
+            case TokenSymbol.LOGICAL_EQUAL:
+                return new BooleanValue(lhs.Text == rhs.Text);
+            
+            case TokenSymbol.LOGICAL_NOT_EQUAL:
+                return new BooleanValue(lhs.Text != rhs.Text);
 
             default:
-                throw new InvalidProgramException($"The operator {binaryExpression.Operator} is not supported.");
+                throw new InvalidProgramException($"The binary operator {binaryExpression.Operator} is not supported.");
         }
     }
 
@@ -228,9 +258,15 @@ public static class Interpreter
 
             case TokenSymbol.LOGICAL_OR:
                 return new BooleanValue(lhs.Value || rhs.Value);
+            
+            case TokenSymbol.LOGICAL_EQUAL:
+                return new BooleanValue(lhs.Value == rhs.Value);
+
+            case TokenSymbol.LOGICAL_NOT_EQUAL:
+                return new BooleanValue(lhs.Value != rhs.Value);
 
             default:
-                throw new InvalidProgramException($"The operator {binaryExpression.Operator} is not supported.");
+                throw new InvalidProgramException($"The binary operator {binaryExpression.Operator} is not supported.");
         }
     }
 
@@ -254,15 +290,16 @@ public static class Interpreter
 
     private static IRuntimeValue EvaluateTernaryExpression(TernaryExpression ternaryExpression, Environment environment)
     {
-        IRuntimeValue condition = Evaluate(ternaryExpression.Condition, environment);
+        var fallThrough = new Environment(environment, "TernaryFallThrough");
+        IRuntimeValue condition = Evaluate(ternaryExpression.Condition, fallThrough);
         
         if (condition is not BooleanValue booleanValue)
             throw new Exception($"Condition must be a boolean value, but was {condition.GetType()}.");
 
         if (booleanValue.Value)
-            return Evaluate(ternaryExpression.Then, new Environment(environment));
+            return Evaluate(ternaryExpression.Then, fallThrough);
         
-        return Evaluate(ternaryExpression.Else, new Environment(environment));
+        return Evaluate(ternaryExpression.Else, fallThrough);
     }
     
     private static IRuntimeValue EvaluateAssignmentExpression(AssignmentExpression assignmentExpression, Environment environment)
@@ -287,26 +324,28 @@ public static class Interpreter
         IfStatement ifStatement,
         Environment environment)
     {
-        IRuntimeValue condition = Evaluate(ifStatement.If.Condition, environment);
+        var fallThrough = new Environment(environment, "IfFallThroughBlock");
+        IRuntimeValue condition = Evaluate(ifStatement.If.Condition, fallThrough);
         
         if (condition is not BooleanValue booleanValue)
-            throw new Exception($"Condition must be a boolean value, but was {condition.GetType()}.");
+            throw new Exception($"Condition must be a boolean value, but was {condition.GetType().Name}.");
 
         if (booleanValue.Value)
-            return Evaluate(ifStatement.If.Block, new Environment(environment));
+            return Evaluate(ifStatement.If.Block, fallThrough);
 
         var resultOfElifs = ifStatement.ElseIfs.Match(
             some: elifs =>
             {
                 foreach (var elseIf in elifs)
                 {
-                    IRuntimeValue elifCondition = Evaluate(elseIf.Condition, environment);
+                    fallThrough = new Environment(environment, "ElifBlock");
+                    IRuntimeValue elifCondition = Evaluate(elseIf.Condition, fallThrough);
 
                     if (elifCondition is not BooleanValue elifBooleanValue)
                         throw new Exception($"Condition must be a boolean value, but was {elifCondition.GetType()}.");
 
                     if (elifBooleanValue.Value)
-                        return Some(Evaluate(elseIf.Block, new Environment(environment)));
+                        return Some(Evaluate(elseIf.Block, fallThrough));
                 }
                 
                 return None<IRuntimeValue>();
@@ -315,9 +354,18 @@ public static class Interpreter
         
         if (resultOfElifs.IsSome())
             return resultOfElifs.Unwrap();
+
+        const string FALL_THROUGH_NAME = "ElseFallThroughBlock";
+        fallThrough.Name = FALL_THROUGH_NAME;
+
+        var hasElifs = ifStatement.ElseIfs.Match(
+            some: elifs => elifs.Any(),
+            none: false);
+
+        Environment elseEnvironment = hasElifs ? new Environment(environment, FALL_THROUGH_NAME) : fallThrough;
         
         return ifStatement.Else.Match(
-            some: e => Evaluate(e, new Environment(environment)),
+            some: e => Evaluate(e, elseEnvironment),
             none: () => NoValue.Instance);
     }
     
@@ -337,7 +385,7 @@ public static class Interpreter
         IRuntimeValue lastEvaluated = NoValue.Instance;
 
         foreach (IStatement statement in blockExpression.Statements)
-            lastEvaluated = Evaluate(statement, new Environment(environment));
+            lastEvaluated = Evaluate(statement, new Environment(environment, "Block"));
 
         return lastEvaluated;
     }

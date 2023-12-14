@@ -2,9 +2,19 @@
 
 namespace MyLang.Interpreter;
 
-public class Environment(Environment? parent = null)
+public class Environment
 {
     private readonly Dictionary<string, Variable> _variables = new();
+    private readonly Environment? _parent;
+
+    public Environment(string name = "Global") => Name = name;
+
+    public Environment(Environment parent, string name)
+    {
+        Name = name;
+        _parent = parent;
+        _parent.Children.Add(this);
+    }
 
     public IReadOnlyDictionary<string, IRuntimeValue> Variables
     {
@@ -13,15 +23,21 @@ public class Environment(Environment? parent = null)
             Dictionary<string, IRuntimeValue> variables =
                 _variables.Keys.ToDictionary(name => name, name => _variables[name].Value);
 
-            return parent is null
+            return _parent is null
                 ? variables
-                : variables.Concat(parent.Variables).ToDictionary(pair => pair.Key, pair => pair.Value);
+                : variables.Concat(_parent.Variables).ToDictionary(pair => pair.Key, pair => pair.Value);
         }
     }
 
+    public IReadOnlyDictionary<string, IRuntimeValue> ScopeVariables 
+        => _variables.Keys.ToDictionary(name => name, name => _variables[name].Value);
+
+    public List<Environment> Children { get; } = [];
+    public string Name { get; set; }
+
     public bool HasDefinedVariable(string name) => _variables.ContainsKey(name);
     public bool HasDefinedVariable(Identifier identifier) => HasDefinedVariable(identifier.Symbol);
-    public bool CanAccessVariable(string name) => HasDefinedVariable(name) || parent?.CanAccessVariable(name) == true;
+    public bool CanAccessVariable(string name) => HasDefinedVariable(name) || _parent?.CanAccessVariable(name) == true;
     public bool CanAccessVariable(Identifier identifier) => CanAccessVariable(identifier.Symbol);
 
     public IRuntimeValue Declare(Identifier identifier, bool mutable, IRuntimeValue value)
@@ -89,8 +105,8 @@ public class Environment(Environment? parent = null)
         if (_variables.ContainsKey(name))
             return this;
 
-        if (parent is not null)
-            return parent.Resolve(name);
+        if (_parent is not null)
+            return _parent.Resolve(name);
 
         throw new Exception($"Variable '{name}' does not exist in this scope.");
     }

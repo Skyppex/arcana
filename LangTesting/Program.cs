@@ -8,8 +8,6 @@ using Environment = MyLang.Interpreter.Environment;
 
 Console.WriteLine("Program started. Type 'read' to read from file, 'q' to exit, 'notree' to disable the AST print, 'tree' to toggle it back on.");
 
-string text = File.ReadAllText(@"..\..\..\..\Examples\example-code.txt");
-
 var parser = new Parser();
 
 Environment cliEnvironment = CreateScope();
@@ -37,16 +35,18 @@ while (true)
 
     Environment targetEnvironment = cliEnvironment;
     TypeEnvironment targetTypeEnvironment = typeEnvironment;
-    
+
+    const string EXAMPLE_CODE_PATH = @"..\..\..\..\Examples\example-code.txt";
+
     if (input is "readonly")
     {
-        input = text;
-        targetEnvironment = CreateScope();
+        input = File.ReadAllText(EXAMPLE_CODE_PATH);
+        targetEnvironment = CreateScope("ReadOnlyGlobal");
         targetTypeEnvironment = TypeEnvironment.Create();
     }
 
     if (input is "read")
-        input = text;
+        input = File.ReadAllText(EXAMPLE_CODE_PATH);
 
     if (input.StartsWith("read "))
     {
@@ -74,9 +74,9 @@ while (true)
         IRuntimeValue evaluation = Interpreter.Evaluate(program, targetEnvironment);
         Console.WriteLine(evaluation.ToString());
         Console.WriteLine();
-        
-        foreach (KeyValuePair<string, IRuntimeValue> variable in targetEnvironment.Variables)
-            Console.WriteLine($"{variable.Key} = {variable.Value}");
+
+        PrintVariables(targetEnvironment);
+        targetEnvironment.Children.Clear();
     }
     catch (Exception e)
     {
@@ -87,18 +87,17 @@ while (true)
     
     if (printTree)
     {
-        Console.WriteLine(program.GetNodeTree(ref indent));
-        Console.WriteLine();
+        Console.Write(program.GetNodeTree(ref indent));
     }
 }
 
 Console.WriteLine("Program ended.");
 
-static Environment CreateScope()
+static Environment CreateScope(string name = "Global")
 {
-    Environment environment = new();
-    environment.MakeBool("true", true);
-    environment.MakeBool("false", false);
+    Environment environment = new(name: name);
+    // environment.MakeBool("true", true);
+    // environment.MakeBool("false", false);
     return environment;
 }
 
@@ -113,4 +112,28 @@ string ParseLibrary(string[] strings)
     }
 
     return stringBuilder.ToString();
+}
+
+static void PrintVariables(Environment environment)
+{
+    PrintVariablesRecurse("", environment);
+    return;
+    
+    static void PrintVariablesRecurse(string? parentName, Environment environment)
+    {
+        foreach (KeyValuePair<string, IRuntimeValue> variable in environment.ScopeVariables)
+        {
+            var scope = parentName is null ? environment.Name : string.Join('.', parentName, environment.Name);
+            Console.WriteLine($"Scope: {scope} | {variable.Key} = {variable.Value}");
+        }
+        
+        PrintChildren(environment.Name, environment.Children);
+        return;
+        
+        static void PrintChildren(string parentName, List<Environment> children)
+        {
+            foreach (var child in children)
+                PrintVariablesRecurse(parentName, child);
+        }
+    }
 }

@@ -38,6 +38,18 @@ if condition {
 }
 ```
 
+## Variable declaration in if statement
+
+### Syntax
+
+```
+if condition with variable declaration {
+    // value is only available in this scope
+    body
+}
+```
+This should also work with `else if`.
+
 ## Match statement
 
 The match statement is exhaustive, meaning that all possible cases must be handled.

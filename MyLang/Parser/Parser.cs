@@ -89,7 +89,7 @@ public class Parser
 
         Next();
 
-        Result<IExpression, string> ifCondition = ParseCondition();
+        Result<IExpression, string> ifCondition = ParseExpression();
         Result<IExpression, string> ifBlock = ParseBlock();
 
         List<(Result<IExpression, string> Condition, Result<IExpression, string> Block)> elseIfStatements = new();
@@ -103,7 +103,7 @@ public class Parser
             if (Current() is IfToken)
             {
                 Next();
-                Result<IExpression, string> condition = ParseCondition();                
+                Result<IExpression, string> condition = ParseExpression();                
                 Result<IExpression, string> block = ParseBlock();
                 elseIfStatements.Add((condition, block));
                 continue;
@@ -145,24 +145,6 @@ public class Parser
             elseBlock.Unwrap().Map(eb =>
                 new IfStatement(new IfStatement.ConditionBlock(ifc, ifb),
                     Some(cbs), Some(eb)) as IStatement))));
-
-        Result<IExpression, string> ParseCondition()
-        {
-            Result<IExpression, string> condition;
-
-            if (Current() is OpenParenToken)
-            {
-                Next();
-                condition = ParseExpression();
-                Expect<CloseParenToken>("Expected ')'.");
-            }
-            else
-            {
-                condition = ParseExpression();
-            }
-
-            return condition;
-        }
     }
 
     private Result<IStatement, string> ParseStructDeclarationStatement()
@@ -718,15 +700,17 @@ public class Parser
             return false;
         }
         
+        bool currentIs = _tokens[0] is T1;
         bool nextIs = _tokens[1] is T2;
+        token = currentIs ? _tokens[0] as T1 : null;
         nextToken = nextIs ? _tokens[1] as T2 : null;
 
-        if (nextIs)
-        {
-            token = Current() as T1;
+        bool @is = currentIs && nextIs;
 
+        if (@is)
+        {
             if (!doNext)
-                return nextIs;
+                return true;
             
             Next();
             Next();
@@ -734,7 +718,7 @@ public class Parser
         else
             token = null;
         
-        return nextIs;
+        return @is;
     }
 
     private bool NextIs<T1, T2, T3>(out T1? token, out T2? nextToken, out T3? nextNextToken, bool doNext = true)
@@ -750,17 +734,19 @@ public class Parser
             return false;
         }
         
+        bool currentIs = _tokens[0] is T1;
         bool nextIs = _tokens[1] is T2;
         bool nextNextIs = _tokens[2] is T3;
+        token = currentIs ? _tokens[0] as T1 : null;
         nextToken = nextIs ? _tokens[1] as T2 : null;
         nextNextToken = nextNextIs ? _tokens[2] as T3 : null;
 
-        if (nextIs && nextNextIs)
-        {
-            token = Current() as T1;
+        bool @is = currentIs && nextIs && nextNextIs;
 
+        if (@is)
+        {
             if (!doNext)
-                return nextIs;
+                return true;
             
             Next();
             Next();
@@ -769,7 +755,7 @@ public class Parser
         else
             token = null;
         
-        return nextIs && nextNextIs;
+        return @is;
     }
 
     private bool NextIs<T1, T2, T3, T4>(out T1? token, out T2? nextToken, out T3? nextNextToken, out T4? nextNextNextToken, bool doNext = true)
@@ -778,7 +764,7 @@ public class Parser
         where T3 : class, IToken
         where T4 : class, IToken
     {
-        if (_tokens.Count < 3)
+        if (_tokens.Count < 4)
         {
             token = null;
             nextToken = null;
@@ -787,19 +773,21 @@ public class Parser
             return false;
         }
         
+        bool currentIs = _tokens[0] is T1;
         bool nextIs = _tokens[1] is T2;
         bool nextNextIs = _tokens[2] is T3;
         bool nextNextNextIs = _tokens[3] is T4;
+        token = currentIs ? _tokens[0] as T1 : null;
         nextToken = nextIs ? _tokens[1] as T2 : null;
         nextNextToken = nextNextIs ? _tokens[2] as T3 : null;
         nextNextNextToken = nextNextNextIs ? _tokens[3] as T4 : null;
 
-        if (nextIs && nextNextIs && nextNextNextIs)
-        {
-            token = Current() as T1;
+        bool @is = currentIs && nextIs && nextNextIs && nextNextNextIs;
 
+        if (@is)
+        {
             if (!doNext)
-                return nextIs;
+                return true;
             
             Next();
             Next();
@@ -809,7 +797,7 @@ public class Parser
         else
             token = null;
         
-        return nextIs && nextNextIs && nextNextNextIs;
+        return @is;
     }
 
     private bool ExistsBeforeSemiColon<T>() where T : IToken
