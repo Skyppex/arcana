@@ -1,9 +1,10 @@
 ﻿using System.Text;
 using MyLang;
-using MyLang.Frontend.Parser;
-using MyLang.Frontend.TypeChecker;
-using MyLang.Runtime;
-using Environment = MyLang.Runtime.Environment;
+using MyLang.Interpreter;
+using MyLang.Parser;
+using MyLang.TypeChecker;
+
+using Environment = MyLang.Interpreter.Environment;
 
 Console.WriteLine("Program started. Type 'read' to read from file, 'q' to exit, 'notree' to disable the AST print, 'tree' to toggle it back on.");
 
@@ -60,7 +61,7 @@ while (true)
             input = ParseLibrary(fileNames);
     }
     
-    MyLang.Frontend.Parser.Program program = parser.CreateAst(input);
+    MyLang.Parser.Program program = parser.CreateAst(input);
 
     try
     {

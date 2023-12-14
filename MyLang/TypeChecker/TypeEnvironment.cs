@@ -1,4 +1,4 @@
-﻿namespace MyLang.Frontend.TypeChecker;
+﻿namespace MyLang.TypeChecker;
 
 public class TypeEnvironment(TypeEnvironment? parent = null)
 {

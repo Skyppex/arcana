@@ -1,9 +1,8 @@
 ﻿using System.Text;
-using Monads;
 
 using MyLang.Models;
 
-namespace MyLang.Frontend.Parser;
+namespace MyLang.Parser;
 
 public static class Indent
 {

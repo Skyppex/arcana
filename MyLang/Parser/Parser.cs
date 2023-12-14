@@ -1,15 +1,13 @@
 ﻿using System.Globalization;
 
-using Monads;
+using MyLang.Lexer;
 
-using MyLang.Frontend.Lexer;
+using static MyLang.Result;
+using static MyLang.Option;
 
-using static Monads.Result;
-using static Monads.Option;
+using Type = MyLang.TypeChecker.Type;
 
-using Type = MyLang.Frontend.TypeChecker.Type;
-
-namespace MyLang.Frontend.Parser;
+namespace MyLang.Parser;
 
 public class Parser
 {

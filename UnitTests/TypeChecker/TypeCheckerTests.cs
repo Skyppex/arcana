@@ -1,9 +1,9 @@
-using MyLang.Frontend.Parser;
-using MyLang.Frontend.TypeChecker;
+using MyLang.Parser;
+using MyLang.TypeChecker;
 
-using Type = MyLang.Frontend.TypeChecker.Type;
+using Type = MyLang.TypeChecker.Type;
 
-namespace TestProject1;
+namespace MyLang.Tests.TypeChecker;
 
 public class TypeCheckerTests
 {
@@ -11,7 +11,7 @@ public class TypeCheckerTests
     public void i32_expression_should_have_type_i32()
     {
         // Arrange
-        var typeChecker = new TypeChecker();
+        var typeChecker = new MyLang.TypeChecker.TypeChecker();
         var expression = new Int32Literal(0);
         
         // Act
@@ -25,7 +25,7 @@ public class TypeCheckerTests
     public void f32_expression_should_have_type_f32()
     {
         // Arrange
-        var typeChecker = new TypeChecker();
+        var typeChecker = new MyLang.TypeChecker.TypeChecker();
         var expression = new Float32Literal(0f);
         
         // Act
@@ -39,7 +39,7 @@ public class TypeCheckerTests
     public void string_expression_should_have_type_string()
     {
         // Arrange
-        var typeChecker = new TypeChecker();
+        var typeChecker = new MyLang.TypeChecker.TypeChecker();
         var expression = new StringLiteral("");
         
         // Act
@@ -54,7 +54,7 @@ public class TypeCheckerTests
         [Values("+", "-", "*", "/", "%")] string @operator)
     {
         // Arrange
-        var typeChecker = new TypeChecker();
+        var typeChecker = new MyLang.TypeChecker.TypeChecker();
         var left = new Int32Literal(0);
         var right = new Int32Literal(0);
         var expression = new BinaryExpression(left, @operator, right);
@@ -71,7 +71,7 @@ public class TypeCheckerTests
         [Values("+", "-", "*", "/", "%")] string @operator)
     {
         // Arrange
-        var typeChecker = new TypeChecker();
+        var typeChecker = new MyLang.TypeChecker.TypeChecker();
         var left = new Float32Literal(0f);
         var right = new Float32Literal(0f);
         var expression = new BinaryExpression(left, @operator, right);
@@ -89,7 +89,7 @@ public class TypeCheckerTests
     {
         // Arrange
         const string OPERATOR = "+";
-        var typeChecker = new TypeChecker();
+        var typeChecker = new MyLang.TypeChecker.TypeChecker();
         var left = new StringLiteral("");
         var right = new StringLiteral("");
         var expression = new BinaryExpression(left, OPERATOR, right);
@@ -106,7 +106,7 @@ public class TypeCheckerTests
         [Values("-", "*", "/", "%")] string @operator)
     {
         // Arrange
-        var typeChecker = new TypeChecker();
+        var typeChecker = new MyLang.TypeChecker.TypeChecker();
         var left = new StringLiteral("");
         var right = new StringLiteral("");
         var expression = new BinaryExpression(left, @operator, right);
@@ -123,7 +123,7 @@ public class TypeCheckerTests
     {
         // Arrange
         int value = 0;
-        var typeChecker = new TypeChecker();
+        var typeChecker = new MyLang.TypeChecker.TypeChecker();
         var initializer = new Int32Literal(value);
         var identifier = new Identifier("x");
         var expression = new VariableDeclarationExpression(Type.i32.Name, false, identifier, initializer);
@@ -139,7 +139,7 @@ public class TypeCheckerTests
     public void identifier_expression_defined_as_i32_should_have_type_i32()
     {
         // Arrange
-        var typeChecker = new TypeChecker();
+        var typeChecker = new MyLang.TypeChecker.TypeChecker();
         var identifier = new Identifier("x");
         var typeEnvironment = new TypeEnvironment();
         typeEnvironment.DefineVariable(identifier.Symbol, Type.i32);

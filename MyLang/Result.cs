@@ -1,6 +1,6 @@
-using static Monads.Option;
+using static MyLang.Option;
 
-namespace Monads;
+namespace MyLang;
 
 public static class Result
 {

@@ -1,9 +1,8 @@
 ﻿using System.Text;
-using Monads;
 
-using static Monads.Option;
+using static MyLang.Option;
 
-namespace MyLang.Frontend.Lexer;
+namespace MyLang.Lexer;
 
 public class Lexer
 {

@@ -2,7 +2,7 @@
 
 using MyLang.Models;
 
-namespace MyLang.Runtime;
+namespace MyLang.Interpreter;
 
 public interface IRuntimeValue;
 

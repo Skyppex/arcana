@@ -1,8 +1,6 @@
-﻿using Monads;
+﻿using static MyLang.Option;
 
-using static Monads.Option;
-
-namespace MyLang.Frontend.Lexer;
+namespace MyLang.Lexer;
 
 public class Cursor(string sourceCode)
 {

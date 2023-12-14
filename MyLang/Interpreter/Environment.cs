@@ -1,6 +1,6 @@
-﻿using MyLang.Frontend.Parser;
+﻿using MyLang.Parser;
 
-namespace MyLang.Runtime;
+namespace MyLang.Interpreter;
 
 public class Environment(Environment? parent = null)
 {

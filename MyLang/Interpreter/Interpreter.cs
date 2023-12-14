@@ -1,10 +1,9 @@
-﻿using Monads;
+﻿using MyLang.Lexer;
+using MyLang.Parser;
 
-using MyLang.Frontend.Lexer;
-using MyLang.Frontend.Parser;
-using static Monads.Option;
+using static MyLang.Option;
 
-namespace MyLang.Runtime;
+namespace MyLang.Interpreter;
 
 public static class Interpreter
 {

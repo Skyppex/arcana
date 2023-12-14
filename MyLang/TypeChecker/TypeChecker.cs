@@ -1,7 +1,7 @@
-﻿using MyLang.Frontend.Lexer;
-using MyLang.Frontend.Parser;
+﻿using MyLang.Lexer;
+using MyLang.Parser;
 
-namespace MyLang.Frontend.TypeChecker;
+namespace MyLang.TypeChecker;
 
 public class TypeChecker
 {
