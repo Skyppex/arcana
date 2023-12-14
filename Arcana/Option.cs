@@ -117,22 +117,21 @@ public static class OptionExtensions
         };
     }
 
-    public static Result<T, TError> OkOr<T, TError>(this Option<T> option, TError error) where TError : Exception => 
+    public static Result<T, TError> OkOr<T, TError>(this Option<T> option, TError error) => 
         option.MapOr(Result.Error<T, TError>(error), Result.Ok<T, TError>);
 
-    public static Result<T, TError> OkOrElse<T, TError>(this Option<T> option, Func<TError> errorGetter) where TError : Exception
+    public static Result<T, TError> OkOrElse<T, TError>(this Option<T> option, Func<TError> errorGetter)
     {
         ArgumentNullException.ThrowIfNull(errorGetter, nameof(errorGetter));
         return option.MapOr(Result.Error<T, TError>(errorGetter()), Result.Ok<T, TError>);
     }
 
-    public static Result<Option<T>, TError> Transpose<T, TError>(this Option<Result<T, TError>> option, TError error)
-        where TError : Exception
+    public static Result<Option<T>, TError> Transpose<T, TError>(this Option<Result<T, TError>> option)
     {
         return option.Match(
             some: result => result.Match(
                 ok: v => Result.Ok<Option<T>, TError>(Some(v)),
-                error: e => Result.Error<Option<T>, TError>(e)),
+                error: Result.Error<Option<T>, TError>),
             none: () => Result.Ok<Option<T>, TError>(None<T>()));
     }
 

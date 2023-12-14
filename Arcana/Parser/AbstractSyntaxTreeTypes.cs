@@ -267,6 +267,67 @@ public sealed class UnionDeclarationStatement(
     }
 }
 
+public sealed class FunctionDeclarationStatement(
+    Option<string> accessModifier,
+    string functionIdentifier,
+    IEnumerable<FunctionDeclarationStatement.Parameter> parameters,
+    Option<string> returnTypeName,
+    IExpression body)
+    : IStatement
+{
+    public Option<string> AccessModifier { get; } = accessModifier;
+    public string FunctionIdentifier { get; } = functionIdentifier;
+    public IEnumerable<Parameter> Parameters { get; } = parameters;
+    public Option<string> ReturnTypeName { get; } = returnTypeName;
+    public IExpression Body { get; } = body;
+
+    public string GetNodeTree(ref int indent)
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"<{nameof(FunctionDeclarationStatement)}>");
+        
+        indent++;
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(FunctionIdentifier)}: {FunctionIdentifier}");
+        builder.AppendLine(Indent.Get(indent) + $"{nameof(ReturnTypeName)}: {ReturnTypeName}");
+
+        if (Parameters.Any())
+        {
+            builder.AppendLine();
+            builder.Append(Indent.Dash(indent) + $"{nameof(Parameters)}:");
+            indent++;
+            
+            foreach (Parameter parameter in Parameters)
+            {
+                builder.AppendLine();
+                builder.AppendLine(Indent.Get(indent) + $"{nameof(Parameter)}:");
+                indent++;
+                builder.AppendLine(Indent.Get(indent) + $"{nameof(parameter.TypeName)}: {parameter.TypeName}");
+                builder.Append(Indent.Get(indent) + $"{nameof(parameter.Identifier)}: {parameter.Identifier}");
+                indent--;
+            }
+            indent--;
+        }
+        
+        builder.AppendLine();
+        builder.Append(Indent.Get(indent) + $"{nameof(Body)}: {Body.GetNodeTree(ref indent)}");
+        indent--;
+        
+        return builder.ToString();
+    }
+
+    public void Traverse(Action<INode> action)
+    {
+        action(this);
+        Body.Traverse(action);
+    }
+
+    public sealed class Parameter(string identifier, string typeName)
+    {
+        public string Identifier { get; } = identifier;
+        public string TypeName { get; } = typeName;
+    }
+}
+
 public sealed class VariableDeclarationExpression(
     string typeName,
     bool mutable,

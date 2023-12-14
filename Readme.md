@@ -22,7 +22,9 @@ This is my WIP programming language.
 
 ## Syntax
 - Structs and Unions
-- Named bit flags with Unions (or maybe Enums)
+- Named bit flags as a wrapper for integer types
+- Functions
+- Implementations
 - Traits
 - Generics
 - Closures

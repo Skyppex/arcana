@@ -53,7 +53,7 @@ public class Lexer
                     break;
                 
                 case TokenSymbol.PLUS_CHAR or TokenSymbol.MINUS_CHAR or TokenSymbol.STAR_CHAR or TokenSymbol.SLASH_CHAR or TokenSymbol.PERCENT_CHAR: 
-                    tokens.Add(new ArithmeticOperatorToken(cursor.Bump().ToString()!));
+                    tokens.Add(new ArithmeticOperatorToken(cursor.Bump().Unwrap().ToString()));
                     break;
                 
                 case TokenSymbol.QUESTION_CHAR:
@@ -406,6 +406,7 @@ public static class Keyword
         { STRUCT, new StructToken() },
         { UNION, new UnionToken() },
         // { FLAGS, new FlagsToken() },
+        { FUNCTION, new FunctionToken()},
         { PUBLIC, new AccessToken(PUBLIC) },
         // { INTERNAL, new AccessToken(INTERNAL) },
     };
@@ -424,6 +425,9 @@ public static class Keyword
     public const string STRUCT = "struct";
     public const string UNION = "union";
     // public const string FLAGS = "flags";
+    
+    // Functions
+    public const string FUNCTION = "fn";
     
     // Branching
     public const string IF = "if";
@@ -527,6 +531,8 @@ public sealed class SemiColonToken : IToken { public string Symbol => TokenSymbo
 public sealed class StructToken : IToken { public string Symbol => Keyword.STRUCT; }
 public sealed class UnionToken : IToken { public string Symbol => Keyword.UNION; }
 // public sealed class FlagsToken : IToken { public string Symbol => Keyword.FLAGS; }
+
+public sealed class FunctionToken : IToken { public string Symbol => Keyword.FUNCTION; }
 
 // public sealed class IfToken : IToken { public string Symbol => Keyword.IF; }
 // public sealed class ElseToken : IToken { public string Symbol => Keyword.ELSE; }

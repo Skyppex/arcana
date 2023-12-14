@@ -1,13 +1,9 @@
-if (mutable i32 num = 9) > 9  {
-    num = 6;
-} else {
-    num = 7;
+fn add(a: i32, b: i32): i32 {
+    a + b
 }
 
-if (mutable i32 num2 = 5) < 0 {
-    num2 = 2;
-} else if false {
-    i32 num3 = 3;
-} else {
-    i32 num4 = 4;
+fn sub(a: i32, b: i32): i32 {
+    fn noop() { }
+    
+    a - b
 }
