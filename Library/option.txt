@@ -1,4 +1,0 @@
-﻿union Option {
-    Some(s: string);
-    None;
-}
