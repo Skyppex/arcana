@@ -5,3 +5,11 @@ version = 3
 [[package]]
 name = "arcana"
 version = "0.1.0"
+
+[[package]]
+name = "mage"
+version = "0.1.0"
+
+[[package]]
+name = "shared"
+version = "0.1.0"
