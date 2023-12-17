@@ -12,3 +12,6 @@ members = [
     "src/shared",
     "src/mage",
 ]
+
+[dependencies]
+shared = { path = "src/shared"}
