@@ -1,5 +1,7 @@
 use num_traits::int::PrimInt;
 
+use crate::parser::AccessModifier;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
@@ -123,8 +125,7 @@ pub enum NumericLiteralType {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
     // Access modifiers
-    Public,
-    Internal,
+    AccessModifier(AccessModifier),
 
     // Types
     Mutable,
@@ -147,4 +148,8 @@ pub enum Keyword {
     // Literals
     True,
     False,
+
+    // Interpreter specific
+    #[cfg(feature = "interpreter")]
+    Drop,
 }

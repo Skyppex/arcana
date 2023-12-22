@@ -1,6 +1,8 @@
 use token::{Token, TokenKind, Literal};
 use cursor::Cursor;
 
+use crate::parser::AccessModifier;
+
 use self::{num_lit::parse_numeric_literal, token::Keyword};
 
 pub mod token;
@@ -309,8 +311,8 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "fn" => Some(TokenKind::Keyword(Keyword::Fn)),
         "struct" => Some(TokenKind::Keyword(Keyword::Struct)),
         "union" => Some(TokenKind::Keyword(Keyword::Union)),
-        "public" => Some(TokenKind::Keyword(Keyword::Public)),
-        "internal" => Some(TokenKind::Keyword(Keyword::Internal)),
+        "public" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Public))),
+        "internal" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
         "true" => Some(TokenKind::Literal(Literal::Bool(true))),
         "false" => Some(TokenKind::Literal(Literal::Bool(false))),
         _ => None,

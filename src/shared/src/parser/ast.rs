@@ -1,17 +1,6 @@
-
-
+#[derive(Debug, Clone)]
 pub enum Statement {
     Program { statements: Vec<Result<Statement, String>> },
-    VariableDeclaration {
-        identifier: String,
-        mutable: bool,
-        type_name: String,
-    },
-    IfStatement {
-        r#if: ConditionBlock,
-        else_ifs: Option<Vec<ConditionBlock>>,
-        r#else: Option<Expression>,
-    },
     StructDeclaration {
         access_modifier: Option<AccessModifier>,
         type_name: String,
@@ -26,22 +15,28 @@ pub enum Statement {
         access_modifier: Option<AccessModifier>,
         identifier: String,
         parameters: Vec<Parameter>,
-        return_type: String,
+        return_type: Option<String>,
         body: Expression,
     },
     Expression(Expression),
 }
 
+#[derive(Debug, Clone)]
 pub enum Expression {
     VariableDeclaration {
-        type_name: String,
         mutable: bool,
+        type_name: String,
         identifier: String,
-        initializer: Box<Expression>,
+        initializer: Option<Box<Expression>>,
+    },
+    If {
+        r#if: ConditionBlock,
+        else_ifs: Option<Vec<ConditionBlock>>,
+        r#else: Option<Box<Expression>>,
     },
     Assignment {
-        member: Member,
-
+        member: Box<Expression>,
+        initializer: Box<Expression>,
     },
     Member(Member),
     Literal(Literal),
@@ -71,6 +66,7 @@ pub enum Expression {
     },
 }
 
+#[derive(Debug, Clone)]
 pub enum Literal {
     Int8(i8),
     Int16(i16),
@@ -89,20 +85,22 @@ pub enum Literal {
     Bool(bool),
     Struct {
         type_name: String,
-        field_initializers: Vec<FieldInitializer>,
+        field_initializers: Option<Vec<FieldInitializer>>,
     },
     Union {
         type_name: String,
         member: String,
-        field_initializers: Vec<FieldInitializer>,
+        field_initializers: Option<Vec<FieldInitializer>>,
     },
 }
 
+#[derive(Debug, Clone)]
 pub struct ConditionBlock {
-    pub condition: Expression,
-    pub block: Expression,
+    pub condition: Box<Expression>,
+    pub block: Box<Expression>,
 }
 
+#[derive(Debug, Clone)]
 pub struct StructField {
     pub access_modifier: Option<AccessModifier>,
     pub mutable: bool,
@@ -110,31 +108,37 @@ pub struct StructField {
     pub type_name: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct FieldInitializer {
-    pub identifier: String,
+    pub identifier: Option<String>,
     pub initializer: Expression,
 }
 
+#[derive(Debug, Clone)]
 pub struct UnionMember {
     pub identifier: String,
     pub fields: Vec<UnionMemberField>,
 }
 
+#[derive(Debug, Clone)]
 pub struct UnionMemberField {
-    pub identifier: String,
+    pub identifier: Option<String>,
     pub type_name: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum AccessModifier {
     Public,
     Internal,
 }
 
+#[derive(Debug, Clone)]
 pub struct Parameter {
     pub identifier: String,
     pub type_name: String,
 }
 
+#[derive(Debug, Clone)]
 pub enum Member {
     Identifier { symbol: String },
     MemberAccess {
@@ -144,12 +148,14 @@ pub enum Member {
     },
 }
 
+#[derive(Debug, Clone)]
 pub enum UnaryOperator {
     Negation,
     LogicalNot,
     BitwiseNot,
 }
 
+#[derive(Debug, Clone)]
 pub enum BinaryOperator {
     Addition,
     Subtraction,
