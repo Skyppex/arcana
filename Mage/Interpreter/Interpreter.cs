@@ -39,6 +39,7 @@ public static class Interpreter
                 environment),
             StructDeclarationStatement => EvaluateStructDeclarationStatement(),
             UnionDeclarationStatement => EvaluateUnionDeclarationStatement(),
+            FunctionDeclarationStatement functionDeclarationStatement => EvaluateFunctionDeclarationStatement(functionDeclarationStatement, environment),
             IfStatement ifStatement => EvaluateIfStatement(ifStatement, environment),
             VariableDeclarationExpression variableDeclarationExpression => EvaluateVariableDeclarationExpression(
                 variableDeclarationExpression,
@@ -320,6 +321,16 @@ public static class Interpreter
 
     private static IRuntimeValue EvaluateStructDeclarationStatement() => NoValue.Instance;
     private static IRuntimeValue EvaluateUnionDeclarationStatement() => NoValue.Instance;
+    private static IRuntimeValue EvaluateFunctionDeclarationStatement(FunctionDeclarationStatement functionDeclarationStatement, Environment environment)
+    {
+        var function = new FunctionValue(
+            functionDeclarationStatement.FunctionIdentifier,
+            functionDeclarationStatement.Parameters,
+            environment,
+            functionDeclarationStatement.Body);
+        
+        return environment.Declare(new Identifier(functionDeclarationStatement.FunctionIdentifier), false, function);
+    }
 
     private static IRuntimeValue EvaluateIfStatement(
         IfStatement ifStatement,

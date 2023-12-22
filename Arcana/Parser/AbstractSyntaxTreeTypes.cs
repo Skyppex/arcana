@@ -270,14 +270,14 @@ public sealed class UnionDeclarationStatement(
 public sealed class FunctionDeclarationStatement(
     Option<string> accessModifier,
     string functionIdentifier,
-    IEnumerable<FunctionDeclarationStatement.Parameter> parameters,
+    List<Parameter> parameters,
     Option<string> returnTypeName,
     IExpression body)
     : IStatement
 {
     public Option<string> AccessModifier { get; } = accessModifier;
     public string FunctionIdentifier { get; } = functionIdentifier;
-    public IEnumerable<Parameter> Parameters { get; } = parameters;
+    public List<Parameter> Parameters { get; } = parameters;
     public Option<string> ReturnTypeName { get; } = returnTypeName;
     public IExpression Body { get; } = body;
 
@@ -287,8 +287,10 @@ public sealed class FunctionDeclarationStatement(
         builder.AppendLine($"<{nameof(FunctionDeclarationStatement)}>");
         
         indent++;
+        int i = indent;
+        AccessModifier.Match(am => builder.AppendLine(Indent.Get(i) + $"{nameof(AccessModifier)}: {am}"), () => {});
         builder.AppendLine(Indent.Get(indent) + $"{nameof(FunctionIdentifier)}: {FunctionIdentifier}");
-        builder.AppendLine(Indent.Get(indent) + $"{nameof(ReturnTypeName)}: {ReturnTypeName}");
+        builder.Append(Indent.Get(indent) + $"{nameof(ReturnTypeName)}: {ReturnTypeName.Match(rt => rt, () => "void")}");
 
         if (Parameters.Any())
         {
@@ -299,33 +301,23 @@ public sealed class FunctionDeclarationStatement(
             foreach (Parameter parameter in Parameters)
             {
                 builder.AppendLine();
-                builder.AppendLine(Indent.Get(indent) + $"{nameof(Parameter)}:");
+                builder.AppendLine(Indent.Dash(indent) + $"{nameof(Parameter)}:");
                 indent++;
-                builder.AppendLine(Indent.Get(indent) + $"{nameof(parameter.TypeName)}: {parameter.TypeName}");
-                builder.Append(Indent.Get(indent) + $"{nameof(parameter.Identifier)}: {parameter.Identifier}");
+                builder.AppendLine(Indent.Get(indent) + $"{nameof(parameter.Identifier)}: {parameter.Identifier}");
+                builder.Append(Indent.Get(indent) + $"{nameof(parameter.TypeName)}: {parameter.TypeName}");
                 indent--;
             }
             indent--;
         }
         
         builder.AppendLine();
-        builder.Append(Indent.Get(indent) + $"{nameof(Body)}: {Body.GetNodeTree(ref indent)}");
+        builder.Append(Indent.Dash(indent) + $"{nameof(Body)}: {Body.GetNodeTree(ref indent)}");
         indent--;
         
         return builder.ToString();
     }
 
-    public void Traverse(Action<INode> action)
-    {
-        action(this);
-        Body.Traverse(action);
-    }
-
-    public sealed class Parameter(string identifier, string typeName)
-    {
-        public string Identifier { get; } = identifier;
-        public string TypeName { get; } = typeName;
-    }
+    public void Traverse(Action<INode> action) => action(this);
 }
 
 public sealed class VariableDeclarationExpression(
@@ -700,27 +692,21 @@ public sealed class BlockExpression(List<IStatement> statements) : IExpression
     public string GetNodeTree(ref int indent)
     {
         StringBuilder builder = new();
-        builder.Append($"<{nameof(BlockExpression)}> {nameof(Statements)}:");
+        builder.Append($"<{nameof(BlockExpression)}>");
+
+        if (!Statements.Any())
+            return builder.ToString();
 
         indent++;
-
-        if (Statements.Any())
-        {
-            indent++;
             
-            foreach (IStatement statement in Statements)
-            {
-                builder.AppendLine();
-                builder.Append(Indent.Get(indent) + $"{statement.GetNodeTree(ref indent)}");
-            }
-
-            indent--;
+        foreach (IStatement statement in Statements)
+        {
+            builder.AppendLine();
+            builder.Append(Indent.Get(indent) + $"{statement.GetNodeTree(ref indent)}");
         }
-        else
-            builder.Append(" None");
-        
+
         indent--;
-        
+
         return builder.ToString();
     }
 
@@ -754,4 +740,11 @@ public sealed class DropExpression(Identifier identifier) : IExpression
         action(this);
         Identifier.Traverse(action);
     }
+}
+
+
+public sealed class Parameter(string identifier, string typeName)
+{
+    public string Identifier { get; } = identifier;
+    public string TypeName { get; } = typeName;
 }

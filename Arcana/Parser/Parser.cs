@@ -69,7 +69,7 @@ public class Parser
 
         Result<IdentifierToken, string> identifier = Expect<IdentifierToken>("Expected identifier after 'fn' keyword.");
         Result<OpenParenToken, string> openParen = Expect<OpenParenToken>("Expected '('.");
-        Result<List<FunctionDeclarationStatement.Parameter>, string> parameters = ParseParameters();
+        Result<List<Parameter>, string> parameters = ParseParameters();
         Result<CloseParenToken, string> closeParen = Expect<CloseParenToken>("Expected ')'.");
 
         bool hasExplicitReturnType = Current() is ColonToken;
@@ -97,9 +97,9 @@ public class Parser
                                     rt.Map(r => r.Symbol),
                                     b) as IStatement))))));
 
-        Result<List<FunctionDeclarationStatement.Parameter>, string> ParseParameters()
+        Result<List<Parameter>, string> ParseParameters()
         {
-            List<Result<FunctionDeclarationStatement.Parameter, string>> parameters = new();
+            List<Result<Parameter, string>> parameters = new();
 
             if (Current() is not CloseParenToken)
             {
@@ -114,11 +114,11 @@ public class Parser
 
             return parameters.Invert().Map(ps => ps.ToList());
 
-            Result<FunctionDeclarationStatement.Parameter, string> ParseParameter() =>
+            Result<Parameter, string> ParseParameter() =>
                 Expect<IdentifierToken>("Expected identifier.")
                     .AndThen(i => Expect<ColonToken>("Expected ':'.")
                         .And(Expect<IdentifierToken>("Expected type identifier.")
-                            .Map(ti => new FunctionDeclarationStatement.Parameter(i.Symbol, ti.Symbol))));
+                            .Map(ti => new Parameter(i.Symbol, ti.Symbol))));
         }
     }
 

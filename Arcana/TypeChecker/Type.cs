@@ -6,13 +6,13 @@ namespace Arcana.TypeChecker;
 
 public abstract class Type(string name)
 {
-    public static readonly Type statement = new UnionType("Statement");
-    public static readonly Type never = new UnionType("never");
-    public static readonly Type i32 = new StructType("i32");
-    public static readonly Type f32 = new StructType("f32");
-    public static readonly Type @string = new StructType("string");
-    public static readonly Type @char = new StructType("char");
-    public static readonly Type @bool = new StructType("bool");
+    public static readonly Type statement = new UnionType(nameof(statement));
+    public static readonly Type @void = new UnionType(nameof(@void));
+    public static readonly Type i32 = new StructType(nameof(i32));
+    public static readonly Type f32 = new StructType(nameof(f32));
+    public static readonly Type @string = new StructType(nameof(@string));
+    public static readonly Type @char = new StructType(nameof(@char));
+    public static readonly Type @bool = new StructType(nameof(@bool));
     
     public static readonly Type[] Numbers = { i32, f32 };
 
@@ -40,4 +40,18 @@ public sealed class UnionType : Type
     public UnionType(string name, Dictionary<string, Dictionary<string, Type>> members) : base(name) => Members = members;
 
     public Dictionary<string, Dictionary<string, Type>> Members { get; }
+}
+
+public sealed class FunctionType : Type
+{
+    public FunctionType(string name, Type returnType, IEnumerable<Type> parameterTypes, TypeEnvironment typeEnvironment) : base(name)
+    {
+        ReturnType = returnType;
+        ParameterTypes = parameterTypes;
+        TypeEnvironment = typeEnvironment;
+    }
+
+    public Type ReturnType { get; }
+    public IEnumerable<Type> ParameterTypes { get; }
+    public TypeEnvironment TypeEnvironment { get; }
 }

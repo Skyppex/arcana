@@ -200,7 +200,7 @@ public class TypeChecker
                 if (typeEnvironment.LookupVariable(identifier.Symbol, out Type? type))
                     return type!;
                 
-                throw new InvalidOperationException($"Identifier '{identifier.Symbol}' doesn't exist in current context.");
+                throw new InvalidOperationException($"Type for identifier '{identifier.Symbol}' doesn't exist in current context.");
             }
 
             case MemberAccessExpression memberExpression:
@@ -259,6 +259,46 @@ public class TypeChecker
                 return typeEnvironment.DefineVariable(variableDeclarationExpression.Identifier.Symbol, type);
             }
             
+            case FunctionDeclarationStatement functionDeclarationStatement:
+            {
+                if (typeEnvironment.IsTypeDefined(functionDeclarationStatement.FunctionIdentifier.AppendParens()))
+                    throw new InvalidOperationException($"Function '{functionDeclarationStatement.FunctionIdentifier}()' already exists in current context.");
+
+                var returnType = functionDeclarationStatement.ReturnTypeName.Match(
+                    some: name => typeEnvironment.LookupType(name, out Type? type)
+                        ? type!
+                        : throw new InvalidOperationException($"Type '{name}' doesn't exist in current context."),
+                    none: Type.@void);
+
+                var functionTypeEnvironment = new TypeEnvironment(typeEnvironment);
+                var parameterTypes = functionDeclarationStatement.Parameters.Select(p =>
+                    {
+                        if (!typeEnvironment.LookupType(p.TypeName, out Type? parameterType))
+                            throw new InvalidOperationException(
+                                $"Type '{p.TypeName}' doesn't exist in current context.");
+                        
+                        if (functionTypeEnvironment.IsVariableDefined(p.Identifier))
+                            throw new InvalidOperationException(
+                                $"Variable '{p.Identifier}' already exists in current context.");
+                        
+                        return functionTypeEnvironment.DefineVariable(p.Identifier, parameterType!);
+                    }).ToList();
+
+                var functionType = new FunctionType(
+                    functionDeclarationStatement.FunctionIdentifier.AppendParens(),
+                    returnType,
+                    parameterTypes,
+                    functionTypeEnvironment);
+
+                Type bodyReturnType = CheckType(functionDeclarationStatement.Body, functionTypeEnvironment);
+                
+                if (bodyReturnType != returnType)
+                    throw new InvalidOperationException(
+                        $"Function '{functionDeclarationStatement.FunctionIdentifier}()' has return type '{returnType}' but body returns '{bodyReturnType}'");
+                
+                return typeEnvironment.DefineType(functionType);
+            }
+            
             case VariableDeclarationStatement variableDeclarationStatement:
             {
                 if (!typeEnvironment.LookupType(variableDeclarationStatement.TypeName, out Type? type))
@@ -276,7 +316,7 @@ public class TypeChecker
 
                 if (!typeEnvironment.LookupVariable(assignmentExpression.Member.Symbol, out Type? variableType, accessorRootType))
                     throw new InvalidOperationException(
-                        $"Identifier '{assignmentExpression.Member.Symbol}' doesn't exist in current context.");
+                        $"Type for identifier '{assignmentExpression.Member.Symbol}' doesn't exist in current context.");
                 
                 if (type != variableType)
                     throw new InvalidOperationException(
@@ -287,7 +327,7 @@ public class TypeChecker
 
             case BlockExpression blockExpression:
             {
-                Type lastType = Type.never;
+                Type lastType = Type.@void;
                 
                 foreach (IStatement stmt in blockExpression.Statements)
                     lastType = CheckType(stmt, new TypeEnvironment(typeEnvironment));
@@ -334,7 +374,7 @@ public class TypeChecker
                             if (typeEnvironment.LookupType(f.TypeName, out Type? type))
                                 return type;
 
-                            return Type.never;
+                            return Type.@void;
                         }))!));
             }
             

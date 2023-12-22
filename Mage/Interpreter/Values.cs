@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 
 using Arcana.Models;
+using Arcana.Parser;
 
 namespace Mage.Interpreter;
 
@@ -78,6 +79,19 @@ public class UnionValue(UnionMember unionMember, Dictionary<string, IRuntimeValu
         
         return $"{UnionMember}({string.Join(", ", Fields.Select(kv => $"{kv.Key}: {kv.Value}"))})";
     } 
+}
+
+public class FunctionValue(
+    string identifier,
+    List<Parameter> parameters,
+    Environment environment,
+    IExpression body)
+    : IRuntimeValue
+{
+    public string Identifier { get; } = identifier;
+    public List<Parameter> Parameters { get; } = parameters;
+    public Environment Environment { get; } = environment;
+    public IExpression Body { get; } = body;
 }
 
 public class EmptyProgramValue : IRuntimeValue;
