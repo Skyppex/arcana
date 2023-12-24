@@ -16,10 +16,6 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    pub fn as_str(&self) -> &'a str {
-        self.chars.as_str()
-    }
-
     pub(crate) fn first(&self) -> char {
         self.chars.clone().next().unwrap_or(END_OF_FILE_CHAR)
     }

@@ -29,10 +29,11 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             cursor.bump();
             cursor.eat_while(|c| is_white_space(c));
 
-            Ok(Token {
-                kind: TokenKind::WhiteSpace,
-                length: cursor.position_within_token(),
-            })
+            tokenize_next(cursor)
+            // Ok(Token {
+            //     kind: TokenKind::WhiteSpace,
+            //     length: cursor.position_within_token(),
+            // })
         }
         '(' => Ok(create_token(TokenKind::OpenParen, cursor)),
         ')' => Ok(create_token(TokenKind::CloseParen, cursor)),

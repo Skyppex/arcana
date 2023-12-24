@@ -1,6 +1,6 @@
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Program { statements: Vec<Result<Statement, String>> },
+    Program { statements: Vec<Statement> },
     StructDeclaration {
         access_modifier: Option<AccessModifier>,
         type_name: String,
@@ -23,6 +23,8 @@ pub enum Statement {
 
 #[derive(Debug, Clone)]
 pub enum Expression {
+    None, // For testing purposes
+
     VariableDeclaration {
         mutable: bool,
         type_name: String,
@@ -46,7 +48,7 @@ pub enum Expression {
     },
     Unary {
         operator: UnaryOperator,
-        operand: Box<Expression>,
+        expression: Box<Expression>,
     },
     Binary {
         left: Box<Expression>,
@@ -167,8 +169,8 @@ pub enum BinaryOperator {
     BitwiseXor,
     BitwiseLeftShift,
     BitwiseRightShift,
-    LogicalAnd,
-    LogicalOr,
+    BooleanLogicalAnd,
+    BooleanLogicalOr,
     Equal,
     NotEqual,
     LessThan,
