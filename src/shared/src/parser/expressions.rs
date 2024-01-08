@@ -1,6 +1,22 @@
 use crate::lexer::token::{TokenKind, Keyword, self};
 
-use super::{cursor::Cursor, Expression, statements::parse_statement, ConditionBlock, FieldInitializer, Literal, Member, BinaryOperator, UnaryOperator};
+use super::{cursor::Cursor,
+    Expression,
+    statements::parse_statement,
+    ConditionBlock,
+    FieldInitializer,
+    Literal,
+    Member,
+    BinaryOperator,
+    UnaryOperator,
+    VariableDeclaration,
+    If,
+    Assignment,
+    Call,
+    Unary,
+    Binary,
+    Ternary
+};
 
 
 
@@ -39,7 +55,7 @@ fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
         return Err(format!("Expected ) but found {:?}", cursor.first().kind));
     };
 
-    Ok(Expression::Drop { identifier })
+    Ok(Expression::Drop(identifier))
 }
 
 pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -57,7 +73,7 @@ pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the }
 
-    Ok(Expression::Block { statements })
+    Ok(Expression::Block(statements))
 }
 
 fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -79,20 +95,20 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
 
                     let initializer = parse_expression(cursor)?;
 
-                    Ok(Expression::VariableDeclaration {
+                    Ok(Expression::VariableDeclaration(VariableDeclaration {
                         mutable: true,
                         type_name,
                         identifier,
                         initializer: Some(Box::new(initializer)),
-                    })
+                    }))
                 },
                 TokenKind::Semicolon => {
-                    Ok(Expression::VariableDeclaration {
+                    Ok(Expression::VariableDeclaration(VariableDeclaration {
                         mutable: true,
                         type_name,
                         identifier,
                         initializer: None,
-                    })
+                    }))
                 },
                 _ => Err(format!("Expected = or : but found {:?}", cursor.first().kind)),
             }
@@ -111,20 +127,20 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
 
                     let expression = parse_expression(cursor)?;
 
-                    Ok(Expression::VariableDeclaration {
+                    Ok(Expression::VariableDeclaration(VariableDeclaration {
                         mutable: false,
                         type_name,
                         identifier,
                         initializer: Some(Box::new(expression)),
-                    })
+                    }))
                 },
                 TokenKind::Semicolon => {
-                    Ok(Expression::VariableDeclaration {
+                    Ok(Expression::VariableDeclaration(VariableDeclaration {
                         mutable: false,
                         type_name,
                         identifier,
                         initializer: None,
-                    })
+                    }))
                 },
                 _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
             }
@@ -162,12 +178,12 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
         }
     }
 
-    return Ok(Expression::If
+    return Ok(Expression::If(If
     {
         r#if: ConditionBlock { condition: Box::new(if_condition), block: Box::new(if_block) },
         else_ifs: if else_ifs.len() > 0 { Some(else_ifs) } else { None },
         r#else
-    })
+    }))
 }
 
 fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -288,10 +304,10 @@ fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
         cursor.bump()?; // Consume the =
         let initializer = parse_expression(cursor)?;
 
-        expression = Expression::Assignment {
+        expression = Expression::Assignment(Assignment {
             member: Box::new(expression),
             initializer: Box::new(initializer),
-        };
+        });
     }
 
     Ok(expression)
@@ -311,11 +327,11 @@ fn parse_ternary(cursor: &mut Cursor) -> Result<Expression, String> {
 
                 let false_expression = parse_expression(cursor)?;
 
-                Expression::Ternary {
+                Expression::Ternary(Ternary {
                     condition: Box::new(expression),
                     true_expression: Box::new(true_expression),
                     false_expression: Box::new(false_expression)
-                }
+                })
             },
             _ => return Err(format!("Expected : but found {:?}", cursor.first().kind)),
         };
@@ -331,7 +347,7 @@ fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
         let operator = cursor.bump()?.kind; // Consume the && or ||
         let right = parse_comparison(cursor)?;
 
-        expression = Expression::Binary {
+        expression = Expression::Binary(Binary {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
@@ -339,7 +355,7 @@ fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::DoublePipe => BinaryOperator::BooleanLogicalOr,
                 _ => unreachable!("Expected && or || but found {:?}", operator),
             },
-        };
+        });
     }
 
     Ok(expression)
@@ -358,7 +374,7 @@ fn parse_comparison(cursor: &mut Cursor) -> Result<Expression, String> {
         let operator = cursor.bump()?.kind; // Consume the ==, !=, >, <, >=, or <=
         let right = parse_bitwise_logical(cursor)?;
 
-        expression = Expression::Binary {
+        expression = Expression::Binary(Binary {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
@@ -370,7 +386,7 @@ fn parse_comparison(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::LessEqual => BinaryOperator::LessThanOrEqual,
                 _ => unreachable!("Expected ==, !=, >, <, >=, or <= but found {:?}", operator),
             },
-        };
+        });
     }
 
     Ok(expression)
@@ -388,7 +404,7 @@ fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
         let operator = cursor.bump()?.kind; // Consume the >>, <<, ^, &, or |
         let right = parse_additive(cursor)?;
 
-        expression = Expression::Binary {
+        expression = Expression::Binary(Binary {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
@@ -399,7 +415,7 @@ fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::Pipe => BinaryOperator::BitwiseOr,
                 _ => unreachable!("Expected >>, <<, ^, &, or | but found {:?}", operator),
             },
-        };
+        });
     }
     
     Ok(expression)
@@ -412,7 +428,7 @@ fn parse_additive(cursor: &mut Cursor) -> Result<Expression, String> {
         let operator = cursor.bump()?.kind; // Consume the + or -
         let right = parse_multiplicative(cursor)?;
 
-        expression = Expression::Binary {
+        expression = Expression::Binary(Binary {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
@@ -420,7 +436,7 @@ fn parse_additive(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::Minus => BinaryOperator::Subtraction,
                 _ => unreachable!("Expected + or - but found {:?}", operator),
             },
-        };
+        });
     }
     
     Ok(expression)
@@ -433,7 +449,7 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
         let operator = cursor.bump()?.kind; // Consume the *, /, or %
         let right = parse_unary(cursor)?;
 
-        expression = Expression::Binary {
+        expression = Expression::Binary(Binary {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
@@ -442,7 +458,7 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::Percent => BinaryOperator::Modulo,
                 _ => unreachable!("Expected *, /, or % but found {:?}", operator),
             },
-        };
+        });
     }
 
     Ok(expression)
@@ -453,7 +469,7 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
         let operator = cursor.bump()?.kind; // Consume the -, !, or ~
         let right = parse_call_member(cursor)?;
 
-        return Ok(Expression::Unary {
+        return Ok(Expression::Unary(Unary {
             operator: match operator {
                 TokenKind::Minus => UnaryOperator::Negation,
                 TokenKind::Bang => UnaryOperator::LogicalNot,
@@ -461,7 +477,7 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
                 _ => unreachable!("Expected -, !, or ~ but found {:?}", operator),
             },
             expression: Box::new(right),
-        })
+        }))
     }
 
     parse_call_member(cursor)
@@ -480,7 +496,7 @@ fn parse_call_member(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_call_expression(caller: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
     let arguments = parse_args(cursor)?;
 
-    let mut call = Expression::Call { caller: Box::new(caller.clone()), arguments };
+    let mut call = Expression::Call(Call { caller: Box::new(caller.clone()), arguments });
 
     if let TokenKind::OpenParen = cursor.first().kind {
         call = parse_call_expression(call, cursor)?;
@@ -565,18 +581,18 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 
 fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> {
     match literal {
-        token::Literal::Int8(literal) => Ok(Expression::Literal(Literal::Int8(literal.value))),
-        token::Literal::Int16(literal) => Ok(Expression::Literal(Literal::Int16(literal.value))),
-        token::Literal::Int32(literal) => Ok(Expression::Literal(Literal::Int32(literal.value))),
-        token::Literal::Int64(literal) => Ok(Expression::Literal(Literal::Int64(literal.value))),
-        token::Literal::Int128(literal) => Ok(Expression::Literal(Literal::Int128(literal.value))),
-        token::Literal::UInt8(literal) => Ok(Expression::Literal(Literal::UInt8(literal.value))),
-        token::Literal::UInt16(literal) => Ok(Expression::Literal(Literal::UInt16(literal.value))),
-        token::Literal::UInt32(literal) => Ok(Expression::Literal(Literal::UInt32(literal.value))),
-        token::Literal::UInt64(literal) => Ok(Expression::Literal(Literal::UInt64(literal.value))),
-        token::Literal::UInt128(literal) => Ok(Expression::Literal(Literal::UInt128(literal.value))),
-        token::Literal::Float32(value) => Ok(Expression::Literal(Literal::Float32(value))),
-        token::Literal::Float64(value) => Ok(Expression::Literal(Literal::Float64(value))),
+        token::Literal::I8(literal) => Ok(Expression::Literal(Literal::I8(literal.value))),
+        token::Literal::I16(literal) => Ok(Expression::Literal(Literal::I16(literal.value))),
+        token::Literal::I32(literal) => Ok(Expression::Literal(Literal::I32(literal.value))),
+        token::Literal::I64(literal) => Ok(Expression::Literal(Literal::I64(literal.value))),
+        token::Literal::I128(literal) => Ok(Expression::Literal(Literal::I128(literal.value))),
+        token::Literal::U8(literal) => Ok(Expression::Literal(Literal::U8(literal.value))),
+        token::Literal::U16(literal) => Ok(Expression::Literal(Literal::U16(literal.value))),
+        token::Literal::U32(literal) => Ok(Expression::Literal(Literal::U32(literal.value))),
+        token::Literal::U64(literal) => Ok(Expression::Literal(Literal::U64(literal.value))),
+        token::Literal::U128(literal) => Ok(Expression::Literal(Literal::U128(literal.value))),
+        token::Literal::F32(value) => Ok(Expression::Literal(Literal::F32(value))),
+        token::Literal::F64(value) => Ok(Expression::Literal(Literal::F64(value))),
         token::Literal::String(value) => Ok(Expression::Literal(Literal::String(value))),
         token::Literal::Char(value) => Ok(Expression::Literal(Literal::Char(value.parse::<char>().unwrap()))),
         token::Literal::Bool(value) => Ok(Expression::Literal(Literal::Bool(value))),

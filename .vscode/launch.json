@@ -7,10 +7,11 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
-            "program": "${workspaceFolder}/<executable file>",
+            "name": "Debug mage",
+            "program": "${workspaceRoot}/target/debug/mage",
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceRoot}",
+            "sourceLanguages": ["rust"],
         }
     ]
 }

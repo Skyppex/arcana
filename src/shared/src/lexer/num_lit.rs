@@ -7,48 +7,48 @@ pub fn parse_numeric_literal(cursor: &mut Cursor) -> Token {
     let suffix = parse_suffix(cursor).unwrap_or(NumericLiteralType::Int32);
 
     let kind = match suffix {
-        NumericLiteralType::Int8 => TokenKind::Literal(Literal::Int8(IntLiteral::<i8> {
+        NumericLiteralType::Int8 => TokenKind::Literal(Literal::I8(IntLiteral::<i8> {
             value: value.parse::<i8>().expect("Failed to parse i8 literal"),
             base,
         })),
-        NumericLiteralType::Int16 => TokenKind::Literal(Literal::Int16(IntLiteral::<i16> {
+        NumericLiteralType::Int16 => TokenKind::Literal(Literal::I16(IntLiteral::<i16> {
             value: value.parse::<i16>().unwrap(),
             base,
         })),
-        NumericLiteralType::Int32 => TokenKind::Literal(Literal::Int32(IntLiteral::<i32> {
+        NumericLiteralType::Int32 => TokenKind::Literal(Literal::I32(IntLiteral::<i32> {
             value: value.parse::<i32>().unwrap(),
             base,
         })),
-        NumericLiteralType::Int64 => TokenKind::Literal(Literal::Int64(IntLiteral::<i64> {
+        NumericLiteralType::Int64 => TokenKind::Literal(Literal::I64(IntLiteral::<i64> {
             value: value.parse::<i64>().unwrap(),
             base,
         })),
-        NumericLiteralType::Int128 => TokenKind::Literal(Literal::Int128(IntLiteral::<i128> {
+        NumericLiteralType::Int128 => TokenKind::Literal(Literal::I128(IntLiteral::<i128> {
             value: value.parse::<i128>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt8 => TokenKind::Literal(Literal::UInt8(IntLiteral::<u8> {
+        NumericLiteralType::UInt8 => TokenKind::Literal(Literal::U8(IntLiteral::<u8> {
             value: value.parse::<u8>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt16 => TokenKind::Literal(Literal::UInt16(IntLiteral::<u16> {
+        NumericLiteralType::UInt16 => TokenKind::Literal(Literal::U16(IntLiteral::<u16> {
             value: value.parse::<u16>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt32 => TokenKind::Literal(Literal::UInt32(IntLiteral::<u32> {
+        NumericLiteralType::UInt32 => TokenKind::Literal(Literal::U32(IntLiteral::<u32> {
             value: value.parse::<u32>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt64 => TokenKind::Literal(Literal::UInt64(IntLiteral::<u64> {
+        NumericLiteralType::UInt64 => TokenKind::Literal(Literal::U64(IntLiteral::<u64> {
             value: value.parse::<u64>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt128 => TokenKind::Literal(Literal::UInt128(IntLiteral::<u128> {
+        NumericLiteralType::UInt128 => TokenKind::Literal(Literal::U128(IntLiteral::<u128> {
             value: value.parse::<u128>().unwrap(),
             base,
         })),
-        NumericLiteralType::Float32 => TokenKind::Literal(Literal::Float32(value.parse::<f32>().expect("Failed to parse float literal"))),
-        NumericLiteralType::Float64 => TokenKind::Literal(Literal::Float64(value.parse::<f64>().expect("Failed to parse float literal"))),
+        NumericLiteralType::Float32 => TokenKind::Literal(Literal::F32(value.parse::<f32>().expect("Failed to parse f32 literal"))),
+        NumericLiteralType::Float64 => TokenKind::Literal(Literal::F64(value.parse::<f64>().expect("Failed to parse f64 literal"))),
     };
 
     Token {

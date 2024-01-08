@@ -1,6 +1,6 @@
 use crate::{lexer::token::{TokenKind, Keyword, Token}, parser::AccessModifier};
 
-use super::{Statement, cursor::Cursor, expressions::{parse_expression, parse_block, self}, Parameter, StructField, UnionMemberField, UnionMember};
+use super::{Statement, cursor::Cursor, expressions::{parse_expression, parse_block, self}, Parameter, StructField, UnionMemberField, UnionMember, StructDeclaration, UnionDeclaration, FunctionDeclaration};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let statement = parse_function_declaration_statement(cursor);
@@ -56,13 +56,13 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
     let body = parse_block(cursor)?;
 
-    Ok(Statement::FunctionDeclaration {
+    Ok(Statement::FunctionDeclaration(FunctionDeclaration {
         access_modifier,
         identifier,
         parameters,
         return_type,
         body,
-    })
+    }))
 }
 
 fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
@@ -111,11 +111,11 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     cursor.bump()?; // Consume the }
 
-    Ok(Statement::StructDeclaration {
+    Ok(Statement::StructDeclaration(StructDeclaration {
         access_modifier,
         type_name,
         fields,
-    })
+    }))
 }
 
 fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
@@ -164,11 +164,11 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     cursor.bump()?; // Consume the }
 
-    Ok(Statement::UnionDeclaration {
+    Ok(Statement::UnionDeclaration(UnionDeclaration {
         access_modifier,
         type_name,
-        fields,
-    })
+        members: fields,
+    }))
 }
 
 fn parse_expression_map(cursor: &mut Cursor) -> Result<Statement, String> {
@@ -266,19 +266,22 @@ fn parse_union_member(cursor: &mut Cursor) -> Result<UnionMember, String> {
 
             let mut has_comma = true;
             
+            let mut field_position = 0;
             while cursor.first().kind != TokenKind::CloseParen {
                 if !has_comma {
                     return Err(format!("Expected , but found {:?}", cursor.first().kind));
                 }
 
                 has_comma = true;
-                fields.push(parse_union_field(cursor)?);
+                fields.push(parse_union_field(cursor, field_position)?);
 
                 if cursor.first().kind == TokenKind::Comma {
                     cursor.bump()?; // Consume the ,
                 } else {
                     has_comma = false;
                 }
+
+                field_position += 1;
             }
 
             cursor.bump()?; // Consume the )
@@ -295,7 +298,7 @@ fn parse_union_member(cursor: &mut Cursor) -> Result<UnionMember, String> {
     }
 }
 
-fn parse_union_field(cursor: &mut Cursor) -> Result<UnionMemberField, String> {
+fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<UnionMemberField, String> {
     let TokenKind::Identifier(first_ident) = cursor.bump()?.kind else {
         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
     };
@@ -309,12 +312,14 @@ fn parse_union_field(cursor: &mut Cursor) -> Result<UnionMemberField, String> {
             };
 
             Ok(UnionMemberField {
+                field_position,
                 identifier: Some(first_ident),
                 type_name,
             })
         },
         _ => {
             return Ok(UnionMemberField {
+                field_position,
                 identifier: None,
                 type_name: first_ident,
             });

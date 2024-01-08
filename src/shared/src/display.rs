@@ -1,4 +1,28 @@
-use super::{Statement, Expression, Member, Literal, StructField, UnionMember, AccessModifier, UnionMemberField, FieldInitializer, UnaryOperator, BinaryOperator, Parameter, ConditionBlock};
+use crate::parser::{
+    Statement,
+    Expression,
+    Member,
+    Literal,
+    StructField,
+    UnionMember,
+    AccessModifier,
+    UnionMemberField,
+    FieldInitializer,
+    UnaryOperator,
+    BinaryOperator,
+    Parameter,
+    ConditionBlock,
+    StructDeclaration,
+    UnionDeclaration,
+    FunctionDeclaration,
+    VariableDeclaration,
+    If,
+    Assignment,
+    Call,
+    Unary,
+    Binary,
+    Ternary
+};
 
 pub struct Indent {
     level: usize,
@@ -31,7 +55,7 @@ impl Indent {
     fn dash_end(&self) -> String {
         let mut result = String::new();
         for _ in 0..self.level - 1 {
-            result.push_str("┆");
+            result.push_str("┆ ");
         }
         result.push_str("╰─");
         result
@@ -52,11 +76,11 @@ impl IndentDisplay for Statement {
                 }
                 result
             },
-            Statement::StructDeclaration {
+            Statement::StructDeclaration(StructDeclaration {
                 access_modifier,
                 type_name,
                 fields 
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str(format!("<struct declaration> {}\n", type_name).as_str());
                 indent.increase();
@@ -71,11 +95,11 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             },
-            Statement::UnionDeclaration {
+            Statement::UnionDeclaration(UnionDeclaration {
                 access_modifier,
                 type_name,
-                fields: members
-            } => {
+                members
+            }) => {
                 let mut result = String::new();
                 result.push_str(format!("<union declaration> {}\n", type_name).as_str());
                 indent.increase();
@@ -90,13 +114,13 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             },
-            Statement::FunctionDeclaration {
+            Statement::FunctionDeclaration(FunctionDeclaration {
                 access_modifier,
                 identifier,
                 parameters,
                 return_type,
                 body
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str(format!("<function declaration> {}\n", identifier).as_str());
                 indent.increase();
@@ -128,14 +152,14 @@ impl IndentDisplay for Expression {
             Expression::None => {
                 String::new()
             },
-            Expression::VariableDeclaration {
+            Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
                 type_name,
                 identifier,
                 initializer
-            } => {
+            }) => {
                 let mut result = String::new();
-                result.push_str(format!("<variable declaration>{}\n", identifier).as_str());
+                result.push_str(format!("<variable declaration> {}\n", identifier).as_str());
                 indent.increase();
                 result.push_str(format!("{}mutable: {}\n", indent.dash(), mutable).as_str());
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name).as_str());
@@ -147,11 +171,11 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             },
-            Expression::If {
+            Expression::If(If {
                 r#if,
                 else_ifs,
                 r#else
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str("<if>\n");
                 indent.increase();
@@ -172,10 +196,10 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             },
-            Expression::Assignment {
+            Expression::Assignment(Assignment {
                 member,
                 initializer
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str("<assignment>\n");
                 indent.increase();
@@ -186,10 +210,10 @@ impl IndentDisplay for Expression {
             },
             Expression::Member(m) => m.indent_display(indent),
             Expression::Literal(l) => l.indent_display(indent),
-            Expression::Call {
+            Expression::Call(Call {
                 caller,
                 arguments
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str("<call>\n");
                 indent.increase();
@@ -206,10 +230,10 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             },
-            Expression::Unary {
+            Expression::Unary(Unary {
                 operator,
                 expression
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str("<unary>\n");
                 indent.increase();
@@ -218,11 +242,11 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             },
-            Expression::Binary {
+            Expression::Binary(Binary {
                 left,
                 operator,
                 right
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str("<binary>\n");
                 indent.increase();
@@ -232,11 +256,11 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             },
-            Expression::Ternary {
+            Expression::Ternary(Ternary {
                 condition,
                 true_expression,
                 false_expression
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str("<ternary>\n");
                 indent.increase();
@@ -246,9 +270,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             },
-            Expression::Block {
-                statements
-            } => {
+            Expression::Block(statements) => {
                 let mut result = String::new();
                 result.push_str("<block>");
                 indent.increase();
@@ -264,9 +286,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             },
-            Expression::Drop {
-                identifier
-            } => {
+            Expression::Drop(identifier) => {
                 let mut result = String::new();
                 result.push_str(format!("<drop> {}", identifier).as_str());
                 result
@@ -306,18 +326,18 @@ impl IndentDisplay for Member {
 impl IndentDisplay for Literal {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            Literal::Int8(v) => v.to_string(),
-            Literal::Int16(v) => v.to_string(),
-            Literal::Int32(v) => v.to_string(),
-            Literal::Int64(v) => v.to_string(),
-            Literal::Int128(v) => v.to_string(),
-            Literal::UInt8(v) => v.to_string(),
-            Literal::UInt16(v) => v.to_string(),
-            Literal::UInt32(v) => v.to_string(),
-            Literal::UInt64(v) => v.to_string(),
-            Literal::UInt128(v) => v.to_string(),
-            Literal::Float32(v) => v.to_string(),
-            Literal::Float64(v) => v.to_string(),
+            Literal::I8(v) => v.to_string(),
+            Literal::I16(v) => v.to_string(),
+            Literal::I32(v) => v.to_string(),
+            Literal::I64(v) => v.to_string(),
+            Literal::I128(v) => v.to_string(),
+            Literal::U8(v) => v.to_string(),
+            Literal::U16(v) => v.to_string(),
+            Literal::U32(v) => v.to_string(),
+            Literal::U64(v) => v.to_string(),
+            Literal::U128(v) => v.to_string(),
+            Literal::F32(v) => v.to_string(),
+            Literal::F64(v) => v.to_string(),
             Literal::String(s) => s.to_string(),
             Literal::Char(c) => c.to_string(),
             Literal::Bool(b) => b.to_string(),

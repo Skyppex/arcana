@@ -1,6 +1,6 @@
 use std::io::{stdin, stdout, Write};
 
-use shared::parser::IndentDisplay;
+use shared::{type_checker::create_typed_ast, display::{Indent, IndentDisplay}, parser::create_ast};
 
 fn main() {
     let result = run_program();
@@ -23,8 +23,12 @@ fn run_program() -> Result<(), String> {
         let tokens = shared::lexer::tokenize(input)?;
         println!("\n{:?}\n", tokens);
 
-        let program = shared::parser::create_ast(tokens)?;
-        let mut indent = shared::parser::Indent::new();
-        println!("{}", program.indent_display(&mut indent));
+        let program = create_ast(tokens)?;
+        let mut indent = Indent::new();
+        println!("{}\n", program.indent_display(&mut indent));
+
+        let typed_program = create_typed_ast(program)?;
+        // let mut indent = Indent::new();
+        // println!("{}\n", typed_program.indent_display(&mut indent));
     }
 }
