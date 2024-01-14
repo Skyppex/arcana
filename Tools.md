@@ -1,6 +1,6 @@
 # Tools
 
-A list of tools that will be needed.
+A list of tools that i wanna make for this language.
 
 ## Mage
 
