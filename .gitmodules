@@ -1,0 +1,3 @@
+[submodule "arcana-lang-support"]
+	path = arcana-lang-support
+	url = ./arcana-lang-support/
