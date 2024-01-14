@@ -2,7 +2,7 @@ pub mod type_checker;
 mod type_environment;
 mod statements;
 mod expressions;
-mod ast;
+pub mod ast;
 
 pub use type_checker::*;
 

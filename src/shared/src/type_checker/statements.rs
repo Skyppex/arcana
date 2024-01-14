@@ -62,8 +62,7 @@ pub fn check_type(statement: &Statement, discovered_types: &Vec<DiscoveredType>)
             let statements: Result<Vec<TypedStatement>, String> = statements.iter().map(|s| check_type(s, discovered_types)).collect();
 
             Ok(TypedStatement::Program {
-                statements: statements?,
-                type_: Type::Void
+                statements: statements?
             })
         },
         Statement::StructDeclaration(parser::StructDeclaration {
@@ -75,7 +74,6 @@ pub fn check_type(statement: &Statement, discovered_types: &Vec<DiscoveredType>)
                 .map(|field| {
                     match check_type_name(&field.type_name, &discovered_types) {
                         Ok(t) => Ok(ast::StructField {
-                            access_modifier: field.access_modifier.clone().map(|am| am.into()),
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
                             type_: t
@@ -155,12 +153,40 @@ pub fn check_type(statement: &Statement, discovered_types: &Vec<DiscoveredType>)
             })
         },
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
-            access_modifier,
+            access_modifier: _,
             identifier,
             parameters,
             return_type,
             body
-        }) => Ok(TypedStatement::None),
+        }) => {
+            let ps: Result<Vec<ast::Parameter>, String> = parameters.iter()
+                .map(|parameter| {
+                    match check_type_name(&parameter.type_name, &discovered_types) {
+                        Ok(t) => Ok(ast::Parameter {
+                            identifier: parameter.identifier.clone(),
+                            type_name: parameter.type_name.clone(),
+                            type_: t
+                        }),
+                        Err(e) => Err(e)
+                    }
+                })
+                .collect();
+
+            let type_ = Type::Function(Function {
+                name: identifier.clone(),
+                parameters: ps.clone()?.iter().map(|p| (p.identifier.clone(), p.type_.clone())).collect(),
+                return_type: Box::new(check_type_name(&return_type.clone().unwrap_or(Type::Void.to_string()), &discovered_types)?)
+            });
+
+            Ok(TypedStatement::FunctionDeclaration {
+                identifier: identifier.clone(),
+                parameters: ps?,
+                return_type: return_type.clone().unwrap_or(Type::Void.to_string()),
+                body: Box::new(check_type(body, discovered_types)?),
+                type_
+            })
+        
+        },
         Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(e)?)),
     }
 }

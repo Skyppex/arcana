@@ -7,7 +7,6 @@ pub enum TypedStatement {
     None,
     Program {
         statements: Vec<TypedStatement>,
-        type_: Type,
     },
     StructDeclaration {
         type_name: String,
@@ -86,7 +85,6 @@ pub enum TypedExpression {
 
 #[derive(Debug, Clone)]
 pub struct StructField {
-    pub access_modifier: Option<AccessModifier>,
     pub mutable: bool,
     pub identifier: String,
     pub type_: Type,
@@ -144,11 +142,13 @@ pub enum Literal {
     Struct {
         type_name: String,
         field_initializers: Option<Vec<FieldInitializer>>,
+        type_: Type,
     },
     Union {
         type_name: String,
         member: String,
         field_initializers: Option<Vec<FieldInitializer>>,
+        type_: Type,
     },
 }
 
@@ -168,6 +168,7 @@ pub struct FieldInitializer {
 pub struct Parameter {
     pub identifier: String,
     pub type_name: String,
+    pub type_: Type,
 }
 
 #[derive(Debug, Clone)]

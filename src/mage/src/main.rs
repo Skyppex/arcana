@@ -28,7 +28,7 @@ fn run_program() -> Result<(), String> {
         println!("{}\n", program.indent_display(&mut indent));
 
         let typed_program = create_typed_ast(program)?;
-        // let mut indent = Indent::new();
-        // println!("{}\n", typed_program.indent_display(&mut indent));
+        let mut indent = Indent::new();
+        println!("{}\n", typed_program.indent_display(&mut indent));
     }
 }

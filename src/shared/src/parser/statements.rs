@@ -1,6 +1,6 @@
-use crate::{lexer::token::{TokenKind, Keyword, Token}, parser::AccessModifier};
+use crate::lexer::token::{TokenKind, Keyword};
 
-use super::{Statement, cursor::Cursor, expressions::{parse_expression, parse_block, self}, Parameter, StructField, UnionMemberField, UnionMember, StructDeclaration, UnionDeclaration, FunctionDeclaration};
+use super::{Statement, cursor::Cursor, expressions::{parse_block, self}, Parameter, StructField, UnionMemberField, UnionMember, StructDeclaration, UnionDeclaration, FunctionDeclaration};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let statement = parse_function_declaration_statement(cursor);
