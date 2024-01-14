@@ -65,13 +65,6 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
         Statement::Program {
             statements
         } => {
-            let mut typed_statements = vec![];
-
-            for statement in statements {
-                println!("{:?}\n", statement);
-                typed_statements.push(check_type(statement, discovered_types, type_environment)?);
-            }
-
             let statements: Result<Vec<TypedStatement>, String> = statements.iter()
                 .map(|s| check_type(s, discovered_types, type_environment))
                 .collect();
