@@ -2,8 +2,7 @@ use std::collections::HashMap;
 
 use super::Type;
 
-
-
+#[derive(Debug, Clone)]
 pub struct TypeEnvironment<'a> {
     parent: Option<&'a TypeEnvironment<'a>>,
     types: HashMap<String, Type>,
@@ -53,5 +52,13 @@ impl<'a> TypeEnvironment<'a> {
         } else {
             None
         }
+    }
+
+    pub fn get_types(&self) -> &HashMap<String, Type> {
+        &self.types
+    }
+
+    pub fn get_variables(&self) -> &HashMap<String, Type> {
+        &self.variables
     }
 }

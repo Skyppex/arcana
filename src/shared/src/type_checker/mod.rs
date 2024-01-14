@@ -1,12 +1,13 @@
 pub mod type_checker;
-mod type_environment;
+pub mod type_environment;
 mod statements;
 mod expressions;
 pub mod ast;
 
 pub use type_checker::*;
+pub use type_environment::*;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Struct {
@@ -126,12 +127,34 @@ impl Type {
             Type::StructField(StructField { struct_name, field_name, .. }) => format!("{}.{}", struct_name, field_name),
             Type::Union(Union { name, .. }) => name.clone(),
             Type::UnionMember(UnionMember { union_name, discriminant_name, .. }) => format!("{}::{}", union_name, discriminant_name),
-            Type::UnionMemberField(UnionMemberField { union_name, discriminant_name, field_position, field_name, ..}) => match field_name {
-                Some(field_name) => format!("{}::{}.{}", union_name, discriminant_name, field_name),
-                None => format!("{}::{}::{}", union_name, discriminant_name, field_position.to_string()),
+            Type::UnionMemberField(UnionMemberField {
+                union_name,
+                discriminant_name,
+                field_position,
+                field_name,
+                field_type,
+            }) => match field_name {
+                Some(field_name) => format!("{}::{}.{}: {}",
+                    union_name,
+                    discriminant_name,
+                    field_name,
+                    field_type.to_string()
+                ),
+                None => format!("{}::{}::{}: {}",
+                    union_name,
+                    discriminant_name,
+                    field_position.to_string(),
+                    field_type.to_string()
+                ),
             },
             Type::Function(Function { name, .. }) => name.clone(),
             // Type::Constant { name, .. } => name.clone(),
         }
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.to_string().fmt(f)
     }
 }

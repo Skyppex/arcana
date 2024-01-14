@@ -22,10 +22,19 @@ pub enum TypedStatement {
         identifier: String,
         parameters: Vec<Parameter>,
         return_type: String,
-        body: Box<TypedStatement>,
+        body: Box<TypedExpression>,
         type_: Type,
     },
     Expression(TypedExpression),
+}
+
+impl TypedStatement {
+    pub fn as_expression(&self) -> Option<&TypedExpression> {
+        match self {
+            TypedStatement::Expression(e) => Some(e),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
