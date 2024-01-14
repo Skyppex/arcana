@@ -13,7 +13,7 @@ use super::{
     expressions,
     ast::{TypedStatement, self},
     type_checker::DiscoveredType,
-    type_environment::TypeEnvironment
+    type_environment::TypeEnvironment,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -68,10 +68,13 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
             let mut typed_statements = vec![];
 
             for statement in statements {
+                println!("{:?}\n", statement);
                 typed_statements.push(check_type(statement, discovered_types, type_environment)?);
             }
 
-            let statements: Result<Vec<TypedStatement>, String> = statements.iter().map(|s| check_type(s, discovered_types, type_environment)).collect();
+            let statements: Result<Vec<TypedStatement>, String> = statements.iter()
+                .map(|s| check_type(s, discovered_types, type_environment))
+                .collect();
 
             Ok(TypedStatement::Program {
                 statements: statements?
@@ -95,22 +98,25 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 })
                 .collect();
 
-            let type_ = Type::Struct(Struct {
-                name: type_name.clone(),
-                fields: fs.clone()?.iter().map(|f| {
+            let fields: Result<HashMap<String, Type>, String> = fs.clone()?.iter().map(|f: &ast::StructField| {
                     let struct_field = Type::StructField(StructField {
                         struct_name: type_name.clone(),
                         field_name: f.identifier.clone(),
                         field_type: Box::new(f.type_.clone())
                     });
 
-                    type_environment.add_type(f.identifier.clone(), struct_field.clone());
+                    match type_environment.add_type(struct_field.clone()) {
+                        Ok(_) => Ok((f.identifier.clone(), struct_field)),
+                        Err(e) => Err(e)
+                    }
+                }).collect();
 
-                    (f.identifier.clone(), struct_field)
-                }).collect()
+            let type_ = Type::Struct(Struct {
+                name: type_name.clone(),
+                fields: fields?
             });
 
-            type_environment.add_type(type_name.clone(), type_.clone());
+            type_environment.add_type(type_.clone())?;
 
             Ok(TypedStatement::StructDeclaration {
                 type_name: type_name.clone(), 
@@ -142,40 +148,39 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                         })
                         .collect();
 
-                    let type_ = Type::UnionMember(UnionMember {
+                    let fields: Result<HashMap<Option<String>, Type>, String> = fs.clone()?.iter().map(|f| {
+                        let union_member_field = Type::UnionMemberField(UnionMemberField {
+                            union_name: type_name.clone(),
+                            discriminant_name: member.identifier.clone(),
+                            field_position: f.field_position,
+                            field_name: f.identifier.clone(),
+                            field_type: Box::new(f.type_.clone())
+                        });
+
+                        match type_environment.add_type(union_member_field.clone()) {
+                            Ok(_) => Ok((f.identifier.clone(), union_member_field)),
+                            Err(e) => Err(e)
+                        }
+                    }).collect();
+
+                    let union_member = Type::UnionMember(UnionMember {
                         union_name: type_name.clone(),
                         discriminant_name: member.identifier.clone(),
-                        fields: fs.clone()?.iter().map(|f| {
-                            let union_member_field = Type::UnionMemberField(UnionMemberField {
-                                union_name: type_name.clone(),
-                                discriminant_name: member.identifier.clone(),
-                                field_position: f.field_position,
-                                field_name: f.identifier.clone(),
-                                field_type: Box::new(f.type_.clone())
-                            });
-
-                            type_environment.add_type(
-                                f.identifier
-                                    .clone()
-                                    .unwrap_or(f.field_position.to_string()),
-                                union_member_field.clone());
-
-                            (f.identifier.clone(), union_member_field)
-                        }).collect()
+                        fields: fields?
                     });
 
-                    type_environment.add_type(member.identifier.clone(), type_.clone());
+                    type_environment.add_type(union_member.clone())?;
 
                     Ok(ast::UnionMember {
                         union_name: type_name.clone(),
                         discriminant_name: member.identifier.clone(),
                         fields: fs.clone()?,
-                        type_
+                        type_: union_member
                     })
                 })
                 .collect();
 
-            let type_ = Type::Union(Union {
+            let union = Type::Union(Union {
                 name: type_name.clone(),
                 members: ms.clone()?
                     .iter()
@@ -183,12 +188,12 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                     .collect()
             });
 
-            type_environment.add_type(type_name.clone(), type_.clone());
+            type_environment.add_type(union.clone())?;
 
             Ok(TypedStatement::UnionDeclaration {
                 type_name: type_name.clone(),
                 members: ms?,
-                type_
+                type_: union
             })
         },
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
@@ -217,7 +222,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 return_type: Box::new(check_type_name(&return_type.clone().unwrap_or(Type::Void.to_string()), &discovered_types)?)
             });
 
-            type_environment.add_type(identifier.clone(), type_.clone());
+            type_environment.add_type(type_.clone())?;
 
             Ok(TypedStatement::FunctionDeclaration {
                 identifier: identifier.clone(),
@@ -226,7 +231,6 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 body: Box::new(check_type(&Statement::Expression(body.clone()), discovered_types, type_environment)?.as_expression().unwrap().clone()),
                 type_
             })
-        
         },
         Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(e, type_environment)?)),
     }

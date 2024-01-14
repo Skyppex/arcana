@@ -1,4 +1,4 @@
-use std::io::{stdin, stdout, Write};
+use std::{io::{stdin, stdout, Write}, fs::{self, File}, path::Path, collections::BinaryHeap};
 
 use shared::{type_checker::{create_typed_ast, TypeEnvironment}, display::{Indent, IndentDisplay}, parser::create_ast};
 
@@ -22,16 +22,27 @@ fn run_program() -> Result<(), String> {
             break Ok(());
         }
 
+        if let "read" = input.trim() {
+            let path = Path::new("src/mage/manual_testing/test.ar");
+            match fs::read_to_string(path) {
+                Ok(source) => input = source,
+                Err(e) => {
+                    println!("Failed to read file: {}", e);
+                    continue;
+                }
+            }
+        }
+
         if let "types" = input.trim() {
             for type_ in type_environemnt.get_types() {
-                println!("{}: {}", type_.0, type_.1);
+                println!("{}", type_.1);
             }
             continue;
         }
 
         if let "vars" = input.trim() {
             for variable in type_environemnt.get_variables() {
-                println!("{}: {}", variable.0, variable.1);
+                println!("{}", variable.1);
             }
             continue;
         }
@@ -46,5 +57,16 @@ fn run_program() -> Result<(), String> {
         let typed_program = create_typed_ast(program, &mut type_environemnt)?;
         let mut indent = Indent::new();
         println!("{}\n", typed_program.indent_display(&mut indent));
+        
+        for type_ in type_environemnt.get_types()
+            .iter()
+            .map(|(name, ..)| name)
+            .collect::<BinaryHeap<&String>>() {
+            println!("{}", type_);
+        }
+
+        for variable in type_environemnt.get_variables() {
+            println!("{}", variable.0);
+        }
     }
 }

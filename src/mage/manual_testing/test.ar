@@ -1,0 +1,13 @@
+struct Value {
+    value: i32
+}
+
+union Option {
+    Some(string),
+    None
+}
+
+union Result {
+    Ok(Value),
+    Error(string)
+}

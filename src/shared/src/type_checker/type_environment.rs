@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::Type;
+use super::{Type, FullName};
 
 #[derive(Debug, Clone)]
 pub struct TypeEnvironment<'a> {
@@ -26,8 +26,14 @@ impl<'a> TypeEnvironment<'a> {
         }
     }
 
-    pub fn add_type(&mut self, name: String, type_: Type) {
-        self.types.insert(name, type_);
+    pub fn add_type(&mut self, type_: Type) -> Result<(), String> {
+        let full_name = type_.full_name();
+        if self.types.contains_key(&full_name) {
+            return Err(format!("Type {} already exists", type_.full_name()));
+        }
+
+        self.types.insert(type_.full_name(), type_);
+        Ok(())
     }
 
     pub fn add_variable(&mut self, name: String, type_: Type) {

@@ -1,10 +1,11 @@
 use crate::parser::{Expression, VariableDeclaration, If, Assignment, Call, Unary, Binary, Ternary};
 
-use super::{ast::TypedExpression, type_environment, TypeEnvironment};
+use super::{ast::TypedExpression, TypeEnvironment};
 
-
-
-pub fn check_type<'a>(expression: &Expression, type_environment: &mut TypeEnvironment<'a>) -> Result<TypedExpression, String> {
+pub fn check_type<'a>(
+    expression: &Expression,
+    type_environment: &mut TypeEnvironment<'a>
+) -> Result<TypedExpression, String> {
     match expression {
         Expression::None => Ok(TypedExpression::None),
         Expression::VariableDeclaration(VariableDeclaration {

@@ -72,7 +72,7 @@ impl IndentDisplay for Statement {
             Statement::Program { statements } => {
                 let mut result = String::new();
                 for statement in statements {
-                    result.push_str(&statement.indent_display(indent));
+                    result.push_str(format!("{}\n┆\n", &statement.indent_display(indent)).as_str());
                 }
                 result
             },
