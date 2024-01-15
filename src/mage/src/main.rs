@@ -1,5 +1,8 @@
-use std::{io::{stdin, stdout, Write}, fs::{self, File}, path::Path, collections::BinaryHeap};
+mod interpreter;
 
+use std::{io::{stdin, stdout, Write}, fs::{self}, path::Path, collections::BinaryHeap};
+
+use interpreter::evironment::Environment;
 use shared::{type_checker::{create_typed_ast, TypeEnvironment}, display::{Indent, IndentDisplay}, parser::create_ast};
 
 fn main() {
@@ -12,6 +15,7 @@ fn main() {
 
 fn run_program() -> Result<(), String> {
     let mut type_environemnt = TypeEnvironment::new();
+    let mut environment = Environment::new();
 
     loop {
         let _ = stdout().flush();
@@ -68,5 +72,11 @@ fn run_program() -> Result<(), String> {
         for variable in type_environemnt.get_variables() {
             println!("{}", variable.0);
         }
+
+        let result = interpreter::evaluate(
+            typed_program,
+            &mut environment)?;
+
+        println!("\n{}\n", result);
     }
 }

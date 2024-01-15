@@ -95,6 +95,7 @@ impl FullName for Function {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Void,
+    Unit,
     I8,
     I16,
     I32,
@@ -149,6 +150,7 @@ impl Type {
     pub fn to_string(&self) -> String {
         match self {
             Type::Void => "void".to_string(),
+            Type::Unit => "()".to_string(),
             Type::I8 => "int8".to_string(),
             Type::I16 => "int16".to_string(),
             Type::I32 => "int32".to_string(),
@@ -198,6 +200,7 @@ impl FullName for Type {
     fn full_name(&self) -> String {
         match self {
             Type::Void => "void".to_string(),
+            Type::Unit => "()".to_string(),
             Type::I8 => "i8".to_string(),
             Type::I16 => "i16".to_string(),
             Type::I32 => "i32".to_string(),

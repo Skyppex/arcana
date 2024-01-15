@@ -2,6 +2,10 @@ use crate::parser;
 
 use super::Type;
 
+pub trait Typed {
+    fn get_type(&self) -> Type;
+}
+
 #[derive(Debug, Clone)]
 pub enum TypedStatement {
     None,
@@ -21,7 +25,7 @@ pub enum TypedStatement {
     FunctionDeclaration {
         identifier: String,
         parameters: Vec<Parameter>,
-        return_type: String,
+        return_type: Type,
         body: Box<TypedExpression>,
         type_: Type,
     },
@@ -33,6 +37,19 @@ impl TypedStatement {
         match self {
             TypedStatement::Expression(e) => Some(e),
             _ => None,
+        }
+    }
+}
+
+impl Typed for TypedStatement {
+    fn get_type(&self) -> Type {
+        match self {
+            TypedStatement::None => Type::Void,
+            TypedStatement::Program { .. } => Type::Void,
+            TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::Expression(e) => e.get_type(),
         }
     }
 }
@@ -90,6 +107,25 @@ pub enum TypedExpression {
         identifier: String,
         type_: Type
     },
+}
+
+impl Typed for TypedExpression {
+    fn get_type(&self) -> Type {
+        match self {
+            TypedExpression::None => Type::Void,
+            TypedExpression::VariableDeclaration { mutable, identifier, initializer, type_ } => type_.clone(),
+            TypedExpression::If { r#if, else_ifs, r#else, type_ } => type_.clone(),
+            TypedExpression::Assignment { member, initializer, type_ } => type_.clone(),
+            TypedExpression::Member(member) => member.get_type(),
+            TypedExpression::Literal(literal) => literal.get_type(),
+            TypedExpression::Call { caller, arguments, type_ } => type_.clone(),
+            TypedExpression::Unary { operator, expression, type_ } => type_.clone(),
+            TypedExpression::Binary { left, operator, right, type_ } => type_.clone(),
+            TypedExpression::Ternary { condition, true_expression, false_expression, type_ } => type_.clone(),
+            TypedExpression::Block { statements, type_ } => type_.clone(),
+            TypedExpression::Drop { identifier, type_ } => type_.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -161,6 +197,30 @@ pub enum Literal {
     },
 }
 
+impl Typed for Literal {
+    fn get_type(&self) -> Type {
+        match self {
+            Literal::I8(_) => Type::I8,
+            Literal::I16(_) => Type::I16,
+            Literal::I32(_) => Type::I32,
+            Literal::I64(_) => Type::I64,
+            Literal::I128(_) => Type::I128,
+            Literal::U8(_) => Type::U8,
+            Literal::U16(_) => Type::U16,
+            Literal::U32(_) => Type::U32,
+            Literal::U64(_) => Type::U64,
+            Literal::U128(_) => Type::U128,
+            Literal::F32(_) => Type::F32,
+            Literal::F64(_) => Type::F64,
+            Literal::String(_) => Type::String,
+            Literal::Char(_) => Type::Char,
+            Literal::Bool(_) => Type::Bool,
+            Literal::Struct { type_, .. } => type_.clone(),
+            Literal::Union { type_, .. } => type_.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ConditionBlock {
     pub condition: Box<TypedExpression>,
@@ -192,6 +252,15 @@ pub enum Member {
         symbol: String,
         type_: Type,
     },
+}
+
+impl Typed for Member {
+    fn get_type(&self) -> Type {
+        match self {
+            Member::Identifier { type_, .. } => type_.clone(),
+            Member::MemberAccess { type_, .. } => type_.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

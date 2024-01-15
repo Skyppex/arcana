@@ -220,7 +220,10 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
             Ok(TypedStatement::FunctionDeclaration {
                 identifier: identifier.clone(),
                 parameters: ps?,
-                return_type: return_type.clone().unwrap_or(Type::Void.to_string()),
+                return_type: match return_type {
+                    Some(t) => check_type_name(&t, &discovered_types)?,
+                    None => Type::Void
+                },
                 body: Box::new(check_type(&Statement::Expression(body.clone()), discovered_types, type_environment)?.as_expression().unwrap().clone()),
                 type_
             })
@@ -229,7 +232,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
     }
 }
 
-fn check_type_name(type_name: &String, discovered_types: &Vec<DiscoveredType>) -> Result<Type, String> {
+fn check_type_name(type_name: &str, discovered_types: &Vec<DiscoveredType>) -> Result<Type, String> {
     match discovered_types.iter().find(|discovered_type| match discovered_type {
         DiscoveredType::Struct(name, ..) => name == type_name,
         DiscoveredType::Union(name, ..) => name == type_name,
