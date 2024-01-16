@@ -304,8 +304,12 @@ fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
         cursor.bump()?; // Consume the =
         let initializer = parse_expression(cursor)?;
 
+        let Expression::Member(member) = expression else {
+            return Err(format!("Expected member but found {:?}", expression));
+        };
+
         expression = Expression::Assignment(Assignment {
-            member: Box::new(expression),
+            member: Box::new(member),
             initializer: Box::new(initializer),
         });
     }
@@ -432,8 +436,8 @@ fn parse_additive(cursor: &mut Cursor) -> Result<Expression, String> {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
-                TokenKind::Plus => BinaryOperator::Addition,
-                TokenKind::Minus => BinaryOperator::Subtraction,
+                TokenKind::Plus => BinaryOperator::Add,
+                TokenKind::Minus => BinaryOperator::Subtract,
                 _ => unreachable!("Expected + or - but found {:?}", operator),
             },
         });
@@ -453,8 +457,8 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
-                TokenKind::Star => BinaryOperator::Multiplication,
-                TokenKind::Slash => BinaryOperator::Division,
+                TokenKind::Star => BinaryOperator::Multiply,
+                TokenKind::Slash => BinaryOperator::Divide,
                 TokenKind::Percent => BinaryOperator::Modulo,
                 _ => unreachable!("Expected *, /, or % but found {:?}", operator),
             },
@@ -471,7 +475,7 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
 
         return Ok(Expression::Unary(Unary {
             operator: match operator {
-                TokenKind::Minus => UnaryOperator::Negation,
+                TokenKind::Minus => UnaryOperator::Negate,
                 TokenKind::Bang => UnaryOperator::LogicalNot,
                 TokenKind::Tilde => UnaryOperator::BitwiseNot,
                 _ => unreachable!("Expected -, !, or ~ but found {:?}", operator),

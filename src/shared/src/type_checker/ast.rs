@@ -1,6 +1,6 @@
 use crate::parser;
 
-use super::Type;
+use super::{Type, FullName};
 
 pub trait Typed {
     fn get_type(&self) -> Type;
@@ -71,7 +71,7 @@ pub enum TypedExpression {
         type_: Type,
     },
     Assignment {
-        member: Box<TypedExpression>,
+        member: Box<Member>,
         initializer: Box<TypedExpression>,
         type_: Type,
     },
@@ -254,6 +254,15 @@ pub enum Member {
     },
 }
 
+impl Member {
+    pub fn get_symbol(&self) -> &str {
+        match self {
+            Member::Identifier { symbol, .. } => symbol,
+            Member::MemberAccess { symbol, .. } => symbol,
+        }
+    }
+}
+
 impl Typed for Member {
     fn get_type(&self) -> Type {
         match self {
@@ -265,17 +274,18 @@ impl Typed for Member {
 
 #[derive(Debug, Clone)]
 pub enum UnaryOperator {
-    Negation,
+    Identity,
+    Negate,
     LogicalNot,
     BitwiseNot,
 }
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
-    Addition,
-    Subtraction,
-    Multiplication,
-    Division,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
     Modulo,
     BitwiseAnd,
     BitwiseOr,

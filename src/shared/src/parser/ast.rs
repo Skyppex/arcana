@@ -1,4 +1,3 @@
-
 #[derive(Debug, Clone)]
 pub enum Statement {
     Program { statements: Vec<Statement> },
@@ -33,7 +32,7 @@ pub struct StructDeclaration {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnionDeclaration{
+pub struct UnionDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_name: String,
     pub members: Vec<UnionMember>,
@@ -123,7 +122,9 @@ pub struct Parameter {
 
 #[derive(Debug, Clone)]
 pub enum Member {
-    Identifier { symbol: String },
+    Identifier {
+        symbol: String,
+    },
     MemberAccess {
         object: Box<Expression>,
         member: Box<Member>,
@@ -132,7 +133,7 @@ pub enum Member {
 }
 
 #[derive(Debug, Clone)]
-pub struct VariableDeclaration{
+pub struct VariableDeclaration {
     pub mutable: bool,
     pub type_name: String,
     pub identifier: String,
@@ -140,39 +141,39 @@ pub struct VariableDeclaration{
 }
 
 #[derive(Debug, Clone)]
-pub struct If{
+pub struct If {
     pub r#if: ConditionBlock,
     pub else_ifs: Option<Vec<ConditionBlock>>,
     pub r#else: Option<Box<Expression>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Assignment{
-    pub member: Box<Expression>,
+pub struct Assignment {
+    pub member: Box<Member>,
     pub initializer: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Call{
+pub struct Call {
     pub caller: Box<Expression>,
     pub arguments: Vec<Expression>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Unary{
+pub struct Unary {
     pub operator: UnaryOperator,
     pub expression: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Binary{
+pub struct Binary {
     pub left: Box<Expression>,
     pub operator: BinaryOperator,
     pub right: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Ternary{
+pub struct Ternary {
     pub condition: Box<Expression>,
     pub true_expression: Box<Expression>,
     pub false_expression: Box<Expression>,
@@ -180,17 +181,17 @@ pub struct Ternary{
 
 #[derive(Debug, Clone)]
 pub enum UnaryOperator {
-    Negation,
+    Negate,
     LogicalNot,
     BitwiseNot,
 }
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
-    Addition,
-    Subtraction,
-    Multiplication,
-    Division,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
     Modulo,
     BitwiseAnd,
     BitwiseOr,

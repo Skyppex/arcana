@@ -1,6 +1,6 @@
-use crate::{parser::{self, Expression, VariableDeclaration, If, Assignment, Call, Unary, Binary, Ternary}, type_checker::ast::Literal};
+use crate::{parser::{self, Expression, VariableDeclaration, If, Assignment}, type_checker::ast::Literal};
 
-use super::{ast::{TypedExpression, Typed, ConditionBlock, Member, FieldInitializer, TypedStatement}, TypeEnvironment, Type, statements, DiscoveredType};
+use super::{ast::{TypedExpression, Typed, ConditionBlock, Member, FieldInitializer, TypedStatement, UnaryOperator, BinaryOperator}, TypeEnvironment, Type, statements, DiscoveredType};
 
 pub fn check_type<'a>(
     expression: &Expression,
@@ -100,8 +100,12 @@ pub fn check_type<'a>(
             member,
             initializer
         }) => {
-            let member = check_type(member, discovered_types, type_environment)?;
+            let member = check_type(&Expression::Member(*member.clone()), discovered_types, type_environment)?;
             let initializer = check_type(initializer, discovered_types, type_environment)?;
+
+            let TypedExpression::Member(member) = member else {
+                return Err("Expected member expression".to_string());
+            };
 
             Ok(TypedExpression::Assignment {
                 member: Box::new(member),
@@ -200,9 +204,74 @@ pub fn check_type<'a>(
             Ok(TypedExpression::Literal(literal))
         },
         Expression::Call(call) => todo!(),
-        Expression::Unary(unary) => todo!(),
-        Expression::Binary(binary) => todo!(),
-        Expression::Ternary(ternary) => todo!(),
+        Expression::Unary(unary) => {
+            let expression = check_type(&unary.expression, discovered_types, type_environment)?;
+            let type_ = expression.get_type();
+
+            Ok(TypedExpression::Unary {
+                operator: match unary.operator {
+                    parser::UnaryOperator::Negate => UnaryOperator::Negate,
+                    parser::UnaryOperator::LogicalNot => UnaryOperator::LogicalNot,
+                    parser::UnaryOperator::BitwiseNot => UnaryOperator::BitwiseNot,
+                },
+                expression: Box::new(expression),
+                type_
+            })
+        
+        },
+        Expression::Binary(binary) => {
+            let left = check_type(&binary.left, discovered_types, type_environment)?;
+            let right = check_type(&binary.right, discovered_types, type_environment)?;
+            let type_ = left.get_type();
+
+            Ok(TypedExpression::Binary {
+                left: Box::new(left),
+                operator: match binary.operator {
+                    parser::BinaryOperator::Add => BinaryOperator::Add,
+                    parser::BinaryOperator::Subtract => BinaryOperator::Subtract,
+                    parser::BinaryOperator::Multiply => BinaryOperator::Multiply,
+                    parser::BinaryOperator::Divide => BinaryOperator::Divide,
+                    parser::BinaryOperator::Modulo => BinaryOperator::Modulo,
+                    parser::BinaryOperator::BitwiseAnd => BinaryOperator::BitwiseAnd,
+                    parser::BinaryOperator::BitwiseOr => BinaryOperator::BitwiseOr,
+                    parser::BinaryOperator::BitwiseXor => BinaryOperator::BitwiseXor,
+                    parser::BinaryOperator::BitwiseLeftShift => BinaryOperator::BitwiseLeftShift,
+                    parser::BinaryOperator::BitwiseRightShift => BinaryOperator::BitwiseRightShift,
+                    parser::BinaryOperator::BooleanLogicalAnd => BinaryOperator::BooleanLogicalAnd,
+                    parser::BinaryOperator::BooleanLogicalOr => BinaryOperator::BooleanLogicalOr,
+                    parser::BinaryOperator::Equal => BinaryOperator::Equal,
+                    parser::BinaryOperator::NotEqual => BinaryOperator::NotEqual,
+                    parser::BinaryOperator::LessThan => BinaryOperator::LessThan,
+                    parser::BinaryOperator::LessThanOrEqual => BinaryOperator::LessThanOrEqual,
+                    parser::BinaryOperator::GreaterThan => BinaryOperator::GreaterThan,
+                    parser::BinaryOperator::GreaterThanOrEqual => BinaryOperator::GreaterThanOrEqual,
+                },
+                right: Box::new(right),
+                type_
+            })
+        
+        },
+        Expression::Ternary(ternary) => {
+            let condition = check_type(&ternary.condition, discovered_types, type_environment)?;
+            let true_expression = check_type(&ternary.true_expression, discovered_types, type_environment)?;
+            let false_expression = check_type(&ternary.false_expression, discovered_types, type_environment)?;
+
+            let Type::Bool = condition.get_type() else {
+                return Err(format!("Ternary condition must be of type bool"));
+            };
+
+            if true_expression.get_type() != false_expression.get_type() {
+                return Err(format!("Ternary true expression type {:?} does not match false expression type {:?}", true_expression.get_type(), false_expression.get_type()));
+            }
+
+            Ok(TypedExpression::Ternary {
+                condition: Box::new(condition),
+                true_expression: Box::new(true_expression.clone()),
+                false_expression: Box::new(false_expression),
+                type_: true_expression.get_type()
+            })
+        
+        },
         Expression::Block(statements) => {
             let mut statements_: Vec<TypedStatement> = vec![];
             
@@ -215,6 +284,14 @@ pub fn check_type<'a>(
                 type_: Type::Void
             })
         },
-        Expression::Drop(symbol) => todo!(),
+        Expression::Drop(symbol) => {
+            let type_ = type_environment.get_variable(symbol)
+                .ok_or_else(|| format!("Unexpected variable: {}", symbol))?.clone();
+
+            Ok(TypedExpression::Drop {
+                identifier: symbol.clone(),
+                type_
+            })
+        },
     }
 }

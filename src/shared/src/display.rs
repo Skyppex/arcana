@@ -478,7 +478,7 @@ impl IndentDisplay for FieldInitializer {
 impl IndentDisplay for UnaryOperator {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
-            UnaryOperator::Negation => "-".to_string(),
+            UnaryOperator::Negate => "-".to_string(),
             UnaryOperator::LogicalNot => "!".to_string(),
             UnaryOperator::BitwiseNot => "~".to_string(),
         }
@@ -488,10 +488,10 @@ impl IndentDisplay for UnaryOperator {
 impl IndentDisplay for BinaryOperator {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
-            BinaryOperator::Addition => "+".to_string(),
-            BinaryOperator::Subtraction => "-".to_string(),
-            BinaryOperator::Multiplication => "*".to_string(),
-            BinaryOperator::Division => "/".to_string(),
+            BinaryOperator::Add => "+".to_string(),
+            BinaryOperator::Subtract => "-".to_string(),
+            BinaryOperator::Multiply => "*".to_string(),
+            BinaryOperator::Divide => "/".to_string(),
             BinaryOperator::Modulo => "%".to_string(),
             BinaryOperator::BitwiseAnd => "&".to_string(),
             BinaryOperator::BitwiseOr => "|".to_string(),
@@ -936,7 +936,8 @@ impl IndentDisplay for type_checker::ast::ConditionBlock {
 impl IndentDisplay for type_checker::ast::UnaryOperator {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::UnaryOperator::Negation => "-".to_string(),
+            type_checker::ast::UnaryOperator::Identity => "+".to_string(),
+            type_checker::ast::UnaryOperator::Negate => "-".to_string(),
             type_checker::ast::UnaryOperator::LogicalNot => "!".to_string(),
             type_checker::ast::UnaryOperator::BitwiseNot => "~".to_string(),
         }
@@ -946,10 +947,10 @@ impl IndentDisplay for type_checker::ast::UnaryOperator {
 impl IndentDisplay for type_checker::ast::BinaryOperator {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::BinaryOperator::Addition => "+".to_string(),
-            type_checker::ast::BinaryOperator::Subtraction => "-".to_string(),
-            type_checker::ast::BinaryOperator::Multiplication => "*".to_string(),
-            type_checker::ast::BinaryOperator::Division => "/".to_string(),
+            type_checker::ast::BinaryOperator::Add => "+".to_string(),
+            type_checker::ast::BinaryOperator::Subtract => "-".to_string(),
+            type_checker::ast::BinaryOperator::Multiply => "*".to_string(),
+            type_checker::ast::BinaryOperator::Divide => "/".to_string(),
             type_checker::ast::BinaryOperator::Modulo => "%".to_string(),
             type_checker::ast::BinaryOperator::BitwiseAnd => "&".to_string(),
             type_checker::ast::BinaryOperator::BitwiseOr => "|".to_string(),

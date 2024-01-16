@@ -1,26 +1,62 @@
-use std::fmt::Display;
+use std::{fmt::Display, collections::HashMap};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Void,
-    Unassigned,
+    Uninitialized,
     Unit,
     Bool(bool),
     Number(Number),
     Char(char),
     String(String),
+    Struct { struct_name: String, fields: HashMap<String, Value> },
+    Union { union_member: UnionMember, fields: HashMap<String, Value> },
 }
 
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Void => write!(f, "void"),
-            Value::Unassigned => write!(f, "unassigned"),
+            Value::Uninitialized => write!(f, "unassigned"),
             Value::Unit => write!(f, "()"),
             Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),
             Value::Char(character) => write!(f, "{}", character),
             Value::String(string) => write!(f, "{}", string),
+            Value::Struct {
+                struct_name,
+                fields
+            } => {
+                write!(f, "{}: {{", struct_name)?;
+
+                for (index, (identifier, value)) in fields.iter().enumerate() {
+                    write!(f, "{}: {}", identifier, value)?;
+
+                    if index < fields.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+
+                write!(f, "}}")
+            
+            },
+            Value::Union {
+                union_member,
+                fields
+            } => {
+                write!(f, "{}::{} {{", union_member.union_name, union_member.member_name)?;
+
+                for (index, (identifier, value)) in fields.iter().enumerate() {
+                    write!(f, "{}: {}", identifier, value)?;
+
+                    if index < fields.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+
+                write!(f, "}}")
+            
+            },
         }
     }
 }
@@ -60,6 +96,19 @@ impl Display for Number {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnionMember {
+    pub union_name: String,
+    pub member_name: String,
+}
+
+impl Display for UnionMember {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::{}", self.union_name, self.member_name)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
     pub identifier: String,
     pub value: Value,
