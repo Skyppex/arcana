@@ -3,7 +3,7 @@
 ## Structs
 
 Public struct declaration -> Statement
-```
+```rs
 public struct Foo { // public struct declaration -> Statement
     public bar: i32; // public immutable i32 bar
     public baz: mutable i32; // public mutable i32 baz
@@ -11,7 +11,7 @@ public struct Foo { // public struct declaration -> Statement
 ```
 
 Public mutable struct declaration -> Statement
-```
+```rs
 public mutable struct Foo { // declaring the struct as mutable makes all fields mutable (you still have to declare the variable as mutable when you use it)
     public bar: i32; // public mutable i32 bar
     public baz: i32; // public mutable i32 baz
@@ -19,12 +19,12 @@ public mutable struct Foo { // declaring the struct as mutable makes all fields 
 ```
 
 Struct literal -> Expression
-```
+```rs
 Foo { bar: 5, baz: 10 }
 ```
 
 Private tuple struct declaration with a field of type Foo called foo -> Statement
-```
+```rs
 struct Wrapper(foo: Foo);
 struct Wrapper(foo: mutable Foo); // mutable tuple struct declaration
 ```
@@ -32,10 +32,63 @@ struct Wrapper(foo: mutable Foo); // mutable tuple struct declaration
 ## Unions
 
 Union declaration with two variants -> Statement
-```
-public union Foo { // public union declaration -> Statement
+```rs
+union Foo { // public union declaration -> Statement
     Bar(a: i32); // Bar variant with a field of type i32 called a
     Baz(a: i32, b: f32); // Baz variant with a field of type i32 called a and a field of type f32 called b
+}
+```
+Here we name the fields of each variant explicitly, but you can omit them
+```rs
+union Foo {
+    Bar(i32);
+    Baz(i32, f32);
+}
+```
+
+### Shared Fields
+Unions can have shared fields. Using this constrains each variant to use the same type of syntax for its fields.
+
+```rs
+union Foo(string) {
+    Bar(i32);
+    Baz(i32, f32);
+}
+```
+The shared field is appended to the end of each variant which mean its equivalent to:
+```rs
+union Foo {
+    Bar(i32, string);
+    Baz(i32, f32, string);
+}
+```
+
+If the shared field is named, all fields in variants must be named:
+```rs
+union Foo(name: string, id: u64) { // Multiple shared fields
+    Bar(a: i32); // Must have a name
+    Baz(a: i32, b: f32); // Must have a name for each field
+}
+```
+
+Using shared fields allows you to access that field without caring about which variant a variable is:
+```rs
+union Foo(string) {
+    Bar(i32);
+    Baz(i32, f32);
+}
+
+union NamedFoo(str_id: string) {
+    Bar(a: i32);
+    Baz(a: i32, b: f32);
+}
+
+fn main() {
+    let foo = Foo::Bar(-5, "bar"); // Note, you have to assign the shared field here.
+    let text = foo.0; // 'foo' now has positional fields. '0' accesses the first shared field on the union.
+
+    let named_foo = NamedFoo::Baz(-5, .5, "1"); // Note, you have to assign the shared field here.
+    let str_id = named_foo.str_id; // When the shared fields are named, you must access them using the fields name.
 }
 ```
 
@@ -43,7 +96,7 @@ public union Foo { // public union declaration -> Statement
 
 Public flags type declaration which uses an u32 to hold the flags -> Statement
 Note that the Foo type is not coercible to an u32, so you can't do `u32 foo = Foo::First`
-```
+```rs
 public flags Foo(u32) {
     First; // default value is 0b0000_0001
     Second; // default value is 0b0000_0010
@@ -79,7 +132,7 @@ Implementation blocks are used to implement functions or traits for types.
 
 ### Syntax
 
-```
+```rs
 implement Type {
     // Functions and traits
 }
@@ -88,7 +141,7 @@ implement Type {
 ### Example
 
 Here the `new` function is implemented for the `Foo` type.
-```
+```rs
 struct Foo {
     bar: i32;
 }
@@ -107,14 +160,14 @@ Type aliases are considered their own type, so you can't use them interchangeabl
 
 ### Syntax
 
-```
+```rs
 type Name = Type;
 ```
 
 ### Example
 
 Here the `Bar` type is an alias for the `Foo` type.
-```
+```rs
 struct Foo {
     bar: i32;
 }
@@ -123,7 +176,7 @@ type Bar = Foo;
 ```
 
 You can have implementations for type aliases, but they are not inherited by the type they alias.
-```
+```rs
 struct Foo {
     bar: i32;
 }
@@ -142,14 +195,14 @@ fn main() {
 }
 ```
 
-## Type Parameters
+## Type Parameters (Generics)
 
 Type parameters are used to make a type generic. \
 They are similar to generics in other languages.
 
 ### Syntax
 
-```
+```rs
 struct Foo<T> {
     bar: T;
 }
@@ -158,7 +211,7 @@ struct Foo<T> {
 ### Example
 
 Here the `Foo` type has a type parameter `T` which is used as the type of the `bar` field.
-```
+```rs
 struct Foo<T> {
     bar: T;
 }
@@ -171,7 +224,7 @@ They are similar to generic constraints in other languages.
 
 ### Syntax
 
-```
+```rs
 struct Foo<T: Trait> {
     bar: T;
 }
@@ -181,7 +234,7 @@ struct Foo<T: Trait> {
 
 Here the `Foo` type has a type parameter `T` which is used as the type of the `bar` field. \
 The type parameter `T` must implement the `Newable` trait.
-```
+```rs
 trait Newable {
     fn new(): Self;
 }
@@ -198,7 +251,7 @@ They are similar to generic constraints in other languages.
 
 ### Syntax
 
-```
+```rs
 struct Foo<T> where T: Trait {
     bar: T;
 }
@@ -208,7 +261,7 @@ struct Foo<T> where T: Trait {
 
 Here the `Foo` type has a type parameter `T` which is used as the type of the `bar` field. \
 The type parameter `T` must implement the `Newable` trait.
-```
+```rs
 trait Newable {
     fn new(): Self;
 }
@@ -227,7 +280,7 @@ Type arithmetic is performed on type aliases, type parameters and type bounds.
 ### Syntax
 
 This is only a subset of the possible operations.
-```
+```rs
 type Name = Type - Type.Member;
 ```
 
@@ -236,7 +289,7 @@ type Name = Type - Type.Member;
 Here are some examples of how to use type arithmetic.
 
 #### Example 1
-```
+```rs
 union Foo {
     Bar(a: i32);
     Baz(a: f32);
@@ -254,7 +307,7 @@ fn main() {
 ```
 
 This lowers to the following:
-```
+```rs
 union Foo {
     Bar(a: i32);
     Baz(a: f32);
@@ -275,7 +328,7 @@ fn main() {
 
 #### Example 2
 
-```
+```rs
 struct Foo {
     bar: i32;
     baz: f32;
@@ -285,12 +338,13 @@ type Omit<T: struct, [U: memberof T]> = T - U;
 
 fn main() {
     Foo foo = Foo { bar: 5, baz: 10 };
-    Omit<Foo, bar> bazOnly = foo; // This is equivalent to Omit<Foo, bar> bazOnly = Omit<Foo, bar> { baz: foo.baz };
+    Omit<Foo, bar> bazOnly = foo;
+    // This is equivalent to Omit<Foo, bar> bazOnly = Omit<Foo, bar> { baz: foo.baz };
 }
 ```
 
 This lowers to the following:
-```
+```rs
 struct Foo {
     bar: i32;
     baz: f32;
@@ -305,11 +359,3 @@ fn main() {
     Omit_Foo_bar bazOnly = Omit_Foo_bar { baz: foo.baz };
 }
 ```
-
-#### Example 3
-
-```
-struct Foo {
-    bar: i32;
-    baz: f32;
-}
