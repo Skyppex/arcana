@@ -117,11 +117,10 @@ pub enum Type {
     UnionMember(UnionMember),
     UnionMemberField(UnionMemberField),
     Function(Function),
-    // Constant {
-    //     name: String,
-    //     type_name: String,
-    //     value: Box<Type>,
-    // }
+    Literal {
+        name: String, // String representation of the literal
+        type_: Box<Type>,
+    }
 }
 
 impl Type {
@@ -191,7 +190,7 @@ impl Type {
                 ),
             },
             Type::Function(Function { name, .. }) => name.clone(),
-            // Type::Constant { name, .. } => name.clone(),
+            Type::Literal { name, .. } => name.clone(),
         }
     }
 }
@@ -222,6 +221,7 @@ impl FullName for Type {
             Type::UnionMember(um) => um.full_name(),
             Type::UnionMemberField(umf) => umf.full_name(),
             Type::Function(f) => f.full_name(),
+            Type::Literal { name, .. } => name.clone(),
         }
     }
 }

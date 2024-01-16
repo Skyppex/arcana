@@ -51,32 +51,33 @@ fn run_program() -> Result<(), String> {
             continue;
         }
 
-        let tokens = shared::lexer::tokenize(input)?;
-        println!("\n{:?}\n", tokens);
+        let tokens = shared::lexer::tokenize(&input)?;
+        // println!("\n{:?}\n", tokens);
 
         let program = create_ast(tokens)?;
         let mut indent = Indent::new();
-        println!("{}\n", program.indent_display(&mut indent));
+        println!("{}", program.indent_display(&mut indent));
 
         let typed_program = create_typed_ast(program, &mut type_environemnt)?;
         let mut indent = Indent::new();
         println!("{}\n", typed_program.indent_display(&mut indent));
         
-        for type_ in type_environemnt.get_types()
-            .iter()
-            .map(|(name, ..)| name)
-            .collect::<BinaryHeap<&String>>() {
-            println!("{}", type_);
-        }
+        // for type_ in type_environemnt.get_types()
+        //     .iter()
+        //     .map(|(name, ..)| name)
+        //     .collect::<BinaryHeap<&String>>() {
+        //     println!("{}", type_);
+        // }
 
-        for variable in type_environemnt.get_variables() {
-            println!("{}", variable.0);
-        }
+        // for variable in type_environemnt.get_variables() {
+        //     println!("{}", variable.0);
+        // }
 
         let result = interpreter::evaluate(
             typed_program,
             &mut environment)?;
 
-        println!("\n{}\n", result);
+        println!("{}", input);
+        println!("{}\n", result);
     }
 }

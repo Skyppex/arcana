@@ -1,6 +1,6 @@
 use shared::type_checker::{ast::*, Type};
 
-use super::{value::Value, evironment::Environment};
+use super::{value::{Value, Number}, evironment::Environment};
 
 pub fn evaluate(typed_statement: TypedStatement, environment: &mut Environment) -> Result<Value, String> {
     match typed_statement {
@@ -79,10 +79,15 @@ fn evaluate_variable_declaration(
     mutable: bool,
     identifier: String,
     initializer: Option<Box<TypedExpression>>,
-    type_: Type,
+    _type_: Type,
     environment: &mut Environment
 ) -> Result<Value, String> {
-    todo!()
+    let value = match initializer {
+        Some(initializer) => evaluate_expression(*initializer, environment)?,
+        None => Value::Void
+    };
+    environment.add_variable(identifier, value.clone(), mutable);
+    Ok(value)
 }
 
 fn evaluate_if(
@@ -109,7 +114,25 @@ fn evaluate_member(m: Member, environment: &mut Environment) -> Result<Value, St
 }
 
 fn evaluate_literal(l: Literal, environment: &mut Environment) -> Result<Value, String> {
-    todo!()
+    match l {
+        Literal::I8(v) => Ok(Value::Number(Number::I8(v))),
+        Literal::I16(v) => Ok(Value::Number(Number::I16(v))),
+        Literal::I32(v) => Ok(Value::Number(Number::I32(v))),
+        Literal::I64(v) => Ok(Value::Number(Number::I64(v))),
+        Literal::I128(v) => Ok(Value::Number(Number::I128(v))),
+        Literal::U8(v) => Ok(Value::Number(Number::U8(v))),
+        Literal::U16(v) => Ok(Value::Number(Number::U16(v))),
+        Literal::U32(v) => Ok(Value::Number(Number::U32(v))),
+        Literal::U64(v) => Ok(Value::Number(Number::U64(v))),
+        Literal::U128(v) => Ok(Value::Number(Number::U128(v))),
+        Literal::F32(v) => Ok(Value::Number(Number::F32(v))),
+        Literal::F64(v) => Ok(Value::Number(Number::F64(v))),
+        Literal::String(v) => Ok(Value::String(v)),
+        Literal::Char(v) => Ok(Value::Char(v)),
+        Literal::Bool(v) => Ok(Value::Bool(v)),
+        Literal::Struct { type_name, field_initializers, type_ } => todo!(),
+        Literal::Union { type_name, member, field_initializers, type_ } => todo!(),
+    }
 }
 
 fn evaluate_call(

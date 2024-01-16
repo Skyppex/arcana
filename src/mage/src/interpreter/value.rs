@@ -1,12 +1,14 @@
 use std::fmt::Display;
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Void,
     Unassigned,
     Unit,
+    Bool(bool),
     Number(Number),
+    Char(char),
     String(String),
-    Boolean(bool),
 }
 
 impl Display for Value {
@@ -15,13 +17,15 @@ impl Display for Value {
             Value::Void => write!(f, "void"),
             Value::Unassigned => write!(f, "unassigned"),
             Value::Unit => write!(f, "()"),
+            Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),
+            Value::Char(character) => write!(f, "{}", character),
             Value::String(string) => write!(f, "{}", string),
-            Value::Boolean(boolean) => write!(f, "{}", boolean),
         }
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Number {
     I8(i8),
     I16(i16),
@@ -59,6 +63,17 @@ impl Display for Number {
 pub struct Variable {
     pub identifier: String,
     pub value: Value,
+    pub mutable: bool,
+}
+
+impl Variable {
+    pub fn new(identifier: String, value: Value, mutable: bool) -> Self {
+        Self {
+            identifier,
+            value,
+            mutable,
+        }
+    }
 }
 
 impl Display for Variable {

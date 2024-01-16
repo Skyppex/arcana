@@ -228,7 +228,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 type_
             })
         },
-        Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(e, type_environment)?)),
+        Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(e, discovered_types, type_environment)?)),
     }
 }
 

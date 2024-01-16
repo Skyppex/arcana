@@ -13,7 +13,25 @@ impl<'a> TypeEnvironment<'a> {
     pub fn new() -> Self {
         Self {
             parent: None,
-            types: HashMap::new(),
+            types: HashMap::from([
+                ("void".to_string(), Type::Void),
+                ("()".to_string(), Type::Unit),
+                ("bool".to_string(), Type::Bool),
+                ("i8".to_string(), Type::I8),
+                ("i16".to_string(), Type::I16),
+                ("i32".to_string(), Type::I32),
+                ("i64".to_string(), Type::I64),
+                ("i128".to_string(), Type::I128),
+                ("u8".to_string(), Type::U8),
+                ("u16".to_string(), Type::U16),
+                ("u32".to_string(), Type::U32),
+                ("u64".to_string(), Type::U64),
+                ("u128".to_string(), Type::U128),
+                ("f32".to_string(), Type::F32),
+                ("f64".to_string(), Type::F64),
+                ("char".to_string(), Type::Char),
+                ("string".to_string(), Type::String),
+            ]),
             variables: HashMap::new(),
         }
     }

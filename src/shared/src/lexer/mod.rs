@@ -9,9 +9,9 @@ pub mod token;
 mod cursor;
 mod num_lit;
 
-pub fn tokenize(source_code: String) -> Result<Vec<Token>, String> {
+pub fn tokenize(source_code: &str) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
-    let mut cursor = cursor::Cursor::new(source_code.as_str());
+    let mut cursor = cursor::Cursor::new(source_code);
 
     while !cursor.is_end_of_file() {
         let token = tokenize_next(&mut cursor);
