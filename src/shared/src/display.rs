@@ -21,7 +21,8 @@ use crate::{parser::{
     Call,
     Unary,
     Binary,
-    Ternary
+    Ternary,
+    UnionMemberFieldInitializers
 }, type_checker::{ast::{TypedStatement, TypedExpression}, self}};
 
 pub struct Indent {
@@ -350,18 +351,12 @@ impl IndentDisplay for Literal {
                 result.push_str("<struct literal>\n");
                 indent.increase();
                 result.push_str(format!("{}type_name: {}", indent.dash(), type_name).as_str());
-                if let Some(field_initializers) = field_initializers {
-                    let mut i = 0;
-                    for field in field_initializers {
-                        if i < field_initializers.len() - 1 {
-                            result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
-                        } else {
-                            result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
-                        }
-                        i += 1;
+                for (i, field) in field_initializers.iter().enumerate() {
+                    if i < field_initializers.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
+                    } else {
+                        result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
                     }
-                } else {
-                    result.push_str(format!("\n{}field_initializers: None", indent.dash_end()).as_str());
                 }
                 indent.decrease();
                 result
@@ -376,19 +371,9 @@ impl IndentDisplay for Literal {
                 indent.increase();
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name).as_str());
                 result.push_str(format!("{}member: {}", indent.dash(), member).as_str());
-                if let Some(field_initializers) = field_initializers {
-                    let mut i = 0;
-                    for field in field_initializers {
-                        if i < field_initializers.len() - 1 {
-                            result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
-                        } else {
-                            result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
-                        }
-                        i += 1;
-                    }
-                } else {
-                    result.push_str(format!("\n{}field_initializers: None", indent.dash_end()).as_str());
-                }
+                indent.increase();
+                result.push_str(format!("{}{}", indent.dash_end(), field_initializers.indent_display(indent)).as_str());
+                indent.decrease();
                 indent.decrease();
                 result
             },
@@ -473,6 +458,42 @@ impl IndentDisplay for FieldInitializer {
         }
         result.push_str(format!("{}initializer: {}", indent.dash_end(), self.initializer.indent_display(indent)).as_str());
         result
+    }
+}
+
+impl IndentDisplay for UnionMemberFieldInitializers {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        match self {
+            UnionMemberFieldInitializers::None => "".to_string(),
+            UnionMemberFieldInitializers::Named(field_initializers) => {
+                let mut result = String::new();
+                result.push_str("\n<named field initializers>");
+                indent.increase();
+                for (i, (identifier, initializer)) in field_initializers.iter().enumerate() {
+                    if i < field_initializers.len() - 1 {
+                        result.push_str(format!("\n{}{}: {},", indent.dash(), identifier, initializer.indent_display(indent)).as_str());
+                    } else {
+                        result.push_str(format!("\n{}{}: {}", indent.dash_end(), identifier, initializer.indent_display(indent)).as_str());
+                    }
+                }
+                indent.decrease();
+                result
+            },
+            UnionMemberFieldInitializers::Unnamed(field_initializers) => {
+                let mut result = String::new();
+                result.push_str("\n<unnamed field initializers>");
+                indent.increase();
+                for (i, initializer) in field_initializers.iter().enumerate() {
+                    if i < field_initializers.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), initializer.indent_display(indent)).as_str());
+                    } else {
+                        result.push_str(format!("\n{}{}", indent.dash_end(), initializer.indent_display(indent)).as_str());
+                    }
+                }
+                indent.decrease();
+                result
+            },
+        }
     }
 }
 
@@ -811,19 +832,17 @@ impl IndentDisplay for type_checker::ast::Literal {
                 result.push_str(format!("<struct literal>: {}\n", type_.to_string()).as_str());
                 indent.increase();
                 result.push_str(format!("{}type_name: {}", indent.dash(), type_name).as_str());
-                if let Some(field_initializers) = field_initializers {
-                    let mut i = 0;
-                    for field in field_initializers {
-                        if i < field_initializers.len() - 1 {
-                            result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
-                        } else {
-                            result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
-                        }
-                        i += 1;
+                let mut i = 0;
+
+                for field in field_initializers {
+                    if i < field_initializers.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
+                    } else {
+                        result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
                     }
-                } else {
-                    result.push_str(format!("\n{}field_initializers: None", indent.dash_end()).as_str());
+                    i += 1;
                 }
+                
                 indent.decrease();
                 result
             },
@@ -837,20 +856,10 @@ impl IndentDisplay for type_checker::ast::Literal {
                 result.push_str(format!("<union literal>: {}\n", type_.to_string()).as_str());
                 indent.increase();
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name).as_str());
-                result.push_str(format!("{}member: {}", indent.dash(), member).as_str());
-                if let Some(field_initializers) = field_initializers {
-                    let mut i = 0;
-                    for field in field_initializers {
-                        if i < field_initializers.len() - 1 {
-                            result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
-                        } else {
-                            result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
-                        }
-                        i += 1;
-                    }
-                } else {
-                    result.push_str(format!("\n{}field_initializers: None", indent.dash_end()).as_str());
-                }
+                result.push_str(format!("{}member: {}\n", indent.dash(), member).as_str());
+                indent.increase();
+                result.push_str(format!("{}{}", indent.dash_end(), field_initializers.indent_display(indent)).as_str());
+                indent.decrease();
                 indent.decrease();
                 result
             },
@@ -884,8 +893,7 @@ impl IndentDisplay for type_checker::ast::UnionMember {
         let mut result = String::new();
         result.push_str(format!("<union member> {}: {}", self.discriminant_name, self.type_.to_string()).as_str());
         indent.increase();
-        let mut i = 0;
-        for field in &self.fields {
+        for (i, field) in self.fields.iter().enumerate() {
             if i == 0 {
                 result.push_str(format!("\n{}{}", indent.dash(), field.indent_display(indent)).as_str());
             } else {
@@ -895,8 +903,6 @@ impl IndentDisplay for type_checker::ast::UnionMember {
                     result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
                 }
             }
-
-            i += 1;
         }
         indent.decrease();
         result
@@ -978,5 +984,41 @@ impl IndentDisplay for type_checker::ast::FieldInitializer {
         }
         result.push_str(format!("{}initializer: {}", indent.dash_end(), self.initializer.indent_display(indent)).as_str());
         result
+    }
+}
+
+impl IndentDisplay for type_checker::ast::UnionMemberFieldInitializers {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        match self {
+            type_checker::ast::UnionMemberFieldInitializers::None => "".to_string(),
+            type_checker::ast::UnionMemberFieldInitializers::Named(field_initializers) => {
+                let mut result = String::new();
+                result.push_str("<union member field initializer>\n");
+                indent.increase();
+                for (i, (identifier, initializer)) in field_initializers.iter().enumerate() {
+                    if i < field_initializers.len() - 1 {
+                        result.push_str(format!("\n{}{}: {},", indent.dash(), identifier, initializer.indent_display(indent)).as_str());
+                    } else {
+                        result.push_str(format!("\n{}{}: {}", indent.dash_end(), identifier, initializer.indent_display(indent)).as_str());
+                    }
+                }
+                indent.decrease();
+                result
+            },
+            type_checker::ast::UnionMemberFieldInitializers::Unnamed(field_initializers) => {
+                let mut result = String::new();
+                result.push_str("<union member field initializer>\n");
+                indent.increase();
+                for (i, initializer) in field_initializers.iter().enumerate() {
+                    if i < field_initializers.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), initializer.indent_display(indent)).as_str());
+                    } else {
+                        result.push_str(format!("\n{}{}", indent.dash_end(), initializer.indent_display(indent)).as_str());
+                    }
+                }
+                indent.decrease();
+                result
+            },
+        }
     }
 }

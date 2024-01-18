@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use crate::parser;
 
-use super::{Type, FullName};
+use super::Type;
 
 pub trait Typed {
     fn get_type(&self) -> Type;
@@ -117,17 +119,17 @@ impl Typed for TypedExpression {
     fn get_type(&self) -> Type {
         match self {
             TypedExpression::None => Type::Void,
-            TypedExpression::VariableDeclaration { mutable, identifier, initializer, type_ } => type_.clone(),
-            TypedExpression::If { r#if, else_ifs, r#else, type_ } => type_.clone(),
-            TypedExpression::Assignment { member, initializer, type_ } => type_.clone(),
+            TypedExpression::VariableDeclaration { type_, .. } => type_.clone(),
+            TypedExpression::If { type_, .. } => type_.clone(),
+            TypedExpression::Assignment { type_, .. } => type_.clone(),
             TypedExpression::Member(member) => member.get_type(),
             TypedExpression::Literal(literal) => literal.get_type(),
-            TypedExpression::Call { caller, arguments, type_ } => type_.clone(),
-            TypedExpression::Unary { operator, expression, type_ } => type_.clone(),
-            TypedExpression::Binary { left, operator, right, type_ } => type_.clone(),
-            TypedExpression::Ternary { condition, true_expression, false_expression, type_ } => type_.clone(),
-            TypedExpression::Block { statements, type_ } => type_.clone(),
-            TypedExpression::Drop { identifier, type_ } => type_.clone(),
+            TypedExpression::Call { type_, .. } => type_.clone(),
+            TypedExpression::Unary { type_, .. } => type_.clone(),
+            TypedExpression::Binary { type_, .. } => type_.clone(),
+            TypedExpression::Ternary { type_, .. } => type_.clone(),
+            TypedExpression::Block { type_, .. } => type_.clone(),
+            TypedExpression::Drop { type_, .. } => type_.clone(),
         }
     }
 }
@@ -190,13 +192,13 @@ pub enum Literal {
     Bool(bool),
     Struct {
         type_name: String,
-        field_initializers: Option<Vec<FieldInitializer>>,
+        field_initializers: Vec<FieldInitializer>,
         type_: Type,
     },
     Union {
         type_name: String,
         member: String,
-        field_initializers: Option<Vec<FieldInitializer>>,
+        field_initializers: UnionMemberFieldInitializers,
         type_: Type,
     },
 }
@@ -235,6 +237,13 @@ pub struct ConditionBlock {
 pub struct FieldInitializer {
     pub identifier: Option<String>,
     pub initializer: TypedExpression,
+}
+
+#[derive(Debug, Clone)]
+pub enum UnionMemberFieldInitializers {
+    None,
+    Named(HashMap<String, TypedExpression>),
+    Unnamed(Vec<TypedExpression>),
 }
 
 #[derive(Debug, Clone)]

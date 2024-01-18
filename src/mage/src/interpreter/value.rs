@@ -10,24 +10,24 @@ pub enum Value {
     Char(char),
     String(String),
     Struct { struct_name: String, fields: HashMap<String, Value> },
-    Union { union_member: UnionMember, fields: HashMap<String, Value> },
+    Union { union_member: UnionMember, fields: UnionFields },
 }
 
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Void => write!(f, "void"),
-            Value::Uninitialized => write!(f, "unassigned"),
+            Value::Uninitialized => write!(f, "uninitialized"),
             Value::Unit => write!(f, "()"),
             Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),
-            Value::Char(character) => write!(f, "{}", character),
-            Value::String(string) => write!(f, "{}", string),
+            Value::Char(character) => write!(f, "'{}'", character),
+            Value::String(string) => write!(f, "\"{}\"", string),
             Value::Struct {
                 struct_name,
                 fields
             } => {
-                write!(f, "{}: {{", struct_name)?;
+                write!(f, "{} {{ ", struct_name)?;
 
                 for (index, (identifier, value)) in fields.iter().enumerate() {
                     write!(f, "{}: {}", identifier, value)?;
@@ -37,25 +37,42 @@ impl Display for Value {
                     }
                 }
 
-                write!(f, "}}")
+                write!(f, " }}")
             
             },
             Value::Union {
                 union_member,
                 fields
             } => {
-                write!(f, "{}::{} {{", union_member.union_name, union_member.member_name)?;
+                match fields {
+                    UnionFields::None => write!(f, ""),
+                    UnionFields::Named(fields) => {
+                        write!(f, "{}::{}(", union_member.union_name, union_member.member_name)?;
+                        
+                        for (index, (identifier, value)) in fields.iter().enumerate() {
+                            write!(f, "{}: {}", identifier, value)?;
+                            
+                            if index < fields.len() - 1 {
+                                write!(f, ", ")?;
+                            }
+                        }
+                        
+                        write!(f, ")")
+                    },
+                    UnionFields::Unnamed(fields) => {
+                        write!(f, "{}::{}(", union_member.union_name, union_member.member_name)?;
 
-                for (index, (identifier, value)) in fields.iter().enumerate() {
-                    write!(f, "{}: {}", identifier, value)?;
-
-                    if index < fields.len() - 1 {
-                        write!(f, ", ")?;
-                    }
+                        for (index, value) in fields.iter().enumerate() {
+                            write!(f, "{}", value)?;
+                            
+                            if index < fields.len() - 1 {
+                                write!(f, ", ")?;
+                            }
+                        }
+                        
+                        write!(f, ")")
+                    },
                 }
-
-                write!(f, "}}")
-            
             },
         }
     }
@@ -129,4 +146,11 @@ impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.identifier, self.value)
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnionFields {
+    None,
+    Named(HashMap<String, Value>),
+    Unnamed(Vec<Value>),
 }

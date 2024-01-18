@@ -144,7 +144,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
     };
 
-    let mut fields = vec![];
+    let mut members = vec![];
     let mut has_comma = true;
 
     while cursor.first().kind != TokenKind::CloseBrace {
@@ -153,7 +153,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         }
 
         has_comma = true;
-        fields.push(parse_union_member(cursor)?);
+        members.push(parse_union_member(cursor)?);
 
         if cursor.first().kind == TokenKind::Comma {
             cursor.bump()?; // Consume the ,
@@ -167,7 +167,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     Ok(Statement::UnionDeclaration(UnionDeclaration {
         access_modifier,
         type_name,
-        members: fields,
+        members,
     }))
 }
 

@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use crate::{parser::{self, Expression, VariableDeclaration, If, Assignment}, type_checker::ast::Literal};
 
-use super::{ast::{TypedExpression, Typed, ConditionBlock, Member, FieldInitializer, TypedStatement, UnaryOperator, BinaryOperator}, TypeEnvironment, Type, statements, DiscoveredType};
+use super::{ast::{TypedExpression, Typed, ConditionBlock, Member, FieldInitializer, TypedStatement, UnaryOperator, BinaryOperator, UnionMemberFieldInitializers}, TypeEnvironment, Type, statements, DiscoveredType};
 
 pub fn check_type<'a>(
     expression: &Expression,
@@ -158,8 +160,7 @@ pub fn check_type<'a>(
                     type_name,
                     field_initializers
                 } => {
-                    let field_initializers: Result<Option<Vec<FieldInitializer>>, String> = field_initializers.as_ref()
-                        .map(|field_initializers| {
+                    let field_initializers: Result<Vec<FieldInitializer>, String> = {
                         let mut field_initializers_: Vec<FieldInitializer> = vec![];
                         for field_initializer in field_initializers {
                             let field_initializer = FieldInitializer {
@@ -171,7 +172,7 @@ pub fn check_type<'a>(
                             field_initializers_.push(field_initializer);
                         }
                         Ok(field_initializers_)
-                    }).transpose();
+                    };
 
                     Literal::Struct {
                         type_name: type_name.clone(),
@@ -185,17 +186,33 @@ pub fn check_type<'a>(
                     member,
                     field_initializers
                 } => {
-                    let field_initializers: Result<Option<Vec<FieldInitializer>>, String> = field_initializers.as_ref().map(|field_initializers| {
-                        let mut field_initializers_: Vec<FieldInitializer> = vec![];
-                        for field_initializer in field_initializers {
-                            let field_initializer = FieldInitializer {
-                                identifier: field_initializer.identifier.clone(),
-                                initializer: check_type(&field_initializer.initializer, discovered_types, type_environment)?
-                            };
-                            field_initializers_.push(field_initializer);
+                    let field_initializers: Result<UnionMemberFieldInitializers, String> = {
+                        let mut field_initializers_: UnionMemberFieldInitializers = UnionMemberFieldInitializers::None;
+                        match field_initializers {
+                            parser::UnionMemberFieldInitializers::None => (),
+                            parser::UnionMemberFieldInitializers::Named(field_initializers) => {
+                                let mut field_initializers__: HashMap<String, TypedExpression> = HashMap::new();
+                                for (identifier, initializer) in field_initializers {
+                                    field_initializers__.insert(identifier.clone(), check_type(
+                                        &initializer,
+                                        discovered_types, type_environment)?
+                                    );
+                                }
+                                field_initializers_ = UnionMemberFieldInitializers::Named(field_initializers__);
+                            },
+                            parser::UnionMemberFieldInitializers::Unnamed(field_initializers) => {
+                                let mut field_initializers__: Vec<TypedExpression> = vec![];
+                                for initializer in field_initializers {
+                                    field_initializers__.push(check_type(
+                                        &initializer,
+                                        discovered_types, type_environment)?
+                                    );
+                                }
+                                field_initializers_ = UnionMemberFieldInitializers::Unnamed(field_initializers__);
+                            },
                         }
                         Ok(field_initializers_)
-                    }).transpose();
+                    };
 
                     Literal::Union {
                         type_name: type_name.clone(),

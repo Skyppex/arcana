@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[derive(Debug, Clone)]
 pub enum Statement {
     Program { statements: Vec<Statement> },
@@ -70,12 +72,12 @@ pub enum Literal {
     Bool(bool),
     Struct {
         type_name: String,
-        field_initializers: Option<Vec<FieldInitializer>>,
+        field_initializers: Vec<FieldInitializer>,
     },
     Union {
         type_name: String,
         member: String,
-        field_initializers: Option<Vec<FieldInitializer>>,
+        field_initializers: UnionMemberFieldInitializers,
     },
 }
 
@@ -110,6 +112,13 @@ pub struct UnionMemberField {
     pub field_position: usize,
     pub identifier: Option<String>,
     pub type_name: String,
+}
+
+#[derive(Debug, Clone)]
+pub enum UnionMemberFieldInitializers {
+    None,
+    Named(HashMap<String, Expression>),
+    Unnamed(Vec<Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

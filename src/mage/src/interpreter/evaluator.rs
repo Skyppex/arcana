@@ -1,6 +1,6 @@
 use shared::type_checker::{ast::*, Type};
 
-use super::{value::{Value, Number}, evironment::Environment, evaluate_binop};
+use super::{value::{Value, Number, UnionMember, UnionFields}, evironment::Environment, evaluate_binop};
 
 pub fn evaluate(typed_statement: TypedStatement, environment: &mut Environment) -> Result<Value, String> {
     match typed_statement {
@@ -171,21 +171,7 @@ fn evaluate_member(member: Member, environment: &mut Environment) -> Result<Valu
             symbol,
             type_: _
         } => {
-            let value = evaluate_expression(*object, environment)?;
-
-            match value {
-                Value::Struct { struct_name, fields } => {
-                    Ok(fields.get(member.get_symbol())
-                        .ok_or(format!("Field '{}' not found in struct '{}'", symbol, struct_name))?
-                        .clone())
-                }
-                Value::Union { union_member, fields } => {
-                    Ok(fields.get(member.get_symbol())
-                        .ok_or(format!("Field '{}' not found in union member '{}'", symbol, union_member))?
-                        .clone())
-                }
-                _ => Err(format!("Cannot access field '{}' of non-struct/union value '{}'", symbol, value))
-            }
+            todo!()
         }
     }
 }
@@ -210,14 +196,49 @@ fn evaluate_literal(literal: Literal) -> Result<Value, String> {
         Literal::Struct {
             type_name,
             field_initializers,
-            type_
-        } => todo!(),
+            type_: _
+        } => {
+            let mut fields = std::collections::HashMap::new();
+
+            for field_initializer in field_initializers {
+                fields.insert(field_initializer.identifier.unwrap(), evaluate_expression(field_initializer.initializer, &mut Environment::new())?);
+            }
+
+            Ok(Value::Struct { struct_name: type_name, fields })
+        }        
         Literal::Union {
             type_name,
             member,
             field_initializers,
-            type_
-        } => todo!(),
+            type_: _
+        } => {
+            let fields: UnionFields = match field_initializers {
+                UnionMemberFieldInitializers::None => UnionFields::None,
+                UnionMemberFieldInitializers::Named(field_initializers) => {
+                    let mut fields = std::collections::HashMap::new();
+
+                    for (identifier, initializer) in field_initializers {
+                        fields.insert(identifier, evaluate_expression(initializer, &mut Environment::new())?);
+                    }
+
+                    UnionFields::Named(fields)
+                }
+                UnionMemberFieldInitializers::Unnamed(field_initializers) => {
+                    let mut fields = Vec::new();
+
+                    for initializer in field_initializers {
+                        fields.push(evaluate_expression(initializer, &mut Environment::new())?);
+                    }
+
+                    UnionFields::Unnamed(fields)
+                }
+            };
+            
+            Ok(Value::Union { union_member: UnionMember {
+                union_name: type_name,
+                member_name: member,
+            }, fields })
+        }
     }
 }
 

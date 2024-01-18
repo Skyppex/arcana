@@ -1,3 +1,23 @@
 struct Value {
-    value: i32
+    value: i32,
+}
+
+union Option {
+    Some(string),
+    None,
+}
+
+union Result {
+    Ok(string),
+    Err(string),
+}
+
+union Two {
+    One(i32),
+    Two(i32, i32),
+}
+
+union Named {
+    One(a: i32),
+    Two(a: i32, b: i32),
 }

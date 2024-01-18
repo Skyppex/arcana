@@ -47,7 +47,7 @@ impl<'a> Environment<'a> {
                 let mut variable = self.resolve(&symbol)
                     .ok_or(format!("Variable '{}' not found", symbol))?.clone();
 
-                if matches!(variable.value, Value::Uninitialized) && !variable.mutable {
+                if !matches!(variable.value, Value::Uninitialized) && !variable.mutable {
                     return Err(format!("Cannot assign to immutable variable '{}'", symbol));
                 }
 

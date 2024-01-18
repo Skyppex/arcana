@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::lexer::token::{TokenKind, Keyword, self};
 
 use super::{cursor::Cursor,
@@ -15,7 +17,7 @@ use super::{cursor::Cursor,
     Call,
     Unary,
     Binary,
-    Ternary
+    Ternary, UnionMemberFieldInitializers
 };
 
 
@@ -219,7 +221,7 @@ fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.bump()?; // Consume the }
     Ok(Expression::Literal(Literal::Struct {
         type_name,
-        field_initializers: if field_initializers.len() > 0 { Some(field_initializers) } else { None } 
+        field_initializers 
     }))
 }
 
@@ -262,39 +264,68 @@ fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.bump()?; // Consume the second :
     cursor.bump()?; // Consume the member identifier
 
-    let TokenKind::OpenParen = cursor.first().kind else {
-        return Ok(Expression::Literal(Literal::Union {
-            type_name,
-            member,
-            field_initializers: None }));
+    let field_initializers = {
+        if cursor.first().kind == TokenKind::OpenParen {
+            cursor.bump()?; // Consume the (
+            if matches!(cursor.second().kind, TokenKind::Colon) {
+                parse_named_union_member_field_initializers(cursor)?
+            } else {
+                parse_unnamed_union_member_field_initializers(cursor)?
+            }
+        } else {
+            UnionMemberFieldInitializers::None
+        }
     };
 
-    cursor.bump()?; // Consume the (
-    
-    let mut field_initializers = vec![];
-    let mut has_comma = true;
-
-    while cursor.first().kind != TokenKind::CloseParen {
-        if !has_comma {
-            return Err(format!("Expected , but found {:?}", cursor.first().kind));
-        }
-
-        has_comma = true;
-        field_initializers.push(parse_field_initializer(cursor)?);
-
-        if cursor.first().kind == TokenKind::Comma {
-            cursor.bump()?; // Consume the ,
-        } else {
-            has_comma = false;
-        }
-    }
-
-    cursor.bump()?; // Consume the )
+    cursor.bump()?; // Consume the ) or }
     Ok(Expression::Literal(Literal::Union {
         type_name,
         member,
-        field_initializers: if field_initializers.len() > 0 { Some(field_initializers) } else { None }
+        field_initializers
     }))
+}
+
+fn parse_unnamed_union_member_field_initializers(cursor: &mut Cursor) -> Result<UnionMemberFieldInitializers, String> {
+    let mut field_initializers = vec![];
+    
+    while cursor.first().kind != TokenKind::CloseParen {
+        let initializer = parse_expression(cursor)?;
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        }
+
+        field_initializers.push(initializer);
+    }
+
+    Ok(UnionMemberFieldInitializers::Unnamed(field_initializers))
+}
+
+fn parse_named_union_member_field_initializers(cursor: &mut Cursor) -> Result<UnionMemberFieldInitializers, String> {
+    let mut field_initializers = HashMap::new();
+    
+    while cursor.first().kind != TokenKind::CloseParen {
+        let TokenKind::Identifier(identifier) = cursor.first().kind else {
+            return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+        };
+
+        let TokenKind::Colon = cursor.second().kind else {
+            return Err(format!("Expected : but found {:?}", cursor.first().kind));
+        };
+
+        cursor.bump()?; // Consume the identifier
+        cursor.bump()?; // Consume the :
+
+        let initializer = parse_expression(cursor)?;
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        }
+
+        field_initializers.insert(identifier, initializer);
+    }
+
+    Ok(UnionMemberFieldInitializers::Named(field_initializers))
 }
 
 fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {

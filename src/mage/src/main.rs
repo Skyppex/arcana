@@ -9,17 +9,13 @@ fn main() {
     let result = run_program();
 
     if let Err(error) = result {
-        println!("Error: {}", error);
+        println!("Fatal: {}", error);
     }
 }
 
 fn run_program() -> Result<(), String> {
     let mut type_environemnt = TypeEnvironment::new();
     let mut environment = Environment::new();
-
-    const PRINT_TOKENS: bool = true;
-    const PRINT_PARSER_AST: bool = false;
-    const PRINT_TYPE_CHECKER_AST: bool = true;
 
     loop {
         let _ = stdout().flush();
@@ -55,28 +51,45 @@ fn run_program() -> Result<(), String> {
             continue;
         }
 
-        let tokens = shared::lexer::tokenize(&input)?;
-        if PRINT_TOKENS {
-            println!("{:?}\n", tokens);
+        if let Err(message) = read_input(input, &mut type_environemnt, &mut environment) {
+            println!("Error: {}", message);
         }
-
-        let program = create_ast(tokens)?;
-        if PRINT_PARSER_AST {
-            let mut indent = Indent::new();
-            println!("{}\n", program.indent_display(&mut indent));
-        }
-
-        let typed_program = create_typed_ast(program, &mut type_environemnt)?;
-        if PRINT_TYPE_CHECKER_AST {
-            let mut indent = Indent::new();
-            println!("{}\n", typed_program.indent_display(&mut indent));
-        }
-        
-        let result = interpreter::evaluate(
-            typed_program,
-            &mut environment)?;
-
-        println!("{}", input);
-        println!("{}\n", result);
     }
+}
+
+fn read_input(
+    input: String,
+    type_environemnt: &mut TypeEnvironment<'_>,
+    environment: &mut Environment<'_>) -> Result<(), String> {
+    const PRINT_TOKENS: bool = true;
+    const PRINT_PARSER_AST: bool = true;
+    const PRINT_TYPE_CHECKER_AST: bool = true;
+
+    let tokens = shared::lexer::tokenize(&input)?;
+    if PRINT_TOKENS {
+        println!("{:?}\n", tokens);
+    }
+
+    let program = create_ast(tokens)?;
+    if PRINT_PARSER_AST {
+        let mut indent = Indent::new();
+        println!("{}\n", program.indent_display(&mut indent));
+    }
+
+    let typed_program = create_typed_ast(program, type_environemnt)?;
+    if PRINT_TYPE_CHECKER_AST {
+        let mut indent = Indent::new();
+        println!("{}\n", typed_program.indent_display(&mut indent));
+    }
+
+    let result = interpreter::evaluate(
+        typed_program,
+        environment)?;
+
+    if PRINT_TOKENS | PRINT_PARSER_AST || PRINT_TYPE_CHECKER_AST {
+        println!("{}", input);
+    }
+
+    println!("{}\n", result);
+    Ok(())
 }
