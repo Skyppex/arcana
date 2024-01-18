@@ -17,7 +17,7 @@ fn run_program() -> Result<(), String> {
     let mut type_environemnt = TypeEnvironment::new();
     let mut environment = Environment::new();
 
-    const PRINT_TOKENS: bool = false;
+    const PRINT_TOKENS: bool = true;
     const PRINT_PARSER_AST: bool = false;
     const PRINT_TYPE_CHECKER_AST: bool = true;
 

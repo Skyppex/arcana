@@ -4,12 +4,12 @@ use shared::type_checker::ast::Member;
 
 use super::value::{Variable, Value};
 
-pub struct Environment {
-    pub parent: Option<Box<Environment>>,
+pub struct Environment<'a> {
+    pub parent: Option<&'a Environment<'a>>,
     pub variables: HashMap<String, Variable>,
 }
 
-impl Environment {
+impl<'a> Environment<'a> {
     pub fn new() -> Self {
         Self {
             parent: None,
@@ -17,9 +17,9 @@ impl Environment {
         }
     }
 
-    pub fn new_with_parent(parent: Box<Environment>) -> Self {
+    pub fn new_child(&'a self) -> Self {
         Self {
-            parent: Some(parent),
+            parent: Some(self),
             variables: HashMap::new(),
         }
     }
@@ -63,6 +63,10 @@ impl Environment {
                 self.set_variable(*member.clone(), value.clone())
             }
         }
+    }
+
+    pub fn remove_variable(&mut self, identifier: &str) -> Option<Variable> {
+        self.variables.remove(identifier)
     }
 
     pub fn resolve(&self, name: &str) -> Option<&Variable> {

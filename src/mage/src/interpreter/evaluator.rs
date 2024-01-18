@@ -8,6 +8,11 @@ pub fn evaluate(typed_statement: TypedStatement, environment: &mut Environment) 
             statements
         } => evaluate_program(statements, environment),
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
+        TypedStatement::Print(e) => {
+            let value = evaluate_expression(e, environment)?;
+            println!("{}", value);
+            Ok(Value::Void)
+        }
         _ => Ok(Value::Void)
     }
 }
@@ -33,7 +38,7 @@ fn evaluate_expression(typed_expression: TypedExpression, environment: &mut Envi
             type_
         } => evaluate_assignment(member, initializer, type_, environment),
         TypedExpression::Member(m) => evaluate_member(m, environment),
-        TypedExpression::Literal(l) => evaluate_literal(l, environment),
+        TypedExpression::Literal(l) => evaluate_literal(l),
         TypedExpression::Call {
             caller,
             arguments,
@@ -92,12 +97,51 @@ fn evaluate_variable_declaration(
 
 fn evaluate_if(
     r#if: ConditionBlock,
-    else_ifs: Option<Vec<ConditionBlock>>,
+    else_ifs: Vec<ConditionBlock>,
     r#else: Option<Box<TypedExpression>>,
-    type_: Type,
+    _type_: Type,
     environment: &mut Environment
 ) -> Result<Value, String> {
-    todo!()
+    let if_environment = &mut environment.new_child();
+    let condition = evaluate_expression(*r#if.condition, if_environment)?;
+
+    match condition {
+        Value::Bool(v) => {
+            if v {
+                let value = evaluate_expression(*r#if.block, if_environment);
+                if r#else.is_none() {
+                    return Ok(Value::Void);
+                } else {
+                    return value;
+                }
+            } else {
+                for else_if in else_ifs {
+                    let else_if_environment = &mut environment.new_child();
+                    let condition = evaluate_expression(*else_if.condition, else_if_environment)?;
+
+                    match condition {
+                        Value::Bool(v) => {
+                            if v {
+                                let value =  evaluate_expression(*else_if.block, else_if_environment);
+                                if r#else.is_none() {
+                                    return Ok(Value::Void);
+                                } else {
+                                    return value;
+                                }
+                            }
+                        }
+                        _ => return Err(format!("Else if condition must be boolean '{}'", condition))
+                    }
+                }
+
+                match r#else {
+                    Some(r#else) => evaluate_expression(*r#else, if_environment),
+                    None => Ok(Value::Void)
+                }
+            }
+        }
+        _ => Err(format!("If condition must be boolean '{}'", condition))
+    }
 }
 
 fn evaluate_assignment(
@@ -146,7 +190,7 @@ fn evaluate_member(member: Member, environment: &mut Environment) -> Result<Valu
     }
 }
 
-fn evaluate_literal(literal: Literal, environment: &mut Environment) -> Result<Value, String> {
+fn evaluate_literal(literal: Literal) -> Result<Value, String> {
     match literal {
         Literal::I8(v) => Ok(Value::Number(Number::I8(v))),
         Literal::I16(v) => Ok(Value::Number(Number::I16(v))),
@@ -251,7 +295,7 @@ fn evaluate_binary(
     left: Box<TypedExpression>,
     operator: BinaryOperator,
     right: Box<TypedExpression>,
-    type_: Type,
+    _type_: Type,
     environment: &mut Environment
 ) -> Result<Value, String> {
     let left = evaluate_expression(*left, environment)?;
@@ -267,14 +311,15 @@ fn evaluate_ternary(
     _type_: Type,
     environment: &mut Environment
 ) -> Result<Value, String> {
-    let condition = evaluate_expression(*condition, environment)?;
+    let ternary_environment = &mut environment.new_child();
+    let condition = evaluate_expression(*condition, ternary_environment)?;
 
     match condition {
         Value::Bool(v) => {
             if v {
-                evaluate_expression(*true_expression, environment)
+                evaluate_expression(*true_expression, ternary_environment)
             } else {
-                evaluate_expression(*false_expression, environment)
+                evaluate_expression(*false_expression, ternary_environment)
             }
         }
         _ => Err(format!("First argument in ternary must be boolean '{}'", condition))
@@ -283,16 +328,26 @@ fn evaluate_ternary(
 
 fn evaluate_block(
     statements: Vec<TypedStatement>,
-    type_: Type,
+    _type_: Type,
     environment: &mut Environment
 ) -> Result<Value, String> {
-    todo!()
+    let block_environment = &mut environment.new_child();
+    let mut value = Value::Void;
+
+    for statement in statements {
+        value = evaluate(statement, block_environment)?;
+    }
+
+    Ok(value)
 }
 
 fn evaluate_drop(
     identifier: String,
-    type_: Type,
+    _type_: Type,
     environment: &mut Environment
 ) -> Result<Value, String> {
-    todo!()
+    let variable: super::value::Variable = environment.remove_variable(&identifier)
+        .ok_or(format!("Variable '{}' not found", identifier))?;
+
+    Ok(variable.value)
 }

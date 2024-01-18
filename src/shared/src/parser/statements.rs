@@ -123,7 +123,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
-            return parse_expression_map(cursor);
+            return parse_print(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -131,7 +131,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
-        return parse_expression_map(cursor);
+        return parse_print(cursor);
     }
 
     cursor.bump()?; // Consume the union keyword
@@ -169,6 +169,26 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         type_name,
         members: fields,
     }))
+}
+
+fn parse_print(cursor: &mut Cursor) -> Result<Statement, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Print) {
+        return parse_expression_map(cursor);
+    }
+
+    cursor.bump()?; // Consume the drop
+
+    let TokenKind::OpenParen = cursor.bump()?.kind else {
+        return Err(format!("Expected ( but found {:?}", cursor.first().kind));
+    };
+
+    let expression = expressions::parse_expression(cursor)?;
+
+    let TokenKind::CloseParen = cursor.bump()?.kind else {
+        return Err(format!("Expected ) but found {:?}", cursor.first().kind));
+    };
+
+    Ok(Statement::Print(expression))
 }
 
 fn parse_expression_map(cursor: &mut Cursor) -> Result<Statement, String> {

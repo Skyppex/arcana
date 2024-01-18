@@ -5,6 +5,9 @@ pub enum Statement {
     UnionDeclaration(UnionDeclaration),
     FunctionDeclaration(FunctionDeclaration),
     Expression(Expression),
+
+    #[cfg(feature = "interpreter")]
+    Print(Expression),
 }
 
 #[derive(Debug, Clone)]
@@ -21,6 +24,7 @@ pub enum Expression {
     Binary(Binary),
     Ternary(Ternary),
     Block(Vec<Statement>),
+    #[cfg(feature = "interpreter")]
     Drop(String),
 }
 

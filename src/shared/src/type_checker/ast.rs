@@ -30,6 +30,9 @@ pub enum TypedStatement {
         type_: Type,
     },
     Expression(TypedExpression),
+
+    #[cfg(feature = "interpreter")]
+    Print(TypedExpression),
 }
 
 impl TypedStatement {
@@ -50,6 +53,7 @@ impl Typed for TypedStatement {
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Expression(e) => e.get_type(),
+            TypedStatement::Print(_) => Type::Void,
         }
     }
 }
@@ -66,7 +70,7 @@ pub enum TypedExpression {
     },
     If {
         r#if: ConditionBlock,
-        else_ifs: Option<Vec<ConditionBlock>>,
+        else_ifs: Vec<ConditionBlock>,
         r#else: Option<Box<TypedExpression>>,
         type_: Type,
     },

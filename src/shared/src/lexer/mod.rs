@@ -316,6 +316,9 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "internal" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
         "true" => Some(TokenKind::Literal(Literal::Bool(true))),
         "false" => Some(TokenKind::Literal(Literal::Bool(false))),
+
+        #[cfg(feature = "interpreter")]
+        "drop" => Some(TokenKind::Keyword(Keyword::Drop)),
         _ => None,
     }
 }

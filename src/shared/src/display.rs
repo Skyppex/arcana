@@ -142,6 +142,7 @@ impl IndentDisplay for Statement {
                 result
             },
             Statement::Expression(e) => e.indent_display(indent),
+            Statement::Print(e) => e.indent_display(indent),
         }
     }
 }
@@ -592,6 +593,7 @@ impl IndentDisplay for TypedStatement {
                 result
             },
             TypedStatement::Expression(e) => e.indent_display(indent),
+            TypedStatement::Print(e) => e.indent_display(indent),
         }
     }
 }
@@ -630,18 +632,14 @@ impl IndentDisplay for TypedExpression {
                 result.push_str(format!("<if>: {}\n", type_.to_string()).as_str());
                 indent.increase();
                 result.push_str(format!("{}condition:{}", indent.dash(), r#if.condition.indent_display(indent)).as_str());
-                if let Some(else_ifs) = else_ifs {
-                    for else_if in else_ifs {
-                        result.push_str(format!("\n{}{}\n", indent.dash(), else_if.indent_display(indent)).as_str());
-                        result.push_str(format!("\n{}condition: {}\n", indent.dash(), else_if.condition.indent_display(indent)).as_str());
-                    }
-                } else {
-                    result.push_str(format!("\n{}else_ifs: None\n", indent.dash()).as_str());
+                for else_if in else_ifs {
+                    result.push_str(format!("\n{}{}\n", indent.dash(), else_if.indent_display(indent)).as_str());
+                    result.push_str(format!("\n{}condition: {}", indent.dash(), else_if.condition.indent_display(indent)).as_str());
                 }
                 if let Some(r#else) = r#else {
-                    result.push_str(format!("{}else block: {}", indent.dash_end(), r#else.indent_display(indent)).as_str());
+                    result.push_str(format!("\n{}else block: {}", indent.dash_end(), r#else.indent_display(indent)).as_str());
                 } else {
-                    result.push_str(format!("{}else block: None", indent.dash_end()).as_str());
+                    result.push_str(format!("\n{}else block: None", indent.dash_end()).as_str());
                 }
                 indent.decrease();
                 result

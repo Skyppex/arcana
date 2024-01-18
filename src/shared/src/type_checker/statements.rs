@@ -56,7 +56,8 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             identifier.clone(),
             parameters.iter().map(|parameter| (parameter.identifier.clone(), parameter.type_name.clone())).collect(),
             return_type.clone().unwrap_or(Type::Void.to_string()))]),
-        Statement::Expression(_) => Ok(vec![])
+        Statement::Expression(_) => Ok(vec![]),
+        Statement::Print(_) => Ok(vec![]),
     }
 }
 
@@ -229,6 +230,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
             })
         },
         Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(e, discovered_types, type_environment)?)),
+        Statement::Print(e) => Ok(TypedStatement::Print(expressions::check_type(e, discovered_types, type_environment)?)),
     }
 }
 
