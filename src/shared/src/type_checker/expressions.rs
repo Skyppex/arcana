@@ -25,6 +25,8 @@ pub fn check_type<'a>(
                 None
             };
 
+            type_environment.add_variable(identifier.clone(), type_.clone());
+
             Ok(TypedExpression::VariableDeclaration {
                 mutable: *mutable,
                 identifier: identifier.clone(),
@@ -103,6 +105,10 @@ pub fn check_type<'a>(
             let member = check_type(&Expression::Member(*member.clone()), discovered_types, type_environment)?;
             let initializer = check_type(initializer, discovered_types, type_environment)?;
 
+            if member.get_type() != initializer.get_type() {
+                return Err(format!("Member type {:?} does not match initializer type {:?}", member.get_type(), initializer.get_type()));
+            }
+
             let TypedExpression::Member(member) = member else {
                 return Err("Expected member expression".to_string());
             };
@@ -154,12 +160,15 @@ pub fn check_type<'a>(
                     type_name,
                     field_initializers
                 } => {
-                    let field_initializers: Result<Option<Vec<FieldInitializer>>, String> = field_initializers.as_ref().map(|field_initializers| {
+                    let field_initializers: Result<Option<Vec<FieldInitializer>>, String> = field_initializers.as_ref()
+                        .map(|field_initializers| {
                         let mut field_initializers_: Vec<FieldInitializer> = vec![];
                         for field_initializer in field_initializers {
                             let field_initializer = FieldInitializer {
                                 identifier: field_initializer.identifier.clone(),
-                                initializer: check_type(&field_initializer.initializer, discovered_types, type_environment)?
+                                initializer: check_type(
+                                    &field_initializer.initializer,
+                                    discovered_types, type_environment)?
                             };
                             field_initializers_.push(field_initializer);
                         }

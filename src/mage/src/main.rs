@@ -17,6 +17,10 @@ fn run_program() -> Result<(), String> {
     let mut type_environemnt = TypeEnvironment::new();
     let mut environment = Environment::new();
 
+    const PRINT_TOKENS: bool = false;
+    const PRINT_PARSER_AST: bool = false;
+    const PRINT_TYPE_CHECKER_AST: bool = true;
+
     loop {
         let _ = stdout().flush();
         let mut input = String::new();
@@ -52,27 +56,22 @@ fn run_program() -> Result<(), String> {
         }
 
         let tokens = shared::lexer::tokenize(&input)?;
-        // println!("\n{:?}\n", tokens);
+        if PRINT_TOKENS {
+            println!("{:?}\n", tokens);
+        }
 
         let program = create_ast(tokens)?;
-        let mut indent = Indent::new();
-        println!("{}", program.indent_display(&mut indent));
+        if PRINT_PARSER_AST {
+            let mut indent = Indent::new();
+            println!("{}\n", program.indent_display(&mut indent));
+        }
 
         let typed_program = create_typed_ast(program, &mut type_environemnt)?;
-        let mut indent = Indent::new();
-        println!("{}\n", typed_program.indent_display(&mut indent));
+        if PRINT_TYPE_CHECKER_AST {
+            let mut indent = Indent::new();
+            println!("{}\n", typed_program.indent_display(&mut indent));
+        }
         
-        // for type_ in type_environemnt.get_types()
-        //     .iter()
-        //     .map(|(name, ..)| name)
-        //     .collect::<BinaryHeap<&String>>() {
-        //     println!("{}", type_);
-        // }
-
-        // for variable in type_environemnt.get_variables() {
-        //     println!("{}", variable.0);
-        // }
-
         let result = interpreter::evaluate(
             typed_program,
             &mut environment)?;
