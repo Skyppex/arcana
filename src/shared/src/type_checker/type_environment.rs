@@ -87,12 +87,10 @@ impl<'a> TypeEnvironment<'a> {
     }
 
     pub fn lookup_type<T: FullName>(&self, full_name: &T) -> bool {
-        if let Some(type_) = self.types.get(&full_name.full_name()) {
-            true
-        } else if let Some(parent) = &self.parent {
-            parent.lookup_type(full_name)
-        } else {
-            false
-        }
+        self.types.get(&full_name.full_name())
+            .is_some() ||
+            self.parent
+                .map_or(false, |parent|
+                    parent.lookup_type(full_name))
     }
 }
