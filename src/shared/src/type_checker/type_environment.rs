@@ -85,4 +85,14 @@ impl<'a> TypeEnvironment<'a> {
     pub fn get_variables(&self) -> &HashMap<String, Type> {
         &self.variables
     }
+
+    pub fn lookup_type<T: FullName>(&self, full_name: &T) -> bool {
+        if let Some(type_) = self.types.get(&full_name.full_name()) {
+            true
+        } else if let Some(parent) = &self.parent {
+            parent.lookup_type(full_name)
+        } else {
+            false
+        }
+    }
 }

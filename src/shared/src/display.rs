@@ -313,7 +313,7 @@ impl IndentDisplay for Member {
                 symbol
             } => {
                 let mut result = String::new();
-                result.push_str("<member access>");
+                result.push_str("<member access>\n");
                 indent.increase();
                 result.push_str(format!("{}object: {}\n", indent.dash(), object.indent_display(indent)).as_str());
                 result.push_str(format!("{}member: {}\n", indent.dash(), member.indent_display(indent)).as_str());
@@ -451,11 +451,13 @@ impl IndentDisplay for FieldInitializer {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
         result.push_str("<field initializer>\n");
+        indent.increase();
         if let Some(identifier) = &self.identifier {
             result.push_str(format!("{}field initializer: {}\n", indent.dash(), identifier).as_str());
         } else {
             result.push_str(format!("{}field initializer: None\n", indent.dash()).as_str());
         }
+        indent.decrease();
         result.push_str(format!("{}initializer: {}", indent.dash_end(), self.initializer.indent_display(indent)).as_str());
         result
     }
@@ -573,7 +575,7 @@ impl IndentDisplay for TypedStatement {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<struct declaration> {}: {}", type_name, type_.to_string()).as_str());
+                result.push_str(format!("<struct declaration> {}: {}", type_name, type_).as_str());
                 indent.increase();
                 for field in fields {
                     result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
@@ -587,7 +589,7 @@ impl IndentDisplay for TypedStatement {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<union declaration> {}: {}", type_name, type_.to_string()).as_str());
+                result.push_str(format!("<union declaration> {}: {}", type_name, type_).as_str());
                 indent.increase();
                 for member in members {
                     result.push_str(format!("\n{}{}", indent.dash_end(), member.indent_display(indent)).as_str());
@@ -603,7 +605,7 @@ impl IndentDisplay for TypedStatement {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<function declaration> {}: {}\n", identifier, type_.to_string()).as_str());
+                result.push_str(format!("<function declaration> {}: {}\n", identifier, type_).as_str());
                 indent.increase();
                 for parameter in parameters {
                     result.push_str(format!("{}{}\n", indent.dash(), parameter.indent_display(indent)).as_str());
@@ -632,7 +634,7 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<variable declaration> {}: {}\n", identifier, type_.to_string()).as_str());
+                result.push_str(format!("<variable declaration> {}: {}\n", identifier, type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}mutable: {}\n", indent.dash(), mutable).as_str());
                 if let Some(initializer) = initializer {
@@ -650,7 +652,7 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<if>: {}\n", type_.to_string()).as_str());
+                result.push_str(format!("<if>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}condition:{}", indent.dash(), r#if.condition.indent_display(indent)).as_str());
                 for else_if in else_ifs {
@@ -671,7 +673,7 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<assignment>: {}\n", type_.to_string()).as_str());
+                result.push_str(format!("<assignment>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}member: {}\n", indent.dash(), member.indent_display(indent)).as_str());
                 result.push_str(format!("{}initializer: {}", indent.dash_end(), initializer.indent_display(indent)).as_str());
@@ -686,7 +688,7 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<call>: {}\n", type_.to_string()).as_str());
+                result.push_str(format!("<call>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}caller: {}", indent.dash(), caller.indent_display(indent)).as_str());
                 let mut i = 0;
@@ -707,7 +709,7 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<unary>: {}\n", type_.to_string()).as_str());
+                result.push_str(format!("<unary>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}operator: {}\n", indent.dash(), operator.indent_display(indent)).as_str());
                 result.push_str(format!("{}expression: {}", indent.dash_end(), expression.indent_display(indent)).as_str());
@@ -721,7 +723,7 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<binary>: {}\n", type_.to_string()).as_str());
+                result.push_str(format!("<binary>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}left: {}\n", indent.dash(), left.indent_display(indent)).as_str());
                 result.push_str(format!("{}operator: {}\n", indent.dash(), operator.indent_display(indent)).as_str());
@@ -736,7 +738,7 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<ternary>: {}\n", type_.to_string()).as_str());
+                result.push_str(format!("<ternary>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
                 result.push_str(format!("{}true_expression: {}\n", indent.dash(), true_expression.indent_display(indent)).as_str());
@@ -749,7 +751,7 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<block>: {}", type_.to_string()).as_str());
+                result.push_str(format!("<block>: {}", type_).as_str());
                 indent.increase();
                 let mut i = 0;
                 for statement in statements {
@@ -768,7 +770,7 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<drop> {}: {}", identifier, type_.to_string()).as_str());
+                result.push_str(format!("<drop> {}: {}", identifier, type_).as_str());
                 result
             },
         }
@@ -783,7 +785,7 @@ impl IndentDisplay for type_checker::ast::Member {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<identifier> {}: {}", symbol, type_.to_string()).as_str());
+                result.push_str(format!("<identifier> {}: {}", symbol, type_).as_str());
                 result
             },
             type_checker::ast::Member::MemberAccess {
@@ -793,7 +795,7 @@ impl IndentDisplay for type_checker::ast::Member {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<member access>: {}", type_.to_string()).as_str());
+                result.push_str(format!("<member access>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}object: {}\n", indent.dash(), object.indent_display(indent)).as_str());
                 result.push_str(format!("{}member: {}\n", indent.dash(), member.indent_display(indent)).as_str());
@@ -829,7 +831,7 @@ impl IndentDisplay for type_checker::ast::Literal {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<struct literal>: {}\n", type_.to_string()).as_str());
+                result.push_str(format!("<struct literal>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}type_name: {}", indent.dash(), type_name).as_str());
                 let mut i = 0;
@@ -853,7 +855,7 @@ impl IndentDisplay for type_checker::ast::Literal {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<union literal>: {}\n", type_.to_string()).as_str());
+                result.push_str(format!("<union literal>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name).as_str());
                 result.push_str(format!("{}member: {}\n", indent.dash(), member).as_str());
@@ -870,7 +872,7 @@ impl IndentDisplay for type_checker::ast::Literal {
 impl IndentDisplay for type_checker::ast::StructField {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str(format!("<struct field> {}: {}\n", self.identifier, self.type_.to_string()).as_str());
+        result.push_str(format!("<struct field> {}: {}\n", self.identifier, self.type_).as_str());
         indent.increase();
         result.push_str(format!("{}mutable: {}", indent.dash(), self.mutable).as_str());
         indent.decrease();
@@ -883,7 +885,7 @@ impl IndentDisplay for type_checker::ast::Parameter {
         let mut result = String::new();
         result.push_str("<parameter>\n");
         result.push_str(format!("{}parameter: {}\n", indent.dash(), self.identifier).as_str());
-        result.push_str(format!("{}type_name: {}", indent.dash_end(), self.type_.to_string()).as_str());
+        result.push_str(format!("{}type_name: {}", indent.dash_end(), self.type_).as_str());
         result
     }
 }
@@ -891,7 +893,7 @@ impl IndentDisplay for type_checker::ast::Parameter {
 impl IndentDisplay for type_checker::ast::UnionMember {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str(format!("<union member> {}: {}", self.discriminant_name, self.type_.to_string()).as_str());
+        result.push_str(format!("<union member> {}: {}", self.discriminant_name, self.type_).as_str());
         indent.increase();
         for (i, field) in self.fields.iter().enumerate() {
             if i == 0 {
@@ -912,14 +914,14 @@ impl IndentDisplay for type_checker::ast::UnionMember {
 impl IndentDisplay for type_checker::ast::UnionMemberField {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str(format!("<union member field>: {}\n", self.type_.to_string()).as_str());
+        result.push_str(format!("<union member field>: {}\n", self.type_).as_str());
         indent.increase();
         if let Some(identifier) = &self.identifier {
             result.push_str(format!("{}identifier: {}\n", indent.dash(), identifier).as_str());
         } else {
             result.push_str(format!("{}identifier: None\n", indent.dash()).as_str());
         }
-        result.push_str(format!("{}type_name: {}", indent.dash_end(), self.type_.to_string()).as_str());
+        result.push_str(format!("{}type_name: {}", indent.dash_end(), self.type_).as_str());
         indent.decrease();
         result
     }
@@ -977,11 +979,13 @@ impl IndentDisplay for type_checker::ast::FieldInitializer {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
         result.push_str("<field initializer>\n");
+        indent.increase();
         if let Some(identifier) = &self.identifier {
             result.push_str(format!("{}field initializer: {}\n", indent.dash(), identifier).as_str());
         } else {
             result.push_str(format!("{}field initializer: None\n", indent.dash()).as_str());
         }
+        indent.decrease();
         result.push_str(format!("{}initializer: {}", indent.dash_end(), self.initializer.indent_display(indent)).as_str());
         result
     }

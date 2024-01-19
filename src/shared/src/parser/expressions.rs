@@ -566,7 +566,7 @@ fn parse_args_list(cursor: &mut Cursor) -> Result<Vec<Expression>, String> {
 }
 
 fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
-    let expression = parse_primary(cursor)?;
+    let mut object = parse_primary(cursor)?;
 
     while let TokenKind::Dot = cursor.first().kind {
         cursor.bump()?; // Consume the .
@@ -575,16 +575,18 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
         };
 
-        cursor.bump()?; // Consume the identifier
+        let Expression::Member(member) = parse_primary(cursor)? else {
+            return Err(format!("Expected member but found {:?}", cursor.first().kind));
+        };
 
-        return Ok(Expression::Member(Member::MemberAccess {
-            object: Box::new(expression),
-            member: Box::new(Member::Identifier { symbol: identifier.clone() }),
+        object = Expression::Member(Member::MemberAccess {
+            object: Box::new(object),
+            member: Box::new(member),
             symbol: identifier,
-        }))
+        });
     }
 
-    Ok(expression)
+    Ok(object)
 }
 
 fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {

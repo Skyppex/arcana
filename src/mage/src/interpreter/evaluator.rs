@@ -168,11 +168,44 @@ fn evaluate_member(member: Member, environment: &mut Environment) -> Result<Valu
         Member::MemberAccess {
             object,
             member,
-            symbol,
+            symbol: _,
             type_: _
         } => {
-            todo!()
+            evaluate_member_access(object, environment, member)
         }
+    }
+}
+
+fn evaluate_member_access(object: Box<TypedExpression>, environment: &mut Environment<'_>, member: Box<Member>) -> Result<Value, String> {
+    let value = evaluate_expression(*object, environment)?;
+
+    match value {
+        Value::Struct { struct_name, fields } => {
+            match *member.clone() {
+                Member::Identifier {
+                    symbol,
+                    type_: _
+                } => {
+                    let field_value = fields.get(&symbol)
+                        .ok_or(format!("Field '{}' not found in struct '{}'", symbol, struct_name))?;
+
+                    Ok(field_value.clone())
+                },
+                Member::MemberAccess {
+                    object,
+                    member,
+                    symbol: _,
+                    type_: _
+                } => evaluate_member_access(object, environment, member),
+            }
+        }
+        Value::Union {
+            union_member,
+            fields
+        } => {
+            todo!("Member access on unions")
+        }
+        _ => Err(format!("Member access is only supported on structs and unions '{}'", value))
     }
 }
 

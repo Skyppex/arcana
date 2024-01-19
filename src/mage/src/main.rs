@@ -38,15 +38,15 @@ fn run_program() -> Result<(), String> {
         }
 
         if let "types" = input.trim() {
-            for type_ in type_environemnt.get_types() {
-                println!("{}", type_.1);
+            for (.., type_) in type_environemnt.get_types() {
+                println!("{}", type_);
             }
             continue;
         }
 
         if let "vars" = input.trim() {
-            for variable in type_environemnt.get_variables() {
-                println!("{}", variable.1);
+            for (.., variable) in type_environemnt.get_variables() {
+                println!("{}", variable);
             }
             continue;
         }

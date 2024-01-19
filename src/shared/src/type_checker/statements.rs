@@ -81,7 +81,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
         }) => {
             let fs: Result<Vec<ast::StructField>, String> = fields.iter()
                 .map(|field| {
-                    match check_type_name(&field.type_name, &discovered_types) {
+                    match check_type_name(&field.type_name, &discovered_types, type_environment) {
                         Ok(t) => Ok(ast::StructField {
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
@@ -129,7 +129,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 .map(|member| {
                     let fs: Result<Vec<ast::UnionMemberField>, String> = member.fields.iter()
                         .map(|field| {
-                            match check_type_name(&field.type_name, &discovered_types) {
+                            match check_type_name(&field.type_name, &discovered_types, type_environment) {
                                 Ok(t) => Ok(ast::UnionMemberField {
                                     union_name: type_name.clone(),
                                     discriminant_name: member.identifier.clone(),
@@ -199,7 +199,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
         }) => {
             let ps: Result<Vec<ast::Parameter>, String> = parameters.iter()
                 .map(|parameter| {
-                    match check_type_name(&parameter.type_name, &discovered_types) {
+                    match check_type_name(&parameter.type_name, &discovered_types, type_environment) {
                         Ok(t) => Ok(ast::Parameter {
                             identifier: parameter.identifier.clone(),
                             type_name: parameter.type_name.clone(),
@@ -213,7 +213,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
             let type_ = Type::Function(Function {
                 name: identifier.clone(),
                 parameters: ps.clone()?.iter().map(|p| (p.identifier.clone(), p.type_.clone())).collect(),
-                return_type: Box::new(check_type_name(&return_type.clone().unwrap_or(Type::Void.to_string()), &discovered_types)?)
+                return_type: Box::new(check_type_name(&return_type.clone().unwrap_or(Type::Void.to_string()), &discovered_types, type_environment)?)
             });
 
             type_environment.add_type(type_.clone())?;
@@ -222,7 +222,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 identifier: identifier.clone(),
                 parameters: ps?,
                 return_type: match return_type {
-                    Some(t) => check_type_name(&t, &discovered_types)?,
+                    Some(t) => check_type_name(&t, &discovered_types, type_environment)?,
                     None => Type::Void
                 },
                 body: Box::new(check_type(&Statement::Expression(body.clone()), discovered_types, type_environment)?.as_expression().unwrap().clone()),
@@ -234,7 +234,11 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
     }
 }
 
-fn check_type_name(type_name: &str, discovered_types: &Vec<DiscoveredType>) -> Result<Type, String> {
+fn check_type_name<'a>(type_name: &str, discovered_types: &Vec<DiscoveredType>, type_environment: &mut TypeEnvironment<'a>) -> Result<Type, String> {
+    if let Some(type_) = type_environment.get_type(type_name) {
+        return Ok(type_.clone());
+    }
+
     match discovered_types.iter().find(|discovered_type| match discovered_type {
         DiscoveredType::Struct(name, ..) => name == type_name,
         DiscoveredType::Union(name, ..) => name == type_name,
@@ -246,7 +250,7 @@ fn check_type_name(type_name: &str, discovered_types: &Vec<DiscoveredType>) -> R
                 let mut map = HashMap::new();
 
                 for (identifier, type_name) in fields {
-                    map.insert(identifier.clone(), check_type_name(type_name, discovered_types)?);
+                    map.insert(identifier.clone(), check_type_name(type_name, discovered_types, type_environment)?);
                 }
 
                 map
@@ -261,7 +265,7 @@ fn check_type_name(type_name: &str, discovered_types: &Vec<DiscoveredType>) -> R
                     let mut fields_map = HashMap::new();
 
                     for (identifier, type_name) in fields {
-                        fields_map.insert(identifier.clone(), check_type_name(type_name, discovered_types)?);
+                        fields_map.insert(identifier.clone(), check_type_name(type_name, discovered_types, type_environment)?);
                     }
 
                     map.insert(identifier.clone(), fields_map);
@@ -280,12 +284,12 @@ fn check_type_name(type_name: &str, discovered_types: &Vec<DiscoveredType>) -> R
                 let mut map = HashMap::new();
 
                 for (identifier, type_name) in parameters {
-                    map.insert(identifier.clone(), check_type_name(type_name, discovered_types)?);
+                    map.insert(identifier.clone(), check_type_name(type_name, discovered_types, type_environment)?);
                 }
 
                 map
             },
-            return_type: Box::new(check_type_name(return_type, discovered_types)?)
+            return_type: Box::new(check_type_name(return_type, discovered_types, type_environment)?)
         
         })),
         None => Type::from_string(type_name).ok_or(format!("Unknown type {}", type_name))

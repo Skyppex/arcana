@@ -32,7 +32,7 @@ pub struct StructField {
 
 impl FullName for StructField {
     fn full_name(&self) -> String {
-        format!("{}.{}", self.struct_name, self.field_name)
+        format!("StructField({}.{}): {}", self.struct_name, self.field_name, self.field_type)
     }
 }
 
@@ -166,9 +166,9 @@ impl Type {
             Type::Char => "char".to_string(),
             Type::Bool => "bool".to_string(),
             Type::Struct(Struct { name, .. }) => name.clone(),
-            Type::StructField(StructField { struct_name, field_name, .. }) => format!("{}.{}", struct_name, field_name),
+            Type::StructField(StructField { struct_name, field_name, .. }) => format!("StructField -> {}.{}", struct_name, field_name),
             Type::Union(Union { name, .. }) => name.clone(),
-            Type::UnionMember(UnionMember { union_name, discriminant_name, .. }) => format!("{}::{}", union_name, discriminant_name),
+            Type::UnionMember(UnionMember { union_name, discriminant_name, .. }) => format!("UnionMember -> {}::{}", union_name, discriminant_name),
             Type::UnionMemberField(UnionMemberField {
                 union_name,
                 discriminant_name,
@@ -176,13 +176,13 @@ impl Type {
                 field_name,
                 field_type,
             }) => match field_name {
-                Some(field_name) => format!("{}::{}.{}: {}",
+                Some(field_name) => format!("UnionMemberField -> {}::{}.{}: {}",
                     union_name,
                     discriminant_name,
                     field_name,
                     field_type
                 ),
-                None => format!("{}::{}::{}: {}",
+                None => format!("UnionMemberField -> {}::{}::{}: {}",
                     union_name,
                     discriminant_name,
                     field_position.to_string(),

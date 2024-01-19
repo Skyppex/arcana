@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{parser::{self, Expression, VariableDeclaration, If, Assignment}, type_checker::ast::Literal};
+use crate::{parser::{self, Expression, VariableDeclaration, If, Assignment}, type_checker::{ast::Literal, StructField}, display::{IndentDisplay, Indent}};
 
-use super::{ast::{TypedExpression, Typed, ConditionBlock, Member, FieldInitializer, TypedStatement, UnaryOperator, BinaryOperator, UnionMemberFieldInitializers}, TypeEnvironment, Type, statements, DiscoveredType};
+use super::{ast::{TypedExpression, Typed, ConditionBlock, Member, FieldInitializer, TypedStatement, UnaryOperator, BinaryOperator, UnionMemberFieldInitializers}, TypeEnvironment, Type, statements, DiscoveredType, FullName};
 
 pub fn check_type<'a>(
     expression: &Expression,
@@ -133,9 +133,9 @@ pub fn check_type<'a>(
                 crate::parser::Member::MemberAccess {
                     object,
                     member,
-                    symbol
+                    symbol: _
                 } => {
-                    todo!("Member access")
+                    check_type_member_access(object, discovered_types, type_environment, member)
                 },
             }
         },
@@ -323,6 +323,65 @@ pub fn check_type<'a>(
                 type_
             })
         },
+    }
+}
+
+fn check_type_member_access(object: &Box<Expression>, discovered_types: &Vec<DiscoveredType>, type_environment: &mut TypeEnvironment<'_>, member: &Box<parser::Member>) -> Result<TypedExpression, String> {
+    let object_type_expression = check_type(object, discovered_types, type_environment)?;
+    let object_type  = object_type_expression.get_type();
+
+    println!("object_type_expression: {}", object_type_expression.indent_display(&mut Indent::new()));
+    println!("object_type: {}", object_type);
+
+    check_type_member_access_recurse(object_type, member, type_environment, object_type_expression, discovered_types)
+}
+
+fn check_type_member_access_recurse(
+    object_type: Type,
+    member: &Box<parser::Member>,
+    type_environment: &mut TypeEnvironment<'_>,
+    object_type_expression: TypedExpression,
+    discovered_types: &Vec<DiscoveredType>) -> Result<TypedExpression, String> {
+    match object_type {
+        Type::Struct(struct_) => {
+            match *member.clone() {
+                parser::Member::Identifier { symbol } => {
+                    if !struct_.fields.contains_key(&symbol) {
+                        return Err(format!("Struct {} does not have a field called '{}'", struct_.name, symbol));
+                    }
+
+                    let fields_type = struct_.fields.get(&symbol).unwrap();
+
+                    if !type_environment.lookup_type(&fields_type) {
+                        return Err(format!("Unexpected type: {}", fields_type.full_name()));
+                    }
+
+                    Ok(TypedExpression::Member(Member::MemberAccess {
+                        object: Box::new(object_type_expression),
+                        member: Box::new(Member::Identifier {
+                            symbol: symbol.clone(),
+                            type_: fields_type.clone()
+                        }),
+                        symbol: symbol.clone(),
+                        type_: fields_type.clone()
+                    }))
+                },
+                parser::Member::MemberAccess {
+                    object,
+                    member,
+                    symbol: _
+                } => {
+                    check_type_member_access(&object, discovered_types, type_environment, &member)
+                },
+            }
+        },
+        Type::StructField(struct_field) => {
+            check_type_member_access_recurse(
+                *struct_field.field_type,
+                member, type_environment, object_type_expression, discovered_types)
+        }
+        Type::Union(_) => todo!(),
+        _ => todo!()
     }
 }
 

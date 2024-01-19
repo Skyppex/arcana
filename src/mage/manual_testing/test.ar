@@ -1,5 +1,17 @@
-struct Value {
-    value: i32,
+struct A {
+    a: i32,
+}
+
+struct B {
+    a: A,
+}
+
+struct C {
+    b: B,
+}
+
+struct D {
+    c: C,
 }
 
 union Option {
@@ -12,12 +24,4 @@ union Result {
     Err(string),
 }
 
-union Two {
-    One(i32),
-    Two(i32, i32),
-}
-
-union Named {
-    One(a: i32),
-    Two(a: i32, b: i32),
-}
+D d = D { c: C { b: B { a: A { a: 5 } } } }
