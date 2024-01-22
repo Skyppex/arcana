@@ -55,6 +55,7 @@ pub struct FunctionDeclaration {
 
 #[derive(Debug, Clone)]
 pub enum Literal {
+    Unit,
     I8(i8),
     I16(i16),
     I32(i32),
@@ -109,8 +110,7 @@ pub struct UnionMember {
 
 #[derive(Debug, Clone)]
 pub struct UnionMemberField {
-    pub field_position: usize,
-    pub identifier: Option<String>,
+    pub identifier: String,
     pub type_name: String,
 }
 

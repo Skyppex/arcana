@@ -32,7 +32,7 @@ pub struct StructField {
 
 impl FullName for StructField {
     fn full_name(&self) -> String {
-        format!("StructField({}.{}): {}", self.struct_name, self.field_name, self.field_type)
+        format!("{}.{}: {}", self.struct_name, self.field_name, self.field_type)
     }
 }
 
@@ -52,7 +52,7 @@ impl FullName for Union {
 pub struct UnionMember {
     pub union_name: String,
     pub discriminant_name: String,
-    pub fields: HashMap<Option<String>, Type>,
+    pub fields: HashMap<String, Type>,
 }
 
 impl FullName for UnionMember {
@@ -65,17 +65,13 @@ impl FullName for UnionMember {
 pub struct UnionMemberField {
     pub union_name: String,
     pub discriminant_name: String,
-    pub field_position: usize,
-    pub field_name: Option<String>,
+    pub field_name: String,
     pub field_type: Box<Type>,
 }
 
 impl FullName for UnionMemberField {
     fn full_name(&self) -> String {
-        match self.field_name {
-            Some(ref field_name) => format!("{}::{}.{}", self.union_name, self.discriminant_name, field_name),
-            None => format!("{}::{}.{}", self.union_name, self.discriminant_name, self.field_position.to_string()),
-        }
+        format!("{}::{}.{}", self.union_name, self.discriminant_name, self.field_name)
     }
 }
 
@@ -127,6 +123,7 @@ impl Type {
     pub fn from_string(type_name: &str) -> Option<Type> {
         match type_name {
             "void" => Some(Type::Void),
+            "unit" => Some(Type::Unit),
             "i8" => Some(Type::I8),
             "i16" => Some(Type::I16),
             "i32" => Some(Type::I32),
@@ -147,51 +144,7 @@ impl Type {
     }
 
     pub fn to_string(&self) -> String {
-        match self {
-            Type::Void => "void".to_string(),
-            Type::Unit => "()".to_string(),
-            Type::I8 => "i8".to_string(),
-            Type::I16 => "i16".to_string(),
-            Type::I32 => "i32".to_string(),
-            Type::I64 => "i64".to_string(),
-            Type::I128 => "i128".to_string(),
-            Type::U8 => "u8".to_string(),
-            Type::U16 => "u16".to_string(),
-            Type::U32 => "u32".to_string(),
-            Type::U64 => "u64".to_string(),
-            Type::U128 => "u128".to_string(),
-            Type::F32 => "f32".to_string(),
-            Type::F64 => "f64".to_string(),
-            Type::String => "string".to_string(),
-            Type::Char => "char".to_string(),
-            Type::Bool => "bool".to_string(),
-            Type::Struct(Struct { name, .. }) => name.clone(),
-            Type::StructField(StructField { struct_name, field_name, .. }) => format!("StructField -> {}.{}", struct_name, field_name),
-            Type::Union(Union { name, .. }) => name.clone(),
-            Type::UnionMember(UnionMember { union_name, discriminant_name, .. }) => format!("UnionMember -> {}::{}", union_name, discriminant_name),
-            Type::UnionMemberField(UnionMemberField {
-                union_name,
-                discriminant_name,
-                field_position,
-                field_name,
-                field_type,
-            }) => match field_name {
-                Some(field_name) => format!("UnionMemberField -> {}::{}.{}: {}",
-                    union_name,
-                    discriminant_name,
-                    field_name,
-                    field_type
-                ),
-                None => format!("UnionMemberField -> {}::{}::{}: {}",
-                    union_name,
-                    discriminant_name,
-                    field_position.to_string(),
-                    field_type
-                ),
-            },
-            Type::Function(Function { name, .. }) => name.clone(),
-            Type::Literal { name, .. } => name.clone(),
-        }
+        self.full_name()
     }
 }
 
@@ -199,7 +152,7 @@ impl FullName for Type {
     fn full_name(&self) -> String {
         match self {
             Type::Void => "void".to_string(),
-            Type::Unit => "()".to_string(),
+            Type::Unit => "unit".to_string(),
             Type::I8 => "i8".to_string(),
             Type::I16 => "i16".to_string(),
             Type::I32 => "i32".to_string(),

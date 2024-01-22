@@ -1,6 +1,6 @@
 mod interpreter;
 
-use std::{io::{stdin, stdout, Write}, fs::{self}, path::Path, collections::BinaryHeap};
+use std::{io::{stdin, stdout, Write}, fs::{self}, path::Path};
 
 use interpreter::evironment::Environment;
 use shared::{type_checker::{create_typed_ast, TypeEnvironment}, display::{Indent, IndentDisplay}, parser::create_ast};
@@ -73,13 +73,13 @@ fn read_input(
     let program = create_ast(tokens)?;
     if PRINT_PARSER_AST {
         let mut indent = Indent::new();
-        println!("{}\n", program.indent_display(&mut indent));
+        println!("{}\n", program.indent_display(&mut indent, false));
     }
 
     let typed_program = create_typed_ast(program, type_environemnt)?;
     if PRINT_TYPE_CHECKER_AST {
         let mut indent = Indent::new();
-        println!("{}\n", typed_program.indent_display(&mut indent));
+        println!("{}\n", typed_program.indent_display(&mut indent, false));
     }
 
     let result = interpreter::evaluate(

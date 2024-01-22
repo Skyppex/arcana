@@ -2,11 +2,28 @@ use shared::type_checker::{ast::*, Type};
 
 use super::{value::{Value, Number, UnionMember, UnionFields}, evironment::Environment, evaluate_binop};
 
-pub fn evaluate(typed_statement: TypedStatement, environment: &mut Environment) -> Result<Value, String> {
+pub fn evaluate<'a>(typed_statement: TypedStatement, environment: &mut Environment) -> Result<Value, String> {
     match typed_statement {
         TypedStatement::Program {
             statements
         } => evaluate_program(statements, environment),
+        TypedStatement::FunctionDeclaration {
+            identifier,
+            parameters,
+            return_type: _,
+            body,
+            type_: _
+        } => {
+            environment.add_variable(
+                identifier.clone(),
+                Value::Function {
+                    parameters: parameters.iter().map(|p| p.identifier.clone()).collect(),
+                    body,
+                },
+                false);
+
+            Ok(Value::Void)
+        }
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
         TypedStatement::Print(e) => {
             let value = evaluate_expression(e, environment)?;
@@ -17,7 +34,7 @@ pub fn evaluate(typed_statement: TypedStatement, environment: &mut Environment) 
     }
 }
 
-fn evaluate_expression(typed_expression: TypedExpression, environment: &mut Environment) -> Result<Value, String> {
+fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: &mut Environment) -> Result<Value, String> {
     match typed_expression {
         TypedExpression::None => Ok(Value::Void),
         TypedExpression::VariableDeclaration {
@@ -72,7 +89,7 @@ fn evaluate_expression(typed_expression: TypedExpression, environment: &mut Envi
     }
 }
 
-fn evaluate_program(statements: Vec<TypedStatement>, environment: &mut Environment) -> Result<Value, String> {
+fn evaluate_program<'a>(statements: Vec<TypedStatement>, environment: &mut Environment) -> Result<Value, String> {
     let mut value = Value::Void;
     for statement in statements {
         value = evaluate(statement, environment)?;
@@ -80,7 +97,7 @@ fn evaluate_program(statements: Vec<TypedStatement>, environment: &mut Environme
     Ok(value)
 }
 
-fn evaluate_variable_declaration(
+fn evaluate_variable_declaration<'a>(
     mutable: bool,
     identifier: String,
     initializer: Option<Box<TypedExpression>>,
@@ -95,7 +112,7 @@ fn evaluate_variable_declaration(
     Ok(value)
 }
 
-fn evaluate_if(
+fn evaluate_if<'a>(
     r#if: ConditionBlock,
     else_ifs: Vec<ConditionBlock>,
     r#else: Option<Box<TypedExpression>>,
@@ -144,7 +161,7 @@ fn evaluate_if(
     }
 }
 
-fn evaluate_assignment(
+fn evaluate_assignment<'a>(
     member: Box<Member>,
     initializer: Box<TypedExpression>,
     _type_: Type,
@@ -155,7 +172,7 @@ fn evaluate_assignment(
     Ok(value)
 }
 
-fn evaluate_member(member: Member, environment: &mut Environment) -> Result<Value, String> {
+fn evaluate_member<'a>(member: Member, environment: &mut Environment) -> Result<Value, String> {
     match member {
         Member::Identifier {
             symbol,
@@ -176,7 +193,7 @@ fn evaluate_member(member: Member, environment: &mut Environment) -> Result<Valu
     }
 }
 
-fn evaluate_member_access(object: Box<TypedExpression>, environment: &mut Environment<'_>, member: Box<Member>) -> Result<Value, String> {
+fn evaluate_member_access<'a>(object: Box<TypedExpression>, environment: &mut Environment<'_>, member: Box<Member>) -> Result<Value, String> {
     let value = evaluate_expression(*object, environment)?;
 
     match value {
@@ -205,12 +222,13 @@ fn evaluate_member_access(object: Box<TypedExpression>, environment: &mut Enviro
         } => {
             todo!("Member access on unions")
         }
-        _ => Err(format!("Member access is only supported on structs and unions '{}'", value))
+        _ => Err(format!("Member access is only supported on structs '{}'", value))
     }
 }
 
-fn evaluate_literal(literal: Literal) -> Result<Value, String> {
+fn evaluate_literal<'a>(literal: Literal) -> Result<Value, String> {
     match literal {
+        Literal::Unit => Ok(Value::Unit),
         Literal::I8(v) => Ok(Value::Number(Number::I8(v))),
         Literal::I16(v) => Ok(Value::Number(Number::I16(v))),
         Literal::I32(v) => Ok(Value::Number(Number::I32(v))),
@@ -275,16 +293,36 @@ fn evaluate_literal(literal: Literal) -> Result<Value, String> {
     }
 }
 
-fn evaluate_call(
+fn evaluate_call<'a>(
     caller: Box<TypedExpression>,
     arguments: Vec<TypedExpression>,
-    type_: Type,
+    _type_: Type,
     environment: &mut Environment
 ) -> Result<Value, String> {
-    todo!()
+    let caller_value = evaluate_expression(*caller, environment)?;
+
+    let mut evaluated_arguments = Vec::new();
+
+    for argument in arguments {
+        let evaluated_arg = evaluate_expression(argument, environment)?;
+        evaluated_arguments.push(evaluated_arg);
+    }
+
+    match caller_value {
+        Value::Function { parameters, body } => {
+            let function_environment = &mut environment.new_child();
+
+            for (index, parameter) in parameters.iter().enumerate() {
+                function_environment.add_variable(parameter.clone(), evaluated_arguments[index].clone(), false);
+            }
+
+            evaluate_expression(*body, function_environment)
+        }
+        _ => Err(format!("Cannot call non-function value '{}'", caller_value))
+    }
 }
 
-fn evaluate_unary(
+fn evaluate_unary<'a>(
     operator: UnaryOperator,
     expression: Box<TypedExpression>,
     _type_: Type,
@@ -345,7 +383,7 @@ fn evaluate_unary(
     }
 }
 
-fn evaluate_binary(
+fn evaluate_binary<'a>(
     left: Box<TypedExpression>,
     operator: BinaryOperator,
     right: Box<TypedExpression>,
@@ -358,7 +396,7 @@ fn evaluate_binary(
     evaluate_binop::evaluate_binop(left, operator, right)
 }
 
-fn evaluate_ternary(
+fn evaluate_ternary<'a>(
     condition: Box<TypedExpression>,
     true_expression: Box<TypedExpression>,
     false_expression: Box<TypedExpression>,
@@ -380,7 +418,7 @@ fn evaluate_ternary(
     }
 }
 
-fn evaluate_block(
+fn evaluate_block<'a>(
     statements: Vec<TypedStatement>,
     _type_: Type,
     environment: &mut Environment
@@ -395,7 +433,7 @@ fn evaluate_block(
     Ok(value)
 }
 
-fn evaluate_drop(
+fn evaluate_drop<'a>(
     identifier: String,
     _type_: Type,
     environment: &mut Environment

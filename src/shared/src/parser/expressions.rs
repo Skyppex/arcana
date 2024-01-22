@@ -530,7 +530,8 @@ fn parse_call_member(cursor: &mut Cursor) -> Result<Expression, String> {
 
 fn parse_call_expression(caller: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
     let arguments = parse_args(cursor)?;
-
+    cursor.bump()?; // Consume the )
+    
     let mut call = Expression::Call(Call { caller: Box::new(caller.clone()), arguments });
 
     if let TokenKind::OpenParen = cursor.first().kind {
@@ -618,6 +619,7 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 
 fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> {
     match literal {
+        token::Literal::Unit => Ok(Expression::Literal(Literal::Unit)),
         token::Literal::I8(literal) => Ok(Expression::Literal(Literal::I8(literal.value))),
         token::Literal::I16(literal) => Ok(Expression::Literal(Literal::I16(literal.value))),
         token::Literal::I32(literal) => Ok(Expression::Literal(Literal::I32(literal.value))),

@@ -332,15 +332,13 @@ fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<Union
             };
 
             Ok(UnionMemberField {
-                field_position,
-                identifier: Some(first_ident),
+                identifier: first_ident,
                 type_name,
             })
         },
         _ => {
             return Ok(UnionMemberField {
-                field_position,
-                identifier: None,
+                identifier: format!("f{}",field_position.to_string()),
                 type_name: first_ident,
             });
         },

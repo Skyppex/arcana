@@ -4,6 +4,7 @@ use shared::type_checker::ast::Member;
 
 use super::value::{Variable, Value};
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Environment<'a> {
     pub parent: Option<&'a Environment<'a>>,
     pub variables: HashMap<String, Variable>,

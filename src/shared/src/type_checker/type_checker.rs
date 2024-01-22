@@ -6,7 +6,7 @@ use super::{statements, ast::TypedStatement, type_environment::TypeEnvironment};
 
 pub enum DiscoveredType {
     Struct(String, HashMap<String, String>),
-    Union(String, HashMap<String, HashMap<Option<String>, String>>),
+    Union(String, HashMap<String, HashMap<String, String>>),
     Function(String, HashMap<String, String>, String),
 }
 

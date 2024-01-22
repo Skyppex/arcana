@@ -75,6 +75,7 @@ pub enum TokenKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
+    Unit,
     I8(IntLiteral<i8>),
     I16(IntLiteral<i16>),
     I32(IntLiteral<i32>),

@@ -1,8 +1,23 @@
 use std::collections::HashMap;
 
-use crate::{parser::{self, Expression, VariableDeclaration, If, Assignment}, type_checker::{ast::Literal, StructField}, display::{IndentDisplay, Indent}};
+use crate::{parser::{self, Assignment, Expression, If, VariableDeclaration}, type_checker::ast::Literal};
 
-use super::{ast::{TypedExpression, Typed, ConditionBlock, Member, FieldInitializer, TypedStatement, UnaryOperator, BinaryOperator, UnionMemberFieldInitializers}, TypeEnvironment, Type, statements, DiscoveredType, FullName};
+use super::{ast::{TypedExpression,
+        Typed,
+        ConditionBlock,
+        Member,
+        FieldInitializer,
+        TypedStatement,
+        UnaryOperator,
+        BinaryOperator,
+        UnionMemberFieldInitializers
+    },
+    TypeEnvironment,
+    Type,
+    statements,
+    DiscoveredType,
+    FullName
+};
 
 pub fn check_type<'a>(
     expression: &Expression,
@@ -123,6 +138,7 @@ pub fn check_type<'a>(
             match member {
                 crate::parser::Member::Identifier { symbol } => {
                     let type_ = type_environment.get_variable(symbol)
+                        .or(type_environment.get_type(symbol))
                         .ok_or_else(|| format!("Unexpected variable: {}", symbol))?.clone();
 
                     Ok(TypedExpression::Member(Member::Identifier {
@@ -141,6 +157,7 @@ pub fn check_type<'a>(
         },
         Expression::Literal(l) => {
             let literal = match l {
+                parser::Literal::Unit => Literal::Unit,
                 parser::Literal::I8(v) => Literal::I8(*v),
                 parser::Literal::I16(v) => Literal::I16(*v),
                 parser::Literal::I32(v) => Literal::I32(*v),
@@ -227,7 +244,50 @@ pub fn check_type<'a>(
 
             Ok(TypedExpression::Literal(literal))
         },
-        Expression::Call(call) => todo!(),
+        Expression::Call(call) => {
+            let Expression::Member(member) = *call.caller.clone() else {
+                Err("Function must be a member".to_string())?
+            };
+
+            let caller = check_type(&call.caller, discovered_types, type_environment)?;
+
+            match member {
+                parser::Member::Identifier { symbol } => {
+                    let function_type = type_environment.get_type(&symbol)
+                        .ok_or_else(|| format!("Unexpected type: {}", symbol))?;
+
+                    let Type::Function(function) = function_type.clone() else {
+                        Err(format!("Expected function type, found {}", function_type.full_name()))?
+                    };
+
+                    let mut args = vec![];
+                    for (i, (.., type_)) in function.clone().parameters.iter().enumerate() {
+                        let Some(arg) = call.arguments.get(i) else {
+                            Err("Not enough arguments")?
+                        };
+                        
+                        let arg_typed_exression = check_type(arg, discovered_types, type_environment)?;
+
+                        if arg_typed_exression.get_deep_type() != type_.clone() {
+                            Err(format!("Argument {} type {} does not match parameter type {}", i, arg_typed_exression.get_type(), type_))?
+                        }
+
+                        args.push(arg_typed_exression);
+                    }
+
+                    Ok(TypedExpression::Call {
+                        caller: Box::new(caller),
+                        arguments: args,
+                        type_: *function.return_type
+                    })
+                },
+                parser::Member::MemberAccess {
+                    object,
+                    member,
+                    symbol
+                } => todo!(),
+            }
+        },
         Expression::Unary(unary) => {
             let expression = check_type(&unary.expression, discovered_types, type_environment)?;
             let type_ = expression.get_type();
@@ -308,10 +368,20 @@ pub fn check_type<'a>(
             for statement in statements {
                 statements_.push(statements::check_type(statement, discovered_types, type_environment)?);
             }
+
+            let mut type_ = Type::Void;
+            for statement in statements_.clone() {
+                match statement {
+                    TypedStatement::Expression(e) => {
+                        type_ = e.get_type();
+                    },
+                    _ => continue
+                }
+            }
             
             Ok(TypedExpression::Block {
                 statements: statements_,
-                type_: Type::Void
+                type_
             })
         },
         Expression::Drop(symbol) => {
@@ -329,10 +399,6 @@ pub fn check_type<'a>(
 fn check_type_member_access(object: &Box<Expression>, discovered_types: &Vec<DiscoveredType>, type_environment: &mut TypeEnvironment<'_>, member: &Box<parser::Member>) -> Result<TypedExpression, String> {
     let object_type_expression = check_type(object, discovered_types, type_environment)?;
     let object_type  = object_type_expression.get_type();
-
-    println!("object_type_expression: {}", object_type_expression.indent_display(&mut Indent::new()));
-    println!("object_type: {}", object_type);
-
     check_type_member_access_recurse(object_type, member, type_environment, object_type_expression, discovered_types)
 }
 
@@ -346,24 +412,26 @@ fn check_type_member_access_recurse(
         Type::Struct(struct_) => {
             match *member.clone() {
                 parser::Member::Identifier { symbol } => {
-                    if !struct_.fields.contains_key(&symbol) {
-                        return Err(format!("Struct {} does not have a field called '{}'", struct_.name, symbol));
+                    let field_type = struct_.fields.get(&symbol)
+                        .ok_or(format!("Struct {} does not have a field called '{}'", struct_.name, symbol))?;
+
+                    if !type_environment.lookup_type(&field_type) {
+                        return Err(format!("Unexpected type: {}", field_type.full_name()));
                     }
 
-                    let fields_type = struct_.fields.get(&symbol).unwrap();
-
-                    if !type_environment.lookup_type(&fields_type) {
-                        return Err(format!("Unexpected type: {}", fields_type.full_name()));
-                    }
+                    let identifier_type = match field_type {
+                        Type::StructField(struct_field) => *struct_field.field_type.clone(),
+                        _ => field_type.clone()
+                    };
 
                     Ok(TypedExpression::Member(Member::MemberAccess {
                         object: Box::new(object_type_expression),
                         member: Box::new(Member::Identifier {
                             symbol: symbol.clone(),
-                            type_: fields_type.clone()
+                            type_: identifier_type.clone()
                         }),
                         symbol: symbol.clone(),
-                        type_: fields_type.clone()
+                        type_: field_type.clone()
                     }))
                 },
                 parser::Member::MemberAccess {
@@ -379,9 +447,8 @@ fn check_type_member_access_recurse(
             check_type_member_access_recurse(
                 *struct_field.field_type,
                 member, type_environment, object_type_expression, discovered_types)
-        }
-        Type::Union(_) => todo!(),
-        _ => todo!()
+        },
+        _ => Err("Member access is only supported on structs".to_string())
     }
 }
 

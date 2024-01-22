@@ -1,5 +1,7 @@
 use std::{fmt::Display, collections::HashMap};
 
+use shared::type_checker::ast::TypedExpression;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Void,
@@ -11,14 +13,15 @@ pub enum Value {
     String(String),
     Struct { struct_name: String, fields: HashMap<String, Value> },
     Union { union_member: UnionMember, fields: UnionFields },
+    Function { parameters: Vec<String>, body: Box<TypedExpression> },
 }
 
-impl Display for Value {
+impl<'a> Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Void => write!(f, "void"),
             Value::Uninitialized => write!(f, "uninitialized"),
-            Value::Unit => write!(f, "()"),
+            Value::Unit => write!(f, "unit"),
             Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),
             Value::Char(character) => write!(f, "'{}'", character),
@@ -74,6 +77,7 @@ impl Display for Value {
                     },
                 }
             },
+            Value::Function { parameters, body } => todo!(),
         }
     }
 }

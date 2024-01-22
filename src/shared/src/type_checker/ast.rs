@@ -6,9 +6,10 @@ use super::Type;
 
 pub trait Typed {
     fn get_type(&self) -> Type;
+    fn get_deep_type(&self) -> Type;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypedStatement {
     None,
     Program {
@@ -44,6 +45,18 @@ impl TypedStatement {
             _ => None,
         }
     }
+
+    pub fn get_type(&self) -> Type {
+        match self {
+            TypedStatement::None => Type::Void,
+            TypedStatement::Program { .. } => Type::Void,
+            TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::Expression(e) => e.get_type(),
+            TypedStatement::Print(_) => Type::Void,
+        }
+    }
 }
 
 impl Typed for TypedStatement {
@@ -58,9 +71,21 @@ impl Typed for TypedStatement {
             TypedStatement::Print(_) => Type::Void,
         }
     }
+
+    fn get_deep_type(&self) -> Type {
+        match self {
+            TypedStatement::None => Type::Void,
+            TypedStatement::Program { .. } => Type::Void,
+            TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::Expression(e) => e.get_deep_type(),
+            TypedStatement::Print(_) => Type::Void,
+        }
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypedExpression {
     None, // For testing purposes
 
@@ -132,9 +157,26 @@ impl Typed for TypedExpression {
             TypedExpression::Drop { type_, .. } => type_.clone(),
         }
     }
+
+    fn get_deep_type(&self) -> Type {
+        match self {
+            TypedExpression::None => Type::Void,
+            TypedExpression::VariableDeclaration { type_, .. } => type_.clone(),
+            TypedExpression::If { type_, .. } => type_.clone(),
+            TypedExpression::Assignment { type_, .. } => type_.clone(),
+            TypedExpression::Member(member) => member.get_deep_type(),
+            TypedExpression::Literal(literal) => literal.get_deep_type(),
+            TypedExpression::Call { type_, .. } => type_.clone(),
+            TypedExpression::Unary { type_, .. } => type_.clone(),
+            TypedExpression::Binary { type_, .. } => type_.clone(),
+            TypedExpression::Ternary { type_, .. } => type_.clone(),
+            TypedExpression::Block { type_, .. } => type_.clone(),
+            TypedExpression::Drop { type_, .. } => type_.clone(),
+        }
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StructField {
     pub mutable: bool,
     pub identifier: String,
@@ -156,7 +198,7 @@ impl Into<AccessModifier> for parser::AccessModifier {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UnionMember {
     pub union_name: String,
     pub discriminant_name: String,
@@ -164,17 +206,17 @@ pub struct UnionMember {
     pub type_: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UnionMemberField {
     pub union_name: String,
     pub discriminant_name: String,
-    pub field_position: usize,
-    pub identifier: Option<String>,
+    pub identifier: String,
     pub type_: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
+    Unit,
     I8(i8),
     I16(i16),
     I32(i32),
@@ -206,6 +248,7 @@ pub enum Literal {
 impl Typed for Literal {
     fn get_type(&self) -> Type {
         match self {
+            Literal::Unit => Type::Unit,
             Literal::I8(_) => Type::I8,
             Literal::I16(_) => Type::I16,
             Literal::I32(_) => Type::I32,
@@ -225,35 +268,39 @@ impl Typed for Literal {
             Literal::Union { type_, .. } => type_.clone(),
         }
     }
+
+    fn get_deep_type(&self) -> Type {
+        self.get_type()
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConditionBlock {
     pub condition: Box<TypedExpression>,
     pub block: Box<TypedExpression>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FieldInitializer {
     pub identifier: Option<String>,
     pub initializer: TypedExpression,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UnionMemberFieldInitializers {
     None,
     Named(HashMap<String, TypedExpression>),
     Unnamed(Vec<TypedExpression>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     pub identifier: String,
     pub type_name: String,
     pub type_: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Member {
     Identifier {
         symbol: String,
@@ -283,9 +330,18 @@ impl Typed for Member {
             Member::MemberAccess { type_, .. } => type_.clone(),
         }
     }
+
+    fn get_deep_type(&self) -> Type {
+        match self {
+            Member::Identifier { type_, .. } => type_.clone(),
+            Member::MemberAccess { member, .. } => {
+                member.get_deep_type()
+            },
+        }
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UnaryOperator {
     Identity,
     Negate,
@@ -293,7 +349,7 @@ pub enum UnaryOperator {
     BitwiseNot,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BinaryOperator {
     Add,
     Subtract,

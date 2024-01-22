@@ -24,4 +24,8 @@ union Result {
     Err(string),
 }
 
-D d = D { c: C { b: B { a: A { a: 5 } } } }
+fn add(a: i32, b: i32): i32 {
+    a + b
+}
+
+A a = A { a: 123 }
