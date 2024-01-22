@@ -61,7 +61,7 @@ fn read_input(
     input: String,
     type_environemnt: &mut TypeEnvironment<'_>,
     environment: &mut Environment<'_>) -> Result<(), String> {
-    const PRINT_TOKENS: bool = true;
+    const PRINT_TOKENS: bool = false;
     const PRINT_PARSER_AST: bool = true;
     const PRINT_TYPE_CHECKER_AST: bool = true;
 
@@ -73,13 +73,13 @@ fn read_input(
     let program = create_ast(tokens)?;
     if PRINT_PARSER_AST {
         let mut indent = Indent::new();
-        println!("{}\n", program.indent_display(&mut indent, false));
+        println!("{}\n", program.indent_display(&mut indent));
     }
 
     let typed_program = create_typed_ast(program, type_environemnt)?;
     if PRINT_TYPE_CHECKER_AST {
         let mut indent = Indent::new();
-        println!("{}\n", typed_program.indent_display(&mut indent, false));
+        println!("{}\n", typed_program.indent_display(&mut indent));
     }
 
     let result = interpreter::evaluate(
