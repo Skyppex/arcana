@@ -1,10 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone)]
 pub enum Statement {
     Program { statements: Vec<Statement> },
     StructDeclaration(StructDeclaration),
     UnionDeclaration(UnionDeclaration),
+    FlagsDeclaration(FlagsDeclaration),
     FunctionDeclaration(FunctionDeclaration),
     Expression(Expression),
 
@@ -42,6 +43,13 @@ pub struct UnionDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_name: String,
     pub members: Vec<UnionMember>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FlagsDeclaration {
+    pub access_modifier: Option<AccessModifier>,
+    pub type_name: String,
+    pub members: Vec<FlagsMember>,
 }
 
 #[derive(Debug, Clone)]
@@ -106,6 +114,27 @@ pub struct FieldInitializer {
 pub struct UnionMember {
     pub identifier: String,
     pub fields: Vec<UnionMemberField>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FlagsMember {
+    pub identifier: String,
+    pub value: FlagsValue,
+}
+
+#[derive(Debug, Clone)]
+pub enum FlagsValue {
+    Default,
+    // Int(String),
+    // Compiled(String)
+}
+
+impl Display for FlagsValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FlagsValue::Default => write!(f, "default"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -17,10 +17,9 @@ use super::{cursor::Cursor,
     Call,
     Unary,
     Binary,
-    Ternary, UnionMemberFieldInitializers
+    Ternary,
+    UnionMemberFieldInitializers
 };
-
-
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
     #[cfg(feature = "interpreter")]

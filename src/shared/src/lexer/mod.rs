@@ -312,6 +312,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "fn" => Some(TokenKind::Keyword(Keyword::Fn)),
         "struct" => Some(TokenKind::Keyword(Keyword::Struct)),
         "union" => Some(TokenKind::Keyword(Keyword::Union)),
+        "flags" => Some(TokenKind::Keyword(Keyword::Flags)),
         "public" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Public))),
         "internal" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
         "true" => Some(TokenKind::Literal(Literal::Bool(true))),
@@ -320,6 +321,9 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
 
         #[cfg(feature = "interpreter")]
         "drop" => Some(TokenKind::Keyword(Keyword::Drop)),
+        #[cfg(feature = "interpreter")]
+        "print" => Some(TokenKind::Keyword(Keyword::Print)),
+        
         _ => None,
     }
 }

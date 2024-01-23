@@ -45,7 +45,11 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                     .map(|field| (field.identifier.clone(), field.type_name.clone()))
                     .collect()))
                 .collect())]),
-            
+        Statement::FlagsDeclaration(parser::FlagsDeclaration {
+            access_modifier: _,
+            type_name,
+            members
+        }) => Ok(vec![]),
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             identifier,
@@ -189,6 +193,41 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 members: ms?,
                 type_: union
             })
+        },
+        Statement::FlagsDeclaration(parser::FlagsDeclaration {
+            access_modifier: _,
+            type_name,
+            members
+        }) => {
+            todo!("Flags declaration")
+            // let ms: Result<Vec<ast::FlagsMember>, String> = members.iter()
+            //     .map(|member| {
+            //         Ok(ast::FlagsMember {
+            //             identifier: member.identifier.clone(),
+            //             value: ast::FlagsValue::Default
+            //         })
+            //     })
+            //     .collect();
+
+            // let flags = Type::Flags(Union {
+            //     name: type_name.clone(),
+            //     members: ms.clone()?
+            //         .iter()
+            //         .map(|m| (m.identifier.clone(), Type::FlagsMember(UnionMember {
+            //             union_name: type_name.clone(),
+            //             discriminant_name: m.identifier.clone(),
+            //             fields: HashMap::new()
+            //         })))
+            //         .collect()
+            // });
+
+            // type_environment.add_type(flags.clone())?;
+
+            // Ok(TypedStatement::FlagsDeclaration {
+            //     type_name: type_name.clone(),
+            //     members: ms?,
+            //     type_: flags
+            // })
         },
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,

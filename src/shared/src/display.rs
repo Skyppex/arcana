@@ -1,28 +1,7 @@
+use std::fmt::Display;
+
 use crate::{parser::{
-    Statement,
-    Expression,
-    Member,
-    Literal,
-    StructField,
-    UnionMember,
-    AccessModifier,
-    UnionMemberField,
-    FieldInitializer,
-    UnaryOperator,
-    BinaryOperator,
-    Parameter,
-    ConditionBlock,
-    StructDeclaration,
-    UnionDeclaration,
-    FunctionDeclaration,
-    VariableDeclaration,
-    If,
-    Assignment,
-    Call,
-    Unary,
-    Binary,
-    Ternary,
-    UnionMemberFieldInitializers
+    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, FlagsDeclaration, FlagsMember, FlagsValue, FunctionDeclaration, If, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, UnionMember, UnionMemberField, UnionMemberFieldInitializers, VariableDeclaration
 }, type_checker::{ast::{TypedStatement, TypedExpression}, self}};
 
 pub struct Indent {
@@ -129,6 +108,27 @@ impl IndentDisplay for Statement {
             }) => {
                 let mut result = String::new();
                 result.push_str(format!("<union declaration> {}\n", type_name).as_str());
+                indent.increase();
+                if let Some(access_modifier) = access_modifier {
+                    result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
+                } else {
+                    result.push_str(format!("{}access_modifier: None", indent.dash()).as_str());
+                }
+                for (i, member) in members.iter().enumerate() {
+                    let is_end = i == members.len() - 1;
+                    indent.current(is_end);
+                    result.push_str(format!("\n{}{}", indent.dash_end(), member.indent_display(indent)).as_str());
+                }
+                indent.decrease();
+                result
+            },
+            Statement::FlagsDeclaration(FlagsDeclaration {
+                access_modifier,
+                type_name,
+                members
+            }) => {
+                let mut result = String::new();
+                result.push_str(format!("<flags declaration> {}\n", type_name).as_str());
                 indent.increase();
                 if let Some(access_modifier) = access_modifier {
                     result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
@@ -462,6 +462,18 @@ impl IndentDisplay for UnionMemberField {
         indent.increase_leaf();
         result.push_str(format!("{}identifier: {}\n", indent.dash(), &self.identifier).as_str());
         result.push_str(format!("{}type_name: {}", indent.dash_end(), self.type_name).as_str());
+        indent.decrease();
+        result
+    }
+}
+
+impl IndentDisplay for FlagsMember {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<flags member>\n");
+        indent.increase_leaf();
+        result.push_str(format!("{}identifier: {}\n", indent.dash(), &self.identifier).as_str());
+        result.push_str(format!("{}value: {}", indent.dash_end(), self.value).as_str());
         indent.decrease();
         result
     }

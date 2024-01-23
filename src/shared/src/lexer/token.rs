@@ -133,7 +133,7 @@ pub enum Keyword {
     Fn,
     Struct,
     Union,
-    // Flags,
+    Flags,
 
     // Control flow
     If,

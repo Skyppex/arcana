@@ -1,6 +1,6 @@
 use crate::lexer::token::{TokenKind, Keyword};
 
-use super::{Statement, cursor::Cursor, expressions::{parse_block, self}, Parameter, StructField, UnionMemberField, UnionMember, StructDeclaration, UnionDeclaration, FunctionDeclaration};
+use super::{cursor::Cursor, expressions::{parse_block, self}, FlagsDeclaration, FlagsMember, FlagsValue, FunctionDeclaration, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let statement = parse_function_declaration_statement(cursor);
@@ -123,7 +123,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
-            return parse_print(cursor);
+            return parse_flags_declaration_statement(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -131,7 +131,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
-        return parse_print(cursor);
+        return parse_flags_declaration_statement(cursor);
     }
 
     cursor.bump()?; // Consume the union keyword
@@ -165,6 +165,59 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     cursor.bump()?; // Consume the }
 
     Ok(Statement::UnionDeclaration(UnionDeclaration {
+        access_modifier,
+        type_name,
+        members,
+    }))
+}
+
+fn parse_flags_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
+    let mut access_modifier = None;
+
+    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Flags) {
+            return parse_print(cursor);
+        }
+
+        cursor.bump()?; // Consume the access modifier
+        access_modifier = Some(am);
+    }
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Flags) {
+        return parse_print(cursor);
+    }
+
+    cursor.bump()?; // Consume the flags keyword
+
+    let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
+        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+    };
+    
+    let TokenKind::OpenBrace = cursor.bump()?.kind else {
+        return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
+    };
+
+    let mut members = vec![];
+    let mut has_comma = true;
+
+    while cursor.first().kind != TokenKind::CloseBrace {
+        if !has_comma {
+            return Err(format!("Expected , but found {:?}", cursor.first().kind));
+        }
+
+        has_comma = true;
+        members.push(parse_flags_member(cursor)?);
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        } else {
+            has_comma = false;
+        }
+    }
+
+    cursor.bump()?; // Consume the }
+
+    Ok(Statement::FlagsDeclaration(FlagsDeclaration {
         access_modifier,
         type_name,
         members,
@@ -343,4 +396,15 @@ fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<Union
             });
         },
     }
+}
+
+fn parse_flags_member(cursor: &mut Cursor) -> Result<FlagsMember, String> {
+    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
+        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+    };
+    
+    Ok(FlagsMember {
+        identifier,
+        value: FlagsValue::Default,
+    })
 }
