@@ -106,7 +106,7 @@ fn evaluate_variable_declaration<'a>(
 ) -> Result<Value, String> {
     let value = match initializer {
         Some(initializer) => evaluate_expression(*initializer, environment)?,
-        None => Value::Void
+        None => Value::Uninitialized
     };
     environment.add_variable(identifier, value.clone(), mutable);
     Ok(value)
