@@ -294,6 +294,7 @@ pub fn check_type<'a>(
 
             Ok(TypedExpression::Unary {
                 operator: match unary.operator {
+                    parser::UnaryOperator::Identity => UnaryOperator::Identity,
                     parser::UnaryOperator::Negate => UnaryOperator::Negate,
                     parser::UnaryOperator::LogicalNot => UnaryOperator::LogicalNot,
                     parser::UnaryOperator::BitwiseNot => UnaryOperator::BitwiseNot,

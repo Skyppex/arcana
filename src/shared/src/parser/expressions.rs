@@ -500,19 +500,20 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
-    while matches!(cursor.first().kind, TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde) {
-        let operator = cursor.bump()?.kind; // Consume the -, !, or ~
-        let right = parse_call_member(cursor)?;
+    if matches!(cursor.first().kind, TokenKind::Plus | TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde) {
+        let operator = cursor.bump()?.kind; // Consume the +, -, !, or ~
+        let right = parse_unary(cursor)?;
 
         return Ok(Expression::Unary(Unary {
             operator: match operator {
+                TokenKind::Plus => UnaryOperator::Identity,
                 TokenKind::Minus => UnaryOperator::Negate,
                 TokenKind::Bang => UnaryOperator::LogicalNot,
                 TokenKind::Tilde => UnaryOperator::BitwiseNot,
-                _ => unreachable!("Expected -, !, or ~ but found {:?}", operator),
+                _ => unreachable!("Expected +, -, !, or ~ but found {:?}", operator),
             },
             expression: Box::new(right),
-        }))
+        }));
     }
 
     parse_call_member(cursor)
@@ -602,6 +603,8 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
         },
         TokenKind::OpenParen => {
             cursor.bump()?; // Consume the (
+
+            let x = 5;
 
             let expression = parse_expression(cursor)?;
 

@@ -194,6 +194,7 @@ pub struct Ternary {
 
 #[derive(Debug, Clone)]
 pub enum UnaryOperator {
+    Identity,
     Negate,
     LogicalNot,
     BitwiseNot,

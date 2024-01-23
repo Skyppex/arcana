@@ -534,6 +534,7 @@ impl IndentDisplay for UnionMemberFieldInitializers {
 impl IndentDisplay for UnaryOperator {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
+            UnaryOperator::Identity => "+".to_string(),
             UnaryOperator::Negate => "-".to_string(),
             UnaryOperator::LogicalNot => "!".to_string(),
             UnaryOperator::BitwiseNot => "~".to_string(),
