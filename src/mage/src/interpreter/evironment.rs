@@ -53,6 +53,7 @@ impl<'a> Environment<'a> {
                 }
 
                 variable.value = value.clone();
+                self.variables.insert(symbol, variable);
                 return Ok(value);
             }
             Member::MemberAccess {
