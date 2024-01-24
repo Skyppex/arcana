@@ -1,16 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{parser::{self, Assignment, Expression, If, VariableDeclaration}, type_checker::ast::Literal};
+use crate::{parser::{self, Assignment, Expression, If, Statement, VariableDeclaration}, type_checker::ast::Literal};
 
-use super::{ast::{TypedExpression,
-        Typed,
-        ConditionBlock,
-        Member,
-        FieldInitializer,
-        TypedStatement,
-        UnaryOperator,
-        BinaryOperator,
-        UnionMemberFieldInitializers
+use super::{ast::{BinaryOperator, Block, ConditionBlock, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator, UnionMemberFieldInitializers
     },
     TypeEnvironment,
     Type,
@@ -380,10 +372,10 @@ pub fn check_type<'a>(
                 }
             }
             
-            Ok(TypedExpression::Block {
+            Ok(TypedExpression::Block(Block {
                 statements: statements_,
                 type_
-            })
+            }))
         },
         Expression::Drop(symbol) => {
             let type_ = type_environment.get_variable(symbol)
@@ -394,7 +386,40 @@ pub fn check_type<'a>(
                 type_
             })
         },
+        Expression::Loop(block) => {
+            let loop_environment = &mut type_environment.new_child();
+            let block = check_type(&Expression::Block(block.clone()), discovered_types, loop_environment)?;
+            let type_ = block.get_type();
+
+            Ok(TypedExpression::Loop(Block {
+                statements: vec![TypedStatement::Expression(block)],
+                type_
+            }))
+        },
     }
+}
+
+fn check_block_types<'a>(
+    statements: &Vec<Statement>,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: &mut TypeEnvironment<'a>) -> Result<Vec<TypedStatement>, String> {
+    let mut statements_: Vec<TypedStatement> = vec![];
+    
+    for statement in statements {
+        statements_.push(statements::check_type(statement, discovered_types, type_environment)?);
+    }
+
+    let mut type_ = Type::Void;
+    for statement in statements_.clone() {
+        match statement {
+            TypedStatement::Expression(e) => {
+                type_ = e.get_type();
+            },
+            _ => continue
+        }
+    }
+    
+    Ok(statements_)
 }
 
 fn check_type_member_access(object: &Box<Expression>, discovered_types: &Vec<DiscoveredType>, type_environment: &mut TypeEnvironment<'_>, member: &Box<parser::Member>) -> Result<TypedExpression, String> {

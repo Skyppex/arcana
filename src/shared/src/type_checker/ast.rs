@@ -86,6 +86,12 @@ impl Typed for TypedStatement {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Block{
+    pub statements: Vec<TypedStatement>,
+    pub type_: Type,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypedExpression {
     None, // For testing purposes
 
@@ -130,14 +136,12 @@ pub enum TypedExpression {
         false_expression: Box<TypedExpression>,
         type_: Type,
     },
-    Block {
-        statements: Vec<TypedStatement>,
-        type_: Type,
-    },
+    Block(Block),
     Drop {
         identifier: String,
         type_: Type
     },
+    Loop(Block),
 }
 
 impl Typed for TypedExpression {
@@ -153,8 +157,9 @@ impl Typed for TypedExpression {
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Ternary { type_, .. } => type_.clone(),
-            TypedExpression::Block { type_, .. } => type_.clone(),
+            TypedExpression::Block(Block { type_, .. }) => type_.clone(),
             TypedExpression::Drop { type_, .. } => type_.clone(),
+            TypedExpression::Loop(Block { type_, .. }) => type_.clone(),
         }
     }
 
@@ -170,8 +175,9 @@ impl Typed for TypedExpression {
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Ternary { type_, .. } => type_.clone(),
-            TypedExpression::Block { type_, .. } => type_.clone(),
+            TypedExpression::Block(Block { type_, .. }) => type_.clone(),
             TypedExpression::Drop { type_, .. } => type_.clone(),
+            TypedExpression::Loop(Block { type_, .. }) => type_.clone(),
         }
     }
 }

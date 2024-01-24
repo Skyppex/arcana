@@ -4,51 +4,51 @@ use super::{cursor::Cursor, token::{Token, NumericLiteralType, IntLiteralBase, T
 pub fn parse_numeric_literal(cursor: &mut Cursor) -> Token {
     let base = parse_base_prefix(cursor).unwrap_or(IntLiteralBase::Decimal);
     let value = parse_numeric_literal_value(cursor, base.clone());
-    let suffix = parse_suffix(cursor).unwrap_or(NumericLiteralType::Int32);
+    let suffix = parse_suffix(cursor).unwrap_or(NumericLiteralType::I32);
 
     let kind = match suffix {
-        NumericLiteralType::Int8 => TokenKind::Literal(Literal::I8(IntLiteral::<i8> {
+        NumericLiteralType::I8 => TokenKind::Literal(Literal::I8(IntLiteral::<i8> {
             value: value.parse::<i8>().expect("Failed to parse i8 literal"),
             base,
         })),
-        NumericLiteralType::Int16 => TokenKind::Literal(Literal::I16(IntLiteral::<i16> {
+        NumericLiteralType::I16 => TokenKind::Literal(Literal::I16(IntLiteral::<i16> {
             value: value.parse::<i16>().unwrap(),
             base,
         })),
-        NumericLiteralType::Int32 => TokenKind::Literal(Literal::I32(IntLiteral::<i32> {
+        NumericLiteralType::I32 => TokenKind::Literal(Literal::I32(IntLiteral::<i32> {
             value: value.parse::<i32>().unwrap(),
             base,
         })),
-        NumericLiteralType::Int64 => TokenKind::Literal(Literal::I64(IntLiteral::<i64> {
+        NumericLiteralType::I64 => TokenKind::Literal(Literal::I64(IntLiteral::<i64> {
             value: value.parse::<i64>().unwrap(),
             base,
         })),
-        NumericLiteralType::Int128 => TokenKind::Literal(Literal::I128(IntLiteral::<i128> {
+        NumericLiteralType::I128 => TokenKind::Literal(Literal::I128(IntLiteral::<i128> {
             value: value.parse::<i128>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt8 => TokenKind::Literal(Literal::U8(IntLiteral::<u8> {
+        NumericLiteralType::U8 => TokenKind::Literal(Literal::U8(IntLiteral::<u8> {
             value: value.parse::<u8>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt16 => TokenKind::Literal(Literal::U16(IntLiteral::<u16> {
+        NumericLiteralType::U16 => TokenKind::Literal(Literal::U16(IntLiteral::<u16> {
             value: value.parse::<u16>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt32 => TokenKind::Literal(Literal::U32(IntLiteral::<u32> {
+        NumericLiteralType::U32 => TokenKind::Literal(Literal::U32(IntLiteral::<u32> {
             value: value.parse::<u32>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt64 => TokenKind::Literal(Literal::U64(IntLiteral::<u64> {
+        NumericLiteralType::U64 => TokenKind::Literal(Literal::U64(IntLiteral::<u64> {
             value: value.parse::<u64>().unwrap(),
             base,
         })),
-        NumericLiteralType::UInt128 => TokenKind::Literal(Literal::U128(IntLiteral::<u128> {
+        NumericLiteralType::U128 => TokenKind::Literal(Literal::U128(IntLiteral::<u128> {
             value: value.parse::<u128>().unwrap(),
             base,
         })),
-        NumericLiteralType::Float32 => TokenKind::Literal(Literal::F32(value.parse::<f32>().expect("Failed to parse f32 literal"))),
-        NumericLiteralType::Float64 => TokenKind::Literal(Literal::F64(value.parse::<f64>().expect("Failed to parse f64 literal"))),
+        NumericLiteralType::F32 => TokenKind::Literal(Literal::F32(value.parse::<f32>().expect("Failed to parse f32 literal"))),
+        NumericLiteralType::F64 => TokenKind::Literal(Literal::F64(value.parse::<f64>().expect("Failed to parse f64 literal"))),
     };
 
     Token {
@@ -107,18 +107,18 @@ fn is_numeric_literal_suffix_start(c: char) -> bool {
 
 fn into_numeric_literal_suffix(suffix: &str) -> Option<NumericLiteralType> {
     match suffix {
-        "i8" => Some(NumericLiteralType::Int8),
-        "i16" => Some(NumericLiteralType::Int16),
-        "i32" => Some(NumericLiteralType::Int32),
-        "i64" => Some(NumericLiteralType::Int64),
-        "i128" => Some(NumericLiteralType::Int128),
-        "u8" => Some(NumericLiteralType::UInt8),
-        "u16" => Some(NumericLiteralType::UInt16),
-        "u32" => Some(NumericLiteralType::UInt32),
-        "u64" => Some(NumericLiteralType::UInt64),
-        "u128" => Some(NumericLiteralType::UInt128),
-        "f32" => Some(NumericLiteralType::Float32),
-        "f64" => Some(NumericLiteralType::Float64),
+        "i8" => Some(NumericLiteralType::I8),
+        "i16" => Some(NumericLiteralType::I16),
+        "i32" => Some(NumericLiteralType::I32),
+        "i64" => Some(NumericLiteralType::I64),
+        "i128" => Some(NumericLiteralType::I128),
+        "u8" => Some(NumericLiteralType::U8),
+        "u16" => Some(NumericLiteralType::U16),
+        "u32" => Some(NumericLiteralType::U32),
+        "u64" => Some(NumericLiteralType::U64),
+        "u128" => Some(NumericLiteralType::U128),
+        "f32" => Some(NumericLiteralType::F32),
+        "f64" => Some(NumericLiteralType::F64),
         _ => None,
     }
 }

@@ -109,18 +109,18 @@ pub enum IntLiteralBase {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NumericLiteralType {
-    Int8,
-    Int16,
-    Int32,
-    Int64,
-    Int128,
-    UInt8,
-    UInt16,
-    UInt32,
-    UInt64,
-    UInt128,
-    Float32,
-    Float64,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    F32,
+    F64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -139,9 +139,9 @@ pub enum Keyword {
     If,
     Else,
     // Match,
+    Loop,
     // While,
     // For,
-    // Loop,
     // Break,
     // Continue,
     // Return,

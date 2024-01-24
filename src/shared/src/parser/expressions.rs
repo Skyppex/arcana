@@ -2,23 +2,7 @@ use std::collections::HashMap;
 
 use crate::lexer::token::{TokenKind, Keyword, self};
 
-use super::{cursor::Cursor,
-    Expression,
-    statements::parse_statement,
-    ConditionBlock,
-    FieldInitializer,
-    Literal,
-    Member,
-    BinaryOperator,
-    UnaryOperator,
-    VariableDeclaration,
-    If,
-    Assignment,
-    Call,
-    Unary,
-    Binary,
-    Ternary,
-    UnionMemberFieldInitializers
+use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration
 };
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -26,7 +10,7 @@ pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
     let expression = parse_drop(cursor);
 
     #[cfg(not(feature = "interpreter"))]
-    let expression = parse_block(cursor);
+    let expression = parse_loop(cursor);
 
     if let TokenKind::Semicolon = cursor.first().kind {
         cursor.bump()?; // Consume the ;
@@ -39,7 +23,7 @@ pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
 #[cfg(feature = "interpreter")]
 fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Drop) {
-        return parse_block(cursor);
+        return parse_loop(cursor);
     }
 
     cursor.bump()?; // Consume the drop
@@ -59,13 +43,34 @@ fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(Expression::Drop(identifier))
 }
 
+pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Loop) {
+        return parse_block(cursor);
+    }
+
+    cursor.bump()?; // Consume the loop
+
+    let block = parse_block_statements(cursor)?;
+
+    Ok(Expression::Loop(block))
+}
+
 pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::OpenBrace {
         return parse_variable_declaration(cursor);
     }
 
-    cursor.bump()?; // Consume the {
+    parse_block_statements(cursor)
+        .map(|statements| Expression::Block(statements))
+}
 
+fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
+    if cursor.first().kind != TokenKind::OpenBrace {
+        return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
+    }
+
+    cursor.bump()?; // Consume the {
+    
     let mut statements = vec![];
 
     while cursor.first().kind != TokenKind::CloseBrace {
@@ -74,7 +79,7 @@ pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the }
 
-    Ok(Expression::Block(statements))
+    Ok(statements)
 }
 
 fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String> {

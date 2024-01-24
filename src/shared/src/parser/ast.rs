@@ -13,6 +13,8 @@ pub enum Statement {
     Print(Expression),
 }
 
+type Block = Vec<Statement>;
+
 #[derive(Debug, Clone)]
 pub enum Expression {
     None, // For testing purposes
@@ -26,7 +28,8 @@ pub enum Expression {
     Unary(Unary),
     Binary(Binary),
     Ternary(Ternary),
-    Block(Vec<Statement>),
+    Block(Block),
+    Loop(Block),
     #[cfg(feature = "interpreter")]
     Drop(String),
 }

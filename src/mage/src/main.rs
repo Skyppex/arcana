@@ -1,6 +1,6 @@
 mod interpreter;
 
-use std::{io::{stdin, stdout, Write}, fs::{self}, path::Path};
+use std::{cell::RefCell, fs::{self}, io::{stdin, stdout, Write}, path::Path, rc::Rc};
 
 use interpreter::evironment::Environment;
 use shared::{type_checker::{create_typed_ast, TypeEnvironment}, display::{Indent, IndentDisplay}, parser::create_ast};
@@ -15,7 +15,7 @@ fn main() {
 
 fn run_program() -> Result<(), String> {
     let mut type_environemnt = TypeEnvironment::new();
-    let mut environment = Environment::new();
+    let environment = Rc::new(RefCell::new(Environment::new()));
 
     loop {
         let _ = stdout().flush();
@@ -51,7 +51,7 @@ fn run_program() -> Result<(), String> {
             continue;
         }
 
-        if let Err(message) = read_input(input, &mut type_environemnt, &mut environment) {
+        if let Err(message) = read_input(input, &mut type_environemnt, environment.clone()) {
             println!("Error: {}", message);
         }
     }
@@ -60,7 +60,7 @@ fn run_program() -> Result<(), String> {
 fn read_input(
     input: String,
     type_environemnt: &mut TypeEnvironment<'_>,
-    environment: &mut Environment<'_>) -> Result<(), String> {
+    environment: Rc<RefCell<Environment>>) -> Result<(), String> {
     const PRINT_TOKENS: bool = false;
     const PRINT_PARSER_AST: bool = true;
     const PRINT_TYPE_CHECKER_AST: bool = true;

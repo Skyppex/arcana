@@ -303,6 +303,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "mutable" => Some(TokenKind::Keyword(Keyword::Mutable)),
         "if" => Some(TokenKind::Keyword(Keyword::If)),
         "else" => Some(TokenKind::Keyword(Keyword::Else)),
+        "loop" => Some(TokenKind::Keyword(Keyword::Loop)),
         // "while" => Some(TokenKind::Keyword(Keyword::While)),
         // "for" => Some(TokenKind::Keyword(Keyword::For)),
         // "match" => Some(TokenKind::Keyword(Keyword::Match)),

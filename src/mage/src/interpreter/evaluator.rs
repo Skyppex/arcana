@@ -1,8 +1,10 @@
-use shared::type_checker::{ast::*, Type};
+use std::{cell::RefCell, rc::Rc};
 
-use super::{value::{Value, Number, UnionMember, UnionFields}, evironment::Environment, evaluate_binop};
+use shared::type_checker::{ast::{Block, *}, Type};
 
-pub fn evaluate<'a>(typed_statement: TypedStatement, environment: &mut Environment) -> Result<Value, String> {
+use super::{value::{Value, Number, UnionMember, UnionFields}, evironment::{Environment, Rcrc}, evaluate_binop};
+
+pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environment>) -> Result<Value, String> {
     match typed_statement {
         TypedStatement::Program {
             statements
@@ -14,7 +16,7 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: &mut Environme
             body,
             type_: _
         } => {
-            environment.add_variable(
+            environment.borrow_mut().add_variable(
                 identifier.clone(),
                 Value::Function {
                     parameters: parameters.iter().map(|p| p.identifier.clone()).collect(),
@@ -34,7 +36,7 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: &mut Environme
     }
 }
 
-fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: &mut Environment) -> Result<Value, String> {
+fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: Rcrc<Environment>) -> Result<Value, String> {
     match typed_expression {
         TypedExpression::None => Ok(Value::Void),
         TypedExpression::VariableDeclaration {
@@ -55,7 +57,7 @@ fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: &mut 
             type_
         } => evaluate_assignment(member, initializer, type_, environment),
         TypedExpression::Member(m) => evaluate_member(m, environment),
-        TypedExpression::Literal(l) => evaluate_literal(l),
+        TypedExpression::Literal(l) => evaluate_literal(l, environment),
         TypedExpression::Call {
             caller,
             arguments,
@@ -78,21 +80,27 @@ fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: &mut 
             false_expression,
             type_
         } => evaluate_ternary(condition, true_expression, false_expression, type_, environment),
-        TypedExpression::Block {
+        TypedExpression::Block(Block {
             statements,
             type_
-        } => evaluate_block(statements, type_, environment),
+        }) => evaluate_block(statements, type_, environment),
         TypedExpression::Drop {
             identifier,
             type_
         } => evaluate_drop(identifier, type_, environment),
+        TypedExpression::Loop(Block {
+            statements,
+            type_: _
+        }) => {
+            evaluate_loop(environment, statements)
+        }
     }
 }
 
-fn evaluate_program<'a>(statements: Vec<TypedStatement>, environment: &mut Environment) -> Result<Value, String> {
+fn evaluate_program<'a>(statements: Vec<TypedStatement>, environment: Rcrc<Environment>) -> Result<Value, String> {
     let mut value = Value::Void;
     for statement in statements {
-        value = evaluate(statement, environment)?;
+        value = evaluate(statement, environment.clone())?;
     }
     Ok(value)
 }
@@ -102,13 +110,13 @@ fn evaluate_variable_declaration<'a>(
     identifier: String,
     initializer: Option<Box<TypedExpression>>,
     _type_: Type,
-    environment: &mut Environment
+    environment: Rcrc<Environment>
 ) -> Result<Value, String> {
     let value = match initializer {
-        Some(initializer) => evaluate_expression(*initializer, environment)?,
+        Some(initializer) => evaluate_expression(*initializer, environment.clone())?,
         None => Value::Uninitialized
     };
-    environment.add_variable(identifier, value.clone(), mutable);
+    environment.borrow_mut().add_variable(identifier, value.clone(), mutable);
     Ok(value)
 }
 
@@ -117,10 +125,10 @@ fn evaluate_if<'a>(
     else_ifs: Vec<ConditionBlock>,
     r#else: Option<Box<TypedExpression>>,
     _type_: Type,
-    environment: &mut Environment
+    environment: Rcrc<Environment>
 ) -> Result<Value, String> {
-    let if_environment = &mut environment.new_child();
-    let condition = evaluate_expression(*r#if.condition, if_environment)?;
+    let if_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
+    let condition = evaluate_expression(*r#if.condition, if_environment.clone())?;
 
     match condition {
         Value::Bool(v) => {
@@ -133,8 +141,8 @@ fn evaluate_if<'a>(
                 }
             } else {
                 for else_if in else_ifs {
-                    let else_if_environment = &mut environment.new_child();
-                    let condition = evaluate_expression(*else_if.condition, else_if_environment)?;
+                    let else_if_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
+                    let condition = evaluate_expression(*else_if.condition, else_if_environment.clone())?;
 
                     match condition {
                         Value::Bool(v) => {
@@ -165,22 +173,22 @@ fn evaluate_assignment<'a>(
     member: Box<Member>,
     initializer: Box<TypedExpression>,
     _type_: Type,
-    environment: &mut Environment
+    environment: Rcrc<Environment>
 ) -> Result<Value, String> {
-    let value = evaluate_expression(*initializer, environment)?;
-    environment.set_variable(*member, value.clone())?;
+    let value = evaluate_expression(*initializer, environment.clone())?;
+    environment.borrow_mut().set_variable(*member, value.clone())?;
     Ok(value)
 }
 
-fn evaluate_member<'a>(member: Member, environment: &mut Environment) -> Result<Value, String> {
+fn evaluate_member<'a>(member: Member, environment: Rcrc<Environment>) -> Result<Value, String> {
     match member {
         Member::Identifier {
             symbol,
             type_: _
         } => {
-            Ok(environment.get_variable(&symbol)
+            Ok(environment.borrow().get_variable(&symbol)
                 .ok_or(format!("Variable '{}' not found", symbol))?
-                .value.clone())
+                .borrow().value.clone())
         }
         Member::MemberAccess {
             object,
@@ -193,8 +201,8 @@ fn evaluate_member<'a>(member: Member, environment: &mut Environment) -> Result<
     }
 }
 
-fn evaluate_member_access<'a>(object: Box<TypedExpression>, environment: &mut Environment<'_>, member: Box<Member>) -> Result<Value, String> {
-    let value = evaluate_expression(*object, environment)?;
+fn evaluate_member_access<'a>(object: Box<TypedExpression>, environment: Rcrc<Environment>, member: Box<Member>) -> Result<Value, String> {
+    let value = evaluate_expression(*object, environment.clone())?;
 
     match value {
         Value::Struct { struct_name, fields } => {
@@ -226,7 +234,7 @@ fn evaluate_member_access<'a>(object: Box<TypedExpression>, environment: &mut En
     }
 }
 
-fn evaluate_literal<'a>(literal: Literal) -> Result<Value, String> {
+fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Result<Value, String> {
     match literal {
         Literal::Unit => Ok(Value::Unit),
         Literal::I8(v) => Ok(Value::Number(Number::I8(v))),
@@ -252,7 +260,9 @@ fn evaluate_literal<'a>(literal: Literal) -> Result<Value, String> {
             let mut fields = std::collections::HashMap::new();
 
             for field_initializer in field_initializers {
-                fields.insert(field_initializer.identifier.unwrap(), evaluate_expression(field_initializer.initializer, &mut Environment::new())?);
+                fields.insert(
+                    field_initializer.identifier.unwrap(),
+                     evaluate_expression(field_initializer.initializer, environment.clone())?);
             }
 
             Ok(Value::Struct { struct_name: type_name, fields })
@@ -269,7 +279,7 @@ fn evaluate_literal<'a>(literal: Literal) -> Result<Value, String> {
                     let mut fields = std::collections::HashMap::new();
 
                     for (identifier, initializer) in field_initializers {
-                        fields.insert(identifier, evaluate_expression(initializer, &mut Environment::new())?);
+                        fields.insert(identifier, evaluate_expression(initializer, environment.clone())?);
                     }
 
                     UnionFields::Named(fields)
@@ -278,7 +288,7 @@ fn evaluate_literal<'a>(literal: Literal) -> Result<Value, String> {
                     let mut fields = Vec::new();
 
                     for initializer in field_initializers {
-                        fields.push(evaluate_expression(initializer, &mut Environment::new())?);
+                        fields.push(evaluate_expression(initializer, environment.clone())?);
                     }
 
                     UnionFields::Unnamed(fields)
@@ -297,23 +307,23 @@ fn evaluate_call<'a>(
     caller: Box<TypedExpression>,
     arguments: Vec<TypedExpression>,
     _type_: Type,
-    environment: &mut Environment
+    environment: Rcrc<Environment>
 ) -> Result<Value, String> {
-    let caller_value = evaluate_expression(*caller, environment)?;
+    let caller_value = evaluate_expression(*caller, environment.clone())?;
 
     let mut evaluated_arguments = Vec::new();
 
     for argument in arguments {
-        let evaluated_arg = evaluate_expression(argument, environment)?;
+        let evaluated_arg = evaluate_expression(argument, environment.clone())?;
         evaluated_arguments.push(evaluated_arg);
     }
 
     match caller_value {
         Value::Function { parameters, body } => {
-            let function_environment = &mut environment.new_child();
+            let function_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
 
             for (index, parameter) in parameters.iter().enumerate() {
-                function_environment.add_variable(parameter.clone(), evaluated_arguments[index].clone(), false);
+                function_environment.borrow_mut().add_variable(parameter.clone(), evaluated_arguments[index].clone(), false);
             }
 
             evaluate_expression(*body, function_environment)
@@ -326,7 +336,7 @@ fn evaluate_unary<'a>(
     operator: UnaryOperator,
     expression: Box<TypedExpression>,
     _type_: Type,
-    environment: &mut Environment
+    environment: Rcrc<Environment>
 ) -> Result<Value, String> {
     let value = evaluate_expression(*expression, environment)?;
 
@@ -388,9 +398,9 @@ fn evaluate_binary<'a>(
     operator: BinaryOperator,
     right: Box<TypedExpression>,
     _type_: Type,
-    environment: &mut Environment
+    environment: Rcrc<Environment>
 ) -> Result<Value, String> {
-    let left = evaluate_expression(*left, environment)?;
+    let left = evaluate_expression(*left, environment.clone())?;
     let right = evaluate_expression(*right, environment)?;
 
     evaluate_binop::evaluate_binop(left, operator, right)
@@ -401,15 +411,15 @@ fn evaluate_ternary<'a>(
     true_expression: Box<TypedExpression>,
     false_expression: Box<TypedExpression>,
     _type_: Type,
-    environment: &mut Environment
+    environment: Rcrc<Environment>
 ) -> Result<Value, String> {
-    let ternary_environment = &mut environment.new_child();
-    let condition = evaluate_expression(*condition, ternary_environment)?;
+    let ternary_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
+    let condition = evaluate_expression(*condition, ternary_environment.clone())?;
 
     match condition {
         Value::Bool(v) => {
             if v {
-                evaluate_expression(*true_expression, ternary_environment)
+                evaluate_expression(*true_expression, ternary_environment.clone())
             } else {
                 evaluate_expression(*false_expression, ternary_environment)
             }
@@ -421,13 +431,13 @@ fn evaluate_ternary<'a>(
 fn evaluate_block<'a>(
     statements: Vec<TypedStatement>,
     _type_: Type,
-    environment: &mut Environment
+    environment: Rcrc<Environment>
 ) -> Result<Value, String> {
-    let block_environment = &mut environment.new_child();
+    let block_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
     let mut value = Value::Void;
 
     for statement in statements {
-        value = evaluate(statement, block_environment)?;
+        value = evaluate(statement, block_environment.clone())?;
     }
 
     Ok(value)
@@ -436,10 +446,40 @@ fn evaluate_block<'a>(
 fn evaluate_drop<'a>(
     identifier: String,
     _type_: Type,
-    environment: &mut Environment
+    environment: Rcrc<Environment>
 ) -> Result<Value, String> {
-    let variable: super::value::Variable = environment.remove_variable(&identifier)
+    let variable = environment.borrow_mut().remove_variable(&identifier)
         .ok_or(format!("Variable '{}' not found", identifier))?;
 
-    Ok(variable.value)
+    let value = variable.borrow().value.clone();
+    Ok(value)
+}
+
+fn evaluate_loop(environment: Rcrc<Environment>, statements: Vec<TypedStatement>) -> Result<Value, String> {
+    let loop_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
+
+    let mut value = Value::Void;
+
+     // Temporary while we don't have a break statement
+    const ITERATIONS: i32 = 10;
+    let mut i = 0;
+
+    loop {
+        for statement in statements.clone() {
+            value = evaluate(statement, loop_environment.clone())?;
+        }
+
+        match value {
+            // Value::Break => break,
+            // Value::Continue => continue,
+            _ => {}
+        }
+
+        i += 1;
+        if i == ITERATIONS {
+            break;
+        }
+    }
+
+    Ok(value)
 }

@@ -1,8 +1,18 @@
-use std::fmt::Display;
-
 use crate::{parser::{
-    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, FlagsDeclaration, FlagsMember, FlagsValue, FunctionDeclaration, If, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, UnionMember, UnionMemberField, UnionMemberFieldInitializers, VariableDeclaration
-}, type_checker::{ast::{TypedStatement, TypedExpression}, self}};
+    Statement,
+    Expression,
+    AccessModifier,
+    StructDeclaration, StructField,
+    UnionDeclaration, UnionMember, UnionMemberField,
+    FlagsDeclaration, FlagsMember,
+    FunctionDeclaration, Parameter,
+    VariableDeclaration, Assignment,
+    Literal, FieldInitializer, UnionMemberFieldInitializers,
+    Unary, UnaryOperator,
+    Binary, BinaryOperator,
+    Ternary, If, ConditionBlock,
+    Call, Member,
+}, type_checker::{ast::{Block, TypedExpression, TypedStatement}, self}};
 
 pub struct Indent {
     levels: Vec<bool>,
@@ -326,6 +336,26 @@ impl IndentDisplay for Expression {
             Expression::Drop(identifier) => {
                 let mut result = String::new();
                 result.push_str(format!("<drop> {}", identifier).as_str());
+                result
+            },
+            Expression::Loop(statements) => {
+                let mut result = String::new();
+                result.push_str("<loop>\n");
+                indent.increase();
+                indent.current(true);
+                result.push_str(format!("{}<block>", indent.dash_end()).as_str());
+                indent.increase();
+                indent.current(true);
+                for (i, statement) in statements.iter().enumerate() {
+                    if i < statements.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                    } else {
+                        indent.current(true);
+                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                    }
+                }
+                indent.decrease();
+                indent.decrease();
                 result
             },
         }
@@ -809,10 +839,10 @@ impl IndentDisplay for TypedExpression {
                 indent.decrease();
                 result
             },
-            TypedExpression::Block {
+            TypedExpression::Block(Block {
                 statements,
                 type_
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str(format!("<block>: {}", type_).as_str());
                 indent.increase();
@@ -833,6 +863,25 @@ impl IndentDisplay for TypedExpression {
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<drop> {}: {}", identifier, type_).as_str());
+                result
+            },
+            TypedExpression::Loop(Block {
+                statements,
+                type_
+            }) => {
+                let mut result = String::new();
+                result.push_str(format!("<loop>: {}", type_).as_str());
+                indent.increase();
+                indent.current(true);
+                for (i, statement) in statements.iter().enumerate() {
+                    if i < statements.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                    } else {
+                        indent.current(true);
+                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                    }
+                }
+                indent.decrease();
                 result
             },
         }
