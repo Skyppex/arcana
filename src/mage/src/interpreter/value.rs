@@ -4,8 +4,8 @@ use shared::type_checker::ast::TypedExpression;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    Void,
     Uninitialized,
+    Void,
     Unit,
     Bool(bool),
     Number(Number),
@@ -19,8 +19,8 @@ pub enum Value {
 impl<'a> Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Value::Void => write!(f, "void"),
             Value::Uninitialized => write!(f, "uninitialized"),
+            Value::Void => write!(f, "void"),
             Value::Unit => write!(f, "unit"),
             Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),

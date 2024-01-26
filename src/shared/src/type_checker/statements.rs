@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::parser::{Statement, self};
 
 use super::{
-    ast::{TypedStatement, self},
+    ast::{self, Typed, TypedStatement},
     expressions,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
@@ -45,11 +45,11 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                     .map(|field| (field.identifier.clone(), field.type_name.clone()))
                     .collect()))
                 .collect())]),
-        Statement::FlagsDeclaration(parser::FlagsDeclaration {
-            access_modifier: _,
-            type_name,
-            members
-        }) => Ok(vec![]),
+        // Statement::FlagsDeclaration(parser::FlagsDeclaration {
+        //     access_modifier: _,
+        //     type_name,
+        //     members
+        // }) => Ok(vec![]),
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             identifier,
@@ -60,6 +60,8 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             identifier.clone(),
             parameters.iter().map(|parameter| (parameter.identifier.clone(), parameter.type_name.clone())).collect(),
             return_type.clone().unwrap_or(Type::Void.to_string()))]),
+        Statement::Semi(_) => Ok(vec![]),
+        Statement::Break(_) => Ok(vec![]),
         Statement::Expression(_) => Ok(vec![]),
         Statement::Print(_) => Ok(vec![]),
     }
@@ -194,41 +196,41 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 type_: union
             })
         },
-        Statement::FlagsDeclaration(parser::FlagsDeclaration {
-            access_modifier: _,
-            type_name,
-            members
-        }) => {
-            todo!("Flags declaration")
-            // let ms: Result<Vec<ast::FlagsMember>, String> = members.iter()
-            //     .map(|member| {
-            //         Ok(ast::FlagsMember {
-            //             identifier: member.identifier.clone(),
-            //             value: ast::FlagsValue::Default
-            //         })
-            //     })
-            //     .collect();
+        // Statement::FlagsDeclaration(parser::FlagsDeclaration {
+        //     access_modifier: _,
+        //     type_name,
+        //     members
+        // }) => {
+        //     todo!("Flags declaration")
+        //     // let ms: Result<Vec<ast::FlagsMember>, String> = members.iter()
+        //     //     .map(|member| {
+        //     //         Ok(ast::FlagsMember {
+        //     //             identifier: member.identifier.clone(),
+        //     //             value: ast::FlagsValue::Default
+        //     //         })
+        //     //     })
+        //     //     .collect();
 
-            // let flags = Type::Flags(Union {
-            //     name: type_name.clone(),
-            //     members: ms.clone()?
-            //         .iter()
-            //         .map(|m| (m.identifier.clone(), Type::FlagsMember(UnionMember {
-            //             union_name: type_name.clone(),
-            //             discriminant_name: m.identifier.clone(),
-            //             fields: HashMap::new()
-            //         })))
-            //         .collect()
-            // });
+        //     // let flags = Type::Flags(Union {
+        //     //     name: type_name.clone(),
+        //     //     members: ms.clone()?
+        //     //         .iter()
+        //     //         .map(|m| (m.identifier.clone(), Type::FlagsMember(UnionMember {
+        //     //             union_name: type_name.clone(),
+        //     //             discriminant_name: m.identifier.clone(),
+        //     //             fields: HashMap::new()
+        //     //         })))
+        //     //         .collect()
+        //     // });
 
-            // type_environment.add_type(flags.clone())?;
+        //     // type_environment.add_type(flags.clone())?;
 
-            // Ok(TypedStatement::FlagsDeclaration {
-            //     type_name: type_name.clone(),
-            //     members: ms?,
-            //     type_: flags
-            // })
-        },
+        //     // Ok(TypedStatement::FlagsDeclaration {
+        //     //     type_name: type_name.clone(),
+        //     //     members: ms?,
+        //     //     type_: flags
+        //     // })
+        // },
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             identifier,
@@ -281,6 +283,11 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 type_
             })
         },
+        Statement::Semi(s) => Ok(TypedStatement::Semi(Box::new(check_type(s, discovered_types, type_environment)?))),
+        Statement::Break(e) => match e {
+            Some(e) => Ok(TypedStatement::Break(Some(expressions::check_type(e, discovered_types, type_environment)?))),
+            None => Ok(TypedStatement::Break(None))
+        } 
         Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(e, discovered_types, type_environment)?)),
         Statement::Print(e) => Ok(TypedStatement::Print(expressions::check_type(e, discovered_types, type_environment)?)),
     }

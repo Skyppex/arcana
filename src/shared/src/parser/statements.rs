@@ -1,15 +1,36 @@
 use crate::lexer::token::{TokenKind, Keyword};
 
-use super::{cursor::Cursor, expressions::{parse_block, self}, FlagsDeclaration, FlagsMember, FlagsValue, FunctionDeclaration, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
+use super::{cursor::Cursor, expressions::{self, parse_block, parse_expression}, FlagsMember, FlagsValue, FunctionDeclaration, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
-    let statement = parse_function_declaration_statement(cursor);
+    match parse_break(cursor) {
+        Ok(s) => {
+            if let TokenKind::Semicolon = cursor.first().kind {
+                cursor.bump()?; // Consume the ;
+                return Ok(Statement::Semi(Box::new(s)));
+            }
+    
+            Ok(s)
+        },
+        Err(e) => Err(e),
+    }
+}
 
-    if let TokenKind::Semicolon = cursor.first().kind {
-        cursor.bump()?; // Consume the semicolon
+fn parse_break(cursor: &mut Cursor) -> Result<Statement, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Break) {
+        return parse_function_declaration_statement(cursor);
     }
 
-    statement
+    cursor.bump()?; // Consume the break
+
+    let expression = if cursor.first().kind == TokenKind::Semicolon {
+        cursor.bump()?; // Consume the ;
+        None
+    } else {
+        Some(parse_expression(cursor)?)
+    };
+
+    Ok(Statement::Break(expression))
 }
 
 fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
@@ -123,7 +144,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
-            return parse_flags_declaration_statement(cursor);
+            return parse_next(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -131,7 +152,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
-        return parse_flags_declaration_statement(cursor);
+        return parse_next(cursor);
     }
 
     cursor.bump()?; // Consume the union keyword
@@ -171,59 +192,68 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }))
 }
 
-fn parse_flags_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
-    let mut access_modifier = None;
+// fn parse_flags_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
+//     let mut access_modifier = None;
 
-    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
-        if cursor.second().kind != TokenKind::Keyword(Keyword::Flags) {
-            return parse_print(cursor);
-        }
+//     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+//         if cursor.second().kind != TokenKind::Keyword(Keyword::Flags) {
+//             return parse_print(cursor);
+//         }
 
-        cursor.bump()?; // Consume the access modifier
-        access_modifier = Some(am);
-    }
+//         cursor.bump()?; // Consume the access modifier
+//         access_modifier = Some(am);
+//     }
 
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Flags) {
-        return parse_print(cursor);
-    }
+//     if cursor.first().kind != TokenKind::Keyword(Keyword::Flags) {
+//         return parse_print(cursor);
+//     }
 
-    cursor.bump()?; // Consume the flags keyword
+//     cursor.bump()?; // Consume the flags keyword
 
-    let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-    };
+//     let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
+//         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+//     };
     
-    let TokenKind::OpenBrace = cursor.bump()?.kind else {
-        return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
-    };
+//     let TokenKind::OpenBrace = cursor.bump()?.kind else {
+//         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
+//     };
 
-    let mut members = vec![];
-    let mut has_comma = true;
+//     let mut members = vec![];
+//     let mut has_comma = true;
 
-    while cursor.first().kind != TokenKind::CloseBrace {
-        if !has_comma {
-            return Err(format!("Expected , but found {:?}", cursor.first().kind));
-        }
+//     while cursor.first().kind != TokenKind::CloseBrace {
+//         if !has_comma {
+//             return Err(format!("Expected , but found {:?}", cursor.first().kind));
+//         }
 
-        has_comma = true;
-        members.push(parse_flags_member(cursor)?);
+//         has_comma = true;
+//         members.push(parse_flags_member(cursor)?);
 
-        if cursor.first().kind == TokenKind::Comma {
-            cursor.bump()?; // Consume the ,
-        } else {
-            has_comma = false;
-        }
-    }
+//         if cursor.first().kind == TokenKind::Comma {
+//             cursor.bump()?; // Consume the ,
+//         } else {
+//             has_comma = false;
+//         }
+//     }
 
-    cursor.bump()?; // Consume the }
+//     cursor.bump()?; // Consume the }
 
-    Ok(Statement::FlagsDeclaration(FlagsDeclaration {
-        access_modifier,
-        type_name,
-        members,
-    }))
+//     Ok(Statement::FlagsDeclaration(FlagsDeclaration {
+//         access_modifier,
+//         type_name,
+//         members,
+//     }))
+// }
+
+fn parse_next(cursor: &mut Cursor) -> Result<Statement, String> {
+    #[cfg(feature = "interpreter")]
+    return parse_print(cursor);
+    
+    #[cfg(not(feature = "interpreter"))]
+    return parse_expression_map(cursor);
 }
 
+#[cfg(feature = "interpreter")]
 fn parse_print(cursor: &mut Cursor) -> Result<Statement, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Print) {
         return parse_expression_map(cursor);
@@ -245,7 +275,17 @@ fn parse_print(cursor: &mut Cursor) -> Result<Statement, String> {
 }
 
 fn parse_expression_map(cursor: &mut Cursor) -> Result<Statement, String> {
-    expressions::parse_expression(cursor).map(|e| Statement::Expression(e))
+    match expressions::parse_expression(cursor) {
+        Ok(e) => {
+            if let TokenKind::Semicolon = cursor.first().kind {
+                cursor.bump()?; // Consume the ;
+                return Ok(Statement::Semi(Box::new(Statement::Expression(e))));
+            }
+    
+            Ok(Statement::Expression(e))
+        },
+        Err(e) => Err(e),
+    }
 }
 
 fn parse_parameters(cursor: &mut Cursor) -> Result<Vec<Parameter>, String> {

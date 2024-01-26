@@ -5,8 +5,10 @@ pub enum Statement {
     Program { statements: Vec<Statement> },
     StructDeclaration(StructDeclaration),
     UnionDeclaration(UnionDeclaration),
-    FlagsDeclaration(FlagsDeclaration),
+    // FlagsDeclaration(FlagsDeclaration),
     FunctionDeclaration(FunctionDeclaration),
+    Semi(Box<Statement>),
+    Break(Option<Expression>),
     Expression(Expression),
 
     #[cfg(feature = "interpreter")]

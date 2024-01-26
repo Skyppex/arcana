@@ -133,7 +133,7 @@ pub enum Keyword {
     Fn,
     Struct,
     Union,
-    Flags,
+    // Flags,
 
     // Control flow
     If,
@@ -142,8 +142,8 @@ pub enum Keyword {
     Loop,
     // While,
     // For,
-    // Break,
-    // Continue,
+    Break,
+    Continue,
     // Return,
 
     // Literals

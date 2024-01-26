@@ -12,7 +12,7 @@ use crate::{parser::{
     Binary, BinaryOperator,
     Ternary, If, ConditionBlock,
     Call, Member,
-}, type_checker::{ast::{Block, TypedExpression, TypedStatement}, self}};
+}, type_checker::{self, ast::{Block, TypedExpression, TypedStatement}, Type}};
 
 pub struct Indent {
     levels: Vec<bool>,
@@ -96,11 +96,7 @@ impl IndentDisplay for Statement {
                 result.push_str(format!("<struct declaration> {}\n", type_name).as_str());
                 indent.increase();
 
-                if let Some(access_modifier) = access_modifier {
-                    result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
-                } else {
-                    result.push_str(format!("{}access_modifier: None", indent.dash()).as_str());
-                }
+                result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
 
                 for (i, field) in fields.iter().enumerate() {
                     let is_end = i == fields.len() - 1;
@@ -119,40 +115,36 @@ impl IndentDisplay for Statement {
                 let mut result = String::new();
                 result.push_str(format!("<union declaration> {}\n", type_name).as_str());
                 indent.increase();
-                if let Some(access_modifier) = access_modifier {
-                    result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
-                } else {
-                    result.push_str(format!("{}access_modifier: None", indent.dash()).as_str());
-                }
+                result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
+
                 for (i, member) in members.iter().enumerate() {
                     let is_end = i == members.len() - 1;
                     indent.current(is_end);
                     result.push_str(format!("\n{}{}", indent.dash_end(), member.indent_display(indent)).as_str());
                 }
+
                 indent.decrease();
                 result
             },
-            Statement::FlagsDeclaration(FlagsDeclaration {
-                access_modifier,
-                type_name,
-                members
-            }) => {
-                let mut result = String::new();
-                result.push_str(format!("<flags declaration> {}\n", type_name).as_str());
-                indent.increase();
-                if let Some(access_modifier) = access_modifier {
-                    result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
-                } else {
-                    result.push_str(format!("{}access_modifier: None", indent.dash()).as_str());
-                }
-                for (i, member) in members.iter().enumerate() {
-                    let is_end = i == members.len() - 1;
-                    indent.current(is_end);
-                    result.push_str(format!("\n{}{}", indent.dash_end(), member.indent_display(indent)).as_str());
-                }
-                indent.decrease();
-                result
-            },
+            // Statement::FlagsDeclaration(FlagsDeclaration {
+            //     access_modifier,
+            //     type_name,
+            //     members
+            // }) => {
+            //     let mut result = String::new();
+            //     result.push_str(format!("<flags declaration> {}\n", type_name).as_str());
+            //     indent.increase();
+            //     result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
+                
+            //     for (i, member) in members.iter().enumerate() {
+            //         let is_end = i == members.len() - 1;
+            //         indent.current(is_end);
+            //         result.push_str(format!("\n{}{}", indent.dash_end(), member.indent_display(indent)).as_str());
+            //     }
+
+            //     indent.decrease();
+            //     result
+            // },
             Statement::FunctionDeclaration(FunctionDeclaration {
                 access_modifier,
                 identifier,
@@ -163,21 +155,33 @@ impl IndentDisplay for Statement {
                 let mut result = String::new();
                 result.push_str(format!("<function declaration> {}\n", identifier).as_str());
                 indent.increase();
-                if let Some(access_modifier) = access_modifier {
-                    result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
-                } else {
-                    result.push_str(format!("{}access_modifier: None", indent.dash()).as_str());
-                }
+                result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
+
                 for parameter in parameters {
                     result.push_str(format!("\n{}{}", indent.dash(), parameter.indent_display(indent)).as_str());
                 }
-                if let Some(return_type) = return_type {
-                    result.push_str(format!("\n{}return_type: {}\n", indent.dash(), return_type).as_str());
-                } else {
-                    result.push_str(format!("{}return_type: None\n", indent.dash()).as_str());
-                }
+
+                result.push_str(format!("\n{}return_type: {}\n", indent.dash(), return_type.indent_display(indent)).as_str());
                 indent.current(true);
                 result.push_str(format!("{}body: {}", indent.dash_end(), body.indent_display(indent)).as_str());
+                indent.decrease();
+                result
+            },
+            Statement::Semi(statement) => {
+                let mut result = String::new();
+                result.push_str("<semi>\n");
+                indent.increase();
+                indent.current(true);
+                result.push_str(format!("{}statement: {}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                indent.decrease();
+                result
+            },
+            Statement::Break(e) => {
+                let mut result = String::new();
+                result.push_str("<break>\n");
+                indent.increase();
+                indent.current(true);
+                result.push_str(format!("{}expression: {}", indent.dash_end(), e.indent_display(indent)).as_str());
                 indent.decrease();
                 result
             },
@@ -205,11 +209,7 @@ impl IndentDisplay for Expression {
                 result.push_str(format!("{}mutable: {}\n", indent.dash(), mutable).as_str());
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name).as_str());
                 indent.current(true);
-                if let Some(initializer) = initializer {
-                    result.push_str(format!("{}initializer: {}", indent.dash_end(), initializer.indent_display(indent)).as_str());
-                } else {
-                    result.push_str(format!("{}initializer: None", indent.dash_end()).as_str());
-                }
+                result.push_str(format!("{}initializer: {}", indent.dash_end(), initializer.indent_display(indent)).as_str());
                 indent.decrease();
                 result
             },
@@ -233,11 +233,7 @@ impl IndentDisplay for Expression {
                     result.push_str(format!("\n{}else_ifs: None\n", indent.dash()).as_str());
                 }
                 indent.current(true);
-                if let Some(r#else) = r#else {
-                    result.push_str(format!("{}else block: {}", indent.dash_end(), r#else.indent_display(indent)).as_str());
-                } else {
-                    result.push_str(format!("{}else block: None", indent.dash_end()).as_str());
-                }
+                result.push_str(format!("{}else block: {}", indent.dash_end(), r#else.indent_display(indent)).as_str());
                 indent.decrease();
                 result
             },
@@ -703,6 +699,25 @@ impl IndentDisplay for TypedStatement {
                 indent.decrease();
                 result
             },
+            TypedStatement::Semi(e) => {
+                let mut result = String::new();
+                result.push_str(format!("<semi>: {}\n", Type::Void).as_str());
+                indent.increase();
+                indent.current(true);
+                result.push_str(format!("{}statement: {}", indent.dash_end(), e.indent_display(indent)).as_str());
+                indent.decrease();
+                result
+            
+            },
+            TypedStatement::Break(e) => {
+                let mut result = String::new();
+                result.push_str(format!("<break>: {}\n", Type::Void).as_str());
+                indent.increase();
+                indent.current(true);
+                result.push_str(format!("{}expression: {}", indent.dash_end(), e.indent_display(indent)).as_str());
+                indent.decrease();
+                result
+            },
             TypedStatement::Expression(e) => e.indent_display(indent),
             TypedStatement::Print(e) => e.indent_display(indent),
         }
@@ -1133,5 +1148,26 @@ impl IndentDisplay for type_checker::ast::UnionMemberFieldInitializers {
                 result
             },
         }
+    }
+}
+
+impl<T: IndentDisplay> IndentDisplay for Option<T> {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        match self {
+            Some(v) => v.indent_display(indent),
+            None => "None".to_string(),
+        }
+    }
+}
+
+impl<T: IndentDisplay> IndentDisplay for Box<T> {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        self.as_ref().indent_display(indent)
+    }
+}
+
+impl IndentDisplay for String {
+    fn indent_display(&self, _indent: &mut Indent) -> String {
+        self.clone()
     }
 }

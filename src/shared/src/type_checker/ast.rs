@@ -32,6 +32,8 @@ pub enum TypedStatement {
         body: Box<TypedExpression>,
         type_: Type,
     },
+    Semi(Box<TypedStatement>),
+    Break(Option<TypedExpression>),
     Expression(TypedExpression),
 
     #[cfg(feature = "interpreter")]
@@ -45,18 +47,6 @@ impl TypedStatement {
             _ => None,
         }
     }
-
-    pub fn get_type(&self) -> Type {
-        match self {
-            TypedStatement::None => Type::Void,
-            TypedStatement::Program { .. } => Type::Void,
-            TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
-            TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
-            TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
-            TypedStatement::Expression(e) => e.get_type(),
-            TypedStatement::Print(_) => Type::Void,
-        }
-    }
 }
 
 impl Typed for TypedStatement {
@@ -67,6 +57,8 @@ impl Typed for TypedStatement {
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::Semi { .. } => Type::Void,
+            TypedStatement::Break(_) => Type::Void,
             TypedStatement::Expression(e) => e.get_type(),
             TypedStatement::Print(_) => Type::Void,
         }
@@ -79,8 +71,10 @@ impl Typed for TypedStatement {
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::Semi(e) => e.get_deep_type(),
+            TypedStatement::Break(e) => e.as_ref().map_or(Type::Void, |e| e.get_deep_type()),
             TypedStatement::Expression(e) => e.get_deep_type(),
-            TypedStatement::Print(_) => Type::Void,
+            TypedStatement::Print(e) => e.get_deep_type(),
         }
     }
 }

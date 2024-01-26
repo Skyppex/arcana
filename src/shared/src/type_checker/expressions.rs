@@ -50,9 +50,9 @@ pub fn check_type<'a>(
         }) => {
             let if_else_environment = &mut type_environment.new_child();
             let if_condition = check_type(&r#if.condition, discovered_types, if_else_environment)?;
-            if let Type::Bool = if_condition.get_type() {
-                return Err(format!("If condition must be of type bool"));
-            }
+            let Type::Bool = if_condition.get_type() else {
+                return Err(format!("If condition must be of type bool | {}", if_condition.get_type()));
+            };
 
             let if_block = check_type(&r#if.block, discovered_types, if_else_environment)?;
             let if_block_type = if_block.get_type();
@@ -258,13 +258,13 @@ pub fn check_type<'a>(
                             Err("Not enough arguments")?
                         };
                         
-                        let arg_typed_exression = check_type(arg, discovered_types, type_environment)?;
+                        let arg_typed_expression = check_type(arg, discovered_types, type_environment)?;
 
-                        if arg_typed_exression.get_deep_type() != type_.clone() {
-                            Err(format!("Argument {} type {} does not match parameter type {}", i, arg_typed_exression.get_type(), type_))?
+                        if arg_typed_expression.get_deep_type() != type_.clone() {
+                            Err(format!("Argument {} type {} does not match parameter type {}", i, arg_typed_expression.get_type(), type_))?
                         }
 
-                        args.push(arg_typed_exression);
+                        args.push(arg_typed_expression);
                     }
 
                     Ok(TypedExpression::Call {
@@ -397,29 +397,6 @@ pub fn check_type<'a>(
             }))
         },
     }
-}
-
-fn check_block_types<'a>(
-    statements: &Vec<Statement>,
-    discovered_types: &Vec<DiscoveredType>,
-    type_environment: &mut TypeEnvironment<'a>) -> Result<Vec<TypedStatement>, String> {
-    let mut statements_: Vec<TypedStatement> = vec![];
-    
-    for statement in statements {
-        statements_.push(statements::check_type(statement, discovered_types, type_environment)?);
-    }
-
-    let mut type_ = Type::Void;
-    for statement in statements_.clone() {
-        match statement {
-            TypedStatement::Expression(e) => {
-                type_ = e.get_type();
-            },
-            _ => continue
-        }
-    }
-    
-    Ok(statements_)
 }
 
 fn check_type_member_access(object: &Box<Expression>, discovered_types: &Vec<DiscoveredType>, type_environment: &mut TypeEnvironment<'_>, member: &Box<parser::Member>) -> Result<TypedExpression, String> {

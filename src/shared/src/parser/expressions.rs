@@ -12,11 +12,6 @@ pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
     #[cfg(not(feature = "interpreter"))]
     let expression = parse_loop(cursor);
 
-    if let TokenKind::Semicolon = cursor.first().kind {
-        cursor.bump()?; // Consume the ;
-        return expression;
-    }
-
     return expression;
 }
 

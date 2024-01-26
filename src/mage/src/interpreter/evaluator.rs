@@ -2,10 +2,15 @@ use std::{cell::RefCell, rc::Rc};
 
 use shared::type_checker::{ast::{Block, *}, Type};
 
-use super::{value::{Value, Number, UnionMember, UnionFields}, evironment::{Environment, Rcrc}, evaluate_binop};
+use crate::interpreter::scope::Scope;
+
+use super::{evaluate_binop, evironment::{Environment, Rcrc}, scope::ScopeType, value::{Value, Number, UnionMember, UnionFields}};
 
 pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environment>) -> Result<Value, String> {
     match typed_statement {
+        TypedStatement::None => Ok(Value::Void),
+        TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
         TypedStatement::Program {
             statements
         } => evaluate_program(statements, environment),
@@ -26,13 +31,17 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
 
             Ok(Value::Void)
         }
+        TypedStatement::Semi(s) => {
+            evaluate(*s, environment)?;
+            Ok(Value::Void)
+        }
+        TypedStatement::Break(e) => evaluate_break(e, Type::Void, environment),
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
         TypedStatement::Print(e) => {
             let value = evaluate_expression(e, environment)?;
             println!("{}", value);
             Ok(Value::Void)
         }
-        _ => Ok(Value::Void)
     }
 }
 
@@ -93,7 +102,7 @@ fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: Rcrc<
             type_: _
         }) => {
             evaluate_loop(environment, statements)
-        }
+        },
     }
 }
 
@@ -133,11 +142,11 @@ fn evaluate_if<'a>(
     match condition {
         Value::Bool(v) => {
             if v {
-                let value = evaluate_expression(*r#if.block, if_environment);
+                let value = evaluate_expression(*r#if.block, if_environment)?;
                 if r#else.is_none() {
                     return Ok(Value::Void);
                 } else {
-                    return value;
+                    return Ok(value);
                 }
             } else {
                 for else_if in else_ifs {
@@ -456,30 +465,45 @@ fn evaluate_drop<'a>(
 }
 
 fn evaluate_loop(environment: Rcrc<Environment>, statements: Vec<TypedStatement>) -> Result<Value, String> {
-    let loop_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
+    let loop_environment = Rc::new(RefCell::new(Environment::new_scope(environment, Scope::Break(None))));
 
-    let mut value = Value::Void;
+    let break_value;
 
-     // Temporary while we don't have a break statement
-    const ITERATIONS: i32 = 10;
-    let mut i = 0;
-
-    loop {
+    'outer: loop {
         for statement in statements.clone() {
-            value = evaluate(statement, loop_environment.clone())?;
-        }
+            evaluate(statement, loop_environment.clone())?;
 
-        match value {
-            // Value::Break => break,
-            // Value::Continue => continue,
-            _ => {}
-        }
+            if let Some(Scope::Break(v)) = loop_environment.borrow().get_scope(&ScopeType::Break) {
+                break_value = match v {
+                    Some(v) => v.clone(),
+                    None => Value::Void
+                };
 
-        i += 1;
-        if i == ITERATIONS {
-            break;
+                break 'outer;
+            }
         }
     }
 
-    Ok(value)
+    Ok(break_value)
+}
+
+fn evaluate_break(
+    expression: Option<TypedExpression>,
+    _type_: Type,
+    environment: Rcrc<Environment>
+) -> Result<Value, String> {
+    if !environment.borrow().has_scope(&ScopeType::Break) {
+        return Err(format!("Cannot break outside of a loop"));
+    };
+    
+    match expression {
+        Some(expression) => {
+            environment.borrow_mut().activate_scope(Scope::Break(Some(evaluate_expression(expression, environment.clone())?)))?;
+            Ok(Value::Void)
+        },
+        None => {
+            environment.borrow_mut().activate_scope(Scope::Break(None))?;
+            Ok(Value::Void)
+        }
+    }
 }
