@@ -357,7 +357,8 @@ impl IndentDisplay for Expression {
                 indent.increase();
                 result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
                 indent.current(true);
-                result.push_str(format!("{}<block>", indent.dash_end()).as_str());
+                result.push_str(format!("{}<block>", indent.dash()).as_str());
+                indent.increase();
                 for (i, statement) in statements.iter().enumerate() {
                     if i < statements.len() - 1 {
                         result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
@@ -366,8 +367,10 @@ impl IndentDisplay for Expression {
                         result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
                     }
                 }
+                indent.decrease();
                 if let Some(else_statements) = else_statements {
-                    result.push_str(format!("\n{}else:", indent.dash()).as_str());
+                    result.push_str(format!("\n{}else: <block>", indent.dash()).as_str());
+                    indent.increase();
                     for (i, statement) in else_statements.iter().enumerate() {
                         if i < else_statements.len() - 1 {
                             result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
@@ -376,8 +379,9 @@ impl IndentDisplay for Expression {
                             result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
                         }
                     }
+                    indent.decrease();
                 } else {
-                    result.push_str(format!("\n{}else: None", indent.dash()).as_str());
+                    result.push_str(format!("\n{}else: <block> None", indent.dash_end()).as_str());
                 }
                 indent.decrease();
                 result
@@ -939,10 +943,11 @@ impl IndentDisplay for TypedExpression {
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<while>: {}", type_).as_str());
+                result.push_str(format!("<while>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
                 indent.current(true);
+                result.push_str(format!("{}<block>", indent.dash()).as_str());
                 for (i, statement) in block.iter().enumerate() {
                     if i < block.len() - 1 {
                         result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
@@ -962,7 +967,7 @@ impl IndentDisplay for TypedExpression {
                         }
                     }
                 } else {
-                    result.push_str(format!("\n{}else: None", indent.dash()).as_str());
+                    result.push_str(format!("\n{}else: None", indent.dash_end()).as_str());
                 }
                 indent.decrease();
                 result
