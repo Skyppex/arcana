@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::lexer::token::{TokenKind, Keyword, self};
 
-use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration
+use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While
 };
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -40,7 +40,7 @@ fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
 
 pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Loop) {
-        return parse_block(cursor);
+        return parse_while(cursor);
     }
 
     cursor.bump()?; // Consume the loop
@@ -48,6 +48,35 @@ pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
     let block = parse_block_statements(cursor)?;
 
     Ok(Expression::Loop(block))
+}
+
+pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::While) {
+        return parse_block(cursor);
+    }
+
+    cursor.bump()?; // Consume the while
+
+    let condition = parse_expression(cursor)?;
+    let block = parse_block_statements(cursor)?;
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
+        return Ok(Expression::While(While {
+            condition: Box::new(condition),
+            statements: block,
+            else_statements: None
+        }));
+    }
+
+    cursor.bump()?; // Consume the else
+
+    let else_block = parse_block_statements(cursor)?;
+
+    Ok(Expression::While(While {
+        condition: Box::new(condition),
+        statements: block,
+        else_statements: Some(else_block)
+    }))
 }
 
 pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {

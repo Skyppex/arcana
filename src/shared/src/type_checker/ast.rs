@@ -34,6 +34,7 @@ pub enum TypedStatement {
     },
     Semi(Box<TypedStatement>),
     Break(Option<TypedExpression>),
+    Continue,
     Expression(TypedExpression),
 
     #[cfg(feature = "interpreter")]
@@ -59,6 +60,7 @@ impl Typed for TypedStatement {
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Semi { .. } => Type::Void,
             TypedStatement::Break(_) => Type::Void,
+            TypedStatement::Continue => Type::Void,
             TypedStatement::Expression(e) => e.get_type(),
             TypedStatement::Print(_) => Type::Void,
         }
@@ -73,6 +75,7 @@ impl Typed for TypedStatement {
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Semi(e) => e.get_deep_type(),
             TypedStatement::Break(e) => e.as_ref().map_or(Type::Void, |e| e.get_deep_type()),
+            TypedStatement::Continue => Type::Void,
             TypedStatement::Expression(e) => e.get_deep_type(),
             TypedStatement::Print(e) => e.get_deep_type(),
         }
@@ -136,6 +139,12 @@ pub enum TypedExpression {
         type_: Type
     },
     Loop(Block),
+    While {
+        condition: Box<TypedExpression>,
+        block: Vec<TypedStatement>,
+        else_block: Option<Vec<TypedStatement>>,
+        type_: Type,
+    },
 }
 
 impl Typed for TypedExpression {
@@ -154,6 +163,7 @@ impl Typed for TypedExpression {
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
             TypedExpression::Drop { type_, .. } => type_.clone(),
             TypedExpression::Loop(Block { type_, .. }) => type_.clone(),
+            TypedExpression::While { type_, .. } => type_.clone(),
         }
     }
 
@@ -172,6 +182,7 @@ impl Typed for TypedExpression {
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
             TypedExpression::Drop { type_, .. } => type_.clone(),
             TypedExpression::Loop(Block { type_, .. }) => type_.clone(),
+            TypedExpression::While { type_, .. } => type_.clone(),
         }
     }
 }

@@ -9,6 +9,7 @@ pub enum Statement {
     FunctionDeclaration(FunctionDeclaration),
     Semi(Box<Statement>),
     Break(Option<Expression>),
+    Continue,
     Expression(Expression),
 
     #[cfg(feature = "interpreter")]
@@ -32,6 +33,7 @@ pub enum Expression {
     Ternary(Ternary),
     Block(Block),
     Loop(Block),
+    While(While),
     #[cfg(feature = "interpreter")]
     Drop(String),
 }
@@ -99,6 +101,13 @@ pub enum Literal {
 pub struct ConditionBlock {
     pub condition: Box<Expression>,
     pub block: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct While {
+    pub condition: Box<Expression>,
+    pub statements: Vec<Statement>,
+    pub else_statements: Option<Vec<Statement>>,
 }
 
 #[derive(Debug, Clone)]

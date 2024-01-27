@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{parser::{self, Assignment, Expression, If, Statement, VariableDeclaration}, type_checker::ast::Literal};
+use crate::{parser::{self, Assignment, Expression, If, Statement, VariableDeclaration, While}, type_checker::ast::Literal};
 
 use super::{ast::{BinaryOperator, Block, ConditionBlock, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator, UnionMemberFieldInitializers
     },
@@ -389,12 +389,50 @@ pub fn check_type<'a>(
         Expression::Loop(block) => {
             let loop_environment = &mut type_environment.new_child();
             let block = check_type(&Expression::Block(block.clone()), discovered_types, loop_environment)?;
-            let type_ = block.get_type();
+
+            let TypedExpression::Block(block) = block else {
+                return Err("Loop block must be a block".to_string())
+            };
 
             Ok(TypedExpression::Loop(Block {
-                statements: vec![TypedStatement::Expression(block)],
-                type_
+                statements: block.statements,
+                type_: block.type_
             }))
+        },
+        Expression::While(While {
+            condition,
+            statements: block,
+            else_statements: else_block
+        }) => {
+            let while_environment = &mut type_environment.new_child();
+            let condition = check_type(condition, discovered_types, while_environment)?;
+            let block = check_type(&Expression::Block(block.clone()), discovered_types, while_environment)?;
+            let else_block = match else_block {
+                Some(else_block) => Some(check_type(&Expression::Block(else_block.clone()), discovered_types, while_environment)?),
+                None => None
+            };
+            let type_ = block.get_type();
+
+            let Type::Bool = condition.get_type() else {
+                return Err(format!("While condition must be of type bool"));
+            };
+
+            let TypedExpression::Block(block) = block else {
+                return Err("While block must be a block".to_string())
+            };
+
+            let else_block = match else_block {
+                Some(TypedExpression::Block(block)) => Some(block.statements),
+                None => None,
+                _ => return Err("Else block must be a block".to_string())
+            };
+            
+            Ok(TypedExpression::While {
+                condition: Box::new(condition),
+                block: block.statements,
+                else_block: else_block,
+                type_
+            })
         },
     }
 }

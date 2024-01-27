@@ -18,7 +18,7 @@ pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
 
 fn parse_break(cursor: &mut Cursor) -> Result<Statement, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Break) {
-        return parse_function_declaration_statement(cursor);
+        return parse_continue(cursor);
     }
 
     cursor.bump()?; // Consume the break
@@ -31,6 +31,15 @@ fn parse_break(cursor: &mut Cursor) -> Result<Statement, String> {
     };
 
     Ok(Statement::Break(expression))
+}
+
+fn parse_continue(cursor: &mut Cursor) -> Result<Statement, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Continue) {
+        return parse_function_declaration_statement(cursor);
+    }
+
+    cursor.bump()?; // Consume the continue
+    Ok(Statement::Continue)
 }
 
 fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {

@@ -36,6 +36,7 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
             Ok(Value::Void)
         }
         TypedStatement::Break(e) => evaluate_break(e, Type::Void, environment),
+        TypedStatement::Continue => evaluate_continue(environment),
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
         TypedStatement::Print(e) => {
             let value = evaluate_expression(e, environment)?;
@@ -100,9 +101,13 @@ fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: Rcrc<
         TypedExpression::Loop(Block {
             statements,
             type_: _
-        }) => {
-            evaluate_loop(environment, statements)
-        },
+        }) => evaluate_loop(statements, environment),
+        TypedExpression::While {
+            condition,
+            block,
+            else_block,
+            type_
+        } => evaluate_while(condition, block, else_block, type_, environment),
     }
 }
 
@@ -464,8 +469,13 @@ fn evaluate_drop<'a>(
     Ok(value)
 }
 
-fn evaluate_loop(environment: Rcrc<Environment>, statements: Vec<TypedStatement>) -> Result<Value, String> {
-    let loop_environment = Rc::new(RefCell::new(Environment::new_scope(environment, Scope::Break(None))));
+fn evaluate_loop(
+    statements: Vec<TypedStatement>,
+    environment: Rcrc<Environment>) -> Result<Value, String> {
+    let loop_environment =
+        Rc::new(RefCell::new(
+            Environment::new_scopes(environment, 
+                [Scope::Break(None), Scope::Continue])));
 
     let break_value;
 
@@ -473,13 +483,82 @@ fn evaluate_loop(environment: Rcrc<Environment>, statements: Vec<TypedStatement>
         for statement in statements.clone() {
             evaluate(statement, loop_environment.clone())?;
 
-            if let Some(Scope::Break(v)) = loop_environment.borrow().get_scope(&ScopeType::Break) {
+            if let Some(Scope::Break(v)) = loop_environment.borrow()
+                .get_scope(&ScopeType::Break) {
                 break_value = match v {
                     Some(v) => v.clone(),
                     None => Value::Void
                 };
 
                 break 'outer;
+            }
+
+            if let Some(Scope::Continue) = loop_environment.borrow().get_scope(&ScopeType::Continue) {
+                continue 'outer;
+            }
+        }
+    }
+
+    Ok(break_value)
+}
+
+fn evaluate_while(
+    condition: Box<TypedExpression>,
+    statements: Vec<TypedStatement>,
+    else_statements: Option<Vec<TypedStatement>>,
+    _type_: Type,
+    environment: Rcrc<Environment>
+) -> Result<Value, String> {
+    let while_environment =
+        Rc::new(RefCell::new(
+            Environment::new_scopes(environment, 
+                [Scope::Break(None), Scope::Continue])));
+
+    let break_value;
+
+    'outer: loop {
+        let value = evaluate_expression(*condition.clone(), while_environment.clone())?;
+
+        match value {
+            Value::Bool(v) => {
+                if !v {
+                    break_value = match else_statements {
+                        Some(else_statements) => {
+                            let mut value = Value::Void;
+
+                            for statement in else_statements {
+                                value = evaluate(statement, while_environment.clone())?;
+                            }
+
+                            value
+                        },
+                        None => Value::Void
+                    };
+
+                    break 'outer;
+                }
+            }
+            _ => return Err(format!("While condition must be boolean '{}'", value))
+        }
+
+        for statement in statements.clone() {
+            evaluate(statement, while_environment.clone())?;
+
+            if let Some(Scope::Break(v)) = while_environment.borrow()
+                .get_scope(&ScopeType::Break) {
+                break_value = match v {
+                    Some(v) => match else_statements {
+                        None => Err(format!("Cannot break with a value in a while loop without an else block (add an else block with 'else {{}}')")),
+                        Some(_) => Ok(v.clone())
+                    },
+                    None => Ok(Value::Void)
+                }?;
+
+                break 'outer;
+            }
+
+            if let Some(Scope::Continue) = while_environment.borrow().get_scope(&ScopeType::Continue) {
+                continue 'outer;
             }
         }
     }
@@ -506,4 +585,13 @@ fn evaluate_break(
             Ok(Value::Void)
         }
     }
+}
+
+fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, String> {
+    if !environment.borrow().has_scope(&ScopeType::Continue) {
+        return Err(format!("Cannot continue outside of a loop"));
+    };
+
+    environment.borrow_mut().activate_scope(Scope::Continue)?;
+    Ok(Value::Void)
 }

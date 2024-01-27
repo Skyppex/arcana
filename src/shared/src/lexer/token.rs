@@ -140,7 +140,7 @@ pub enum Keyword {
     Else,
     // Match,
     Loop,
-    // While,
+    While,
     // For,
     Break,
     Continue,

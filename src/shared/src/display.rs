@@ -1,17 +1,5 @@
 use crate::{parser::{
-    Statement,
-    Expression,
-    AccessModifier,
-    StructDeclaration, StructField,
-    UnionDeclaration, UnionMember, UnionMemberField,
-    FlagsDeclaration, FlagsMember,
-    FunctionDeclaration, Parameter,
-    VariableDeclaration, Assignment,
-    Literal, FieldInitializer, UnionMemberFieldInitializers,
-    Unary, UnaryOperator,
-    Binary, BinaryOperator,
-    Ternary, If, ConditionBlock,
-    Call, Member,
+    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, FlagsDeclaration, FlagsMember, FunctionDeclaration, If, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, UnionMember, UnionMemberField, UnionMemberFieldInitializers, VariableDeclaration, While
 }, type_checker::{self, ast::{Block, TypedExpression, TypedStatement}, Type}};
 
 pub struct Indent {
@@ -185,6 +173,11 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             },
+            Statement::Continue => {
+                let mut result = String::new();
+                result.push_str("<continue>");
+                result
+            },
             Statement::Expression(e) => e.indent_display(indent),
             Statement::Print(e) => e.indent_display(indent),
         }
@@ -351,6 +344,41 @@ impl IndentDisplay for Expression {
                     }
                 }
                 indent.decrease();
+                indent.decrease();
+                result
+            },
+            Expression::While(While {
+                condition,
+                statements,
+                else_statements
+            }) => {
+                let mut result = String::new();
+                result.push_str("<while>\n");
+                indent.increase();
+                result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
+                indent.current(true);
+                result.push_str(format!("{}<block>", indent.dash_end()).as_str());
+                for (i, statement) in statements.iter().enumerate() {
+                    if i < statements.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                    } else {
+                        indent.current(true);
+                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                    }
+                }
+                if let Some(else_statements) = else_statements {
+                    result.push_str(format!("\n{}else:", indent.dash()).as_str());
+                    for (i, statement) in else_statements.iter().enumerate() {
+                        if i < else_statements.len() - 1 {
+                            result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                        } else {
+                            indent.current(true);
+                            result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                        }
+                    }
+                } else {
+                    result.push_str(format!("\n{}else: None", indent.dash()).as_str());
+                }
                 indent.decrease();
                 result
             },
@@ -718,6 +746,11 @@ impl IndentDisplay for TypedStatement {
                 indent.decrease();
                 result
             },
+            TypedStatement::Continue => {
+                let mut result = String::new();
+                result.push_str(format!("<continue>: {}\n", Type::Void).as_str());
+                result
+            },
             TypedStatement::Expression(e) => e.indent_display(indent),
             TypedStatement::Print(e) => e.indent_display(indent),
         }
@@ -895,6 +928,41 @@ impl IndentDisplay for TypedExpression {
                         indent.current(true);
                         result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
                     }
+                }
+                indent.decrease();
+                result
+            },
+            TypedExpression::While {
+                condition,
+                block,
+                else_block,
+                type_
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<while>: {}", type_).as_str());
+                indent.increase();
+                result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
+                indent.current(true);
+                for (i, statement) in block.iter().enumerate() {
+                    if i < block.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                    } else {
+                        indent.current(true);
+                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                    }
+                }
+                if let Some(else_block) = else_block {
+                    result.push_str(format!("\n{}else:", indent.dash()).as_str());
+                    for (i, statement) in else_block.iter().enumerate() {
+                        if i < else_block.len() - 1 {
+                            result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                        } else {
+                            indent.current(true);
+                            result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                        }
+                    }
+                } else {
+                    result.push_str(format!("\n{}else: None", indent.dash()).as_str());
                 }
                 indent.decrease();
                 result
