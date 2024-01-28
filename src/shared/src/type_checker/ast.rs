@@ -29,12 +29,13 @@ pub enum TypedStatement {
         identifier: String,
         parameters: Vec<Parameter>,
         return_type: Type,
-        body: Box<TypedExpression>,
+        body: Vec<TypedStatement>,
         type_: Type,
     },
     Semi(Box<TypedStatement>),
     Break(Option<TypedExpression>),
     Continue,
+    Return(Option<TypedExpression>),
     Expression(TypedExpression),
 
     #[cfg(feature = "interpreter")]
@@ -61,6 +62,7 @@ impl Typed for TypedStatement {
             TypedStatement::Semi { .. } => Type::Void,
             TypedStatement::Break(_) => Type::Void,
             TypedStatement::Continue => Type::Void,
+            TypedStatement::Return(_) => Type::Void,
             TypedStatement::Expression(e) => e.get_type(),
             TypedStatement::Print(_) => Type::Void,
         }
@@ -76,6 +78,7 @@ impl Typed for TypedStatement {
             TypedStatement::Semi(e) => e.get_deep_type(),
             TypedStatement::Break(e) => e.as_ref().map_or(Type::Void, |e| e.get_deep_type()),
             TypedStatement::Continue => Type::Void,
+            TypedStatement::Return(e) => e.as_ref().map_or(Type::Void, |e| e.get_deep_type()),
             TypedStatement::Expression(e) => e.get_deep_type(),
             TypedStatement::Print(e) => e.get_deep_type(),
         }

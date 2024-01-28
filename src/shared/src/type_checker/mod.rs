@@ -1,9 +1,10 @@
 pub mod type_checker;
 pub mod type_environment;
-mod statements;
-mod expressions;
 pub mod ast;
 pub mod full_name;
+
+mod statements;
+mod expressions;
 
 pub use type_checker::*;
 pub use type_environment::*;

@@ -310,7 +310,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "break" => Some(TokenKind::Keyword(Keyword::Break)),
         "continue" => Some(TokenKind::Keyword(Keyword::Continue)),
         "fn" => Some(TokenKind::Keyword(Keyword::Fn)),
-        // "return" => Some(TokenKind::Keyword(Keyword::Return)),
+        "return" => Some(TokenKind::Keyword(Keyword::Return)),
         "struct" => Some(TokenKind::Keyword(Keyword::Struct)),
         "union" => Some(TokenKind::Keyword(Keyword::Union)),
         // "flags" => Some(TokenKind::Keyword(Keyword::Flags)),

@@ -1,6 +1,6 @@
 use crate::lexer::token::{TokenKind, Keyword};
 
-use super::{cursor::Cursor, expressions::{self, parse_block, parse_expression}, FlagsMember, FlagsValue, FunctionDeclaration, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
+use super::{cursor::Cursor, expressions::{self, parse_block, parse_block_statements, parse_expression}, FlagsMember, FlagsValue, FunctionDeclaration, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     match parse_break(cursor) {
@@ -47,7 +47,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Fn) {
-            return parse_struct_declaration_statement(cursor);
+            return parse_return(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -55,7 +55,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Fn) {
-        return parse_struct_declaration_statement(cursor);
+        return parse_return(cursor);
     }
 
     cursor.bump()?; // Consume the fn keyword
@@ -84,7 +84,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         };
     }
 
-    let body = parse_block(cursor)?;
+    let body = parse_block_statements(cursor)?;
 
     Ok(Statement::FunctionDeclaration(FunctionDeclaration {
         access_modifier,
@@ -93,6 +93,23 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         return_type,
         body,
     }))
+}
+
+fn parse_return(cursor: &mut Cursor) -> Result<Statement, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Return) {
+        return parse_struct_declaration_statement(cursor);
+    }
+
+    cursor.bump()?; // Consume the return
+
+    let expression = if cursor.first().kind == TokenKind::Semicolon {
+        cursor.bump()?; // Consume the ;
+        None
+    } else {
+        Some(parse_expression(cursor)?)
+    };
+
+    Ok(Statement::Return(expression))
 }
 
 fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {

@@ -10,6 +10,7 @@ pub enum Statement {
     Semi(Box<Statement>),
     Break(Option<Expression>),
     Continue,
+    Return(Option<Expression>),
     Expression(Expression),
 
     #[cfg(feature = "interpreter")]
@@ -65,7 +66,7 @@ pub struct FunctionDeclaration {
     pub identifier: String,
     pub parameters: Vec<Parameter>,
     pub return_type: Option<String>,
-    pub body: Expression,
+    pub body: Block,
 }
 
 #[derive(Debug, Clone)]

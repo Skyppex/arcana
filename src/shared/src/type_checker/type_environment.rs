@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{Type, FullName};
+use super::{FullName, Type};
 
 #[derive(Debug, Clone)]
 pub struct TypeEnvironment<'a> {

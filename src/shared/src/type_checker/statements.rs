@@ -3,17 +3,7 @@ use std::collections::HashMap;
 use crate::parser::{Statement, self};
 
 use super::{
-    ast::{self, Typed, TypedStatement},
-    expressions,
-    type_checker::DiscoveredType,
-    type_environment::TypeEnvironment,
-    Function,
-    Struct,
-    StructField,
-    Type,
-    Union,
-    UnionMember,
-    UnionMemberField
+    ast::{self, Typed, TypedStatement}, expressions, type_checker::DiscoveredType, type_environment::TypeEnvironment, Function, Struct, StructField, Type, Union, UnionMember, UnionMemberField
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -63,12 +53,17 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         Statement::Semi(_) => Ok(vec![]),
         Statement::Break(_) => Ok(vec![]),
         Statement::Continue => Ok(vec![]),
+        Statement::Return(_) => Ok(vec![]),
         Statement::Expression(_) => Ok(vec![]),
         Statement::Print(_) => Ok(vec![]),
     }
 }
 
-pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredType>, type_environment: &mut TypeEnvironment<'a>) -> Result<TypedStatement, String> {
+pub fn check_type<'a>(
+    statement: &Statement,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: &mut TypeEnvironment<'a>
+) -> Result<TypedStatement, String> {
     match statement {
         Statement::Program {
             statements
@@ -252,20 +247,39 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                             block_environment.add_variable(parameter.identifier.clone(), t.clone());
 
                             Ok(ast::Parameter {
-                            identifier: parameter.identifier.clone(),
-                            type_name: parameter.type_name.clone(),
-                            type_: t
-                        })},
+                                identifier: parameter.identifier.clone(),
+                                type_name: parameter.type_name.clone(),
+                                type_: t
+                            }
+                        )},
                         Err(e) => Err(e)
                     }
                 })
                 .collect();
 
-            let body_typed_statement = &check_type(&Statement::Expression(body.clone()), discovered_types, block_environment)?;
-            let body_type = body_typed_statement.get_type();
-            
-            if body_type != return_type {
-                return Err(format!("Function {} has return type {} but body has type {}", identifier, return_type, body_type));
+            let body_typed_statement: Result<Vec<TypedStatement>, String> = body.iter()
+                .map(|s| {
+                    let typed_statement = &check_type(
+                                s,
+                                discovered_types,
+                                block_environment);
+
+                    typed_statement.clone()
+                })
+                .collect();
+
+            let body_typed_statement = body_typed_statement?;
+
+            for s in body_typed_statement.clone() {
+                let t = s.get_type();
+
+                if t == Type::Void {
+                    continue;
+                }
+
+                if t != return_type {
+                    return Err(format!("Function {} has return type {} but body has type {}", identifier, return_type, s.get_type()));
+                }
             }
 
             let type_ = Type::Function(Function {
@@ -280,7 +294,7 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
                 identifier: identifier.clone(),
                 parameters: ps?,
                 return_type,
-                body: Box::new(body_typed_statement.as_expression().unwrap().clone()),
+                body: body_typed_statement,
                 type_
             })
         },
@@ -290,6 +304,10 @@ pub fn check_type<'a>(statement: &Statement, discovered_types: &Vec<DiscoveredTy
             None => Ok(TypedStatement::Break(None))
         } 
         Statement::Continue => Ok(TypedStatement::Continue),
+        Statement::Return(e) => match e {
+            Some(e) => Ok(TypedStatement::Return(Some(expressions::check_type(e, discovered_types, type_environment)?))),
+            None => Ok(TypedStatement::Return(None))
+        },
         Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(e, discovered_types, type_environment)?)),
         Statement::Print(e) => Ok(TypedStatement::Print(expressions::check_type(e, discovered_types, type_environment)?)),
     }

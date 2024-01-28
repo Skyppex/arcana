@@ -88,7 +88,7 @@ pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {
         .map(|statements| Expression::Block(statements))
 }
 
-fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
+pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
     if cursor.first().kind != TokenKind::OpenBrace {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
     }

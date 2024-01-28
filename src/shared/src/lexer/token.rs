@@ -144,7 +144,7 @@ pub enum Keyword {
     // For,
     Break,
     Continue,
-    // Return,
+    Return,
 
     // Literals
     True,

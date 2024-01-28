@@ -1,6 +1,6 @@
 use std::{fmt::Display, collections::HashMap};
 
-use shared::type_checker::ast::TypedExpression;
+use shared::type_checker::ast::TypedStatement;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -13,7 +13,7 @@ pub enum Value {
     String(String),
     Struct { struct_name: String, fields: HashMap<String, Value> },
     Union { union_member: UnionMember, fields: UnionFields },
-    Function { parameters: Vec<String>, body: Box<TypedExpression> },
+    Function { parameters: Vec<String>, body: Vec<TypedStatement> },
 }
 
 impl<'a> Display for Value {

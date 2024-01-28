@@ -1,6 +1,23 @@
 use crate::{parser::{
-    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, FlagsDeclaration, FlagsMember, FunctionDeclaration, If, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, UnionMember, UnionMemberField, UnionMemberFieldInitializers, VariableDeclaration, While
-}, type_checker::{self, ast::{Block, TypedExpression, TypedStatement}, Type}};
+    Statement, Expression,
+    AccessModifier,
+    StructDeclaration, StructField,
+    UnionDeclaration, UnionMember, UnionMemberField, UnionMemberFieldInitializers,
+    FunctionDeclaration, Parameter,
+    Member, Assignment, VariableDeclaration,
+    Unary, UnaryOperator,
+    Binary, BinaryOperator,
+    Ternary,
+    If, While,
+    ConditionBlock,
+    Call,
+    FlagsMember,
+    Literal, FieldInitializer,
+}, type_checker::{self, ast::{
+    TypedStatement,
+    TypedExpression,
+    Block,
+}, Type}};
 
 pub struct Indent {
     levels: Vec<bool>,
@@ -150,8 +167,16 @@ impl IndentDisplay for Statement {
                 }
 
                 result.push_str(format!("\n{}return_type: {}\n", indent.dash(), return_type.indent_display(indent)).as_str());
-                indent.current(true);
-                result.push_str(format!("{}body: {}", indent.dash_end(), body.indent_display(indent)).as_str());
+                
+                for (i, statement) in body.iter().enumerate() {
+                    if i < body.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                    } else {
+                        indent.current(true);
+                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                    }
+                }
+
                 indent.decrease();
                 result
             },
@@ -176,6 +201,15 @@ impl IndentDisplay for Statement {
             Statement::Continue => {
                 let mut result = String::new();
                 result.push_str("<continue>");
+                result
+            },
+            Statement::Return(e) => {
+                let mut result = String::new();
+                result.push_str("<return>\n");
+                indent.increase();
+                indent.current(true);
+                result.push_str(format!("{}expression: {}", indent.dash_end(), e.indent_display(indent)).as_str());
+                indent.decrease();
                 result
             },
             Statement::Expression(e) => e.indent_display(indent),
@@ -215,6 +249,7 @@ impl IndentDisplay for Expression {
                 result.push_str("<if>\n");
                 indent.increase();
                 result.push_str(format!("{}condition:{}", indent.dash(), r#if.condition.indent_display(indent)).as_str());
+                result.push_str(format!("\n{}body: {}", indent.dash(), r#if.block.indent_display(indent)).as_str());
                 if let Some(else_ifs) = else_ifs {
                     for (i, else_if) in else_ifs.iter().enumerate() {
                         let is_end = i == else_ifs.len() - 1;
@@ -722,12 +757,22 @@ impl IndentDisplay for TypedStatement {
                 let mut result = String::new();
                 result.push_str(format!("<function declaration> {}: {}\n", identifier, type_).as_str());
                 indent.increase();
+                
                 for parameter in parameters {
                     result.push_str(format!("{}{}\n", indent.dash(), parameter.indent_display(indent)).as_str());
                 }
-                result.push_str(format!("{}return_type: {}\n", indent.dash(), return_type).as_str());
-                indent.current(true);
-                result.push_str(format!("{}body: {}", indent.dash_end(), body.indent_display(indent)).as_str());
+
+                result.push_str(format!("{}return_type: {}", indent.dash(), return_type).as_str());
+                
+                for (i, statement) in body.iter().enumerate() {
+                    if i < body.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                    } else {
+                        indent.current(true);
+                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                    }
+                }
+
                 indent.decrease();
                 result
             },
@@ -753,6 +798,15 @@ impl IndentDisplay for TypedStatement {
             TypedStatement::Continue => {
                 let mut result = String::new();
                 result.push_str(format!("<continue>: {}\n", Type::Void).as_str());
+                result
+            },
+            TypedStatement::Return(e) => {
+                let mut result = String::new();
+                result.push_str(format!("<return>: {}\n", Type::Void).as_str());
+                indent.increase();
+                indent.current(true);
+                result.push_str(format!("{}expression: {}", indent.dash_end(), e.indent_display(indent)).as_str());
+                indent.decrease();
                 result
             },
             TypedStatement::Expression(e) => e.indent_display(indent),

@@ -30,15 +30,18 @@ impl Environment {
         }
     }
 
-    pub fn new_scope(parent: Rcrc<Environment>, scopes: Scope) -> Self {
-        Self::new_scopes(parent, [scopes])
+    pub fn new_scope<T: Into<ScopeState>>(parent: Rcrc<Environment>, scope: T) -> Self {
+        Self::new_scopes(parent, [scope])
     }
 
-    pub fn new_scopes<T: IntoIterator<Item = Scope>>(parent: Rcrc<Environment>, scopes: T) -> Self {
+    pub fn new_scopes<T: Into<ScopeState>, U: IntoIterator<Item = T>>
+    (parent: Rcrc<Environment>, scopes: U) -> Self {
         Self {
             parent: Some(parent),
             variables: HashMap::new(),
-            scopes: scopes.into_iter().map(|scope| scope.into()).collect::<Vec<ScopeState>>(),
+            scopes: scopes.into_iter()
+                .map(|scope| scope.into())
+                .collect::<Vec<ScopeState>>(),
         }
     }
 
@@ -49,7 +52,7 @@ impl Environment {
 
     pub fn get_scope(&self, scope_type: &ScopeType) -> Option<Scope> {
         self.scopes.iter().find(|s| s.scope_type == *scope_type && s.active)
-            .map(|f| f.scope.clone())
+            .map(|f: &ScopeState| f.scope.clone())
             .or_else(|| self.parent.as_ref().and_then(|p| p.borrow().get_scope(scope_type)))
     }
 
@@ -64,7 +67,10 @@ impl Environment {
                 scope_state.scope = scope;
                 scope_state.active = true
             },
-            None => self.parent.as_mut().unwrap().borrow_mut().activate_scope(scope)?,
+            None => self.parent.as_mut()
+                .expect("Already checked if the scope exists, if it's not in the current environment, it must be in the parent")
+                .borrow_mut()
+                .activate_scope(scope)?,
         }
         
         Ok(())

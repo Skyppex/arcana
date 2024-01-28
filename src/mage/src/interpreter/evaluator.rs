@@ -37,6 +37,7 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
         }
         TypedStatement::Break(e) => evaluate_break(e, Type::Void, environment),
         TypedStatement::Continue => evaluate_continue(environment),
+        TypedStatement::Return(e) => evaluate_return(e, Type::Void, environment),
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
         TypedStatement::Print(e) => {
             let value = evaluate_expression(e, environment)?;
@@ -238,12 +239,6 @@ fn evaluate_member_access<'a>(object: Box<TypedExpression>, environment: Rcrc<En
                 } => evaluate_member_access(object, environment, member),
             }
         }
-        Value::Union {
-            union_member,
-            fields
-        } => {
-            todo!("Member access on unions")
-        }
         _ => Err(format!("Member access is only supported on structs '{}'", value))
     }
 }
@@ -324,7 +319,7 @@ fn evaluate_call<'a>(
     environment: Rcrc<Environment>
 ) -> Result<Value, String> {
     let caller_value = evaluate_expression(*caller, environment.clone())?;
-
+ 
     let mut evaluated_arguments = Vec::new();
 
     for argument in arguments {
@@ -334,13 +329,53 @@ fn evaluate_call<'a>(
 
     match caller_value {
         Value::Function { parameters, body } => {
-            let function_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
+            let function_environment =
+                Rc::new(RefCell::new(Environment::new_scope(
+                    environment,
+                    ScopeType::Return)));
 
             for (index, parameter) in parameters.iter().enumerate() {
                 function_environment.borrow_mut().add_variable(parameter.clone(), evaluated_arguments[index].clone(), false);
             }
 
-            evaluate_expression(*body, function_environment)
+            let mut value = Value::Void;
+            for statement in body {
+                value = evaluate(statement, function_environment.clone())?;
+
+                if let Some(Scope::Return(v)) =
+                    function_environment.borrow()
+                    .get_scope(&ScopeType::Return) {
+                    match v {
+                        Some(v) => {
+                            if _type_ == Type::Void {
+                                return Err(format!(
+                                    "Cannot return a value from a void function",
+                                ));
+                            }
+
+                            value = v.clone();
+                            break;
+                        },
+                        None => {
+                            if _type_ != Type::Void {
+                                return Err(format!(
+                                    "Cannot return void from a non-void function. Expected type '{}', found type 'void'",
+                                    _type_
+                                ));
+                            }
+
+                            value = Value::Void;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if _type_ == Type::Void {
+                return Ok(Value::Void);
+            }
+
+            Ok(value)
         }
         _ => Err(format!("Cannot call non-function value '{}'", caller_value))
     }
@@ -512,7 +547,7 @@ fn evaluate_while(
     let while_environment =
         Rc::new(RefCell::new(
             Environment::new_scopes(environment, 
-                [Scope::Break(None), Scope::Continue])));
+                [ScopeType::Break, ScopeType::Continue])));
 
     let break_value;
 
@@ -594,4 +629,26 @@ fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, String> {
 
     environment.borrow_mut().activate_scope(Scope::Continue)?;
     Ok(Value::Void)
+}
+
+fn evaluate_return(
+    expression: Option<TypedExpression>,
+    _type_: Type,
+    environment: Rcrc<Environment>
+) -> Result<Value, String> {
+    if !environment.borrow().has_scope(&ScopeType::Return) {
+        return Err(format!("Cannot return outside of a function"));
+    };
+
+    match expression {
+        Some(expression) => {
+            let value = evaluate_expression(expression, environment.clone())?;
+            environment.borrow_mut().activate_scope(Scope::Return(Some(value)))?;
+            Ok(Value::Void)
+        },
+        None => {
+            environment.borrow_mut().activate_scope(Scope::Return(None))?;
+            Ok(Value::Void)
+        }
+    }
 }
