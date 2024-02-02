@@ -119,6 +119,11 @@ pub enum TypedExpression {
         arguments: Vec<TypedExpression>,
         type_: Type,
     },
+    Index {
+        caller: Box<TypedExpression>,
+        argument: Box<TypedExpression>,
+        type_: Type,
+    },
     Unary {
         operator: UnaryOperator,
         expression: Box<TypedExpression>,
@@ -160,6 +165,7 @@ impl Typed for TypedExpression {
             TypedExpression::Member(member) => member.get_type(),
             TypedExpression::Literal(literal) => literal.get_type(),
             TypedExpression::Call { type_, .. } => type_.clone(),
+            TypedExpression::Index { type_, .. } => type_.clone(),
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Ternary { type_, .. } => type_.clone(),
@@ -179,6 +185,7 @@ impl Typed for TypedExpression {
             TypedExpression::Member(member) => member.get_deep_type(),
             TypedExpression::Literal(literal) => literal.get_deep_type(),
             TypedExpression::Call { type_, .. } => type_.clone(),
+            TypedExpression::Index { type_, .. } => type_.clone(),
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Ternary { type_, .. } => type_.clone(),

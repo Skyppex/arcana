@@ -1,4 +1,4 @@
-pub(super) mod evironment;
+pub(super) mod environment;
 pub(super) mod value;
 pub(super) mod evaluator;
 pub(super) mod evaluate_binop;

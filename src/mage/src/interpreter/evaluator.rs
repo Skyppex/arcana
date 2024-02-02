@@ -4,7 +4,7 @@ use shared::type_checker::{ast::{Block, *}, Type};
 
 use crate::interpreter::scope::Scope;
 
-use super::{evaluate_binop, evironment::{Environment, Rcrc}, scope::ScopeType, value::{Value, Number, UnionMember, UnionFields}};
+use super::{environment::{Environment, Rcrc}, evaluate_binop, scope::ScopeType, value::{Value, Number, UnionMember, UnionFields}};
 
 pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environment>) -> Result<Value, String> {
     match typed_statement {
@@ -74,6 +74,11 @@ fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: Rcrc<
             arguments,
             type_
         } => evaluate_call(caller, arguments, type_, environment),
+        TypedExpression::Index {
+            caller,
+            argument,
+            type_
+        } => evaluate_index(caller, argument, type_, environment),
         TypedExpression::Unary {
             operator,
             expression,
@@ -324,7 +329,7 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
     }
 }
 
-fn evaluate_call<'a>(
+fn evaluate_call(
     caller: Box<TypedExpression>,
     arguments: Vec<TypedExpression>,
     _type_: Type,
@@ -386,6 +391,32 @@ fn evaluate_call<'a>(
             if _type_ == Type::Void {
                 return Ok(Value::Void);
             }
+
+            Ok(value)
+        }
+        _ => Err(format!("Cannot call non-function value '{}'", caller_value))
+    }
+}
+
+fn evaluate_index(
+    caller: Box<TypedExpression>,
+    argument: Box<TypedExpression>,
+    _type_: Type,
+    environment: Rcrc<Environment>
+) -> Result<Value, String> {
+    let caller_value = evaluate_expression(*caller, environment.clone())?;
+ 
+    let evaluated_argument = evaluate_expression(*argument, environment.clone())?;
+
+    let Value::Number(Number::U64(index)) = evaluated_argument else {
+        unreachable!("Type is known after type checking, this should never happen")
+    };
+
+    match caller_value {
+        Value::Array(values) => {
+            let value = values.get(index as usize)
+                .cloned()
+                .ok_or(format!("Index out of bounds '{}'", index))?;
 
             Ok(value)
         }

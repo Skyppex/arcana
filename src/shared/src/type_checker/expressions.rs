@@ -309,6 +309,26 @@ pub fn check_type<'a>(
                 } => todo!(),
             }
         },
+        Expression::Index(index) => {
+            let caller = check_type(&index.caller, discovered_types, type_environment)?;
+            let caller_type = caller.clone().get_type();
+
+            let Type::Array(type_) = caller_type else {
+                return Err(format!("Index caller type {:?} is not an array", caller_type));
+            };
+
+            let index = check_type(&index.index, discovered_types, type_environment)?;
+
+            if index.get_type() != Type::U64 {
+                return Err(format!("Index type {:?} is not a u64", index.get_type()));
+            }
+
+            Ok(TypedExpression::Index {
+                caller: Box::new(caller),
+                argument: Box::new(index),
+                type_: *type_
+            })
+        }
         Expression::Unary(unary) => {
             let expression = check_type(&unary.expression, discovered_types, type_environment)?;
             let type_ = expression.get_type();

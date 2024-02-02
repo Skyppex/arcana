@@ -29,6 +29,7 @@ pub enum Expression {
     Member(Member),
     Literal(Literal),
     Call(Call),
+    Index(Index),
     Unary(Unary),
     Binary(Binary),
     Ternary(Ternary),
@@ -215,6 +216,12 @@ pub struct Assignment {
 pub struct Call {
     pub caller: Box<Expression>,
     pub arguments: Vec<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Index {
+    pub caller: Box<Expression>,
+    pub index: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]

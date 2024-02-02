@@ -2,7 +2,7 @@ mod interpreter;
 
 use std::{cell::RefCell, fs::{self}, io::{stdin, stdout, Write}, path::Path, rc::Rc};
 
-use interpreter::evironment::Environment;
+use interpreter::environment::Environment;
 use shared::{type_checker::{create_typed_ast, TypeEnvironment}, display::{Indent, IndentDisplay}, parser::create_ast};
 
 fn main() {

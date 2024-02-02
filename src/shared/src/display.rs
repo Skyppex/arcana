@@ -1,18 +1,5 @@
 use crate::{parser::{
-    Statement, Expression,
-    AccessModifier,
-    StructDeclaration, StructField,
-    UnionDeclaration, UnionMember, UnionMemberField, UnionMemberFieldInitializers,
-    FunctionDeclaration, Parameter,
-    Member, Assignment, VariableDeclaration,
-    Unary, UnaryOperator,
-    Binary, BinaryOperator,
-    Ternary,
-    If, While,
-    ConditionBlock,
-    Call,
-    FlagsMember,
-    Literal, FieldInitializer,
+    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, UnionMember, UnionMemberField, UnionMemberFieldInitializers, VariableDeclaration, While
 }, type_checker::{self, ast::{
     TypedStatement,
     TypedExpression,
@@ -304,6 +291,18 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             },
+            Expression::Index(Index {
+                caller,
+                index
+            }) => {
+                let mut result = String::new();
+                result.push_str("<index>\n");
+                indent.increase_leaf();
+                result.push_str(format!("{}caller: {}\n", indent.dash(), caller.indent_display(indent)).as_str());
+                result.push_str(format!("{}index: {}", indent.dash_end(), index.indent_display(indent)).as_str());
+                indent.decrease();
+                result
+            }
             Expression::Unary(Unary {
                 operator,
                 expression
@@ -491,7 +490,7 @@ impl IndentDisplay for Literal {
                         result.push_str(format!("\n{}{}", indent.dash_end(), expression.indent_display(indent)).as_str());
                     }
                 }
-                
+
                 indent.decrease();
                 result
             },
@@ -926,6 +925,19 @@ impl IndentDisplay for TypedExpression {
                 indent.decrease();
                 result
             },
+            TypedExpression::Index {
+                caller,
+                argument,
+                type_
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<index>: {}\n", type_).as_str());
+                indent.increase_leaf();
+                result.push_str(format!("{}caller: {}\n", indent.dash(), caller.indent_display(indent)).as_str());
+                result.push_str(format!("{}index: {}", indent.dash_end(), argument.indent_display(indent)).as_str());
+                indent.decrease();
+                result
+            }
             TypedExpression::Unary {
                 operator,
                 expression,

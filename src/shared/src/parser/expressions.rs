@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::lexer::token::{self, Keyword, TokenKind};
 
-use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While
+use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While
 };
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -531,8 +531,12 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_call_member(cursor: &mut Cursor) -> Result<Expression, String> {
     let member = parse_member_access(cursor)?;
 
-    if let TokenKind::OpenParen = cursor.first().kind {
+    if cursor.first().kind == TokenKind::OpenParen {
         return parse_call_expression(member, cursor);
+    }
+
+    if cursor.first().kind == TokenKind::OpenBracket {
+        return parse_index_expression(member, cursor);
     }
 
     return Ok(member);
@@ -574,6 +578,23 @@ fn parse_args_list(cursor: &mut Cursor) -> Result<Vec<Expression>, String> {
     }
 
     Ok(args)
+}
+
+fn parse_index_expression(caller: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
+    cursor.bump()?; // Consume the [
+    let argument = parse_expression(cursor)?;
+    cursor.bump()?; // Consume the ]
+    
+    let mut index = Expression::Index(Index {
+        caller: Box::new(caller.clone()),
+        index: Box::new(argument)
+    });
+
+    if let TokenKind::OpenBracket = cursor.first().kind {
+        index = parse_index_expression(index, cursor)?;
+    }
+
+    return Ok(index);
 }
 
 fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
