@@ -281,6 +281,7 @@ fn evaluate_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
         },
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left == right)),
         (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left == right)),
+        (Value::Unit, Value::Unit) => Ok(Value::Bool(true)),
         (left, right) => Err(format!("Cannot equal {:?} and {:?}", left, right)),
     }
 }
@@ -306,6 +307,7 @@ fn evaluate_not_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
         },
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left != right)),
         (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left != right)),
+        (Value::Unit, Value::Unit) => Ok(Value::Bool(false)),
         (left, right) => Err(format!("Cannot not equal {:?} and {:?}", left, right)),
     }
 }

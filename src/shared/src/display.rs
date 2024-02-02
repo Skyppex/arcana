@@ -168,6 +168,10 @@ impl IndentDisplay for Statement {
 
                 result.push_str(format!("\n{}return_type: {}\n", indent.dash(), return_type.indent_display(indent)).as_str());
                 
+                indent.current(true);
+                result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
+                indent.increase();
+
                 for (i, statement) in body.iter().enumerate() {
                     if i < body.len() - 1 {
                         result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
@@ -177,6 +181,7 @@ impl IndentDisplay for Statement {
                     }
                 }
 
+                indent.decrease();
                 indent.decrease();
                 result
             },
@@ -762,8 +767,12 @@ impl IndentDisplay for TypedStatement {
                     result.push_str(format!("{}{}\n", indent.dash(), parameter.indent_display(indent)).as_str());
                 }
 
-                result.push_str(format!("{}return_type: {}", indent.dash(), return_type).as_str());
+                result.push_str(format!("{}return_type: {}\n", indent.dash(), return_type).as_str());
                 
+                indent.current(true);
+                result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
+                indent.increase();
+
                 for (i, statement) in body.iter().enumerate() {
                     if i < body.len() - 1 {
                         result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
@@ -773,6 +782,7 @@ impl IndentDisplay for TypedStatement {
                     }
                 }
 
+                indent.decrease();
                 indent.decrease();
                 result
             },

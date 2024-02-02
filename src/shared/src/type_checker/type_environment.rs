@@ -15,7 +15,7 @@ impl<'a> TypeEnvironment<'a> {
             parent: None,
             types: HashMap::from([
                 ("void".to_string(), Type::Void),
-                ("()".to_string(), Type::Unit),
+                ("unit".to_string(), Type::Unit),
                 ("bool".to_string(), Type::Bool),
                 ("i8".to_string(), Type::I8),
                 ("i16".to_string(), Type::I16),

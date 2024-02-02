@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::lexer::token::{TokenKind, Keyword, self};
+use crate::lexer::token::{self, Keyword, TokenKind};
 
 use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While
 };
@@ -111,6 +111,10 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         TokenKind::Keyword(Keyword::Mutable) => {
             cursor.bump()?; // Consume the mutable
 
+            if cursor.first().kind == TokenKind::Literal(token::Literal::Unit) {
+                return Err("Cannot declare a mutable variable of type unit".to_string());
+            }
+
             let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
                 return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
             };
@@ -175,6 +179,38 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
                 _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
             }
         },
+        TokenKind::Literal(token::Literal::Unit) => {
+            let TokenKind::Identifier(identifier) = cursor.second().kind else {
+                return parse_if(cursor);
+            };
+
+            cursor.bump()?; // Consume the type identifier
+            cursor.bump()?; // Consume the identifier
+
+            match cursor.first().kind {
+                TokenKind::Equal => {
+                    cursor.bump()?; // Consume the =
+
+                    let expression = parse_expression(cursor)?;
+
+                    Ok(Expression::VariableDeclaration(VariableDeclaration {
+                        mutable: false,
+                        type_name: token::Literal::Unit.to_string(),
+                        identifier,
+                        initializer: Some(Box::new(expression)),
+                    }))
+                },
+                TokenKind::Semicolon => {
+                    Ok(Expression::VariableDeclaration(VariableDeclaration {
+                        mutable: false,
+                        type_name: token::Literal::Unit.to_string(),
+                        identifier,
+                        initializer: None,
+                    }))
+                },
+                _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
+            }
+        }
         _ => parse_if(cursor),
     }
 }
@@ -631,8 +667,6 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
         },
         TokenKind::OpenParen => {
             cursor.bump()?; // Consume the (
-
-            let x = 5;
 
             let expression = parse_expression(cursor)?;
 

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use num_traits::int::PrimInt;
 
 use crate::parser::AccessModifier;
@@ -93,10 +95,39 @@ pub enum Literal {
     Bool(bool),
 }
 
+impl ToString for Literal {
+    fn to_string(&self) -> String {
+        match self {
+            Literal::Unit => "unit".to_string(),
+            Literal::I8(v) => v.to_string(),
+            Literal::I16(v) => v.to_string(),
+            Literal::I32(v) => v.to_string(),
+            Literal::I64(v) => v.to_string(),
+            Literal::I128(v) => v.to_string(),
+            Literal::U8(v) => v.to_string(),
+            Literal::U16(v) => v.to_string(),
+            Literal::U32(v) => v.to_string(),
+            Literal::U64(v) => v.to_string(),
+            Literal::U128(v) => v.to_string(),
+            Literal::F32(v) => v.to_string(),
+            Literal::F64(v) => v.to_string(),
+            Literal::String(v) => v.to_string(),
+            Literal::Char(v) => v.to_string(),
+            Literal::Bool(v) => v.to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntLiteral<T: PrimInt> {
     pub value: T,
     pub base: IntLiteralBase,
+}
+
+impl<T: PrimInt + Display> ToString for IntLiteral<T> {
+    fn to_string(&self) -> String {
+        format!("{}{}", self.base.to_string(), self.value)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -105,6 +136,17 @@ pub enum IntLiteralBase {
     Octal = 8,
     Decimal = 10,
     Hexadecimal = 16,
+}
+
+impl ToString for IntLiteralBase {
+    fn to_string(&self) -> String {
+        match self {
+            IntLiteralBase::Binary => "0b".to_string(),
+            IntLiteralBase::Octal => "0o".to_string(),
+            IntLiteralBase::Decimal => "".to_string(),
+            IntLiteralBase::Hexadecimal => "0x".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
