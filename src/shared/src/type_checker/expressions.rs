@@ -311,7 +311,7 @@ pub fn check_type<'a>(
         },
         Expression::Index(index) => {
             let caller = check_type(&index.caller, discovered_types, type_environment)?;
-            let caller_type = caller.clone().get_type();
+            let caller_type = caller.clone().get_deep_type();
 
             let Type::Array(type_) = caller_type else {
                 return Err(format!("Index caller type {:?} is not an array", caller_type));

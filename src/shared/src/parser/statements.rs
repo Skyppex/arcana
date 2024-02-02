@@ -1,6 +1,6 @@
 use crate::lexer::token::{TokenKind, Keyword};
 
-use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, FlagsMember, FlagsValue, FunctionDeclaration, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
+use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, types::{can_be_type, parse_type}, FlagsMember, FlagsValue, FunctionDeclaration, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     match parse_break(cursor) {
@@ -79,9 +79,11 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     if cursor.first().kind == TokenKind::Colon {
         cursor.bump()?; // Consume the :
 
-        if let TokenKind::Identifier(rt) = cursor.bump()?.kind {
-            return_type = Some(rt);
-        };
+        if !can_be_type(cursor) {
+            return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
+        }
+
+        return_type = Some(parse_type(cursor)?);
     }
 
     let body = parse_block_statements(cursor)?;
@@ -346,9 +348,11 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
         return Err(format!("Expected : but found {:?}", cursor.first().kind));
     };
 
-    let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-    };
+    if !can_be_type(cursor) {
+        return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
+    }
+
+    let type_name = parse_type(cursor)?;
 
     Ok(Parameter {
         identifier,
@@ -380,9 +384,11 @@ fn parse_struct_field(cursor: &mut Cursor) -> Result<StructField, String> {
         _ => false,
     };
 
-    let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-    };
+    if !can_be_type(cursor) {
+        return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
+    }
+
+    let type_name = parse_type(cursor)?;
 
     Ok(StructField {
         access_modifier,
@@ -446,9 +452,11 @@ fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<Union
         TokenKind::Colon => {
             cursor.bump()?; // Consume the :
             
-            let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-                return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-            };
+            if !can_be_type(cursor) {
+                return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
+            }
+
+            let type_name = parse_type(cursor)?;
 
             Ok(UnionMemberField {
                 identifier: first_ident,
