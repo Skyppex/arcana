@@ -58,19 +58,26 @@ impl<'a> TypeEnvironment<'a> {
         self.variables.insert(name, type_);
     }
 
-    pub fn get_type(&self, name: &str) -> Option<&Type> {
+    pub fn get_type(&self, name: &str) -> Option<Type> {
         if let Some(type_) = self.types.get(name) {
-            Some(type_)
+            Some(type_.clone())
         } else if let Some(parent) = &self.parent {
             parent.get_type(name)
         } else {
+            if name.starts_with("[") {
+                let type_name = &name[1..name.len() - 1];
+                if let Some(type_) = self.get_type(type_name) {
+                    return Some(Type::Array(Box::new(type_.clone())));
+                }
+            }
+    
             None
         }
     }
 
-    pub fn get_variable(&self, name: &str) -> Option<&Type> {
+    pub fn get_variable(&self, name: &str) -> Option<Type> {
         if let Some(type_) = self.variables.get(name) {
-            Some(type_)
+            Some(type_.clone())
         } else if let Some(parent) = &self.parent {
             parent.get_variable(name)
         } else {

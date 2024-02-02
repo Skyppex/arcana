@@ -107,19 +107,34 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
 }
 
 fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String> {
-    if !is_type_annotation(cursor) {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Let) {
         return parse_if(cursor);
     }
 
-    let TypeAnnotation {
-        mutable,
-        type_name
-    } = parse_type_annotation_start(cursor)?;
+    cursor.bump()?; // Consume the let
 
+    let mutable = matches!(cursor.first().kind, TokenKind::Keyword(Keyword::Mutable));
+
+    if mutable {
+        cursor.bump()?; // Consume the mutable
+    }
+    
     let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
     };
     
+    if cursor.first().kind != TokenKind::Colon {
+        return Err(format!("Expected : but found {:?}", cursor.first().kind));
+    }
+
+    cursor.bump()?; // Consume the :
+    
+    if !can_be_type(cursor) {
+        return Err(format!("Expected type annotation but found {:?}", cursor.first().kind));
+    }
+
+    let type_name = parse_type(cursor)?;
+
     match cursor.first().kind {
         TokenKind::Equal => {
             cursor.bump()?; // Consume the =
@@ -650,35 +665,21 @@ fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> 
     }
 }
 
-fn is_type_annotation(cursor: &Cursor) -> bool {
+fn can_be_type(cursor: &Cursor) -> bool {
     let mut cloned_cursor = cursor.clone();
 
     match cloned_cursor.first().kind {
         TokenKind::Literal(token::Literal::Unit) => true,
-        TokenKind::Keyword(Keyword::Mutable) => true,
-        TokenKind::Identifier(_) => {
-            matches!(cursor.second().kind, TokenKind::Identifier(_))
-        },
+        TokenKind::Identifier(_) => true,
         TokenKind::OpenBracket => {
             let _ = cloned_cursor.bump();
-            is_type_annotation(&cloned_cursor)
+            can_be_type(&cloned_cursor)
         },
         _ => false,
     }
 }
 
-fn parse_type_annotation_start(cursor: &mut Cursor) -> Result<TypeAnnotation, String> {
-    let mutable = matches!(cursor.first().kind, TokenKind::Keyword(Keyword::Mutable));
-
-    if mutable {
-        cursor.bump()?; // Consume the mutable
-    }
-
-    let type_name = parse_type_annotation_continue(cursor)?;
-    Ok(TypeAnnotation { mutable, type_name })
-}
-
-fn parse_type_annotation_continue(cursor: &mut Cursor) -> Result<String, String> {
+fn parse_type(cursor: &mut Cursor) -> Result<String, String> {
     match cursor.first().kind {
         TokenKind::Literal(token::Literal::Unit) => {
             cursor.bump()?; // Consume the unit
@@ -691,7 +692,7 @@ fn parse_type_annotation_continue(cursor: &mut Cursor) -> Result<String, String>
         TokenKind::OpenBracket => {
             cursor.bump()?; // Consume the [
 
-            let type_name = parse_type_annotation_continue(cursor)?;
+            let type_name = parse_type(cursor)?;
 
             if cursor.first().kind != TokenKind::CloseBracket {
                 return Err(format!("Expected ] but found {:?}", cursor.first().kind));
@@ -702,9 +703,4 @@ fn parse_type_annotation_continue(cursor: &mut Cursor) -> Result<String, String>
         },
         _ => Err(format!("Expected type identifier but found {:?}", cursor.first().kind)),
     }
-}
-
-struct TypeAnnotation {
-    mutable: bool,
-    type_name: String,
 }

@@ -132,6 +132,7 @@ impl<T: PrimInt + Display> ToString for IntLiteral<T> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum IntLiteralBase {
+    None = 0,
     Binary = 2,
     Octal = 8,
     Decimal = 10,
@@ -141,6 +142,7 @@ pub enum IntLiteralBase {
 impl ToString for IntLiteralBase {
     fn to_string(&self) -> String {
         match self {
+            IntLiteralBase::None => "".to_string(),
             IntLiteralBase::Binary => "0b".to_string(),
             IntLiteralBase::Octal => "0o".to_string(),
             IntLiteralBase::Decimal => "".to_string(),
@@ -169,6 +171,9 @@ pub enum NumericLiteralType {
 pub enum Keyword {
     // Access modifiers
     AccessModifier(AccessModifier),
+
+    // Variable Declarations
+    Let,
 
     // Types
     Mutable,

@@ -300,6 +300,7 @@ fn escapable_is_char(c: char) -> Option<char> {
 
 fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
     match string {
+        "let" => Some(TokenKind::Keyword(Keyword::Let)),
         "mutable" => Some(TokenKind::Keyword(Keyword::Mutable)),
         "if" => Some(TokenKind::Keyword(Keyword::If)),
         "else" => Some(TokenKind::Keyword(Keyword::Else)),

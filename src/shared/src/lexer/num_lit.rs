@@ -2,9 +2,19 @@ use super::{cursor::Cursor, token::{Token, NumericLiteralType, IntLiteralBase, T
 
 
 pub fn parse_numeric_literal(cursor: &mut Cursor) -> Token {
-    let base = parse_base_prefix(cursor).unwrap_or(IntLiteralBase::Decimal);
+    let base: IntLiteralBase = parse_base_prefix(cursor).unwrap_or(IntLiteralBase::None);
     let value = parse_numeric_literal_value(cursor, base.clone());
-    let suffix = parse_suffix(cursor).unwrap_or(NumericLiteralType::I32);
+    let suffix = parse_suffix(cursor).unwrap_or_else(|| {
+        if base == IntLiteralBase::None {
+            if value.contains('.') {
+                NumericLiteralType::F64
+            } else {
+                NumericLiteralType::I64
+            }
+        } else {
+            NumericLiteralType::I64
+        }
+    });
 
     let kind = match suffix {
         NumericLiteralType::I8 => TokenKind::Literal(Literal::I8(IntLiteral::<i8> {
@@ -98,7 +108,12 @@ fn parse_suffix(cursor: &mut Cursor) -> Option<NumericLiteralType> {
 }
 
 fn is_numeric_literal_continue(c: char, base: IntLiteralBase) -> bool {
-    c.is_digit(base as u32) || c == '.'
+    let base = match base {
+        IntLiteralBase::None => 10,
+        other => other as u32,
+    };
+
+    c.is_digit(base) || c == '.'
 }
 
 fn is_numeric_literal_suffix_start(c: char) -> bool {

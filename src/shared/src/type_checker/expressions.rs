@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{parser::{self, Assignment, Expression, If, Statement, VariableDeclaration, While}, type_checker::ast::Literal};
+use crate::{parser::{self, Assignment, Expression, If, VariableDeclaration, While}, type_checker::ast::Literal};
 
 use super::{ast::{BinaryOperator, Block, ConditionBlock, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator, UnionMemberFieldInitializers
     },
@@ -33,6 +33,12 @@ pub fn check_type<'a>(
             } else {
                 None
             };
+
+            if let Some(initializer) = &initializer {
+                if initializer.get_type() != type_ {
+                    return Err(format!("Initializer type {:?} does not match variable type {:?}", initializer.get_type(), type_));
+                }
+            }
 
             type_environment.add_variable(identifier.clone(), type_.clone());
 
