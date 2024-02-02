@@ -87,6 +87,7 @@ pub enum Literal {
     String(String),
     Char(char),
     Bool(bool),
+    Array(Vec<Expression>),
     Struct {
         type_name: String,
         field_initializers: Vec<FieldInitializer>,

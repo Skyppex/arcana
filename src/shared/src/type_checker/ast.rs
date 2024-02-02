@@ -246,6 +246,7 @@ pub enum Literal {
     String(String),
     Char(char),
     Bool(bool),
+    Array { values: Vec<TypedExpression>, type_: Type },
     Struct {
         type_name: String,
         field_initializers: Vec<FieldInitializer>,
@@ -278,6 +279,7 @@ impl Typed for Literal {
             Literal::String(_) => Type::String,
             Literal::Char(_) => Type::Char,
             Literal::Bool(_) => Type::Bool,
+            Literal::Array { type_, .. } => Type::Array(Box::new(type_.clone())),
             Literal::Struct { type_, .. } => type_.clone(),
             Literal::Union { type_, .. } => type_.clone(),
         }

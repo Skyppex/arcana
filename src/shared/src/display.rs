@@ -478,6 +478,23 @@ impl IndentDisplay for Literal {
             Literal::String(s) => s.to_string(),
             Literal::Char(c) => c.to_string(),
             Literal::Bool(b) => b.to_string(),
+            Literal::Array(expressions) => {
+                let mut result = String::new();
+                result.push_str("<array>");
+                indent.increase();
+
+                for (i, expression) in expressions.iter().enumerate() {
+                    if i < expressions.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), expression.indent_display(indent)).as_str());
+                    } else {
+                        indent.current(true);
+                        result.push_str(format!("\n{}{}", indent.dash_end(), expression.indent_display(indent)).as_str());
+                    }
+                }
+                
+                indent.decrease();
+                result
+            },
             Literal::Struct {
                 type_name,
                 field_initializers
@@ -1090,6 +1107,26 @@ impl IndentDisplay for type_checker::ast::Literal {
             type_checker::ast::Literal::String(s) => s.to_string(),
             type_checker::ast::Literal::Char(c) => c.to_string(),
             type_checker::ast::Literal::Bool(b) => b.to_string(),
+            type_checker::ast::Literal::Array {
+                values,
+                type_
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<array>: {}", type_).as_str());
+                indent.increase();
+
+                for (i, expression) in values.iter().enumerate() {
+                    if i < values.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), expression.indent_display(indent)).as_str());
+                    } else {
+                        indent.current(true);
+                        result.push_str(format!("\n{}{}", indent.dash_end(), expression.indent_display(indent)).as_str());
+                    }
+                }
+
+                indent.decrease();
+                result
+            },
             type_checker::ast::Literal::Struct {
                 type_name,
                 field_initializers,

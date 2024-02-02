@@ -11,6 +11,7 @@ pub enum Value {
     Number(Number),
     Char(char),
     String(String),
+    Array(Vec<Value>),
     Struct { struct_name: String, fields: HashMap<String, Value> },
     Union { union_member: UnionMember, fields: UnionFields },
     Function { parameters: Vec<String>, body: Vec<TypedStatement> },
@@ -26,6 +27,19 @@ impl<'a> Display for Value {
             Value::Number(number) => write!(f, "{}", number),
             Value::Char(character) => write!(f, "'{}'", character),
             Value::String(string) => write!(f, "\"{}\"", string),
+            Value::Array(values) => {
+                write!(f, "[")?;
+
+                for (index, value) in values.iter().enumerate() {
+                    write!(f, "{}", value)?;
+
+                    if index < values.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+
+                write!(f, "]")
+            },
             Value::Struct {
                 struct_name,
                 fields

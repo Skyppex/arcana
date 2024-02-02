@@ -261,6 +261,18 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
         Literal::String(v) => Ok(Value::String(v)),
         Literal::Char(v) => Ok(Value::Char(v)),
         Literal::Bool(v) => Ok(Value::Bool(v)),
+        Literal::Array {
+            values,
+            type_: _
+        } => {
+            let mut array = Vec::new();
+
+            for element in values {
+                array.push(evaluate_expression(element, environment.clone())?);
+            }
+
+            Ok(Value::Array(array))
+        }
         Literal::Struct {
             type_name,
             field_initializers,

@@ -165,6 +165,29 @@ pub fn check_type<'a>(
                 parser::Literal::String(v) => Literal::String(v.clone()),
                 parser::Literal::Char(v) => Literal::Char(*v),
                 parser::Literal::Bool(v) => Literal::Bool(*v),
+                parser::Literal::Array(v) => {
+                    let v: Result<(Vec<TypedExpression>, Type), String> = {
+                        let mut v_: Vec<TypedExpression> = vec![];
+                        let mut previous_type = Type::Void;
+
+                        for e in v {
+                            let value = check_type(&e, discovered_types, type_environment)?;
+                            let type_ = value.get_type();
+                            
+                            if previous_type != Type::Void && type_ != previous_type {
+                                return Err(format!("Array element type {:?} does not match previous element type {:?}", type_, previous_type));
+                            }
+
+                            previous_type = type_;
+                            v_.push(value);
+                        }
+
+                        Ok((v_, previous_type))
+                    };
+
+                    let v = v?;
+                    Literal::Array { values: v.0, type_: v.1 }
+                },
                 parser::Literal::Struct {
                     type_name,
                     field_initializers

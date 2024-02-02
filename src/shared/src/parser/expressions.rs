@@ -107,111 +107,41 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
 }
 
 fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String> {
+    if !is_type_annotation(cursor) {
+        return parse_if(cursor);
+    }
+
+    let TypeAnnotation {
+        mutable,
+        type_name
+    } = parse_type_annotation_start(cursor)?;
+
+    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
+        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+    };
+    
     match cursor.first().kind {
-        TokenKind::Keyword(Keyword::Mutable) => {
-            cursor.bump()?; // Consume the mutable
+        TokenKind::Equal => {
+            cursor.bump()?; // Consume the =
 
-            if cursor.first().kind == TokenKind::Literal(token::Literal::Unit) {
-                return Err("Cannot declare a mutable variable of type unit".to_string());
-            }
+            let initializer = parse_expression(cursor)?;
 
-            let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-                return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
-            };
-
-            let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-                return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-            };
-
-            match cursor.first().kind {
-                TokenKind::Equal => {
-                    cursor.bump()?; // Consume the =
-
-                    let initializer = parse_expression(cursor)?;
-
-                    Ok(Expression::VariableDeclaration(VariableDeclaration {
-                        mutable: true,
-                        type_name,
-                        identifier,
-                        initializer: Some(Box::new(initializer)),
-                    }))
-                },
-                TokenKind::Semicolon => {
-                    Ok(Expression::VariableDeclaration(VariableDeclaration {
-                        mutable: true,
-                        type_name,
-                        identifier,
-                        initializer: None,
-                    }))
-                },
-                _ => Err(format!("Expected = or : but found {:?}", cursor.first().kind)),
-            }
+            Ok(Expression::VariableDeclaration(VariableDeclaration {
+                mutable,
+                type_name,
+                identifier,
+                initializer: Some(Box::new(initializer)),
+            }))
         },
-        TokenKind::Identifier(type_name) => {
-            let TokenKind::Identifier(identifier) = cursor.second().kind else {
-                return parse_if(cursor);
-            };
-
-            cursor.bump()?; // Consume the type identifier
-            cursor.bump()?; // Consume the identifier
-
-            match cursor.first().kind {
-                TokenKind::Equal => {
-                    cursor.bump()?; // Consume the =
-
-                    let expression = parse_expression(cursor)?;
-
-                    Ok(Expression::VariableDeclaration(VariableDeclaration {
-                        mutable: false,
-                        type_name,
-                        identifier,
-                        initializer: Some(Box::new(expression)),
-                    }))
-                },
-                TokenKind::Semicolon => {
-                    Ok(Expression::VariableDeclaration(VariableDeclaration {
-                        mutable: false,
-                        type_name,
-                        identifier,
-                        initializer: None,
-                    }))
-                },
-                _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
-            }
+        TokenKind::Semicolon => {
+            Ok(Expression::VariableDeclaration(VariableDeclaration {
+                mutable,
+                type_name,
+                identifier,
+                initializer: None,
+            }))
         },
-        TokenKind::Literal(token::Literal::Unit) => {
-            let TokenKind::Identifier(identifier) = cursor.second().kind else {
-                return parse_if(cursor);
-            };
-
-            cursor.bump()?; // Consume the type identifier
-            cursor.bump()?; // Consume the identifier
-
-            match cursor.first().kind {
-                TokenKind::Equal => {
-                    cursor.bump()?; // Consume the =
-
-                    let expression = parse_expression(cursor)?;
-
-                    Ok(Expression::VariableDeclaration(VariableDeclaration {
-                        mutable: false,
-                        type_name: token::Literal::Unit.to_string(),
-                        identifier,
-                        initializer: Some(Box::new(expression)),
-                    }))
-                },
-                TokenKind::Semicolon => {
-                    Ok(Expression::VariableDeclaration(VariableDeclaration {
-                        mutable: false,
-                        type_name: token::Literal::Unit.to_string(),
-                        identifier,
-                        initializer: None,
-                    }))
-                },
-                _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
-            }
-        }
-        _ => parse_if(cursor),
+        _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
     }
 }
 
@@ -678,6 +608,23 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
                 _ => Err(format!("Expected ) but found {:?}", cursor.first().kind)),
             }
         },
+        TokenKind::OpenBracket => {
+            cursor.bump()?; // Consume the [
+
+            let mut elements = vec![];
+
+            while cursor.first().kind != TokenKind::CloseBracket {
+                elements.push(parse_expression(cursor)?);
+
+                if cursor.first().kind == TokenKind::Comma {
+                    cursor.bump()?; // Consume the ,
+                }
+            }
+
+            cursor.bump()?; // Consume the ]
+
+            Ok(Expression::Literal(Literal::Array(elements)))
+        }
         _ => Err(format!("Expected primary expression but found {:?}", cursor.first().kind)),
     }
 }
@@ -701,4 +648,63 @@ fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> 
         token::Literal::Char(value) => Ok(Expression::Literal(Literal::Char(value.parse::<char>().unwrap()))),
         token::Literal::Bool(value) => Ok(Expression::Literal(Literal::Bool(value))),
     }
+}
+
+fn is_type_annotation(cursor: &Cursor) -> bool {
+    let mut cloned_cursor = cursor.clone();
+
+    match cloned_cursor.first().kind {
+        TokenKind::Literal(token::Literal::Unit) => true,
+        TokenKind::Keyword(Keyword::Mutable) => true,
+        TokenKind::Identifier(_) => {
+            matches!(cursor.second().kind, TokenKind::Identifier(_))
+        },
+        TokenKind::OpenBracket => {
+            let _ = cloned_cursor.bump();
+            is_type_annotation(&cloned_cursor)
+        },
+        _ => false,
+    }
+}
+
+fn parse_type_annotation_start(cursor: &mut Cursor) -> Result<TypeAnnotation, String> {
+    let mutable = matches!(cursor.first().kind, TokenKind::Keyword(Keyword::Mutable));
+
+    if mutable {
+        cursor.bump()?; // Consume the mutable
+    }
+
+    let type_name = parse_type_annotation_continue(cursor)?;
+    Ok(TypeAnnotation { mutable, type_name })
+}
+
+fn parse_type_annotation_continue(cursor: &mut Cursor) -> Result<String, String> {
+    match cursor.first().kind {
+        TokenKind::Literal(token::Literal::Unit) => {
+            cursor.bump()?; // Consume the unit
+            Ok("unit".to_string())
+        },
+        TokenKind::Identifier(type_name) => {
+            cursor.bump()?; // Consume the type identifier
+            Ok(type_name)
+        },
+        TokenKind::OpenBracket => {
+            cursor.bump()?; // Consume the [
+
+            let type_name = parse_type_annotation_continue(cursor)?;
+
+            if cursor.first().kind != TokenKind::CloseBracket {
+                return Err(format!("Expected ] but found {:?}", cursor.first().kind));
+            }
+
+            cursor.bump()?; // Consume the ]
+            Ok(format!("[{}]", type_name))
+        },
+        _ => Err(format!("Expected type identifier but found {:?}", cursor.first().kind)),
+    }
+}
+
+struct TypeAnnotation {
+    mutable: bool,
+    type_name: String,
 }
