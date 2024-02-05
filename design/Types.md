@@ -294,7 +294,7 @@ union Foo {
     Baz(a: f32),
 }
 
-type Exclude<T: union, [U: memberof T]> = T - U;
+type Exclude<T: union, ..[U: memberof T]> = T - ..U;
 
 fn main() {
     Foo foo = Foo.Baz;
@@ -333,13 +333,18 @@ struct Foo {
     baz: f32,
 }
 
-type Omit<T: struct, [U: memberof T]> = T - U;
+type Omit<T: struct, ..[U: memberof T]> = T - ..U;
 
 fn main() {
     Foo foo = Foo { bar: 5, baz: 10 };
     Omit<Foo, bar> bazOnly = foo;
     // This is equivalent to Omit<Foo, bar> bazOnly = Omit<Foo, bar> { baz: foo.baz };
 }
+
+// You could, for this specific case do this:
+type BazOnly = Foo - bar;
+// We know, when doing a '-', that we are removeing from Foo.
+// This allows us to just specify the field itself, no need to qualify Foo.bar.
 ```
 
 This lowers to the following:
@@ -357,4 +362,45 @@ fn main() {
     Foo foo = Foo.Baz;
     Omit_Foo_bar bazOnly = Omit_Foo_bar { baz: foo.baz };
 }
+
+struct BazOnly {
+    bar: i32,
+}
+```
+
+You can extend types with new fields:
+```rs
+struct Foo {
+    bar: i32,
+    baz: f32,
+}
+
+type Extend<T: struct, ..[U: field]> = T + U;
+
+fn main() {
+    Foo foo = Foo { bar: 5, baz: 10 };
+
+    // We have to use the 'with' keyword here since a '+' would
+    // get confused with the addition operator
+    Extend<Foo, barBaz: bool> barBaz = foo with { barBaz: false };
+    // This is equivalent to Extend<Foo, barBaz: bool> barBaz = Extend<Foo, barBaz: bool> { baz: foo.baz, barBaz: false };
+}
+```
+
+This is how you would declare a type like this using another type alias,
+you can define the new fields' access modifier.
+
+Here the `Foo` struct has been made `public` along with its fields.
+When declaring the `FooBarBaz` type alias, the new `barBaz` field is also marked as `public`.
+If you didn't do this, the field would be private for the `FooBarBaz` type even though its itself `public`.
+
+```rs
+type Extend<T: struct, ..[U: field]> = T + U;
+
+public struct Foo {
+    public bar: i32,
+    public baz: f32,
+}
+
+type FooBarBaz = Extend<Foo, public barBaz: bool>;
 ```

@@ -1,6 +1,6 @@
 # Syntax Examples
 
-`i32 x;` Variable declaration -> Statement \
+`let x: i32;` Variable declaration -> Statement \
 `mutable i32 x;` Mutable variable declaration -> Statement \
 `i32 x = 0;` Variable declaration with initialization -> Expression \
 `mutable i32 x = 0;` Mutable variable declaration with initialization -> Expression
