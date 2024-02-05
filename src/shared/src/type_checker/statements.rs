@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::parser::{Statement, self};
+use crate::parser::{self, Impl, Statement};
 
 use super::{
     ast::{self, Typed, TypedStatement}, expressions, type_checker::DiscoveredType, type_environment::TypeEnvironment, Function, Struct, StructField, Type, Union, UnionMember, UnionMemberField
@@ -40,6 +40,16 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         //     type_name,
         //     members
         // }) => Ok(vec![]),
+        Statement::Impl(Impl {
+            functions: methods,
+            ..
+        }) => {
+            let mut discovered_types = vec![];
+            for method in methods {
+                discovered_types.append(&mut discover_user_defined_types(method)?);
+            }
+            Ok(discovered_types)
+        },
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             identifier,
@@ -227,6 +237,43 @@ pub fn check_type<'a>(
         //     //     type_: flags
         //     // })
         // },
+        Statement::Impl(parser::Impl {
+            type_name,
+            functions
+        }) => {
+            let impl_type = check_type_name(type_name, discovered_types, type_environment)?;
+            
+            let mut typed_functions = vec![];
+            
+            for function in functions {
+                let typed_function = check_type(function, discovered_types, type_environment)?;
+                
+                let TypedStatement::FunctionDeclaration {
+                    identifier,
+                    parameters,
+                    return_type,
+                    body: _,
+                    type_: _
+                } = typed_function.clone() else {
+                    return Err("Impl method must be a function".to_string());
+                };
+
+                typed_functions.push(typed_function);
+
+                let function_type = Type::Function(Function {
+                    name: identifier.clone(),
+                    parameters: parameters.iter().map(|p| (p.identifier.clone(), p.type_.clone())).collect(),
+                    return_type: Box::new(return_type.clone())
+                });
+
+                type_environment.add_impl_function(impl_type.clone(), identifier.clone(), function_type.clone())?;
+            }
+
+            Ok(TypedStatement::Impl {
+                type_name: type_name.clone(),
+                functions: typed_functions,
+            })
+        }
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             identifier,

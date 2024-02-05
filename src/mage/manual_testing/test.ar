@@ -1,41 +1,5 @@
-struct A {
-    a: i32,
-}
-
-struct B {
-    a: A,
-}
-
-struct C {
-    b: B,
-}
-
-struct D {
-    c: C,
-}
-
-union Option {
-    Some(string),
-    None,
-}
-
-union Result {
-    Ok(string),
-    Err(string),
-}
-
-fn add(a: i32, b: i32): i32 {
-    a + b
-}
-
-fn sub(a: i32, b: i32): i32 {
-    a - b
-}
-
-fn gt5od(a: i32): i32 {
-    if a > 5 {
-        return a;
+impl i64 {
+    func times_two(a: i64): i64 {
+        a * 2
     }
-
-    a * 2
 }

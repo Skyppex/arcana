@@ -11,6 +11,31 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
         TypedStatement::None => Ok(Value::Void),
         TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
         TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::Impl {
+            type_name,
+            functions
+        } => {
+            for function in functions {
+                match function {
+                    TypedStatement::FunctionDeclaration {
+                        identifier,
+                        parameters,
+                        return_type: _,
+                        body,
+                        type_: _
+                    } => {
+                        evaluate_function_declaration(
+                            &environment,
+                            format!("{}::{}", type_name, identifier),
+                            parameters,
+                            body)?;
+                    }
+                    other => return Err(format!("Impl can only contain function declarations '{:?}'", other))
+                }
+            }
+
+            Ok(Value::Void)
+        }
         TypedStatement::Program {
             statements
         } => evaluate_program(statements, environment),
@@ -21,15 +46,10 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
             body,
             type_: _
         } => {
-            environment.borrow_mut().add_variable(
-                identifier.clone(),
-                Value::Function {
-                    parameters: parameters.iter().map(|p| p.identifier.clone()).collect(),
-                    body,
-                },
-                false);
-
-            Ok(Value::Void)
+            evaluate_function_declaration(&environment,
+                identifier,
+                parameters,
+                body)
         }
         TypedStatement::Semi(s) => {
             evaluate(*s, environment)?;
@@ -45,6 +65,25 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
             Ok(Value::Void)
         }
     }
+}
+
+fn evaluate_function_declaration(
+    environment: &Rc<RefCell<Environment>>,
+    identifier: String,
+    parameters: Vec<Parameter>,
+    body: Vec<TypedStatement>) -> Result<Value, String> {
+    environment.borrow_mut().add_variable(
+        identifier.clone(),
+        Value::Function {
+            parameters: parameters
+                .iter()
+                .map(|p| p.identifier.clone())
+                .collect(),
+            body,
+        },
+        false);
+
+    Ok(Value::Void)
 }
 
 fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: Rcrc<Environment>) -> Result<Value, String> {

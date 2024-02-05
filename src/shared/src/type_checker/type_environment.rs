@@ -7,6 +7,7 @@ pub struct TypeEnvironment<'a> {
     parent: Option<&'a TypeEnvironment<'a>>,
     types: HashMap<String, Type>,
     variables: HashMap<String, Type>,
+    impls: HashMap<String, HashMap<String, Type>>,
 }
 
 impl<'a> TypeEnvironment<'a> {
@@ -33,6 +34,7 @@ impl<'a> TypeEnvironment<'a> {
                 ("string".to_string(), Type::String),
             ]),
             variables: HashMap::new(),
+            impls: HashMap::new(),
         }
     }
 
@@ -41,6 +43,7 @@ impl<'a> TypeEnvironment<'a> {
             parent: Some(self),
             types: HashMap::new(),
             variables: HashMap::new(),
+            impls: HashMap::new(),
         }
     }
 
@@ -51,6 +54,26 @@ impl<'a> TypeEnvironment<'a> {
         }
 
         self.types.insert(type_.full_name(), type_);
+        Ok(())
+    }
+
+    pub fn add_impl_function(&mut self, type_: Type, function_name: String, function_type: Type) -> Result<(), String> {
+        let full_name = type_.full_name();
+        match self.impls.get_mut(&full_name) {
+            Some(impl_) => {
+                if impl_.contains_key(&function_name) {
+                    return Err(format!("Function {} already exists for type {}", function_name, full_name));
+                }
+
+                impl_.insert(function_name, function_type);
+            },
+            None => {
+                let mut impl_ = HashMap::new();
+                impl_.insert(function_name, function_type);
+                self.impls.insert(full_name, impl_);
+            }
+        }
+
         Ok(())
     }
 

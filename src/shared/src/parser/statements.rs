@@ -1,6 +1,6 @@
 use crate::lexer::token::{TokenKind, Keyword};
 
-use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, types::{can_be_type, parse_type}, FlagsMember, FlagsValue, FunctionDeclaration, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
+use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, types::{can_be_type, parse_type}, FlagsMember, FlagsValue, FunctionDeclaration, Impl, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     match parse_break(cursor) {
@@ -46,7 +46,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     let mut access_modifier = None;
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
-        if cursor.second().kind != TokenKind::Keyword(Keyword::Fn) {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Func) {
             return parse_return(cursor);
         }
 
@@ -54,11 +54,11 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         access_modifier = Some(am);
     }
 
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Fn) {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Func) {
         return parse_return(cursor);
     }
 
-    cursor.bump()?; // Consume the fn keyword
+    cursor.bump()?; // Consume the func keyword
 
     let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
@@ -172,7 +172,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
-            return parse_next(cursor);
+            return parse_impl(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -180,7 +180,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
-        return parse_next(cursor);
+        return parse_impl(cursor);
     }
 
     cursor.bump()?; // Consume the union keyword
@@ -272,6 +272,23 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 //         members,
 //     }))
 // }
+
+fn parse_impl(cursor: &mut Cursor) -> Result<Statement, String> {
+    let TokenKind::Keyword(Keyword::Impl) = cursor.first().kind else {
+        return parse_next(cursor);
+    };
+
+    cursor.bump()?; // Consume the impl
+
+    if !can_be_type(cursor) {
+        return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
+    }
+
+    let type_name = parse_type(cursor)?;
+    let methods = parse_block_statements(cursor)?;
+
+    Ok(Statement::Impl(Impl { type_name, functions: methods }))
+}
 
 fn parse_next(cursor: &mut Cursor) -> Result<Statement, String> {
     #[cfg(feature = "interpreter")]

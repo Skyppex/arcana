@@ -1,11 +1,18 @@
 use std::{collections::HashMap, fmt::Display};
 
 #[derive(Debug, Clone)]
+// FlagsDeclaration(FlagsDeclaration),
+pub struct Impl{
+    pub type_name: String,
+    pub functions: Vec<Statement>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Statement {
     Program { statements: Vec<Statement> },
     StructDeclaration(StructDeclaration),
     UnionDeclaration(UnionDeclaration),
-    // FlagsDeclaration(FlagsDeclaration),
+    Impl(Impl),
     FunctionDeclaration(FunctionDeclaration),
     Semi(Box<Statement>),
     Break(Option<Expression>),

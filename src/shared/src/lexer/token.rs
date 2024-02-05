@@ -177,10 +177,11 @@ pub enum Keyword {
 
     // Types
     Mutable,
-    Fn,
+    Func,
     Struct,
     Union,
     // Flags,
+    Impl,
 
     // Control flow
     If,
