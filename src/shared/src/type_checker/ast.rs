@@ -214,6 +214,7 @@ pub struct StructField {
 pub enum AccessModifier {
     Public,
     Internal,
+    Super,
 }
 
 impl Into<AccessModifier> for parser::AccessModifier {
@@ -221,6 +222,7 @@ impl Into<AccessModifier> for parser::AccessModifier {
         match self {
             parser::AccessModifier::Public => AccessModifier::Public,
             parser::AccessModifier::Internal => AccessModifier::Internal,
+            parser::AccessModifier::Super => AccessModifier::Super,
         }
     }
 }

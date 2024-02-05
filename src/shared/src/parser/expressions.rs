@@ -113,7 +113,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
 
     cursor.bump()?; // Consume the let
 
-    let mutable = matches!(cursor.first().kind, TokenKind::Keyword(Keyword::Mutable));
+    let mutable = matches!(cursor.first().kind, TokenKind::Keyword(Keyword::Mut));
 
     if mutable {
         cursor.bump()?; // Consume the mutable

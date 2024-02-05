@@ -632,6 +632,7 @@ impl IndentDisplay for AccessModifier {
         match self {
             AccessModifier::Public => "public".to_string(),
             AccessModifier::Internal => "internal".to_string(),
+            AccessModifier::Super => "super".to_string(),
         }
     }
 }

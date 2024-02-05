@@ -176,7 +176,7 @@ pub enum Keyword {
     Let,
 
     // Types
-    Mutable,
+    Mut,
     Func,
     Struct,
     Union,

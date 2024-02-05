@@ -301,7 +301,7 @@ fn escapable_is_char(c: char) -> Option<char> {
 fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
     match string {
         "let" => Some(TokenKind::Keyword(Keyword::Let)),
-        "mutable" => Some(TokenKind::Keyword(Keyword::Mutable)),
+        "mut" => Some(TokenKind::Keyword(Keyword::Mut)),
         "if" => Some(TokenKind::Keyword(Keyword::If)),
         "else" => Some(TokenKind::Keyword(Keyword::Else)),
         "loop" => Some(TokenKind::Keyword(Keyword::Loop)),
@@ -318,6 +318,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "impl" => Some(TokenKind::Keyword(Keyword::Impl)),
         "public" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Public))),
         "internal" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
+        "super" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
         "true" => Some(TokenKind::Literal(Literal::Bool(true))),
         "false" => Some(TokenKind::Literal(Literal::Bool(false))),
         "unit" => Some(TokenKind::Literal(Literal::Unit)),

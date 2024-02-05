@@ -178,6 +178,7 @@ pub enum UnionMemberFieldInitializers {
 pub enum AccessModifier {
     Public,
     Internal,
+    Super,
 }
 
 #[derive(Debug, Clone)]

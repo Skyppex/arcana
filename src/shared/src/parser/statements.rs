@@ -394,7 +394,7 @@ fn parse_struct_field(cursor: &mut Cursor) -> Result<StructField, String> {
     };
 
     let mutable = match cursor.first().kind {
-        TokenKind::Keyword(Keyword::Mutable) => {
+        TokenKind::Keyword(Keyword::Mut) => {
             cursor.bump()?; // Consume the mutable keyword
             true
         },
