@@ -450,7 +450,9 @@ pub fn check_type<'a>(
 
             let scope = loop_environment.borrow().get_scope(&ScopeType::Break);
             match scope {
-                Some(Scope::Break(Some(type_))) => {
+                Some(scope) => {
+                    let type_ = scope.fold()?;
+
                     Ok(TypedExpression::Loop(Block {
                         statements: block.statements,
                         type_

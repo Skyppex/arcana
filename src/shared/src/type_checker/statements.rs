@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::parser::{self, Impl, Statement};
 
 use super::{
-    ast::{self, Typed, TypedStatement}, expressions, scope::Scope, type_checker::DiscoveredType, type_environment::TypeEnvironment, Function, Rcrc, Struct, StructField, Type, Union, UnionMember, UnionMemberField
+    ast::{self, Typed, TypedStatement}, expressions, scope::{Scope, ScopeType}, type_checker::DiscoveredType, type_environment::TypeEnvironment, Function, Rcrc, Struct, StructField, Type, Union, UnionMember, UnionMemberField
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -324,9 +324,11 @@ pub fn check_type<'a>(
             )?;
 
             let block_environment =
-                Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment.clone())));
+                Rc::new(RefCell::new(TypeEnvironment::new_scope(
+                    type_environment.clone(),
+                    ScopeType::Return)));
 
-            let ps: Result<Vec<ast::Parameter>, String> = parameters
+            let parameters: Result<Vec<ast::Parameter>, String> = parameters
                 .iter()
                 .map(|parameter| {
                     match check_type_name(
@@ -351,34 +353,24 @@ pub fn check_type<'a>(
             let body_typed_statement: Result<Vec<TypedStatement>, String> = body
                 .iter()
                 .map(|s| {
-                    let typed_statement = &check_type(s, discovered_types, block_environment.clone());
-
-                    typed_statement.clone()
+                    check_type(s, discovered_types, block_environment.clone())
                 })
                 .collect();
 
             let body_typed_statement = body_typed_statement?;
 
-            for s in body_typed_statement.clone() {
-                let t = s.get_type();
+            let return_scope = block_environment.borrow().get_scope(&ScopeType::Return);
 
-                if t == Type::Void {
-                    continue;
-                }
+            let body_type = return_scope.map(|s| s.fold())
+                .unwrap_or(Ok(Type::Void))?;
 
-                if t != return_type {
-                    return Err(format!(
-                        "Function {} has return type {} but body has type {}",
-                        identifier,
-                        return_type,
-                        s.get_type()
-                    ));
-                }
+            if return_type != body_type {
+                return Err(format!("Function body's return type {} does not match function return type {}", body_type, return_type));
             }
 
             let type_ = Type::Function(Function {
                 name: identifier.clone(),
-                parameters: ps
+                parameters: parameters
                     .clone()?
                     .iter()
                     .map(|p| (p.identifier.clone(), p.type_.clone()))
@@ -390,7 +382,7 @@ pub fn check_type<'a>(
 
             Ok(TypedStatement::FunctionDeclaration {
                 identifier: identifier.clone(),
-                parameters: ps?,
+                parameters: parameters?,
                 return_type,
                 body: body_typed_statement,
                 type_,
@@ -410,12 +402,12 @@ pub fn check_type<'a>(
                 )?;
 
                 let break_type = typed_expression.get_type();
-                type_environment.borrow_mut().activate_scope(Scope::Break(Some(break_type)))?;
+                type_environment.borrow_mut().activate_scope(ScopeType::Break, break_type)?;
                 Ok(TypedStatement::Break(Some(typed_expression)))
             },
             None =>
             {
-                type_environment.borrow_mut().activate_scope(Scope::Break(None))?;
+                type_environment.borrow_mut().activate_scope(ScopeType::Break, Type::Void)?;
                 Ok(TypedStatement::Break(None))
             },
         },
@@ -429,11 +421,11 @@ pub fn check_type<'a>(
                 )?;
 
                 let return_type = typed_expression.get_type();
-                type_environment.borrow_mut().activate_scope(Scope::Return(Some(return_type)))?;
+                type_environment.borrow_mut().activate_scope(ScopeType::Return, return_type)?;
                 Ok(TypedStatement::Return(Some(typed_expression)))
             },
             None => {
-                type_environment.borrow_mut().activate_scope(Scope::Return(None))?;
+                type_environment.borrow_mut().activate_scope(ScopeType::Return, Type::Void)?;
                 Ok(TypedStatement::Return(None))
             },
         },

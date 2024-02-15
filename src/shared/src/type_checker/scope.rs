@@ -1,9 +1,31 @@
+use std::{fmt::Display, vec};
+
 use super::Type;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Scope {
-    Break(Option<Type>),
-    Return(Option<Type>),
+pub struct Scope {
+    pub scope_type: ScopeType,
+    pub types: Vec<Type>,
+}
+
+impl Scope {
+    pub fn active(&self) -> bool {
+        !self.types.is_empty()
+    }
+
+    pub fn fold(&self) -> Result<Type, String> {
+        let type_ = self.types.iter().fold(Ok(Type::Void), |acc, t| {
+            let acc = acc?;
+
+            if acc == Type::Void || &acc == t {
+                Ok(t.clone())
+            } else {
+                Err(format!("Type mismatch: {} != {}", acc, t))
+            }
+        })?;
+
+        Ok(type_)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -12,44 +34,17 @@ pub enum ScopeType {
     Return,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ScopeState {
-    pub scope: Scope,
-    pub scope_type: ScopeType,
-    pub active: bool,
-}
-
 impl Into<Scope> for ScopeType {
     fn into(self) -> Scope {
+        Scope { scope_type: self, types: vec![] }
+    }
+}
+
+impl Display for ScopeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ScopeType::Break => Scope::Break(None),
-            ScopeType::Return => Scope::Return(None),
-        }
-    }
-
-}
-
-impl Into<ScopeState> for Scope {
-    fn into(self) -> ScopeState {
-        ScopeState {
-            scope_type: self.clone().into(),
-            scope: self,
-            active: false,
-        }
-    }
-}
-
-impl Into<ScopeState> for ScopeType {
-    fn into(self) -> ScopeState {
-        <ScopeType as Into<Scope>>::into(self).into()
-    }
-}
-
-impl Into<ScopeType> for Scope {
-    fn into(self) -> ScopeType {
-        match self {
-            Scope::Break(_) => ScopeType::Break,
-            Scope::Return(_) => ScopeType::Return,
+            ScopeType::Break => write!(f, "break"),
+            ScopeType::Return => write!(f, "return"),
         }
     }
 }

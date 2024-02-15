@@ -27,8 +27,22 @@ fn run_program() -> Result<(), String> {
             break Ok(());
         }
 
-        if let "read" = input.trim() {
-            let path = Path::new("src/mage/manual_testing/test.ar");
+        if input.trim().starts_with("read") {
+            let path = Path::new("src/mage/manual_testing");
+
+            let file_name = input
+                .split(" ")
+                .skip(1)
+                .collect::<Vec<&str>>()
+                .join(" ")
+                .replace("\r", "")
+                .replace("\n", "");
+
+            let path = path.join(file_name)
+                .with_extension("ar");
+
+            println!("Reading file: {:?}", path);
+
             match fs::read_to_string(path) {
                 Ok(source) => input = source,
                 Err(e) => {

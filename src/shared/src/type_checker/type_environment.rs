@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use super::{scope::{Scope, ScopeState, ScopeType}, FullName, Type};
+use super::{scope::{Scope, ScopeType}, FullName, Type};
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
 
@@ -10,7 +10,7 @@ pub struct TypeEnvironment {
     types: HashMap<String, Type>,
     variables: HashMap<String, Type>,
     impls: HashMap<String, HashMap<String, Type>>,
-    scopes: Vec<ScopeState>,
+    scopes: Vec<Scope>,
 }
 
 impl TypeEnvironment {
@@ -52,11 +52,11 @@ impl TypeEnvironment {
         }
     }
 
-    pub fn new_scope<T: Into<ScopeState>>(parent: Rcrc<Self>, scope: T) -> Self {
+    pub fn new_scope<T: Into<Scope>>(parent: Rcrc<Self>, scope: T) -> Self {
         Self::new_scopes(parent, [scope])
     }
 
-    pub fn new_scopes<T: Into<ScopeState>, U: IntoIterator<Item = T>>
+    pub fn new_scopes<T: Into<Scope>, U: IntoIterator<Item = T>>
     (parent: Rcrc<Self>, scopes: U) -> Self {
         Self {
             parent: Some(parent),
@@ -65,7 +65,7 @@ impl TypeEnvironment {
             impls: HashMap::new(),
             scopes: scopes.into_iter()
                 .map(|scope| scope.into())
-                .collect::<Vec<ScopeState>>(),
+                .collect::<Vec<Scope>>(),
         }
     }
 
@@ -75,27 +75,25 @@ impl TypeEnvironment {
     }
 
     pub fn get_scope(&self, scope_type: &ScopeType) -> Option<Scope> {
-        self.scopes.iter().find(|s| s.scope_type == *scope_type && s.active)
-            .map(|f: &ScopeState| f.scope.clone())
+        self.scopes.iter().find(|s| s.scope_type == *scope_type && s.active())
+            .map(|f: &Scope| f.clone())
             .or_else(|| self.parent.as_ref().and_then(|p|
                 p.borrow().get_scope(scope_type)))
     }
 
-    pub fn activate_scope(&mut self, scope: Scope) -> Result<(), String> {
-        let scope_type: ScopeType = scope.clone().into();
+    pub fn activate_scope(&mut self, scope_type: ScopeType, type_: Type) -> Result<(), String> {
         if !self.has_scope(&scope_type) {
             return Err(format!("Scope '{:?}' not found", scope_type));
         }
 
         match self.scopes.iter_mut().find(|s| s.scope_type == scope_type) {
             Some(scope_state) => {
-                scope_state.scope = scope;
-                scope_state.active = true
+                scope_state.types.push(type_)
             },
             None => self.parent.as_mut()
                 .expect("Already checked if the scope exists, if it's not in the current environment, it must be in the parent")
                 .borrow_mut()
-                .activate_scope(scope)?,
+                .activate_scope(scope_type, type_)?,
         }
         
         Ok(())
