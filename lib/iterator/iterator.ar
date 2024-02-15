@@ -1,0 +1,10 @@
+pub mod lib.iterator;
+
+pub trait Iterator {
+    type Item;
+    func next(&mut self) -> Option<Self::Item>;
+}
+
+pub trait DoubleSidedIterator: Iterator {
+    func prev(&mut self) -> Option<Self::Item>;
+}

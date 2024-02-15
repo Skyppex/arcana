@@ -1,0 +1,68 @@
+pub mod lib.iterator;
+
+pub struct Map<TIterator, TFunc> {
+    iterator: TIterator,
+    mapper: TFunc
+}
+
+impl<TFrom, TTo> Iterator<Self::Item = TFrom> {
+    pub func map(self, mapper: (TFrom): TTo): Map<Self, TFrom, TTo> {
+        Map { self, mapper }
+    }
+}
+
+impl<T, TIterator, TFunc> Iterator for Map<TIterator, TFunc> {
+    type Item = T;
+
+    func next(&mut self) -> Option<Self::Item> {
+        match self.iterator.next() {
+            Some(item) => Some(self.mapper(item)),
+            None => None
+        }
+    }
+}
+
+// Other Spell
+pub mod iterator_extensions;
+
+pub struct Closest<TIterator, TType, TOperand> {
+    iterator: TIterator,
+    selector: (TType): TOperand
+    comparer: (TOperand, TOperand): Ordering
+}
+
+extend impl<TType, TOperand> Iterator<Self::Item = TType> {
+    pub func closest(
+        self,
+        selector: (TType): TOperand,
+        comparer: (TOperand, TOperand): Ordering): Closest<Self, TType, TOperand> {
+        Closest { self, selector, comparer }
+    }
+}
+
+impl<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOperand> {
+    type Item = T;
+
+    func next(&mut self) -> Option<Self::Item> {
+        let mut closest = None;
+
+        for item in self.iterator {
+            let closest_operand = match closest {
+                Some(item) => self.selector(item),
+                None => {
+                    closest = Some(item);
+                    continue;
+                }
+            };
+
+            let operand = self.selector(item);
+            let ordering = self.comparer(operand, closest_operand);
+
+            if ordering == Ordering::Less {
+                closest = Some(item);
+            }
+        }
+
+        closest
+    }
+}
