@@ -65,6 +65,10 @@ impl Environment {
 
         match self.scopes.iter_mut().find(|s| s.scope_type == scope_type) {
             Some(scope_state) => {
+                if scope_state.active {
+                    panic!("Scope '{:?}' already active", scope_type);
+                }
+                
                 scope_state.scope = scope;
                 scope_state.active = true
             },

@@ -160,6 +160,10 @@ fn evaluate_program<'a>(statements: Vec<TypedStatement>, environment: Rcrc<Envir
     let mut value = Value::Void;
     for statement in statements {
         value = evaluate(statement, environment.clone())?;
+        
+        if environment.borrow().get_scope(&ScopeType::Return).is_some() {
+            break;
+        }
     }
     Ok(value)
 }
@@ -569,6 +573,11 @@ fn evaluate_block<'a>(
 
     for statement in statements {
         value = evaluate(statement, block_environment.clone())?;
+
+        if block_environment.borrow().get_scope(&ScopeType::Return).is_some() {
+            value = Value::Void;
+            break;
+        }
     }
 
     Ok(value)
@@ -613,6 +622,11 @@ fn evaluate_loop(
             if let Some(Scope::Continue) = loop_environment.borrow().get_scope(&ScopeType::Continue) {
                 continue 'outer;
             }
+
+            if loop_environment.borrow().get_scope(&ScopeType::Return).is_some() {
+                break_value = Value::Void;
+                break  'outer;
+            }
         }
     }
 
@@ -645,6 +659,11 @@ fn evaluate_while(
 
                             for statement in else_statements {
                                 value = evaluate(statement, while_environment.clone())?;
+                                
+                                if while_environment.borrow().get_scope(&ScopeType::Return).is_some() {
+                                    value = Value::Void;
+                                    break;
+                                }
                             }
 
                             value
@@ -676,6 +695,12 @@ fn evaluate_while(
 
             if let Some(Scope::Continue) = while_environment.borrow().get_scope(&ScopeType::Continue) {
                 continue 'outer;
+            }
+
+            
+            if while_environment.borrow().get_scope(&ScopeType::Return).is_some() {
+                break_value = Value::Void;
+                break 'outer;
             }
         }
     }
