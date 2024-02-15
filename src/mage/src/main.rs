@@ -14,10 +14,11 @@ fn main() {
 }
 
 fn run_program() -> Result<(), String> {
-    let mut type_environemnt = TypeEnvironment::new();
+    let type_environemnt = Rc::new(RefCell::new(TypeEnvironment::new()));
     let environment = Rc::new(RefCell::new(Environment::new()));
 
     loop {
+        let type_environemnt = type_environemnt.clone();
         let _ = stdout().flush();
         let mut input = String::new();
         stdin().read_line(&mut input).expect("Failed to read line");
@@ -38,20 +39,20 @@ fn run_program() -> Result<(), String> {
         }
 
         if let "types" = input.trim() {
-            for (.., type_) in type_environemnt.get_types() {
+            for (.., type_) in type_environemnt.borrow().get_types() {
                 println!("{}", type_);
             }
             continue;
         }
 
         if let "vars" = input.trim() {
-            for (.., variable) in type_environemnt.get_variables() {
+            for (.., variable) in type_environemnt.borrow().get_variables() {
                 println!("{}", variable);
             }
             continue;
         }
 
-        if let Err(message) = read_input(input, &mut type_environemnt, environment.clone()) {
+        if let Err(message) = read_input(input, type_environemnt, environment.clone()) {
             println!("Error: {}", message);
         }
     }
@@ -59,7 +60,7 @@ fn run_program() -> Result<(), String> {
 
 fn read_input(
     input: String,
-    type_environemnt: &mut TypeEnvironment<'_>,
+    type_environemnt: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>) -> Result<(), String> {
     const PRINT_TOKENS: bool = false;
     const PRINT_PARSER_AST: bool = true;

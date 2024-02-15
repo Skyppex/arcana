@@ -5,6 +5,7 @@ pub mod full_name;
 
 mod statements;
 mod expressions;
+mod scope;
 
 pub use type_checker::*;
 pub use type_environment::*;

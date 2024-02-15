@@ -1,20 +1,15 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{parser::{self, Assignment, Expression, If, VariableDeclaration, While}, type_checker::ast::Literal};
 
 use super::{ast::{BinaryOperator, Block, ConditionBlock, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator, UnionMemberFieldInitializers
-    },
-    TypeEnvironment,
-    Type,
-    statements,
-    DiscoveredType,
-    FullName
+    }, scope::{Scope, ScopeType}, statements, DiscoveredType, FullName, Rcrc, Type, TypeEnvironment
 };
 
 pub fn check_type<'a>(
     expression: &Expression,
     discovered_types: &Vec<DiscoveredType>,
-    type_environment: &mut TypeEnvironment<'a>
+    type_environment: Rc<RefCell<TypeEnvironment>>
 ) -> Result<TypedExpression, String> {
     match expression {
         Expression::None => Ok(TypedExpression::None),
@@ -24,11 +19,11 @@ pub fn check_type<'a>(
             identifier,
             initializer
         }) => {
-            let type_ = type_environment.get_type(type_name)
+            let type_ = type_environment.borrow().get_type(type_name)
                 .ok_or_else(|| format!("Unexpected type: {}", type_name))?.clone();
 
             let initializer = if let Some(initializer) = initializer {
-                let initializer = check_type(initializer, discovered_types, type_environment)?;
+                let initializer = check_type(initializer, discovered_types, type_environment.clone())?;
                 Some(Box::new(initializer))
             } else {
                 None
@@ -40,7 +35,7 @@ pub fn check_type<'a>(
                 }
             }
 
-            type_environment.add_variable(identifier.clone(), type_.clone());
+            type_environment.borrow_mut().add_variable(identifier.clone(), type_.clone());
 
             Ok(TypedExpression::VariableDeclaration {
                 mutable: *mutable,
@@ -54,21 +49,25 @@ pub fn check_type<'a>(
             else_ifs,
             r#else
         }) => {
-            let if_else_environment = &mut type_environment.new_child();
-            let if_condition = check_type(&r#if.condition, discovered_types, if_else_environment)?;
+            let if_else_environment =
+                Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment.clone())));
+
+            let if_condition = check_type(&r#if.condition, discovered_types, if_else_environment.clone())?;
             let Type::Bool = if_condition.get_type() else {
                 return Err(format!("If condition must be of type bool | {}", if_condition.get_type()));
             };
 
-            let if_block = check_type(&r#if.block, discovered_types, if_else_environment)?;
+            let if_block = check_type(&r#if.block, discovered_types, if_else_environment.clone())?;
             let if_block_type = if_block.get_type();
 
             let mut else_if_condition_blocks = vec![];
 
             if let Some(else_ifs) = else_ifs {
                 for else_if in else_ifs {
-                    let else_if_environment = &mut type_environment.new_child();
-                    let else_if_condition = check_type(&else_if.condition, discovered_types, else_if_environment)?;
+                    let else_if_environment =
+                        Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment.clone())));
+                    
+                    let else_if_condition = check_type(&else_if.condition, discovered_types, else_if_environment.clone())?;
                     if let Type::Bool = else_if_condition.get_type() {
                         return Err(format!("Else if condition must be of type bool"));
                     }
@@ -115,7 +114,7 @@ pub fn check_type<'a>(
             member,
             initializer
         }) => {
-            let member = check_type(&Expression::Member(*member.clone()), discovered_types, type_environment)?;
+            let member = check_type(&Expression::Member(*member.clone()), discovered_types, type_environment.clone())?;
             let initializer = check_type(initializer, discovered_types, type_environment)?;
 
             if member.get_type() != initializer.get_type() {
@@ -135,8 +134,8 @@ pub fn check_type<'a>(
         Expression::Member(member) => {
             match member {
                 crate::parser::Member::Identifier { symbol } => {
-                    let type_ = type_environment.get_variable(symbol)
-                        .or(type_environment.get_type(symbol))
+                    let type_ = type_environment.borrow().get_variable(symbol)
+                        .or(type_environment.borrow().get_type(symbol))
                         .ok_or_else(|| format!("Unexpected variable: {}", symbol))?.clone();
 
                     Ok(TypedExpression::Member(Member::Identifier {
@@ -177,7 +176,7 @@ pub fn check_type<'a>(
                         let mut previous_type = Type::Void;
 
                         for e in v {
-                            let value = check_type(&e, discovered_types, type_environment)?;
+                            let value = check_type(&e, discovered_types, type_environment.clone())?;
                             let type_ = value.get_type();
                             
                             if previous_type != Type::Void && type_ != previous_type {
@@ -205,7 +204,7 @@ pub fn check_type<'a>(
                                 identifier: field_initializer.identifier.clone(),
                                 initializer: check_type(
                                     &field_initializer.initializer,
-                                    discovered_types, type_environment)?
+                                    discovered_types, type_environment.clone())?
                             };
                             field_initializers_.push(field_initializer);
                         }
@@ -215,7 +214,7 @@ pub fn check_type<'a>(
                     Literal::Struct {
                         type_name: type_name.clone(),
                         field_initializers: field_initializers?,
-                        type_: type_environment.get_type(type_name)
+                        type_: type_environment.borrow().get_type(type_name)
                             .ok_or_else(|| format!("Unexpected type: {}", type_name))?.clone()
                     }
                 },
@@ -233,7 +232,7 @@ pub fn check_type<'a>(
                                 for (identifier, initializer) in field_initializers {
                                     field_initializers__.insert(identifier.clone(), check_type(
                                         &initializer,
-                                        discovered_types, type_environment)?
+                                        discovered_types, type_environment.clone())?
                                     );
                                 }
                                 field_initializers_ = UnionMemberFieldInitializers::Named(field_initializers__);
@@ -243,7 +242,7 @@ pub fn check_type<'a>(
                                 for initializer in field_initializers {
                                     field_initializers__.push(check_type(
                                         &initializer,
-                                        discovered_types, type_environment)?
+                                        discovered_types, type_environment.clone())?
                                     );
                                 }
                                 field_initializers_ = UnionMemberFieldInitializers::Unnamed(field_initializers__);
@@ -256,7 +255,7 @@ pub fn check_type<'a>(
                         type_name: type_name.clone(),
                         member: member.clone(),
                         field_initializers: field_initializers?,
-                        type_: type_environment.get_type(type_name)
+                        type_: type_environment.borrow().get_type(type_name)
                             .ok_or_else(|| format!("Unexpected type: {}", type_name))?.clone()
                     }
                 
@@ -270,11 +269,11 @@ pub fn check_type<'a>(
                 Err("Function must be a member".to_string())?
             };
 
-            let caller = check_type(&call.caller, discovered_types, type_environment)?;
+            let caller = check_type(&call.caller, discovered_types, type_environment.clone())?;
 
             match member {
                 parser::Member::Identifier { symbol } => {
-                    let function_type = type_environment.get_type(&symbol)
+                    let function_type = type_environment.borrow().get_type(&symbol)
                         .ok_or_else(|| format!("Unexpected type: {}", symbol))?;
 
                     let Type::Function(function) = function_type.clone() else {
@@ -287,7 +286,7 @@ pub fn check_type<'a>(
                             Err("Not enough arguments")?
                         };
                         
-                        let arg_typed_expression = check_type(arg, discovered_types, type_environment)?;
+                        let arg_typed_expression = check_type(arg, discovered_types, type_environment.clone())?;
 
                         if arg_typed_expression.get_deep_type() != type_.clone() {
                             Err(format!("Argument {} type {} does not match parameter type {}", i, arg_typed_expression.get_type(), type_))?
@@ -303,14 +302,14 @@ pub fn check_type<'a>(
                     })
                 },
                 parser::Member::MemberAccess {
-                    object,
-                    member,
-                    symbol
-                } => todo!(),
+                    object: _,
+                    member: _,
+                    symbol: _
+                } => todo!("Member access call"),
             }
         },
         Expression::Index(index) => {
-            let caller = check_type(&index.caller, discovered_types, type_environment)?;
+            let caller = check_type(&index.caller, discovered_types, type_environment.clone())?;
             let caller_type = caller.clone().get_deep_type();
 
             let Type::Array(type_) = caller_type else {
@@ -346,7 +345,7 @@ pub fn check_type<'a>(
         
         },
         Expression::Binary(binary) => {
-            let left = check_type(&binary.left, discovered_types, type_environment)?;
+            let left = check_type(&binary.left, discovered_types, type_environment.clone())?;
             let right = check_type(&binary.right, discovered_types, type_environment)?;
             let left_type = left.get_type();
             let right_type = right.get_type();
@@ -383,9 +382,11 @@ pub fn check_type<'a>(
         
         },
         Expression::Ternary(ternary) => {
-            let ternary_environment = &mut type_environment.new_child();
-            let condition = check_type(&ternary.condition, discovered_types, ternary_environment)?;
-            let true_expression = check_type(&ternary.true_expression, discovered_types, ternary_environment)?;
+            let ternary_environment =
+                Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment.clone())));
+
+            let condition = check_type(&ternary.condition, discovered_types, ternary_environment.clone())?;
+            let true_expression = check_type(&ternary.true_expression, discovered_types, ternary_environment.clone())?;
             let false_expression = check_type(&ternary.false_expression, discovered_types, ternary_environment)?;
 
             let Type::Bool = condition.get_type() else {
@@ -408,7 +409,7 @@ pub fn check_type<'a>(
             let mut statements_: Vec<TypedStatement> = vec![];
             
             for statement in statements {
-                statements_.push(statements::check_type(statement, discovered_types, type_environment)?);
+                statements_.push(statements::check_type(statement, discovered_types, type_environment.clone())?);
             }
 
             let mut type_ = Type::Void;
@@ -427,7 +428,7 @@ pub fn check_type<'a>(
             }))
         },
         Expression::Drop(symbol) => {
-            let type_ = type_environment.get_variable(symbol)
+            let type_ = type_environment.borrow().get_variable(symbol)
                 .ok_or_else(|| format!("Unexpected variable: {}", symbol))?.clone();
 
             Ok(TypedExpression::Drop {
@@ -436,26 +437,45 @@ pub fn check_type<'a>(
             })
         },
         Expression::Loop(block) => {
-            let loop_environment = &mut type_environment.new_child();
-            let block = check_type(&Expression::Block(block.clone()), discovered_types, loop_environment)?;
+            let loop_environment =
+                Rc::new(RefCell::new(TypeEnvironment::new_scope(
+                    type_environment,
+                    ScopeType::Break)));
+
+            let block = check_type(&Expression::Block(block.clone()), discovered_types, loop_environment.clone())?;
 
             let TypedExpression::Block(block) = block else {
-                return Err("Loop block must be a block".to_string())
+                return Err("Loop must have a block".to_string())
             };
 
-            Ok(TypedExpression::Loop(Block {
-                statements: block.statements,
-                type_: block.type_
-            }))
+            let scope = loop_environment.borrow().get_scope(&ScopeType::Break);
+            match scope {
+                Some(Scope::Break(Some(type_))) => {
+                    Ok(TypedExpression::Loop(Block {
+                        statements: block.statements,
+                        type_
+                    }))
+                },
+                _ => {
+                    Ok(TypedExpression::Loop(Block {
+                        statements: block.statements,
+                        type_: Type::Void
+                    }))
+                }
+            }
         },
         Expression::While(While {
             condition,
             statements: block,
             else_statements: else_block
         }) => {
-            let while_environment = &mut type_environment.new_child();
-            let condition = check_type(condition, discovered_types, while_environment)?;
-            let block = check_type(&Expression::Block(block.clone()), discovered_types, while_environment)?;
+            let while_environment =
+                Rc::new(RefCell::new(TypeEnvironment::new_scope(
+                    type_environment,
+                    ScopeType::Break)));
+
+            let condition = check_type(condition, discovered_types, while_environment.clone())?;
+            let block = check_type(&Expression::Block(block.clone()), discovered_types, while_environment.clone())?;
             let else_block = match else_block {
                 Some(else_block) => Some(check_type(&Expression::Block(else_block.clone()), discovered_types, while_environment)?),
                 None => None
@@ -486,8 +506,13 @@ pub fn check_type<'a>(
     }
 }
 
-fn check_type_member_access(object: &Box<Expression>, discovered_types: &Vec<DiscoveredType>, type_environment: &mut TypeEnvironment<'_>, member: &Box<parser::Member>) -> Result<TypedExpression, String> {
-    let object_type_expression = check_type(object, discovered_types, type_environment)?;
+fn check_type_member_access(
+    object: &Box<Expression>,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+    member: &Box<parser::Member>)
+    -> Result<TypedExpression, String> {
+    let object_type_expression = check_type(object, discovered_types, type_environment.clone())?;
     let object_type  = object_type_expression.get_type();
     check_type_member_access_recurse(object_type, member, type_environment, object_type_expression, discovered_types)
 }
@@ -495,7 +520,7 @@ fn check_type_member_access(object: &Box<Expression>, discovered_types: &Vec<Dis
 fn check_type_member_access_recurse(
     object_type: Type,
     member: &Box<parser::Member>,
-    type_environment: &mut TypeEnvironment<'_>,
+    type_environment: Rcrc<TypeEnvironment>,
     object_type_expression: TypedExpression,
     discovered_types: &Vec<DiscoveredType>) -> Result<TypedExpression, String> {
     match object_type {
@@ -505,7 +530,7 @@ fn check_type_member_access_recurse(
                     let field_type = struct_.fields.get(&symbol)
                         .ok_or(format!("Struct {} does not have a field called '{}'", struct_.name, symbol))?;
 
-                    if !type_environment.lookup_type(&field_type) {
+                    if !type_environment.borrow().lookup_type(&field_type) {
                         return Err(format!("Unexpected type: {}", field_type.full_name()));
                     }
 

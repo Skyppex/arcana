@@ -91,7 +91,10 @@ impl<'a> Display for Value {
                     },
                 }
             },
-            Value::Function { parameters, body } => todo!(),
+            Value::Function {
+                parameters: _,
+                body: _
+            } => todo!("Display for function value"),
         }
     }
 }

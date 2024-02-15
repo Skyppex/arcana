@@ -1,16 +1,19 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use super::{FullName, Type};
+use super::{scope::{Scope, ScopeState, ScopeType}, FullName, Type};
+
+pub type Rcrc<T> = Rc<RefCell<T>>;
 
 #[derive(Debug, Clone)]
-pub struct TypeEnvironment<'a> {
-    parent: Option<&'a TypeEnvironment<'a>>,
+pub struct TypeEnvironment {
+    parent: Option<Rcrc<TypeEnvironment>>,
     types: HashMap<String, Type>,
     variables: HashMap<String, Type>,
     impls: HashMap<String, HashMap<String, Type>>,
+    scopes: Vec<ScopeState>,
 }
 
-impl<'a> TypeEnvironment<'a> {
+impl TypeEnvironment {
     pub fn new() -> Self {
         Self {
             parent: None,
@@ -35,16 +38,67 @@ impl<'a> TypeEnvironment<'a> {
             ]),
             variables: HashMap::new(),
             impls: HashMap::new(),
+            scopes: Vec::new(),
         }
     }
 
-    pub fn new_child(&'a self) -> Self {
+    pub fn new_parent(parent: Rcrc<Self>) -> Self {
         Self {
-            parent: Some(self),
+            parent: Some(parent),
             types: HashMap::new(),
             variables: HashMap::new(),
             impls: HashMap::new(),
+            scopes: Vec::new(),
         }
+    }
+
+    pub fn new_scope<T: Into<ScopeState>>(parent: Rcrc<Self>, scope: T) -> Self {
+        Self::new_scopes(parent, [scope])
+    }
+
+    pub fn new_scopes<T: Into<ScopeState>, U: IntoIterator<Item = T>>
+    (parent: Rcrc<Self>, scopes: U) -> Self {
+        Self {
+            parent: Some(parent),
+            variables: HashMap::new(),
+            types: HashMap::new(),
+            impls: HashMap::new(),
+            scopes: scopes.into_iter()
+                .map(|scope| scope.into())
+                .collect::<Vec<ScopeState>>(),
+        }
+    }
+
+    pub fn has_scope(&self, scope_type: &ScopeType) -> bool {
+        self.scopes.iter().any(|s| s.scope_type == *scope_type) ||
+            self.parent.as_ref().map(|p| p.borrow().has_scope(scope_type)).unwrap_or(false)
+    }
+
+    pub fn get_scope(&self, scope_type: &ScopeType) -> Option<Scope> {
+        self.scopes.iter().find(|s| s.scope_type == *scope_type && s.active)
+            .map(|f: &ScopeState| f.scope.clone())
+            .or_else(|| self.parent.as_ref().and_then(|p|
+                p.borrow().get_scope(scope_type)))
+    }
+
+    pub fn activate_scope(&mut self, scope: Scope) -> Result<(), String> {
+        let scope_type: ScopeType = scope.clone().into();
+        if !self.has_scope(&scope_type) {
+            return Err(format!("Scope '{:?}' not found", scope_type));
+        }
+
+        match self.scopes.iter_mut().find(|s| s.scope_type == scope_type) {
+            Some(scope_state) => {
+                scope_state.scope = scope;
+                scope_state.active = true
+            },
+            None => self.parent.as_mut()
+                .expect("Already checked if the scope exists, if it's not in the current environment, it must be in the parent")
+                .borrow_mut()
+                .activate_scope(scope)?,
+        }
+        
+        Ok(())
     }
 
     pub fn add_type(&mut self, type_: Type) -> Result<(), String> {
@@ -85,7 +139,7 @@ impl<'a> TypeEnvironment<'a> {
         if let Some(type_) = self.types.get(name) {
             Some(type_.clone())
         } else if let Some(parent) = &self.parent {
-            parent.get_type(name)
+            parent.borrow().get_type(name)
         } else {
             if name.starts_with("[") {
                 let type_name = &name[1..name.len() - 1];
@@ -102,7 +156,7 @@ impl<'a> TypeEnvironment<'a> {
         if let Some(type_) = self.variables.get(name) {
             Some(type_.clone())
         } else if let Some(parent) = &self.parent {
-            parent.get_variable(name)
+            parent.borrow().get_variable(name)
         } else {
             None
         }
@@ -119,8 +173,8 @@ impl<'a> TypeEnvironment<'a> {
     pub fn lookup_type<T: FullName>(&self, full_name: &T) -> bool {
         self.types.get(&full_name.full_name())
             .is_some() ||
-            self.parent
+            self.parent.as_ref()
                 .map_or(false, |parent|
-                    parent.lookup_type(full_name))
+                    parent.borrow().lookup_type(full_name))
     }
 }

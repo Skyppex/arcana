@@ -1,5 +1,11 @@
-impl i64 {
-    func times_two(a: i64): i64 {
-        a * 2
+let mut i: i64 = 0;
+
+let x: i64 = loop {
+    i = i + 1;
+
+    if i == 10 {
+        break 5;
     }
+
+    print(i);
 }

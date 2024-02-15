@@ -1,6 +1,6 @@
 use crate::lexer::token::{TokenKind, Keyword};
 
-use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, types::{can_be_type, parse_type}, FlagsMember, FlagsValue, FunctionDeclaration, Impl, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
+use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, types::{can_be_type, parse_type}, FunctionDeclaration, Impl, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     match parse_break(cursor) {
@@ -23,11 +23,14 @@ fn parse_break(cursor: &mut Cursor) -> Result<Statement, String> {
 
     cursor.bump()?; // Consume the break
 
-    let expression = if cursor.first().kind == TokenKind::Semicolon {
-        cursor.bump()?; // Consume the ;
-        None
+    let expression = if cursor.first().kind != TokenKind::Semicolon {
+        let expression = parse_expression(cursor)?;
+        println!("{:?}", expression);
+        expect_semicolon(cursor)?;
+        Some(expression)
     } else {
-        Some(parse_expression(cursor)?)
+        expect_semicolon(cursor)?;
+        None
     };
 
     Ok(Statement::Break(expression))
@@ -326,7 +329,7 @@ fn parse_expression_map(cursor: &mut Cursor) -> Result<Statement, String> {
                 cursor.bump()?; // Consume the ;
                 return Ok(Statement::Semi(Box::new(Statement::Expression(e))));
             }
-    
+
             Ok(Statement::Expression(e))
         },
         Err(e) => Err(e),
@@ -489,13 +492,22 @@ fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<Union
     }
 }
 
-fn parse_flags_member(cursor: &mut Cursor) -> Result<FlagsMember, String> {
-    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-    };
+// fn parse_flags_member(cursor: &mut Cursor) -> Result<FlagsMember, String> {
+//     let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
+//         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+//     };
     
-    Ok(FlagsMember {
-        identifier,
-        value: FlagsValue::Default,
-    })
+//     Ok(FlagsMember {
+//         identifier,
+//         value: FlagsValue::Default,
+//     })
+// }
+
+fn expect_semicolon(cursor: &mut Cursor) -> Result<(), String> {
+    if cursor.first().kind != TokenKind::Semicolon {
+        return Err(format!("Expected ; but found {:?}", cursor.first().kind));
+    }
+
+    cursor.bump()?; // Consume the ;
+    Ok(())
 }

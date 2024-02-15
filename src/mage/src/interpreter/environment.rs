@@ -53,7 +53,8 @@ impl Environment {
     pub fn get_scope(&self, scope_type: &ScopeType) -> Option<Scope> {
         self.scopes.iter().find(|s| s.scope_type == *scope_type && s.active)
             .map(|f: &ScopeState| f.scope.clone())
-            .or_else(|| self.parent.as_ref().and_then(|p| p.borrow().get_scope(scope_type)))
+            .or_else(|| self.parent.as_ref().and_then(|p|
+                p.borrow().get_scope(scope_type)))
     }
 
     pub fn activate_scope(&mut self, scope: Scope) -> Result<(), String> {
