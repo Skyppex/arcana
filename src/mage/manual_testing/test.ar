@@ -1,4 +1,4 @@
-func do_struff(i: i64): i64 {
+func do_stuff(i: i64): i64 {
     if i >= 10 {
         return i * 2;
     }

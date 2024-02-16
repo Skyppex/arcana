@@ -1,4 +1,4 @@
-pub mod lib.iterator;
+pub mod lib::iterator;
 
 pub struct Map<TIterator, TFunc> {
     iterator: TIterator,
@@ -23,7 +23,7 @@ impl<T, TIterator, TFunc> Iterator for Map<TIterator, TFunc> {
 }
 
 // Other Spell
-pub mod iterator_extensions;
+pub mod iteratorExtensions;
 
 pub struct Closest<TIterator, TType, TOperand> {
     iterator: TIterator,
@@ -47,7 +47,7 @@ impl<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOper
         let mut closest = None;
 
         for item in self.iterator {
-            let closest_operand = match closest {
+            let closestOperand = match closest {
                 Some(item) => self.selector(item),
                 None => {
                     closest = Some(item);
@@ -56,7 +56,7 @@ impl<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOper
             };
 
             let operand = self.selector(item);
-            let ordering = self.comparer(operand, closest_operand);
+            let ordering = self.comparer(operand, closestOperand);
 
             if ordering == Ordering::Less {
                 closest = Some(item);
