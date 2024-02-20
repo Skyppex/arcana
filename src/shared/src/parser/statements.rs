@@ -1,6 +1,6 @@
-use crate::lexer::token::{TokenKind, Keyword};
+use crate::{lexer::token::{Keyword, TokenKind}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_name}};
 
-use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_name}, FunctionDeclaration, Impl, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
+use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, FunctionDeclaration, Impl, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     match parse_break(cursor) {

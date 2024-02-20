@@ -6,7 +6,7 @@ use crate::parser::AccessModifier;
 use self::{num_lit::parse_numeric_literal, token::Keyword};
 
 pub mod token;
-mod cursor;
+pub mod cursor;
 mod num_lit;
 
 pub fn tokenize(source_code: &str) -> Result<Vec<Token>, String> {

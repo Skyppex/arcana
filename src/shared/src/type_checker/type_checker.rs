@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use crate::parser::Statement;
+use crate::{parser::Statement, types::{TypeAnnotation, TypeName}};
 
 use super::{ast::TypedStatement, statements, type_environment::TypeEnvironment, Rcrc};
 
 pub enum DiscoveredType {
-    Struct(String, HashMap<String, String>),
-    Union(String, HashMap<String, HashMap<String, String>>),
-    Function(String, HashMap<String, String>, String),
+    Struct(TypeName, HashMap<String, TypeAnnotation>),
+    Union(TypeName, HashMap<String, HashMap<String, TypeAnnotation>>),
+    Function(TypeName, HashMap<String, TypeAnnotation>, TypeAnnotation),
 }
 
 pub fn create_typed_ast<'a>(program: Statement, type_environment: Rcrc<TypeEnvironment>) -> Result<TypedStatement, String> {

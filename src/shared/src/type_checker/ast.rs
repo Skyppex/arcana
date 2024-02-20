@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::parser;
+use crate::{parser, types::TypeName};
 
 use super::Type;
 
@@ -263,12 +263,12 @@ pub enum Literal {
     Bool(bool),
     Array { values: Vec<TypedExpression>, type_: Type },
     Struct {
-        type_name: String,
+        type_name: TypeName,
         field_initializers: Vec<FieldInitializer>,
         type_: Type,
     },
     Union {
-        type_name: String,
+        type_name: TypeName,
         member: String,
         field_initializers: UnionMemberFieldInitializers,
         type_: Type,

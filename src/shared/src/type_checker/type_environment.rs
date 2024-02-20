@@ -1,5 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+use crate::types::{TypeAnnotation, TypeName};
+
 use super::{scope::{Scope, ScopeType}, FullName, Type};
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
@@ -133,21 +135,16 @@ impl TypeEnvironment {
         self.variables.insert(name, type_);
     }
 
-    pub fn get_type(&self, name: &str) -> Option<Type> {
-        if let Some(type_) = self.types.get(name) {
-            Some(type_.clone())
-        } else if let Some(parent) = &self.parent {
-            parent.borrow().get_type(name)
-        } else {
-            if name.starts_with("[") {
-                let type_name = &name[1..name.len() - 1];
-                if let Some(type_) = self.get_type(type_name) {
-                    return Some(Type::Array(Box::new(type_.clone())));
-                }
-            }
-    
-            None
-        }
+    pub fn get_type_from_str(&self, type_str: &str) -> Option<Type> {
+        todo!("get_type_from_str")
+    }
+
+    pub fn get_type_from_annotation(&self, type_annotation: &TypeAnnotation) -> Option<Type> {
+        todo!("get_type_from_annotation")
+    }
+
+    pub fn get_type_from_name(&self, type_name: &TypeName) -> Option<Type> {
+        todo!("get_type_from_name")
     }
 
     pub fn get_variable(&self, name: &str) -> Option<Type> {

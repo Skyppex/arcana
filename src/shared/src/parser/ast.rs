@@ -1,7 +1,8 @@
 use std::{collections::HashMap, fmt::Display};
 
+use crate::types::{TypeAnnotation, TypeName};
+
 #[derive(Debug, Clone)]
-// FlagsDeclaration(FlagsDeclaration),
 pub struct Impl{
     pub type_annotation: TypeAnnotation,
     pub functions: Vec<Statement>,
@@ -97,11 +98,11 @@ pub enum Literal {
     Bool(bool),
     Array(Vec<Expression>),
     Struct {
-        type_name: String,
+        type_name: TypeName,
         field_initializers: Vec<FieldInitializer>,
     },
     Union {
-        type_name: String,
+        type_name: TypeName,
         member: String,
         field_initializers: UnionMemberFieldInitializers,
     },
@@ -280,22 +281,4 @@ pub enum BinaryOperator {
     LessThanOrEqual,
     GreaterThan,
     GreaterThanOrEqual,
-}
-
-#[derive(Debug, Clone)]
-pub enum TypeAnnotation {
-    Type(String),
-    GenericType(String, Vec<TypeAnnotation>),
-    Slice(Box<TypeAnnotation>),
-}
-
-#[derive(Debug, Clone)]
-pub enum TypeName {
-    Type(String),
-    GenericType(String, Vec<GenericType>),
-}
-
-#[derive(Debug, Clone)]
-pub struct GenericType {
-    pub type_name: String,
 }

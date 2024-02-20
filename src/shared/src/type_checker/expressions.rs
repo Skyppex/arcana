@@ -19,7 +19,7 @@ pub fn check_type<'a>(
             identifier,
             initializer
         }) => {
-            let type_ = type_environment.borrow().get_type(type_name)
+            let type_ = type_environment.borrow().get_type_from_annotation(type_name)
                 .ok_or_else(|| format!("Unexpected type: {}", type_name))?.clone();
 
             let initializer = if let Some(initializer) = initializer {
@@ -135,7 +135,7 @@ pub fn check_type<'a>(
             match member {
                 crate::parser::Member::Identifier { symbol } => {
                     let type_ = type_environment.borrow().get_variable(symbol)
-                        .or(type_environment.borrow().get_type(symbol))
+                        // .or(type_environment.borrow().get_type_from_annotation(symbol)) // I can't remember why i added this
                         .ok_or_else(|| format!("Unexpected variable: {}", symbol))?.clone();
 
                     Ok(TypedExpression::Member(Member::Identifier {
@@ -214,7 +214,7 @@ pub fn check_type<'a>(
                     Literal::Struct {
                         type_name: type_name.clone(),
                         field_initializers: field_initializers?,
-                        type_: type_environment.borrow().get_type(type_name)
+                        type_: type_environment.borrow().get_type_from_name(type_name)
                             .ok_or_else(|| format!("Unexpected type: {}", type_name))?.clone()
                     }
                 },
@@ -255,7 +255,7 @@ pub fn check_type<'a>(
                         type_name: type_name.clone(),
                         member: member.clone(),
                         field_initializers: field_initializers?,
-                        type_: type_environment.borrow().get_type(type_name)
+                        type_: type_environment.borrow().get_type_from_name(type_name)
                             .ok_or_else(|| format!("Unexpected type: {}", type_name))?.clone()
                     }
                 
@@ -273,7 +273,7 @@ pub fn check_type<'a>(
 
             match member {
                 parser::Member::Identifier { symbol } => {
-                    let function_type = type_environment.borrow().get_type(&symbol)
+                    let function_type = type_environment.borrow().get_type_from_str(&symbol)
                         .ok_or_else(|| format!("Unexpected type: {}", symbol))?;
 
                     let Type::Function(function) = function_type.clone() else {

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use crate::lexer::token::{self, Keyword, TokenKind};
+use crate::{lexer::token::{self, Keyword, TokenKind}, types::parse_type_name};
 
-use super::{cursor::Cursor, statements::parse_statement, types::{can_be_type_annotation, parse_type_annotation}, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While
-};
+use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While};
+use crate::types::{can_be_type_annotation, parse_type_annotation};
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
     #[cfg(feature = "interpreter")]
@@ -229,7 +229,7 @@ fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the }
     Ok(Expression::Literal(Literal::Struct {
-        type_name,
+        type_name: parse_type_name(&type_name)?,
         field_initializers 
     }))
 }
@@ -288,7 +288,7 @@ fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the ) or }
     Ok(Expression::Literal(Literal::Union {
-        type_name,
+        type_name: parse_type_name(&type_name)?,
         member,
         field_initializers
     }))

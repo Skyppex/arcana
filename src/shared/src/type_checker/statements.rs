@@ -1,9 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::parser::{self, Impl, Statement};
+use crate::{parser::{self, Impl, Statement}, types::TypeAnnotation};
 
 use super::{
-    ast::{self, Typed, TypedStatement}, expressions, scope::{Scope, ScopeType}, type_checker::DiscoveredType, type_environment::TypeEnvironment, Function, Rcrc, Struct, StructField, Type, Union, UnionMember, UnionMemberField
+    ast::{self, Typed, TypedStatement}, expressions, scope::ScopeType, type_checker::DiscoveredType, type_environment::TypeEnvironment, Function, Rcrc, Struct, StructField, Type, Union, UnionMember, UnionMemberField
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -72,7 +72,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .iter()
                 .map(|parameter| (parameter.identifier.clone(), parameter.type_annotation.clone()))
                 .collect(),
-            return_type.clone().unwrap_or(Type::Void.to_string()),
+            return_type.clone().unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
         )]),
         Statement::Semi(_) => Ok(vec![]),
         Statement::Break(_) => Ok(vec![]),
@@ -447,7 +447,7 @@ fn check_type_name<'a>(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<Type, String> {
-    if let Some(type_) = type_environment.borrow().get_type(type_name) {
+    if let Some(type_) = type_environment.borrow().get_type_from_annotation(type_name) {
         return Ok(type_.clone());
     }
 

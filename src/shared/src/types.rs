@@ -1,7 +1,66 @@
-use crate::lexer::token::{self, TokenKind};
+use std::fmt::Display;
 
-use super::{cursor::Cursor, GenericType, TypeAnnotation, TypeName};
+use crate::{lexer::token::{self, TokenKind}, parser::cursor::Cursor};
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeAnnotation {
+    Type(String),
+    GenericType(String, Vec<TypeAnnotation>),
+    Slice(Box<TypeAnnotation>),
+}
+
+impl Display for TypeAnnotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeAnnotation::Type(type_name) =>
+                write!(f, "{}", type_name),
+            TypeAnnotation::GenericType(type_name, generics) => {
+                write!(f, "{}<{}>",
+                    type_name,
+                    generics.iter()
+                        .map(|g| g.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", "))
+            },
+            TypeAnnotation::Slice(type_name) =>
+                write!(f, "[{}]", type_name),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeName {
+    Type(String),
+    GenericType(String, Vec<GenericType>),
+}
+
+impl Display for TypeName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeName::Type(type_name) =>
+                write!(f, "{}", type_name),
+            TypeName::GenericType(type_name, generics) => {
+                write!(f, "{}<{}>",
+                    type_name,
+                    generics.iter()
+                        .map(|g| g.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", "))
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct GenericType {
+    pub type_name: String,
+}
+
+impl Display for GenericType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.type_name)
+    }
+}
 
 pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
     let mut cloned_cursor = cursor.clone();
