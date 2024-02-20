@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 #[derive(Debug, Clone)]
 // FlagsDeclaration(FlagsDeclaration),
 pub struct Impl{
-    pub type_name: String,
+    pub type_annotation: TypeAnnotation,
     pub functions: Vec<Statement>,
 }
 
@@ -50,30 +50,30 @@ pub enum Expression {
 #[derive(Debug, Clone)]
 pub struct StructDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub type_name: String,
+    pub type_name: TypeName,
     pub fields: Vec<StructField>,
 }
 
 #[derive(Debug, Clone)]
 pub struct UnionDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub type_name: String,
+    pub type_name: TypeName,
     pub members: Vec<UnionMember>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FlagsDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub type_name: String,
+    pub type_name: TypeName,
     pub members: Vec<FlagsMember>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FunctionDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub identifier: String,
+    pub identifier: TypeName,
     pub parameters: Vec<Parameter>,
-    pub return_type: Option<String>,
+    pub return_type: Option<TypeAnnotation>,
     pub body: Block,
 }
 
@@ -125,7 +125,7 @@ pub struct StructField {
     pub access_modifier: Option<AccessModifier>,
     pub mutable: bool,
     pub identifier: String,
-    pub type_name: String,
+    pub type_annotation: TypeAnnotation,
 }
 
 #[derive(Debug, Clone)]
@@ -164,7 +164,7 @@ impl Display for FlagsValue {
 #[derive(Debug, Clone)]
 pub struct UnionMemberField {
     pub identifier: String,
-    pub type_name: String,
+    pub type_name: TypeAnnotation,
 }
 
 #[derive(Debug, Clone)]
@@ -184,7 +184,7 @@ pub enum AccessModifier {
 #[derive(Debug, Clone)]
 pub struct Parameter {
     pub identifier: String,
-    pub type_name: String,
+    pub type_annotation: TypeAnnotation,
 }
 
 #[derive(Debug, Clone)]
@@ -202,7 +202,7 @@ pub enum Member {
 #[derive(Debug, Clone)]
 pub struct VariableDeclaration {
     pub mutable: bool,
-    pub type_name: String,
+    pub type_annotation: TypeAnnotation,
     pub identifier: String,
     pub initializer: Option<Box<Expression>>,
 }
@@ -280,4 +280,22 @@ pub enum BinaryOperator {
     LessThanOrEqual,
     GreaterThan,
     GreaterThanOrEqual,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeAnnotation {
+    Type(String),
+    GenericType(String, Vec<TypeAnnotation>),
+    Slice(Box<TypeAnnotation>),
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeName {
+    Type(String),
+    GenericType(String, Vec<GenericType>),
+}
+
+#[derive(Debug, Clone)]
+pub struct GenericType {
+    pub type_name: String,
 }

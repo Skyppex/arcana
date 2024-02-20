@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::lexer::token::{self, Keyword, TokenKind};
 
-use super::{cursor::Cursor, statements::parse_statement, types::{can_be_type, parse_type}, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While
+use super::{cursor::Cursor, statements::parse_statement, types::{can_be_type_annotation, parse_type_annotation}, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While
 };
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -129,11 +129,11 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
 
     cursor.bump()?; // Consume the :
     
-    if !can_be_type(cursor) {
+    if !can_be_type_annotation(cursor) {
         return Err(format!("Expected type annotation but found {:?}", cursor.first().kind));
     }
 
-    let type_name = parse_type(cursor)?;
+    let type_name = parse_type_annotation(cursor)?;
 
     match cursor.first().kind {
         TokenKind::Equal => {
@@ -143,7 +143,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
 
             Ok(Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
-                type_name,
+                type_annotation: type_name,
                 identifier,
                 initializer: Some(Box::new(initializer)),
             }))
@@ -151,7 +151,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         TokenKind::Semicolon => {
             Ok(Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
-                type_name,
+                type_annotation: type_name,
                 identifier,
                 initializer: None,
             }))

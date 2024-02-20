@@ -141,7 +141,7 @@ impl IndentDisplay for Statement {
                 let mut result = String::new();
                 result.push_str("<impl>\n");
                 indent.increase();
-                result.push_str(format!("{}type_name: {}", indent.dash(), impl_.type_name).as_str());
+                result.push_str(format!("{}type_name: {}", indent.dash(), impl_.type_annotation).as_str());
 
                 for (i, function) in impl_.functions.iter().enumerate() {
                     let is_end = i == impl_.functions.len() - 1;
@@ -242,7 +242,7 @@ impl IndentDisplay for Expression {
                 indent.increase();
                 result.push_str(format!("{}mutable: {}\n", indent.dash(), mutable).as_str());
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name).as_str());
-                indent.current(true);
+                type_annotation: indent.current(true);
                 result.push_str(format!("{}initializer: {}", indent.dash_end(), initializer.indent_display(indent)).as_str());
                 indent.decrease();
                 result
@@ -576,7 +576,7 @@ impl IndentDisplay for StructField {
             result.push_str(format!("{}access_modifier: None\n", indent.dash()).as_str());
         }
 
-        result.push_str(format!("{}type_name: {}\n", indent.dash(), self.type_name).as_str());
+        result.push_str(format!("{}type_name: {}\n", indent.dash(), self.type_annotation).as_str());
         result.push_str(format!("{}mutable: {}", indent.dash_end(), self.mutable).as_str());
         indent.decrease();
         result
@@ -740,7 +740,7 @@ impl IndentDisplay for Parameter {
         result.push_str("<parameter>\n");
         indent.increase_leaf();
         result.push_str(format!("{}parameter: {}\n", indent.dash(), self.identifier).as_str());
-        result.push_str(format!("{}type_name: {}", indent.dash_end(), self.type_name).as_str());
+        result.push_str(format!("{}type_name: {}", indent.dash_end(), self.type_annotation).as_str());
         indent.decrease();
         result
     }

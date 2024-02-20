@@ -23,7 +23,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             type_name.clone(),
             fields
                 .iter()
-                .map(|field| (field.identifier.clone(), field.type_name.clone()))
+                .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
                 .collect(),
         )]),
         Statement::UnionDeclaration(parser::UnionDeclaration {
@@ -70,7 +70,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             identifier.clone(),
             parameters
                 .iter()
-                .map(|parameter| (parameter.identifier.clone(), parameter.type_name.clone()))
+                .map(|parameter| (parameter.identifier.clone(), parameter.type_annotation.clone()))
                 .collect(),
             return_type.clone().unwrap_or(Type::Void.to_string()),
         )]),
@@ -107,7 +107,7 @@ pub fn check_type<'a>(
             let fs: Result<Vec<ast::StructField>, String> = fields
                 .iter()
                 .map(|field| {
-                    match check_type_name(&field.type_name, &discovered_types, type_environment.clone()) {
+                    match check_type_name(&field.type_annotation, &discovered_types, type_environment.clone()) {
                         Ok(t) => Ok(ast::StructField {
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
@@ -266,7 +266,7 @@ pub fn check_type<'a>(
         //     // })
         // },
         Statement::Impl(parser::Impl {
-            type_name,
+            type_annotation: type_name,
             functions,
         }) => {
             let impl_type = check_type_name(type_name, discovered_types, type_environment.clone())?;
@@ -332,7 +332,7 @@ pub fn check_type<'a>(
                 .iter()
                 .map(|parameter| {
                     match check_type_name(
-                        &parameter.type_name,
+                        &parameter.type_annotation,
                         &discovered_types,
                         block_environment.clone(),
                     ) {
@@ -341,7 +341,7 @@ pub fn check_type<'a>(
 
                             Ok(ast::Parameter {
                                 identifier: parameter.identifier.clone(),
-                                type_name: parameter.type_name.clone(),
+                                type_name: parameter.type_annotation.clone(),
                                 type_: t,
                             })
                         }

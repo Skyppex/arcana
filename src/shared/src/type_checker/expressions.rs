@@ -15,7 +15,7 @@ pub fn check_type<'a>(
         Expression::None => Ok(TypedExpression::None),
         Expression::VariableDeclaration(VariableDeclaration {
             mutable,
-            type_name,
+            type_annotation: type_name,
             identifier,
             initializer
         }) => {
