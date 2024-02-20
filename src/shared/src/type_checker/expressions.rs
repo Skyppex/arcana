@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{parser::{self, Assignment, Expression, If, VariableDeclaration, While}, type_checker::ast::Literal};
 
 use super::{ast::{BinaryOperator, Block, ConditionBlock, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator, UnionMemberFieldInitializers
-    }, scope::{Scope, ScopeType}, statements, DiscoveredType, FullName, Rcrc, Type, TypeEnvironment
+    }, scope::ScopeType, statements, DiscoveredType, FullName, Rcrc, Type, TypeEnvironment
 };
 
 pub fn check_type<'a>(
