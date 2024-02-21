@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{parser, types::TypeName};
+use crate::{parser, types::{TypeName, TypeAnnotation}};
 
 use super::Type;
 
@@ -16,24 +16,24 @@ pub enum TypedStatement {
         statements: Vec<TypedStatement>,
     },
     StructDeclaration {
-        type_name: String,
+        type_name: TypeName,
         fields: Vec<StructField>,
         type_: Type,
     },
     UnionDeclaration {
-        type_name: String,
+        type_name: TypeName,
         members: Vec<UnionMember>,
         type_: Type,
     },
     FunctionDeclaration {
-        identifier: String,
+        identifier: TypeName,
         parameters: Vec<Parameter>,
         return_type: Type,
         body: Vec<TypedStatement>,
         type_: Type,
     },
     Impl {
-        type_name: String,
+        type_name: TypeAnnotation,
         functions: Vec<TypedStatement>,
     },
     Semi(Box<TypedStatement>),
