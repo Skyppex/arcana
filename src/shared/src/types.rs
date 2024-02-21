@@ -6,7 +6,17 @@ use crate::{lexer::token::{self, TokenKind}, parser::cursor::Cursor};
 pub enum TypeAnnotation {
     Type(String),
     GenericType(String, Vec<TypeAnnotation>),
-    Slice(Box<TypeAnnotation>),
+    Array(Box<TypeAnnotation>),
+}
+
+impl TypeAnnotation {
+    pub fn name(&self) -> &str {
+        match self {
+            TypeAnnotation::Type(name) => name,
+            TypeAnnotation::GenericType(name, _) => name,
+            TypeAnnotation::Array(type_name) => type_name.name(),
+        }
+    }
 }
 
 impl Display for TypeAnnotation {
@@ -22,7 +32,7 @@ impl Display for TypeAnnotation {
                         .collect::<Vec<String>>()
                         .join(", "))
             },
-            TypeAnnotation::Slice(type_name) =>
+            TypeAnnotation::Array(type_name) =>
                 write!(f, "[{}]", type_name),
         }
     }
@@ -32,6 +42,15 @@ impl Display for TypeAnnotation {
 pub enum TypeName {
     Type(String),
     GenericType(String, Vec<GenericType>),
+}
+
+impl TypeName {
+    pub fn name(&self) -> &str {
+        match self {
+            TypeName::Type(name) => name,
+            TypeName::GenericType(name, _) => name,
+        }
+    }
 }
 
 impl Display for TypeName {
@@ -113,7 +132,7 @@ pub(super) fn parse_type_annotation(cursor: &mut Cursor) -> Result<TypeAnnotatio
             }
 
             cursor.bump()?; // Consume the ]
-            Ok(TypeAnnotation::Slice(Box::new(type_name)))
+            Ok(TypeAnnotation::Array(Box::new(type_name)))
         },
         _ => Err(format!("Expected type identifier but found {:?}", cursor.first().kind)),
     }
@@ -134,14 +153,25 @@ fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(cursor: &mut
     Ok(types)
 }
 
-pub(super) fn parse_type_name(type_name: &str) -> Result<TypeName, String> {
-    let tokens = crate::lexer::tokenize(type_name)?;
-    let cursor = &mut Cursor::new(tokens);
+pub(super) fn parse_type_name_from_str(type_str: &str, use_double_colon: bool) -> Result<TypeName, String> {
+    let tokens = crate::lexer::tokenize(type_str)?;
+    let mut cursor = Cursor::new(tokens);
+    parse_type_name(&mut cursor, use_double_colon)
+}
 
+pub(super) fn parse_type_name(cursor: &mut Cursor, use_double_colon: bool) -> Result<TypeName, String> {
     match cursor.first().kind {
         TokenKind::Identifier(type_name) => {
             cursor.bump()?; // Consume the type identifier
             
+            if use_double_colon {
+                if cursor.first().kind != TokenKind::DoubleColon {
+                    return Err(format!("Expected :: but found {:?}", cursor.first().kind));
+                }
+                
+                cursor.bump()?; // Consume the ::
+            }
+
             if cursor.first().kind == TokenKind::Less {
                 cursor.bump()?; // Consume the <
                 let generics =
@@ -161,7 +191,7 @@ fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericType>, 
     let mut types = Vec::new();
 
     while cursor.first().kind != TokenKind::Greater {
-        let TokenKind::Identifier(type_name) = cursor.first().kind else {
+        let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
             return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
         };
 

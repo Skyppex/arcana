@@ -202,12 +202,11 @@ fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_union_literal(cursor);
     };
 
-    let TokenKind::OpenBrace = cursor.second().kind else {
+    if !matches!(cursor.second().kind, TokenKind::OpenBrace | TokenKind::DoubleColon) {
         return parse_union_literal(cursor);
     };
 
-    cursor.bump()?; // Consume the type identifier
-    cursor.bump()?; // Consume the {
+    let type_name = parse_type_name(cursor, true)?;
 
     let mut field_initializers = vec![];
     let mut has_comma = true;
@@ -229,7 +228,7 @@ fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the }
     Ok(Expression::Literal(Literal::Struct {
-        type_name: parse_type_name(&type_name)?,
+        type_name,
         field_initializers 
     }))
 }
@@ -252,25 +251,19 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
 }
 
 fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
-    let TokenKind::Identifier(type_name) = cursor.first().kind else {
+    let TokenKind::Identifier(_) = cursor.first().kind else {
         return parse_assignment(cursor);
     };
 
-    let TokenKind::Colon = cursor.second().kind else {
+    let TokenKind::DoubleColon = cursor.second().kind else {
         return parse_assignment(cursor);
     };
     
-    let TokenKind::Colon = cursor.third().kind else {
-        return parse_assignment(cursor);
-    };
-    
-    let TokenKind::Identifier(member) = cursor.fourth().kind else {
+    let TokenKind::Identifier(member) = cursor.third().kind else {
         return parse_assignment(cursor);
     };
 
-    cursor.bump()?; // Consume the type identifier
-    cursor.bump()?; // Consume the first :
-    cursor.bump()?; // Consume the second :
+    let type_name = parse_type_name(cursor, true)?;
     cursor.bump()?; // Consume the member identifier
 
     let field_initializers = {
@@ -288,7 +281,7 @@ fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the ) or }
     Ok(Expression::Literal(Literal::Union {
-        type_name: parse_type_name(&type_name)?,
+        type_name,
         member,
         field_initializers
     }))
@@ -439,12 +432,13 @@ fn parse_comparison(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_additive(cursor)?;
 
-    while matches!(cursor.first().kind, 
-        TokenKind::DoubleGreater
-        | TokenKind::DoubleLess
-        | TokenKind::Caret
+    while matches!(cursor.first().kind,
+          TokenKind::Caret
         | TokenKind::Ampersand
-        | TokenKind::Pipe) {
+        | TokenKind::Pipe) ||
+        matches!((cursor.first().kind, cursor.second().kind),
+          (TokenKind::Greater, TokenKind::Greater)
+        | (TokenKind::Less   , TokenKind::Less   )) {
         let operator = cursor.bump()?.kind; // Consume the >>, <<, ^, &, or |
         let right = parse_additive(cursor)?;
 
@@ -452,8 +446,14 @@ fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
-                TokenKind::DoubleGreater => BinaryOperator::BitwiseRightShift,
-                TokenKind::DoubleLess => BinaryOperator::BitwiseLeftShift,
+                TokenKind::Greater => {
+                    cursor.bump()?; // Consume the >
+                    BinaryOperator::BitwiseRightShift
+                },
+                TokenKind::Less => {
+                    cursor.bump()?; // Consume the <
+                    BinaryOperator::BitwiseLeftShift
+                },
                 TokenKind::Caret => BinaryOperator::BitwiseXor,
                 TokenKind::Ampersand => BinaryOperator::BitwiseAnd,
                 TokenKind::Pipe => BinaryOperator::BitwiseOr,

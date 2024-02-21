@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{parser::{self, Impl, Statement}, types::TypeAnnotation};
+use crate::{parser::{self, Impl, Statement}, types::{TypeAnnotation, TypeName}};
 
 use super::{
     ast::{self, Typed, TypedStatement}, expressions, scope::ScopeType, type_checker::DiscoveredType, type_environment::TypeEnvironment, Function, Rcrc, Struct, StructField, Type, Union, UnionMember, UnionMemberField
@@ -40,7 +40,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                         member
                             .fields
                             .iter()
-                            .map(|field| (field.identifier.clone(), field.type_name.clone()))
+                            .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
                             .collect(),
                     )
                 })
@@ -104,10 +104,20 @@ pub fn check_type<'a>(
             type_name,
             fields,
         }) => {
+            let struct_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
+                type_environment.clone(),
+            )));
+
+            if let TypeName::GenericType(_, generics) = type_name {
+                for generic in generics {
+                    struct_type_environment.borrow_mut().add_type(Type::Generic(generic.clone()))?;
+                }
+            }
+
             let fs: Result<Vec<ast::StructField>, String> = fields
                 .iter()
                 .map(|field| {
-                    match check_type_name(&field.type_annotation, &discovered_types, type_environment.clone()) {
+                    match check_type_annotation(&field.type_annotation, &discovered_types, struct_type_environment.clone()) {
                         Ok(t) => Ok(ast::StructField {
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
@@ -136,7 +146,7 @@ pub fn check_type<'a>(
                 .collect();
 
             let type_ = Type::Struct(Struct {
-                name: type_name.clone(),
+                type_name: type_name.clone(),
                 fields: fields?,
             });
 
@@ -153,6 +163,16 @@ pub fn check_type<'a>(
             type_name,
             members,
         }) => {
+            let union_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
+                type_environment.clone(),
+            )));
+
+            if let TypeName::GenericType(_, generics) = type_name {
+                for generic in generics {
+                    union_type_environment.borrow_mut().add_type(Type::Generic(generic.clone()))?;
+                }
+            }
+
             let ms: Result<Vec<ast::UnionMember>, String> = members
                 .iter()
                 .map(|member| {
@@ -160,10 +180,10 @@ pub fn check_type<'a>(
                         .fields
                         .iter()
                         .map(|field| {
-                            match check_type_name(
-                                &field.type_name,
+                            match check_type_annotation(
+                                &field.type_annotation,
                                 &discovered_types,
-                                type_environment.clone(),
+                                union_type_environment.clone(),
                             ) {
                                 Ok(t) => Ok(ast::UnionMemberField {
                                     union_name: type_name.clone(),
@@ -214,7 +234,7 @@ pub fn check_type<'a>(
                 .collect();
 
             let union = Type::Union(Union {
-                name: type_name.clone(),
+                type_name: type_name.clone(),
                 members: ms
                     .clone()?
                     .iter()
@@ -266,10 +286,10 @@ pub fn check_type<'a>(
         //     // })
         // },
         Statement::Impl(parser::Impl {
-            type_annotation: type_name,
+            type_annotation,
             functions,
         }) => {
-            let impl_type = check_type_name(type_name, discovered_types, type_environment.clone())?;
+            let impl_type = check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
 
             let mut typed_functions = vec![];
 
@@ -290,7 +310,7 @@ pub fn check_type<'a>(
                 typed_functions.push(typed_function);
 
                 let function_type = Type::Function(Function {
-                    name: identifier.clone(),
+                    identifier: identifier.clone(),
                     parameters: parameters
                         .iter()
                         .map(|p| (p.identifier.clone(), p.type_.clone()))
@@ -306,7 +326,7 @@ pub fn check_type<'a>(
             }
 
             Ok(TypedStatement::Impl {
-                type_name: type_name.clone(),
+                type_annotation: type_annotation.clone(),
                 functions: typed_functions,
             })
         }
@@ -317,8 +337,8 @@ pub fn check_type<'a>(
             return_type,
             body,
         }) => {
-            let return_type = check_type_name(
-                &return_type.clone().unwrap_or(Type::Void.to_string()),
+            let return_type = check_type_annotation(
+                &return_type.clone().unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
                 &discovered_types,
                 type_environment.clone(),
             )?;
@@ -331,7 +351,7 @@ pub fn check_type<'a>(
             let parameters: Result<Vec<ast::Parameter>, String> = parameters
                 .iter()
                 .map(|parameter| {
-                    match check_type_name(
+                    match check_type_annotation(
                         &parameter.type_annotation,
                         &discovered_types,
                         block_environment.clone(),
@@ -341,7 +361,7 @@ pub fn check_type<'a>(
 
                             Ok(ast::Parameter {
                                 identifier: parameter.identifier.clone(),
-                                type_name: parameter.type_annotation.clone(),
+                                type_annotation: parameter.type_annotation.clone(),
                                 type_: t,
                             })
                         }
@@ -369,7 +389,7 @@ pub fn check_type<'a>(
             }
 
             let type_ = Type::Function(Function {
-                name: identifier.clone(),
+                identifier: identifier.clone(),
                 parameters: parameters
                     .clone()?
                     .iter()
@@ -442,12 +462,12 @@ pub fn check_type<'a>(
     }
 }
 
-fn check_type_name<'a>(
-    type_name: &str,
+fn check_type_name(
+    type_name: &TypeName,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<Type, String> {
-    if let Some(type_) = type_environment.borrow().get_type_from_annotation(type_name) {
+    if let Some(type_) = type_environment.borrow().get_type_from_name(type_name) {
         return Ok(type_.clone());
     }
 
@@ -458,33 +478,33 @@ fn check_type_name<'a>(
             DiscoveredType::Union(name, ..) => name == type_name,
             DiscoveredType::Function(name, ..) => name == type_name,
         }) {
-        Some(DiscoveredType::Struct(name, fields)) => Ok(Type::Struct(Struct {
-            name: name.clone(),
+        Some(DiscoveredType::Struct(type_name, fields)) => Ok(Type::Struct(Struct {
+            type_name: type_name.clone(),
             fields: {
                 let mut map = HashMap::new();
 
-                for (identifier, type_name) in fields {
+                for (identifier, type_annotation) in fields {
                     map.insert(
                         identifier.clone(),
-                        check_type_name(type_name, discovered_types, type_environment.clone())?,
+                        check_type_annotation(type_annotation, discovered_types, type_environment.clone())?,
                     );
                 }
 
                 map
             },
         })),
-        Some(DiscoveredType::Union(name, members)) => Ok(Type::Union(Union {
-            name: name.clone(),
+        Some(DiscoveredType::Union(type_name, members)) => Ok(Type::Union(Union {
+            type_name: type_name.clone(),
             members: {
                 let mut map = HashMap::new();
 
                 for (identifier, fields) in members {
                     let mut fields_map = HashMap::new();
 
-                    for (identifier, type_name) in fields {
+                    for (identifier, type_annotation) in fields {
                         fields_map.insert(
                             identifier.clone(),
-                            check_type_name(type_name, discovered_types, type_environment.clone())?,
+                            check_type_annotation(type_annotation, discovered_types, type_environment.clone())?,
                         );
                     }
 
@@ -496,7 +516,7 @@ fn check_type_name<'a>(
                         (
                             k.clone(),
                             Type::UnionMember(UnionMember {
-                                union_name: name.clone(),
+                                union_name: type_name.clone(),
                                 discriminant_name: k.clone(),
                                 fields: v.clone(),
                             }),
@@ -505,28 +525,117 @@ fn check_type_name<'a>(
                     .collect()
             },
         })),
-        Some(DiscoveredType::Function(name, parameters, return_type)) => {
+        Some(DiscoveredType::Function(type_name, parameters, return_type)) => {
             Ok(Type::Function(Function {
-                name: name.clone(),
+                identifier: type_name.clone(),
                 parameters: {
                     let mut map = HashMap::new();
 
-                    for (identifier, type_name) in parameters {
+                    for (identifier, type_annotation) in parameters {
                         map.insert(
                             identifier.clone(),
-                            check_type_name(type_name, discovered_types, type_environment.clone())?,
+                            check_type_annotation(type_annotation, discovered_types, type_environment.clone())?,
                         );
                     }
 
                     map
                 },
-                return_type: Box::new(check_type_name(
+                return_type: Box::new(check_type_annotation(
                     return_type,
                     discovered_types,
                     type_environment,
                 )?),
             }))
         }
-        None => Type::from_string(type_name).ok_or(format!("Unknown type {}", type_name)),
+        None => Type::from_string(&type_name.to_string()).ok_or(format!("Unknown type {}", type_name)),
+    }
+}
+
+fn check_type_annotation(
+    type_annotation: &TypeAnnotation,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<Type, String> {
+    if let Some(type_) = type_environment.borrow().get_type_from_annotation(type_annotation) {
+         return Ok(type_);
+    }
+
+    match discovered_types
+        .iter()
+        .find(|discovered_type| match discovered_type {
+            DiscoveredType::Struct(type_name, ..) => type_name.name() == type_annotation.name(),
+            DiscoveredType::Union(type_name, ..) => type_name.name() == type_annotation.name(),
+            DiscoveredType::Function(type_name, ..) => type_name.name() == type_annotation.name(),
+        }) {
+        Some(DiscoveredType::Struct(type_name, fields)) => Ok(Type::Struct(Struct {
+            type_name: type_name.clone(),
+            fields: {
+                let mut map = HashMap::new();
+
+                for (identifier, type_annotation) in fields {
+                    map.insert(
+                        identifier.clone(),
+                        check_type_annotation(type_annotation, discovered_types, type_environment.clone())?,
+                    );
+                }
+
+                map
+            },
+        })),
+        Some(DiscoveredType::Union(type_name, members)) => Ok(Type::Union(Union {
+            type_name: type_name.clone(),
+            members: {
+                let mut map = HashMap::new();
+
+                for (identifier, fields) in members {
+                    let mut fields_map = HashMap::new();
+
+                    for (identifier, type_annotation) in fields {
+                        fields_map.insert(
+                            identifier.clone(),
+                            check_type_annotation(type_annotation, discovered_types, type_environment.clone())?,
+                        );
+                    }
+
+                    map.insert(identifier.clone(), fields_map);
+                }
+
+                map.iter()
+                    .map(|(k, v)| {
+                        (
+                            k.clone(),
+                            Type::UnionMember(UnionMember {
+                                union_name: type_name.clone(),
+                                discriminant_name: k.clone(),
+                                fields: v.clone(),
+                            }),
+                        )
+                    })
+                    .collect()
+            },
+        })),
+        Some(DiscoveredType::Function(type_name, parameters, return_type)) => {
+            Ok(Type::Function(Function {
+                identifier: type_name.clone(),
+                parameters: {
+                    let mut map = HashMap::new();
+
+                    for (identifier, type_annotation) in parameters {
+                        map.insert(
+                            identifier.clone(),
+                            check_type_annotation(type_annotation, discovered_types, type_environment.clone())?,
+                        );
+                    }
+
+                    map
+                },
+                return_type: Box::new(check_type_annotation(
+                    return_type,
+                    discovered_types,
+                    type_environment,
+                )?),
+            }))
+        }
+        None => Type::from_string(&type_annotation.to_string()).ok_or(format!("Unknown type {}", type_annotation)),
     }
 }

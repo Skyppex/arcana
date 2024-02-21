@@ -530,7 +530,7 @@ fn check_type_member_access_recurse(
             match *member.clone() {
                 parser::Member::Identifier { symbol } => {
                     let field_type = struct_.fields.get(&symbol)
-                        .ok_or(format!("Struct {} does not have a field called '{}'", struct_.name, symbol))?;
+                        .ok_or(format!("Struct {} does not have a field called '{}'", struct_.type_name, symbol))?;
 
                     if !type_environment.borrow().lookup_type(&field_type) {
                         return Err(format!("Unexpected type: {}", field_type.full_name()));

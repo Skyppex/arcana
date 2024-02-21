@@ -13,21 +13,23 @@ pub use full_name::*;
 
 use std::{collections::HashMap, fmt::Display};
 
+use crate::types::{GenericType, TypeName};
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Struct {
-    pub name: String,
+    pub type_name: TypeName,
     pub fields: HashMap<String, Type>,
 }
 
 impl FullName for Struct {
     fn full_name(&self) -> String {
-        self.name.clone()
+        self.type_name.to_string()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructField {
-    pub struct_name: String,
+    pub struct_name: TypeName,
     pub field_name: String,
     pub field_type: Box<Type>,
 }
@@ -40,19 +42,19 @@ impl FullName for StructField {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Union {
-    pub name: String,
+    pub type_name: TypeName,
     pub members: HashMap<String, Type>,
 }
 
 impl FullName for Union {
     fn full_name(&self) -> String {
-        self.name.clone()
+        self.type_name.to_string()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnionMember {
-    pub union_name: String,
+    pub union_name: TypeName,
     pub discriminant_name: String,
     pub fields: HashMap<String, Type>,
 }
@@ -65,7 +67,7 @@ impl FullName for UnionMember {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnionMemberField {
-    pub union_name: String,
+    pub union_name: TypeName,
     pub discriminant_name: String,
     pub field_name: String,
     pub field_type: Box<Type>,
@@ -79,19 +81,20 @@ impl FullName for UnionMemberField {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
-    pub name: String,
+    pub identifier: TypeName,
     pub parameters: HashMap<String, Type>,
     pub return_type: Box<Type>,
 }
 
 impl FullName for Function {
     fn full_name(&self) -> String {
-        self.name.clone()
+        self.identifier.to_string()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
+    Generic(GenericType),
     Void,
     Unit,
     I8,
@@ -154,6 +157,7 @@ impl Type {
 impl FullName for Type {
     fn full_name(&self) -> String {
         match self {
+            Type::Generic(GenericType { type_name }) => type_name.to_string(),
             Type::Void => "void".to_string(),
             Type::Unit => "unit".to_string(),
             Type::I8 => "i8".to_string(),

@@ -42,7 +42,14 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
         '[' => Ok(create_token(TokenKind::OpenBracket, cursor)),
         ']' => Ok(create_token(TokenKind::CloseBracket, cursor)),
         ',' => Ok(create_token(TokenKind::Comma, cursor)),
-        ':' => Ok(create_token(TokenKind::Colon, cursor)),
+        ':' => {
+            if cursor.second() == ':' {
+                cursor.bump();
+                Ok(create_token(TokenKind::DoubleColon, cursor))
+            } else {
+                Ok(create_token(TokenKind::Colon, cursor))
+            }
+        },
         ';' => Ok(create_token(TokenKind::Semicolon, cursor)),
         '.' => Ok(create_token(TokenKind::Dot, cursor)),
         '?' => Ok(create_token(TokenKind::QuestionMark, cursor)),
@@ -146,9 +153,6 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             if cursor.second() == '=' {
                 cursor.bump();
                 Ok(create_token(TokenKind::LessEqual, cursor))
-            } else if cursor.second() == '<' {
-                cursor.bump();
-                Ok(create_token(TokenKind::DoubleLess, cursor))
             } else {
                 Ok(create_token(TokenKind::Less, cursor))
             }
@@ -157,9 +161,6 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             if cursor.second() == '=' {
                 cursor.bump();
                 Ok(create_token(TokenKind::GreaterEqual, cursor))
-            } else if cursor.second() == '>' {
-                cursor.bump();
-                Ok(create_token(TokenKind::DoubleGreater, cursor))
             } else {
                 Ok(create_token(TokenKind::Greater, cursor))
             }

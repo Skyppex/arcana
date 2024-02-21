@@ -63,9 +63,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
     cursor.bump()?; // Consume the func keyword
 
-    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-    };
+    let identifier = parse_type_name(cursor, false)?;
 
     let TokenKind::OpenParen = cursor.bump()?.kind else {
         return Err(format!("Expected ( but found {:?}", cursor.first().kind));
@@ -93,7 +91,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
     Ok(Statement::FunctionDeclaration(FunctionDeclaration {
         access_modifier,
-        identifier: parse_type_name(&identifier)?,
+        identifier,
         parameters,
         return_type,
         body,
@@ -135,9 +133,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     cursor.bump()?; // Consume the struct keyword
 
-    let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-    };
+    let type_name = parse_type_name(cursor, false)?;
 
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
@@ -165,7 +161,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     Ok(Statement::StructDeclaration(StructDeclaration {
         access_modifier,
-        type_name: parse_type_name(&type_name)?,
+        type_name,
         fields,
     }))
 }
@@ -188,9 +184,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     cursor.bump()?; // Consume the union keyword
 
-    let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-    };
+    let type_name = parse_type_name(cursor, false)?;
     
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
@@ -218,7 +212,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     Ok(Statement::UnionDeclaration(UnionDeclaration {
         access_modifier,
-        type_name: parse_type_name(&type_name)?,
+        type_name,
         members,
     }))
 }
@@ -480,13 +474,13 @@ fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<Union
 
             Ok(UnionMemberField {
                 identifier: first_ident,
-                type_name,
+                type_annotation: type_name,
             })
         },
         _ => {
             return Ok(UnionMemberField {
                 identifier: format!("f{}",field_position.to_string()),
-                type_name: parse_type_annotation_from_str(&first_ident)?,
+                type_annotation: parse_type_annotation_from_str(&first_ident)?,
             });
         },
     }

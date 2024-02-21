@@ -1,7 +1,0 @@
-let x: bool = loop {
-    if true {
-        break 1;
-    }
-
-    break true;
-}

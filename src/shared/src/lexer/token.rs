@@ -44,10 +44,8 @@ pub enum TokenKind {
     Bang,
     BangEqual,
     Less,
-    DoubleLess,
     LessEqual,
     Greater,
-    DoubleGreater,
     GreaterEqual,
 
     // Keywords
@@ -68,6 +66,7 @@ pub enum TokenKind {
     CloseBracket,
     Comma,
     Colon,
+    DoubleColon,
     Semicolon,
     Dot,
     QuestionMark,

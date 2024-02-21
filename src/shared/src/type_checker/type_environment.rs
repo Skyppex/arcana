@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::types::{TypeAnnotation, TypeName};
+use crate::types::{parse_type_annotation_from_str, TypeAnnotation, TypeName};
 
 use super::{scope::{Scope, ScopeType}, FullName, Type};
 
@@ -111,24 +111,8 @@ impl TypeEnvironment {
         Ok(())
     }
 
-    pub fn add_impl_function(&mut self, type_: Type, function_name: String, function_type: Type) -> Result<(), String> {
-        let full_name = type_.full_name();
-        match self.impls.get_mut(&full_name) {
-            Some(impl_) => {
-                if impl_.contains_key(&function_name) {
-                    return Err(format!("Function {} already exists for type {}", function_name, full_name));
-                }
-
-                impl_.insert(function_name, function_type);
-            },
-            None => {
-                let mut impl_ = HashMap::new();
-                impl_.insert(function_name, function_type);
-                self.impls.insert(full_name, impl_);
-            }
-        }
-
-        Ok(())
+    pub fn add_impl_function(&mut self, type_: Type, function_name: TypeName, function_type: Type) -> Result<(), String> {
+        todo!()
     }
 
     pub fn add_variable(&mut self, name: String, type_: Type) {
@@ -136,11 +120,26 @@ impl TypeEnvironment {
     }
 
     pub fn get_type_from_str(&self, type_str: &str) -> Option<Type> {
-        todo!("get_type_from_str")
+        todo!()          
     }
 
     pub fn get_type_from_annotation(&self, type_annotation: &TypeAnnotation) -> Option<Type> {
-        todo!("get_type_from_annotation")
+        match type_annotation {
+            TypeAnnotation::Type(type_name) => {
+                self.types.get(type_name).cloned()
+                    .or(self.parent.as_ref()
+                        .and_then(|parent| parent.borrow().get_type_from_annotation(type_annotation)))
+            },
+            TypeAnnotation::GenericType(type_name, _) =>{
+                self.types.get(type_name).cloned()
+                    .or(self.parent.as_ref()
+                        .and_then(|parent| parent.borrow().get_type_from_annotation(type_annotation)))
+            },
+            TypeAnnotation::Array(type_annotation) => {
+                self.get_type_from_annotation(type_annotation)
+                    .map(|t| Type::Array(Box::new(t)))
+            },
+        }
     }
 
     pub fn get_type_from_name(&self, type_name: &TypeName) -> Option<Type> {

@@ -14,11 +14,11 @@ fn main() {
 }
 
 fn run_program() -> Result<(), String> {
-    let type_environemnt = Rc::new(RefCell::new(TypeEnvironment::new()));
+    let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
     let environment = Rc::new(RefCell::new(Environment::new()));
 
     loop {
-        let type_environemnt = type_environemnt.clone();
+        let type_environment = type_environment.clone();
         let _ = stdout().flush();
         let mut input = String::new();
         stdin().read_line(&mut input).expect("Failed to read line");
@@ -53,20 +53,20 @@ fn run_program() -> Result<(), String> {
         }
 
         if let "types" = input.trim() {
-            for (.., type_) in type_environemnt.borrow().get_types() {
+            for (.., type_) in type_environment.borrow().get_types() {
                 println!("{}", type_);
             }
             continue;
         }
 
         if let "vars" = input.trim() {
-            for (.., variable) in type_environemnt.borrow().get_variables() {
+            for (.., variable) in type_environment.borrow().get_variables() {
                 println!("{}", variable);
             }
             continue;
         }
 
-        if let Err(message) = read_input(input, type_environemnt, environment.clone()) {
+        if let Err(message) = read_input(input, type_environment, environment.clone()) {
             println!("Error: {}", message);
         }
     }
@@ -74,7 +74,7 @@ fn run_program() -> Result<(), String> {
 
 fn read_input(
     input: String,
-    type_environemnt: Rc<RefCell<TypeEnvironment>>,
+    type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>) -> Result<(), String> {
     const PRINT_TOKENS: bool = false;
     const PRINT_PARSER_AST: bool = true;
@@ -91,7 +91,7 @@ fn read_input(
         println!("{}\n", program.indent_display(&mut indent));
     }
 
-    let typed_program = create_typed_ast(program, type_environemnt)?;
+    let typed_program = create_typed_ast(program, type_environment)?;
     if PRINT_TYPE_CHECKER_AST {
         let mut indent = Indent::new();
         println!("{}\n", typed_program.indent_display(&mut indent));

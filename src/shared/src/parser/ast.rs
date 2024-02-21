@@ -165,7 +165,7 @@ impl Display for FlagsValue {
 #[derive(Debug, Clone)]
 pub struct UnionMemberField {
     pub identifier: String,
-    pub type_name: TypeAnnotation,
+    pub type_annotation: TypeAnnotation,
 }
 
 #[derive(Debug, Clone)]

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use shared::type_checker::{ast::{Block, *}, Type};
+use shared::{type_checker::{ast::{Block, *}, Type}, types::{TypeAnnotation, TypeName}};
 
 use crate::interpreter::scope::Scope;
 
@@ -12,26 +12,11 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
         TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
         TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
         TypedStatement::Impl {
-            type_name,
+            type_annotation,
             functions
         } => {
             for function in functions {
-                match function {
-                    TypedStatement::FunctionDeclaration {
-                        identifier,
-                        parameters,
-                        return_type: _,
-                        body,
-                        type_: _
-                    } => {
-                        evaluate_function_declaration(
-                            &environment,
-                            format!("{}::{}", type_name, identifier),
-                            parameters,
-                            body)?;
-                    }
-                    other => return Err(format!("Impl can only contain function declarations '{:?}'", other))
-                }
+                todo!()
             }
 
             Ok(Value::Void)
@@ -69,21 +54,10 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
 
 fn evaluate_function_declaration(
     environment: &Rc<RefCell<Environment>>,
-    identifier: String,
+    identifier: TypeName,
     parameters: Vec<Parameter>,
     body: Vec<TypedStatement>) -> Result<Value, String> {
-    environment.borrow_mut().add_variable(
-        identifier.clone(),
-        Value::Function {
-            parameters: parameters
-                .iter()
-                .map(|p| p.identifier.clone())
-                .collect(),
-            body,
-        },
-        false);
-
-    Ok(Value::Void)
+    todo!()
 }
 
 fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: Rcrc<Environment>) -> Result<Value, String> {

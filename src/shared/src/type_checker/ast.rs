@@ -33,7 +33,7 @@ pub enum TypedStatement {
         type_: Type,
     },
     Impl {
-        type_name: TypeAnnotation,
+        type_annotation: TypeAnnotation,
         functions: Vec<TypedStatement>,
     },
     Semi(Box<TypedStatement>),
@@ -229,7 +229,7 @@ impl Into<AccessModifier> for parser::AccessModifier {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnionMember {
-    pub union_name: String,
+    pub union_name: TypeName,
     pub discriminant_name: String,
     pub fields: Vec<UnionMemberField>,
     pub type_: Type,
@@ -237,7 +237,7 @@ pub struct UnionMember {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnionMemberField {
-    pub union_name: String,
+    pub union_name: TypeName,
     pub discriminant_name: String,
     pub identifier: String,
     pub type_: Type,
@@ -327,7 +327,7 @@ pub enum UnionMemberFieldInitializers {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     pub identifier: String,
-    pub type_name: String,
+    pub type_annotation: TypeAnnotation,
     pub type_: Type,
 }
 
