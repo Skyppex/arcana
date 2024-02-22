@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::types::{parse_type_annotation_from_str, TypeAnnotation, TypeIdentifier};
+use crate::types::{TypeAnnotation, TypeIdentifier};
 
 use super::{scope::{Scope, ScopeType}, FullName, Type};
 
@@ -9,7 +9,7 @@ pub type Rcrc<T> = Rc<RefCell<T>>;
 #[derive(Debug, Clone)]
 pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
-    types: HashMap<String, Type>,
+    types: HashMap<TypeIdentifier, Type>,
     variables: HashMap<String, Type>,
     impls: HashMap<String, HashMap<String, Type>>,
     scopes: Vec<Scope>,
@@ -20,23 +20,23 @@ impl TypeEnvironment {
         Self {
             parent: None,
             types: HashMap::from([
-                ("void".to_string(), Type::Void),
-                ("unit".to_string(), Type::Unit),
-                ("bool".to_string(), Type::Bool),
-                ("i8".to_string(), Type::I8),
-                ("i16".to_string(), Type::I16),
-                ("i32".to_string(), Type::I32),
-                ("i64".to_string(), Type::I64),
-                ("i128".to_string(), Type::I128),
-                ("u8".to_string(), Type::U8),
-                ("u16".to_string(), Type::U16),
-                ("u32".to_string(), Type::U32),
-                ("u64".to_string(), Type::U64),
-                ("u128".to_string(), Type::U128),
-                ("f32".to_string(), Type::F32),
-                ("f64".to_string(), Type::F64),
-                ("char".to_string(), Type::Char),
-                ("string".to_string(), Type::String),
+                (TypeIdentifier::Type("void".to_string()), Type::Void),
+                (TypeIdentifier::Type("unit".to_string()), Type::Unit),
+                (TypeIdentifier::Type("bool".to_string()), Type::Bool),
+                (TypeIdentifier::Type("i8".to_string()), Type::I8),
+                (TypeIdentifier::Type("i16".to_string()), Type::I16),
+                (TypeIdentifier::Type("i32".to_string()), Type::I32),
+                (TypeIdentifier::Type("i64".to_string()), Type::I64),
+                (TypeIdentifier::Type("i128".to_string()), Type::I128),
+                (TypeIdentifier::Type("u8".to_string()), Type::U8),
+                (TypeIdentifier::Type("u16".to_string()), Type::U16),
+                (TypeIdentifier::Type("u32".to_string()), Type::U32),
+                (TypeIdentifier::Type("u64".to_string()), Type::U64),
+                (TypeIdentifier::Type("u128".to_string()), Type::U128),
+                (TypeIdentifier::Type("f32".to_string()), Type::F32),
+                (TypeIdentifier::Type("f64".to_string()), Type::F64),
+                (TypeIdentifier::Type("char".to_string()), Type::Char),
+                (TypeIdentifier::Type("string".to_string()), Type::String),
             ]),
             variables: HashMap::new(),
             impls: HashMap::new(),
@@ -102,12 +102,11 @@ impl TypeEnvironment {
     }
 
     pub fn add_type(&mut self, type_: Type) -> Result<(), String> {
-        let full_name = type_.full_name();
-        if self.types.contains_key(&full_name) {
+        if self.types.contains_key(&type_.type_identifier()) {
             return Err(format!("Type {} already exists", type_.full_name()));
         }
 
-        self.types.insert(type_.full_name(), type_);
+        self.types.insert(type_.type_identifier(), type_);
         Ok(())
     }
 
@@ -123,20 +122,28 @@ impl TypeEnvironment {
         todo!()          
     }
 
-    pub fn get_type_from_annotation(&self, type_annotation: &TypeAnnotation) -> Option<Type> {
+    pub fn get_type_from_annotation(&self, type_annotation: &TypeAnnotation, type_environment: Rc<RefCell<TypeEnvironment>>) -> Result<Type, String> {
         match type_annotation {
             TypeAnnotation::Type(type_name) => {
-                self.types.get(type_name).cloned()
-                    .or(self.parent.as_ref()
-                        .and_then(|parent| parent.borrow().get_type_from_annotation(type_annotation)))
+                if let Some(t) = self.types.get(&TypeIdentifier::Type(type_name.clone())) {
+                    Ok(t.clone())
+                } else if let Some(parent) = &self.parent {
+                    parent.borrow().get_type_from_annotation(type_annotation, type_environment)
+                } else {
+                    Err(format!("Type {} not found", type_name))
+                }
             },
-            TypeAnnotation::ConcreteType(type_name, _) =>{
-                self.types.get(type_name).cloned()
-                    .or(self.parent.as_ref()
-                        .and_then(|parent| parent.borrow().get_type_from_annotation(type_annotation)))
+            TypeAnnotation::ConcreteType(type_name, concrete_types) => {
+                if let Some(t) = self.types.get(&TypeIdentifier::GenericType(type_name.clone(), vec![])) {
+                    t.clone_with_concrete_types(concrete_types.clone(), type_environment)
+                } else if let Some(parent) = &self.parent {
+                    parent.borrow().get_type_from_annotation(type_annotation, type_environment)
+                } else {
+                    Err(format!("Type {} not found", type_name))
+                }
             },
             TypeAnnotation::Array(type_annotation) => {
-                self.get_type_from_annotation(type_annotation)
+                self.get_type_from_annotation(type_annotation, type_environment)
                     .map(|t| Type::Array(Box::new(t)))
             },
         }
@@ -156,7 +163,7 @@ impl TypeEnvironment {
         }
     }
 
-    pub fn get_types(&self) -> &HashMap<String, Type> {
+    pub fn get_types(&self) -> &HashMap<TypeIdentifier, Type> {
         &self.types
     }
 
@@ -164,11 +171,10 @@ impl TypeEnvironment {
         &self.variables
     }
 
-    pub fn lookup_type<T: FullName>(&self, full_name: &T) -> bool {
-        self.types.get(&full_name.full_name())
-            .is_some() ||
+    pub fn lookup_type(&self, type_: &Type) -> bool {
+        self.types.values().into_iter().any(|t| t == type_) ||
             self.parent.as_ref()
                 .map_or(false, |parent|
-                    parent.borrow().lookup_type(full_name))
+                    parent.borrow().lookup_type(type_))
     }
 }

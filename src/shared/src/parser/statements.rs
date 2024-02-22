@@ -281,10 +281,10 @@ fn parse_impl(cursor: &mut Cursor) -> Result<Statement, String> {
         return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
     }
 
-    let type_name = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor)?;
     let methods = parse_block_statements(cursor)?;
 
-    Ok(Statement::Impl(Impl { type_annotation: type_name, functions: methods }))
+    Ok(Statement::Impl(Impl { type_annotation, functions: methods }))
 }
 
 fn parse_next(cursor: &mut Cursor) -> Result<Statement, String> {
@@ -366,11 +366,11 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
         return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
     }
 
-    let type_name = parse_type_annotation(cursor)?;
+    let type_anntation = parse_type_annotation(cursor)?;
 
     Ok(Parameter {
         identifier,
-        type_annotation: type_name,
+        type_annotation: type_anntation,
     })
 }
 
@@ -402,13 +402,13 @@ fn parse_struct_field(cursor: &mut Cursor) -> Result<StructField, String> {
         return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
     }
 
-    let type_name = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor)?;
 
     Ok(StructField {
         access_modifier,
         mutable,
         identifier,
-        type_annotation: type_name,
+        type_annotation,
     })
 }
 
@@ -470,11 +470,11 @@ fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<Union
                 return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
             }
 
-            let type_name = parse_type_annotation(cursor)?;
+            let type_annotation = parse_type_annotation(cursor)?;
 
             Ok(UnionMemberField {
                 identifier: first_ident,
-                type_annotation: type_name,
+                type_annotation,
             })
         },
         _ => {

@@ -11,9 +11,11 @@ pub use type_checker::*;
 pub use type_environment::*;
 pub use full_name::*;
 
-use std::{collections::HashMap, fmt::Display};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
-use crate::types::{GenericType, TypeIdentifier};
+use crate::types::{GenericType, TypeAnnotation, TypeIdentifier};
+
+use self::statements::check_type_annotation;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Struct {
@@ -151,6 +153,71 @@ impl Type {
 
     pub fn to_string(&self) -> String {
         self.full_name()
+    }
+
+    pub fn type_identifier(&self) -> TypeIdentifier {
+        match self {
+            Type::Generic(name) => TypeIdentifier::Type(name.type_name.clone()),
+            Type::Void => TypeIdentifier::Type("void".to_string()),
+            Type::Unit => TypeIdentifier::Type("unit".to_string()),
+            Type::I8 => TypeIdentifier::Type("i8".to_string()),
+            Type::I16 => TypeIdentifier::Type("i16".to_string()),
+            Type::I32 => TypeIdentifier::Type("i32".to_string()),
+            Type::I64 => TypeIdentifier::Type("i64".to_string()),
+            Type::I128 => TypeIdentifier::Type("i128".to_string()),
+            Type::U8 => TypeIdentifier::Type("u8".to_string()),
+            Type::U16 => TypeIdentifier::Type("u16".to_string()),
+            Type::U32 => TypeIdentifier::Type("u32".to_string()),
+            Type::U64 => TypeIdentifier::Type("u64".to_string()),
+            Type::U128 => TypeIdentifier::Type("u128".to_string()),
+            Type::F32 => TypeIdentifier::Type("f32".to_string()),
+            Type::F64 => TypeIdentifier::Type("f64".to_string()),
+            Type::String => TypeIdentifier::Type("string".to_string()),
+            Type::Char => TypeIdentifier::Type("char".to_string()),
+            Type::Bool => TypeIdentifier::Type("bool".to_string()),
+            Type::Struct(s) => s.type_identifier.clone(),
+            Type::StructField(sf) => TypeIdentifier::MemberType(Box::new(sf.struct_name.clone()), sf.field_name.clone()),
+            Type::Union(u) => u.type_identifier.clone(),
+            _ => panic!("Cannot get type identifier for type {}", self.full_name()),
+        }
+    }
+
+    pub fn clone_with_concrete_types(&self, concrete_types: Vec<TypeAnnotation>, type_environment: Rc<RefCell<TypeEnvironment>>) -> Result<Type, String> {
+        match self {
+            Type::Struct(s) => {
+                let TypeIdentifier::GenericType(_, generics) = s.type_identifier.clone() else {
+                    return Err(format!("Cannot clone concrete types for type {}", self.full_name()));
+                };
+
+                let mut type_map = HashMap::new();
+
+                for (ta, gt) in concrete_types.iter().zip(generics) {
+                    type_map.insert(gt, ta);
+                }
+
+                let mut fields = HashMap::new();
+
+                for (field_name, type_) in s.fields.iter() {
+                    let Type::Generic(generic) = type_ else {
+                        fields.insert(field_name.clone(), type_.clone());
+                        continue;
+                    };
+                    
+                    let concrete_type = type_map.get(generic)
+                        .ok_or(format!("No concrete type found for generic type {}", generic.type_name))?;
+
+                    let concrete_type = check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+
+                    fields.insert(field_name.clone(), concrete_type);
+                }
+
+                Ok(Type::Struct(Struct {
+                    type_identifier: s.type_identifier.clone(),
+                    fields,
+                }))
+            },
+            _ => Err(format!("Cannot clone concrete types for type {}", self.full_name())),
+        }
     }
 }
 

@@ -1472,6 +1472,14 @@ impl IndentDisplay for TypeIdentifier {
                 indent.decrease();
                 result
             },
+            TypeIdentifier::MemberType(type_identifier, name) => {
+                indent.increase();
+                result.push_str(format!("{}type: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
+                indent.end_current();
+                result.push_str(format!("\n{}member: {}", indent.dash_end(), name).as_str());
+                indent.decrease();
+                result
+            },
         }
     }
 }

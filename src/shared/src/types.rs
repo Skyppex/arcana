@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, hash::Hash};
 
 use crate::{lexer::token::{self, TokenKind}, parser::cursor::Cursor};
 
@@ -38,10 +38,11 @@ impl Display for TypeAnnotation {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq)]
 pub enum TypeIdentifier {
     Type(String),
     GenericType(String, Vec<GenericType>),
+    MemberType(Box<TypeIdentifier>, String),
 }
 
 impl TypeIdentifier {
@@ -49,7 +50,24 @@ impl TypeIdentifier {
         match self {
             TypeIdentifier::Type(name) => name,
             TypeIdentifier::GenericType(name, _) => name,
+            TypeIdentifier::MemberType(_, name) => name,
         }
+    }
+}
+
+impl PartialEq for TypeIdentifier {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Type(name_left), Self::Type(name_right)) => name_left == name_right,
+            (Self::GenericType(name_left, _), Self::GenericType(name_right, _)) => name_left == name_right,
+            _ => false,
+        }
+    }
+}
+
+impl Hash for TypeIdentifier {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
     }
 }
 
@@ -66,11 +84,13 @@ impl Display for TypeIdentifier {
                         .collect::<Vec<String>>()
                         .join(", "))
             },
+            TypeIdentifier::MemberType(parent, member) =>
+                write!(f, "{} -> {}", parent, member),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GenericType {
     pub type_name: String,
 }

@@ -19,8 +19,7 @@ pub fn check_type<'a>(
             identifier,
             initializer
         }) => {
-            let type_ = type_environment.borrow().get_type_from_annotation(type_annotation)
-                .ok_or_else(|| format!("Unexpected type: {}", type_annotation))?.clone();
+            let type_ = type_environment.borrow().get_type_from_annotation(type_annotation, type_environment.clone())?;
 
             let initializer = if let Some(initializer) = initializer {
                 let initializer = check_type(initializer, discovered_types, type_environment.clone())?;

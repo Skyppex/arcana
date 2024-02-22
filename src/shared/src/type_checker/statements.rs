@@ -551,12 +551,12 @@ fn check_type_identifier(
     }
 }
 
-fn check_type_annotation(
+pub fn check_type_annotation(
     type_annotation: &TypeAnnotation,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<Type, String> {
-    if let Some(type_) = type_environment.borrow().get_type_from_annotation(type_annotation) {
+    if let Ok(type_) = type_environment.borrow().get_type_from_annotation(type_annotation, type_environment.clone()) {
          return Ok(type_);
     }
 
