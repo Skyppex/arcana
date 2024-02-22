@@ -184,8 +184,18 @@ impl Type {
             Type::Char => TypeIdentifier::Type("char".to_string()),
             Type::Bool => TypeIdentifier::Type("bool".to_string()),
             Type::Struct(s) => s.type_identifier.clone(),
-            Type::StructField(sf) => TypeIdentifier::MemberType(Box::new(sf.struct_name.clone()), sf.field_name.clone()),
+            Type::StructField(sf) => TypeIdentifier::MemberType(
+                Box::new(sf.struct_name.clone()),
+                sf.field_name.clone()),
             Type::Union(u) => u.type_identifier.clone(),
+            Type::UnionMember(um) => TypeIdentifier::MemberType(
+                Box::new(um.union_name.clone()),
+                um.discriminant_name.clone()),
+            Type::UnionMemberField(umf) => TypeIdentifier::MemberType(
+                Box::new(TypeIdentifier::MemberType(
+                    Box::new(umf.union_name.clone()),
+                    umf.discriminant_name.clone())),
+                umf.field_name.clone()),
             _ => panic!("Cannot get type identifier for type {}", self.full_name()),
         }
     }
@@ -194,7 +204,7 @@ impl Type {
         match self {
             Type::Struct(s) => {
                 let TypeIdentifier::GenericType(name, generics) = s.type_identifier.clone() else {
-                    return Err(format!("Cannot clone concrete types for type {}", self.full_name()));
+                    return Err(format!("Cannot clone concrete types for struct {}", self.full_name()));
                 };
 
                 let mut type_map = HashMap::new();
@@ -205,13 +215,12 @@ impl Type {
 
                 let mut fields = HashMap::new();
 
-                for (field_name, type_) in s.fields.iter() {
+                for (_, type_) in s.fields.iter() {
                     let Type::StructField(StructField {
                         struct_name: _,
                         field_name,
                         field_type }) = type_ else {
-                        fields.insert(field_name.clone(), type_.clone());
-                        continue;
+                        return Err(format!("Struct fields are not of type StructField {}", type_.full_name()));
                     };
 
                     let Type::Generic( generic ) = *field_type.clone() else {
@@ -232,6 +241,73 @@ impl Type {
                     fields,
                 }))
             },
+            Type::Union(u) => {
+                let TypeIdentifier::GenericType(name, generics) = u.type_identifier.clone() else {
+                    return Err(format!("Cannot clone concrete types for union {}", self.full_name()));
+                };
+
+                let mut type_map = HashMap::new();
+
+                for (ta, gt) in concrete_types.iter().zip(generics) {
+                    type_map.insert(gt, ta);
+                }
+
+                let type_identifier = TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone());
+
+                let mut members = HashMap::new();
+
+                for (member_name, type_) in u.members.iter() {
+                    let Type::UnionMember(u) = type_ else {
+                        return Err(format!("Union members are not of type UnionMember {}", type_.full_name()));
+                    };
+
+                    let mut fields = HashMap::new();
+
+                    for (_, type_) in u.fields.iter() {
+                        let Type::UnionMemberField(UnionMemberField {
+                            union_name: _,
+                            discriminant_name: _,
+                            field_name,
+                            field_type }) = type_ else {
+                            return Err(format!("Union member fields are not of type UnionMemberField {}", type_.full_name()));
+                        };
+                        
+                        let Type::Generic( generic ) = *field_type.clone() else {
+                            fields.insert(field_name.clone(), type_.clone());
+                            continue;
+                        };
+                        
+                        let concrete_type = type_map.get(&generic)
+                            .ok_or(format!("No concrete type found for generic type {}", generic.type_name))?;
+    
+                        let concrete_type = check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+
+                        fields.insert(
+                            field_name.clone(),
+                            Type::UnionMemberField(UnionMemberField {
+                                union_name: type_identifier.clone(),
+                                discriminant_name: u.discriminant_name.clone(),
+                                field_name: field_name.clone(),
+                                field_type: Box::new(concrete_type)
+                            }));
+                    }
+
+                    let member_type = Type::UnionMember(UnionMember {
+                        union_name: TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone()),
+                        discriminant_name: member_name.clone(),
+                        fields,
+                    });
+
+                    members.insert(member_name.clone(), member_type);
+                }
+
+                let union = Type::Union(Union {
+                    type_identifier,
+                    members,
+                });
+
+                Ok(union)
+            }
             _ => Err(format!("Cannot clone concrete types for type {}", self.full_name())),
         }
     }

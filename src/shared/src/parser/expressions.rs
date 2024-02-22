@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{lexer::token::{self, Keyword, TokenKind}};
+use crate::{lexer::token::{self, Keyword, TokenKind}, types::TypeAnnotation};
 
 use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While};
 use crate::types::{can_be_type_annotation, parse_type_annotation};
@@ -162,7 +162,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
 
 fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::If) {
-        return parse_struct_literal(cursor);
+        return parse_type_literal(cursor);
     }
 
     cursor.bump()?; // Consume the if
@@ -197,17 +197,25 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
     }))
 }
 
-fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
     let TokenKind::Identifier(_) = cursor.first().kind else {
-        return parse_union_literal(cursor);
+        return parse_assignment(cursor);
     };
 
     if !matches!(cursor.second().kind, TokenKind::OpenBrace | TokenKind::DoubleColon) {
-        return parse_union_literal(cursor);
+        return parse_assignment(cursor);
     };
 
-    let type_identifier = parse_type_annotation(cursor, true)?;
+    let type_annotation = parse_type_annotation(cursor, true)?;
 
+    if cursor.first().kind == TokenKind::OpenBrace {
+        parse_struct_literal(cursor, type_annotation)
+    } else {
+        parse_union_literal(cursor, type_annotation)
+    }
+}
+
+fn parse_struct_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) -> Result<Expression, String> {
     if cursor.bump()?.kind != TokenKind::OpenBrace {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
     }
@@ -232,7 +240,7 @@ fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the }
     Ok(Expression::Literal(Literal::Struct {
-        type_annotation: type_identifier,
+        type_annotation,
         field_initializers 
     }))
 }
@@ -254,21 +262,14 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
     Ok(FieldInitializer { identifier: Some(identifier), initializer })
 }
 
-fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
-    let TokenKind::Identifier(_) = cursor.first().kind else {
-        return parse_assignment(cursor);
-    };
-
-    let TokenKind::DoubleColon = cursor.second().kind else {
-        return parse_assignment(cursor);
+fn parse_union_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) -> Result<Expression, String> {
+    let TokenKind::DoubleColon = cursor.bump()?.kind else {
+        return Err(format!("Expected :: but found {:?}", cursor.first().kind));
     };
     
-    let TokenKind::Identifier(member) = cursor.third().kind else {
-        return parse_assignment(cursor);
+    let TokenKind::Identifier(member) = cursor.bump()?.kind else {
+        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
     };
-
-    let type_annotation = parse_type_annotation(cursor, true)?;
-    cursor.bump()?; // Consume the member identifier
 
     let field_initializers = {
         if cursor.first().kind == TokenKind::OpenParen {
@@ -283,7 +284,7 @@ fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         }
     };
 
-    cursor.bump()?; // Consume the ) or }
+    cursor.bump()?; // Consume the )
     Ok(Expression::Literal(Literal::Union {
         type_annotation,
         member,

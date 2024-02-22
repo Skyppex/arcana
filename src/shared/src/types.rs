@@ -139,11 +139,11 @@ pub(super) fn parse_type_annotation(cursor: &mut Cursor, use_double_colon: bool)
             cursor.bump()?; // Consume the type identifier
 
             if use_double_colon {
-                if cursor.first().kind != TokenKind::DoubleColon {
+                if cursor.first().kind == TokenKind::DoubleColon {
+                    cursor.bump()?; // Consume the ::
+                } else if cursor.first().kind == TokenKind::Less {
                     return Err(format!("Expected :: but found {:?}", cursor.first().kind));
                 }
-                
-                cursor.bump()?; // Consume the ::
             }
 
             if cursor.first().kind == TokenKind::Less {

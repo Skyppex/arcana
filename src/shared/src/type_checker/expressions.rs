@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{parser::{self, Assignment, Expression, If, VariableDeclaration, While}, type_checker::ast::Literal};
 
 use super::{ast::{BinaryOperator, Block, ConditionBlock, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator, UnionMemberFieldInitializers
-    }, scope::ScopeType, statements, DiscoveredType, FullName, Rcrc, Type, TypeEnvironment
+    }, scope::ScopeType, statements, DiscoveredType, FullName, Rcrc, Struct, StructField, Type, TypeEnvironment, Union, UnionMember, UnionMemberField
 };
 
 pub fn check_type<'a>(
@@ -185,18 +185,18 @@ pub fn check_type<'a>(
                                 return Err(format!("Array element type {:?} does not match previous element type {:?}", type_, previous_type));
                             }
 
-                            previous_type = type_;
+                            previous_type = type_.clone();
                             v_.push(value);
                         }
 
-                        Ok((v_, previous_type))
+                        Ok((v_, previous_type.clone()))
                     };
 
                     let v = v?;
                     Literal::Array { values: v.0, type_: v.1 }
                 },
                 parser::Literal::Struct {
-                    type_annotation: type_identifier,
+                    type_annotation,
                     field_initializers
                 } => {
                     let field_initializers: Result<Vec<FieldInitializer>, String> = {
@@ -213,52 +213,122 @@ pub fn check_type<'a>(
                         Ok(field_initializers_)
                     };
 
+                    let type_ = type_environment.borrow()
+                            .get_type_from_annotation(type_annotation, type_environment.clone())?;
+
+                    let Type::Struct(Struct { fields, .. }) = type_.clone() else {
+                        Err(format!("{} is not a struct", type_.full_name()))?
+                    };
+
+                    let field_initializers = field_initializers?;
+
+                    for (field, initializer) in fields.iter().zip(field_initializers.iter()) {
+                        let Type::StructField(StructField { field_type, .. }) = field.1 else {
+                            return Err(format!("Field type {} is not a struct field", field.1.full_name()));
+                        };
+                        
+                        let initializer_type = initializer.initializer.get_type();
+
+                        if **field_type != initializer_type {
+                            return Err(format!("Field type {} does not match initializer type {}", field_type, initializer_type));
+                        }
+                    }
+
                     Literal::Struct {
-                        type_annotation: type_identifier.clone(),
-                        field_initializers: field_initializers?,
-                        type_: type_environment.borrow()
-                            .get_type_from_annotation(type_identifier, type_environment.clone())?
+                        type_annotation: type_annotation.clone(),
+                        field_initializers: field_initializers,
+                        type_
                     }
                 },
                 parser::Literal::Union {
-                    type_annotation: type_identifier,
+                    type_annotation,
                     member,
                     field_initializers
                 } => {
                     let field_initializers: Result<UnionMemberFieldInitializers, String> = {
-                        let mut field_initializers_: UnionMemberFieldInitializers = UnionMemberFieldInitializers::None;
-                        match field_initializers {
-                            parser::UnionMemberFieldInitializers::None => (),
+                        let field_initializers = match field_initializers {
+                            parser::UnionMemberFieldInitializers::None => UnionMemberFieldInitializers::None,
                             parser::UnionMemberFieldInitializers::Named(field_initializers) => {
-                                let mut field_initializers__: HashMap<String, TypedExpression> = HashMap::new();
+                                let mut fis: HashMap<String, TypedExpression> = HashMap::new();
+
                                 for (identifier, initializer) in field_initializers {
-                                    field_initializers__.insert(identifier.clone(), check_type(
+                                    fis.insert(identifier.clone(), check_type(
                                         &initializer,
                                         discovered_types, type_environment.clone())?
                                     );
                                 }
-                                field_initializers_ = UnionMemberFieldInitializers::Named(field_initializers__);
+
+                                UnionMemberFieldInitializers::Named(fis)
                             },
                             parser::UnionMemberFieldInitializers::Unnamed(field_initializers) => {
-                                let mut field_initializers__: Vec<TypedExpression> = vec![];
+                                let mut fis: Vec<TypedExpression> = vec![];
+
                                 for initializer in field_initializers {
-                                    field_initializers__.push(check_type(
+                                    fis.push(check_type(
                                         &initializer,
                                         discovered_types, type_environment.clone())?
                                     );
                                 }
-                                field_initializers_ = UnionMemberFieldInitializers::Unnamed(field_initializers__);
+
+                                UnionMemberFieldInitializers::Unnamed(fis)
                             },
-                        }
-                        Ok(field_initializers_)
+                        };
+
+                        Ok(field_initializers)
                     };
 
+                    let type_ = type_environment.borrow()
+                            .get_type_from_annotation(type_annotation, type_environment.clone())?;
+
+                    let Type::Union(Union { members, .. }) = type_.clone() else {
+                        Err(format!("{} is not a struct", type_.full_name()))?
+                    };
+
+                    let Some(Type::UnionMember(UnionMember { fields, .. })) = members.get(member) else {
+                        Err(format!("{} is not a member of {}", member, type_.full_name()))?
+                    };
+
+                    let field_initializers = field_initializers?;
+
+                    match field_initializers {
+                        UnionMemberFieldInitializers::None => (),
+                        UnionMemberFieldInitializers::Named(ref field_initializers) => {
+                            for ((_, field_type), (_, initializer)) in fields.iter().zip(field_initializers.iter()) {
+                                let Type::UnionMemberField(UnionMemberField { field_type, .. }) = field_type else {
+                                    return Err(format!("Field type {} is not a union member field", field_type.full_name()));
+                                };
+                                
+                                let initializer_type = initializer.get_type();
+
+                                if **field_type != initializer_type {
+                                    return Err(format!("Field type {} does not match initializer type {}", field_type, initializer_type));
+                                }
+                            }
+                        },
+                        UnionMemberFieldInitializers::Unnamed(ref field_initializers) => {
+                            if fields.len() != field_initializers.len() {
+                                return Err(format!("Union member {} has {} fields, but {} initializers were provided", member, fields.len(), field_initializers.len()));
+                            }
+
+                            for (field, initializer) in fields.iter().zip(field_initializers.iter()) {
+                                let Type::UnionMemberField(UnionMemberField { field_type, .. }) = field.1 else {
+                                    return Err(format!("Field type {} is not a union member field", field.1.full_name()));
+                                };
+                                
+                                let initializer_type = initializer.get_type();
+
+                                if **field_type != initializer_type {
+                                    return Err(format!("Field type {} does not match initializer type {}", field_type, initializer_type));
+                                }
+                            }
+                        },
+                    }                        
+
                     Literal::Union {
-                        type_annotation: type_identifier.clone(),
+                        type_annotation: type_annotation.clone(),
                         member: member.clone(),
-                        field_initializers: field_initializers?,
-                        type_: type_environment.borrow()
-                            .get_type_from_annotation(type_identifier, type_environment.clone())?
+                        field_initializers,
+                        type_
                     }
                 },
             };
@@ -289,7 +359,7 @@ pub fn check_type<'a>(
                         
                         let arg_typed_expression = check_type(arg, discovered_types, type_environment.clone())?;
 
-                        if arg_typed_expression.get_deep_type() != type_.clone() {
+                        if &arg_typed_expression.get_deep_type() != type_ {
                             Err(format!("Argument {} type {} does not match parameter type {}", i, arg_typed_expression.get_type(), type_))?
                         }
 
@@ -326,7 +396,7 @@ pub fn check_type<'a>(
             Ok(TypedExpression::Index {
                 caller: Box::new(caller),
                 argument: Box::new(index),
-                type_: *type_
+                type_: *type_.clone()
             })
         }
         Expression::Unary(unary) => {
@@ -341,7 +411,7 @@ pub fn check_type<'a>(
                     parser::UnaryOperator::BitwiseNot => UnaryOperator::BitwiseNot,
                 },
                 expression: Box::new(expression),
-                type_
+                type_: type_.clone()
             })
         
         },
@@ -503,7 +573,7 @@ pub fn check_type<'a>(
                 condition: Box::new(condition),
                 block: block.statements,
                 else_block: else_block,
-                type_
+                type_: type_.clone()
             })
         },
     }
@@ -517,7 +587,7 @@ fn check_type_member_access(
     -> Result<TypedExpression, String> {
     let object_type_expression = check_type(object, discovered_types, type_environment.clone())?;
     let object_type  = object_type_expression.get_type();
-    check_type_member_access_recurse(object_type, member, type_environment, object_type_expression, discovered_types)
+    check_type_member_access_recurse(object_type.clone(), member, type_environment, object_type_expression, discovered_types)
 }
 
 fn check_type_member_access_recurse(

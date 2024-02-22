@@ -2,4 +2,13 @@ struct A<T> {
     a: T
 }
 
-let a: A<i64>;
+struct B {
+    b: string
+}
+
+union Option<T> {
+    Some(T),
+    None
+}
+
+let a: Option<i64>;
