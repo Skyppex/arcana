@@ -17,7 +17,7 @@ use crate::types::{GenericType, TypeAnnotation, TypeIdentifier};
 
 use self::statements::check_type_annotation;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Struct {
     pub type_identifier: TypeIdentifier,
     pub fields: HashMap<String, Type>,
@@ -26,6 +26,14 @@ pub struct Struct {
 impl FullName for Struct {
     fn full_name(&self) -> String {
         self.type_identifier.to_string()
+    }
+}
+
+impl PartialEq for Struct {
+    fn eq(&self, other: &Self) -> bool {
+        println!("self.type_identifier == other.type_identifier: {}", self.type_identifier == other.type_identifier);
+        println!("self.fields == other.fields: {}", self.fields == other.fields);
+        self.type_identifier == other.type_identifier && self.fields == other.fields
     }
 }
 
@@ -185,7 +193,7 @@ impl Type {
     pub fn clone_with_concrete_types(&self, concrete_types: Vec<TypeAnnotation>, type_environment: Rc<RefCell<TypeEnvironment>>) -> Result<Type, String> {
         match self {
             Type::Struct(s) => {
-                let TypeIdentifier::GenericType(_, generics) = s.type_identifier.clone() else {
+                let TypeIdentifier::GenericType(name, generics) = s.type_identifier.clone() else {
                     return Err(format!("Cannot clone concrete types for type {}", self.full_name()));
                 };
 
@@ -198,12 +206,20 @@ impl Type {
                 let mut fields = HashMap::new();
 
                 for (field_name, type_) in s.fields.iter() {
-                    let Type::Generic(generic) = type_ else {
+                    let Type::StructField(StructField {
+                        struct_name: _,
+                        field_name,
+                        field_type }) = type_ else {
+                        fields.insert(field_name.clone(), type_.clone());
+                        continue;
+                    };
+
+                    let Type::Generic( generic ) = *field_type.clone() else {
                         fields.insert(field_name.clone(), type_.clone());
                         continue;
                     };
                     
-                    let concrete_type = type_map.get(generic)
+                    let concrete_type = type_map.get(&generic)
                         .ok_or(format!("No concrete type found for generic type {}", generic.type_name))?;
 
                     let concrete_type = check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
@@ -212,7 +228,7 @@ impl Type {
                 }
 
                 Ok(Type::Struct(Struct {
-                    type_identifier: s.type_identifier.clone(),
+                    type_identifier: TypeIdentifier::ConcreteType(name, concrete_types),
                     fields,
                 }))
             },

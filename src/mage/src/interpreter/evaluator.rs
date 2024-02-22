@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use shared::{type_checker::{ast::{Block, *}, Type}, types::{TypeAnnotation, TypeIdentifier}};
+use shared::{type_checker::{ast::{Block, *}, Type}, types::TypeIdentifier};
 
 use crate::interpreter::scope::Scope;
 
@@ -296,7 +296,7 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
             Ok(Value::Array(array))
         }
         Literal::Struct {
-            type_identifier,
+            type_annotation,
             field_initializers,
             type_: _
         } => {
@@ -308,10 +308,10 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
                      evaluate_expression(field_initializer.initializer, environment.clone())?);
             }
 
-            Ok(Value::Struct { struct_name: type_identifier, fields })
+            Ok(Value::Struct { struct_name: type_annotation, fields })
         }        
         Literal::Union {
-            type_identifier,
+            type_annotation,
             member,
             field_initializers,
             type_: _
@@ -339,7 +339,7 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
             };
             
             Ok(Value::Union { union_member: UnionMember {
-                union_name: type_identifier,
+                union_name: type_annotation,
                 member_name: member,
             }, fields })
         }

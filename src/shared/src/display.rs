@@ -530,7 +530,7 @@ impl IndentDisplay for Literal {
                 result
             },
             Literal::Struct {
-                type_identifier,
+                type_annotation: type_identifier,
                 field_initializers
             } => {
                 let mut result = String::new();
@@ -551,7 +551,7 @@ impl IndentDisplay for Literal {
                 result
             },
             Literal::Union {
-                type_identifier,
+                type_annotation: type_identifier,
                 member,
                 field_initializers
             } => {
@@ -1235,7 +1235,7 @@ impl IndentDisplay for type_checker::ast::Literal {
                 result
             },
             type_checker::ast::Literal::Struct {
-                type_identifier,
+                type_annotation: type_identifier,
                 field_initializers,
                 type_
             } => {
@@ -1257,7 +1257,7 @@ impl IndentDisplay for type_checker::ast::Literal {
                 result
             },
             type_checker::ast::Literal::Union {
-                type_identifier,
+                type_annotation: type_identifier,
                 member,
                 field_initializers,
                 type_
@@ -1465,6 +1465,26 @@ impl IndentDisplay for TypeIdentifier {
                     } else {
                         indent.end_current();
                         result.push_str(format!("\n{}generic: {}", indent.dash_end(), generic.indent_display(indent)).as_str());
+                    }
+                }
+
+                indent.decrease();
+                indent.decrease();
+                result
+            },
+            TypeIdentifier::ConcreteType(type_name, concrete_types) => {
+                indent.increase();
+                result.push_str(format!("{}type: {}", indent.dash(), type_name).as_str());
+                indent.end_current();
+                result.push_str(format!("\n{}concrete_types:", indent.dash_end()).as_str());
+                indent.increase();
+
+                for (i, concrete_type) in concrete_types.iter().enumerate() {
+                    if i < concrete_types.len() - 1 {
+                        result.push_str(format!("\n{}concrete_type: {},", indent.dash(), concrete_type.indent_display(indent)).as_str());
+                    } else {
+                        indent.end_current();
+                        result.push_str(format!("\n{}concrete_type: {}", indent.dash_end(), concrete_type.indent_display(indent)).as_str());
                     }
                 }
 

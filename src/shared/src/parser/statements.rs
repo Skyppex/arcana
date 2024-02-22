@@ -1,4 +1,4 @@
-use crate::{lexer::token::{Keyword, TokenKind}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_name}};
+use crate::{lexer::token::{Keyword, TokenKind}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_identifier}};
 
 use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, FunctionDeclaration, Impl, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
 
@@ -63,7 +63,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
     cursor.bump()?; // Consume the func keyword
 
-    let type_identifier = parse_type_name(cursor, false)?;
+    let type_identifier = parse_type_identifier(cursor, false)?;
 
     let TokenKind::OpenParen = cursor.bump()?.kind else {
         return Err(format!("Expected ( but found {:?}", cursor.first().kind));
@@ -84,7 +84,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
             return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
         }
 
-        return_type = Some(parse_type_annotation(cursor)?);
+        return_type = Some(parse_type_annotation(cursor, false)?);
     }
 
     let body = parse_block_statements(cursor)?;
@@ -133,7 +133,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     cursor.bump()?; // Consume the struct keyword
 
-    let type_identifier = parse_type_name(cursor, false)?;
+    let type_identifier = parse_type_identifier(cursor, false)?;
 
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
@@ -184,7 +184,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     cursor.bump()?; // Consume the union keyword
 
-    let type_name = parse_type_name(cursor, false)?;
+    let type_name = parse_type_identifier(cursor, false)?;
     
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
@@ -281,7 +281,7 @@ fn parse_impl(cursor: &mut Cursor) -> Result<Statement, String> {
         return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
     }
 
-    let type_annotation = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor, false)?;
     let methods = parse_block_statements(cursor)?;
 
     Ok(Statement::Impl(Impl { type_annotation, functions: methods }))
@@ -366,7 +366,7 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
         return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
     }
 
-    let type_anntation = parse_type_annotation(cursor)?;
+    let type_anntation = parse_type_annotation(cursor, false)?;
 
     Ok(Parameter {
         identifier,
@@ -402,7 +402,7 @@ fn parse_struct_field(cursor: &mut Cursor) -> Result<StructField, String> {
         return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
     }
 
-    let type_annotation = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor, false)?;
 
     Ok(StructField {
         access_modifier,
@@ -470,7 +470,7 @@ fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<Union
                 return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
             }
 
-            let type_annotation = parse_type_annotation(cursor)?;
+            let type_annotation = parse_type_annotation(cursor, false)?;
 
             Ok(UnionMemberField {
                 identifier: first_ident,
@@ -480,7 +480,7 @@ fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<Union
         _ => {
             return Ok(UnionMemberField {
                 identifier: format!("f{}",field_position.to_string()),
-                type_annotation: parse_type_annotation_from_str(&first_ident)?,
+                type_annotation: parse_type_annotation_from_str(&first_ident, false)?,
             });
         },
     }

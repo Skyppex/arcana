@@ -134,8 +134,9 @@ impl TypeEnvironment {
                 }
             },
             TypeAnnotation::ConcreteType(type_name, concrete_types) => {
-                if let Some(t) = self.types.get(&TypeIdentifier::GenericType(type_name.clone(), vec![])) {
-                    t.clone_with_concrete_types(concrete_types.clone(), type_environment)
+                if let Some((_, t)) = self.types.iter().find(|(k, _)| k.eq_names(&TypeIdentifier::GenericType(type_name.clone(), vec![]))) {
+                    let concrete = t.clone_with_concrete_types(concrete_types.clone(), type_environment);
+                    concrete
                 } else if let Some(parent) = &self.parent {
                     parent.borrow().get_type_from_annotation(type_annotation, type_environment)
                 } else {
@@ -150,7 +151,7 @@ impl TypeEnvironment {
     }
 
     pub fn get_type_from_identifier(&self, type_identifier: &TypeIdentifier) -> Option<Type> {
-        todo!("get_type_from_name")
+        todo!("get_type_from_identifier")
     }
 
     pub fn get_variable(&self, name: &str) -> Option<Type> {

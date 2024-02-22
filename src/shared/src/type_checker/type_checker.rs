@@ -15,8 +15,6 @@ pub fn create_typed_ast<'a>(program: Statement, type_environment: Rcrc<TypeEnvir
     // Discover user-defined types. Only store their names and fields with type names.
     let discovered_types = statements::discover_user_defined_types(&program)?;
 
-    println!("{:?}", discovered_types);
-
     // Then check the types of the entire AST.
     statements::check_type(&program, &discovered_types, type_environment)
 }

@@ -98,11 +98,11 @@ pub enum Literal {
     Bool(bool),
     Array(Vec<Expression>),
     Struct {
-        type_identifier: TypeIdentifier,
+        type_annotation: TypeAnnotation,
         field_initializers: Vec<FieldInitializer>,
     },
     Union {
-        type_identifier: TypeIdentifier,
+        type_annotation: TypeAnnotation,
         member: String,
         field_initializers: UnionMemberFieldInitializers,
     },

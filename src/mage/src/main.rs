@@ -60,8 +60,15 @@ fn run_program() -> Result<(), String> {
         }
 
         if let "vars" = input.trim() {
-            for (.., variable) in type_environment.borrow().get_variables() {
-                println!("{}", variable);
+            for (name, variable) in type_environment.borrow().get_variables() {
+                println!("{}: {}", name, variable);
+            }
+            continue;
+        }
+
+        if let "varsd" = input.trim() {
+            for (name, variable) in type_environment.borrow().get_variables() {
+                println!("{}: {:?}", name, variable);
             }
             continue;
         }

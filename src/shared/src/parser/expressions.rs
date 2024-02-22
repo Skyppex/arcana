@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{lexer::token::{self, Keyword, TokenKind}, types::parse_type_name};
+use crate::{lexer::token::{self, Keyword, TokenKind}};
 
 use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While};
 use crate::types::{can_be_type_annotation, parse_type_annotation};
@@ -133,7 +133,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         return Err(format!("Expected type annotation but found {:?}", cursor.first().kind));
     }
 
-    let type_annotation = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor, false)?;
 
     match cursor.first().kind {
         TokenKind::Equal => {
@@ -206,7 +206,11 @@ fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_union_literal(cursor);
     };
 
-    let type_annotation = parse_type_name(cursor, true)?;
+    let type_identifier = parse_type_annotation(cursor, true)?;
+
+    if cursor.bump()?.kind != TokenKind::OpenBrace {
+        return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
+    }
 
     let mut field_initializers = vec![];
     let mut has_comma = true;
@@ -228,7 +232,7 @@ fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the }
     Ok(Expression::Literal(Literal::Struct {
-        type_identifier: type_annotation,
+        type_annotation: type_identifier,
         field_initializers 
     }))
 }
@@ -263,7 +267,7 @@ fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_assignment(cursor);
     };
 
-    let type_identifier = parse_type_name(cursor, true)?;
+    let type_annotation = parse_type_annotation(cursor, true)?;
     cursor.bump()?; // Consume the member identifier
 
     let field_initializers = {
@@ -281,7 +285,7 @@ fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the ) or }
     Ok(Expression::Literal(Literal::Union {
-        type_identifier,
+        type_annotation,
         member,
         field_initializers
     }))

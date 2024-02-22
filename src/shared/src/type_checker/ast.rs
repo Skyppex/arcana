@@ -263,12 +263,12 @@ pub enum Literal {
     Bool(bool),
     Array { values: Vec<TypedExpression>, type_: Type },
     Struct {
-        type_identifier: TypeIdentifier,
+        type_annotation: TypeAnnotation,
         field_initializers: Vec<FieldInitializer>,
         type_: Type,
     },
     Union {
-        type_identifier: TypeIdentifier,
+        type_annotation: TypeAnnotation,
         member: String,
         field_initializers: UnionMemberFieldInitializers,
         type_: Type,

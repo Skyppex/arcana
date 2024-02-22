@@ -116,8 +116,11 @@ pub fn check_type<'a>(
             let member = check_type(&Expression::Member(*member.clone()), discovered_types, type_environment.clone())?;
             let initializer = check_type(initializer, discovered_types, type_environment)?;
 
+            println!("member: {:?}", member.get_type());
+            println!("initializer: {:?}", initializer.get_type());
+
             if member.get_type() != initializer.get_type() {
-                return Err(format!("Member type {:?} does not match initializer type {:?}", member.get_type(), initializer.get_type()));
+                return Err(format!("Member type {} does not match initializer type {}", member.get_type(), initializer.get_type()));
             }
 
             let TypedExpression::Member(member) = member else {
@@ -193,7 +196,7 @@ pub fn check_type<'a>(
                     Literal::Array { values: v.0, type_: v.1 }
                 },
                 parser::Literal::Struct {
-                    type_identifier,
+                    type_annotation: type_identifier,
                     field_initializers
                 } => {
                     let field_initializers: Result<Vec<FieldInitializer>, String> = {
@@ -211,14 +214,14 @@ pub fn check_type<'a>(
                     };
 
                     Literal::Struct {
-                        type_identifier: type_identifier.clone(),
+                        type_annotation: type_identifier.clone(),
                         field_initializers: field_initializers?,
-                        type_: type_environment.borrow().get_type_from_identifier(type_identifier)
-                            .ok_or_else(|| format!("Unexpected type: {}", type_identifier))?.clone()
+                        type_: type_environment.borrow()
+                            .get_type_from_annotation(type_identifier, type_environment.clone())?
                     }
                 },
                 parser::Literal::Union {
-                    type_identifier,
+                    type_annotation: type_identifier,
                     member,
                     field_initializers
                 } => {
@@ -251,13 +254,12 @@ pub fn check_type<'a>(
                     };
 
                     Literal::Union {
-                        type_identifier: type_identifier.clone(),
+                        type_annotation: type_identifier.clone(),
                         member: member.clone(),
                         field_initializers: field_initializers?,
-                        type_: type_environment.borrow().get_type_from_identifier(type_identifier)
-                            .ok_or_else(|| format!("Unexpected type: {}", type_identifier))?.clone()
+                        type_: type_environment.borrow()
+                            .get_type_from_annotation(type_identifier, type_environment.clone())?
                     }
-                
                 },
             };
 
