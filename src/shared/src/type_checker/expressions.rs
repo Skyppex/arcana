@@ -15,12 +15,12 @@ pub fn check_type<'a>(
         Expression::None => Ok(TypedExpression::None),
         Expression::VariableDeclaration(VariableDeclaration {
             mutable,
-            type_annotation: type_name,
+            type_annotation,
             identifier,
             initializer
         }) => {
-            let type_ = type_environment.borrow().get_type_from_annotation(type_name)
-                .ok_or_else(|| format!("Unexpected type: {}", type_name))?.clone();
+            let type_ = type_environment.borrow().get_type_from_annotation(type_annotation)
+                .ok_or_else(|| format!("Unexpected type: {}", type_annotation))?.clone();
 
             let initializer = if let Some(initializer) = initializer {
                 let initializer = check_type(initializer, discovered_types, type_environment.clone())?;
@@ -194,7 +194,7 @@ pub fn check_type<'a>(
                     Literal::Array { values: v.0, type_: v.1 }
                 },
                 parser::Literal::Struct {
-                    type_name,
+                    type_identifier,
                     field_initializers
                 } => {
                     let field_initializers: Result<Vec<FieldInitializer>, String> = {
@@ -212,14 +212,14 @@ pub fn check_type<'a>(
                     };
 
                     Literal::Struct {
-                        type_name: type_name.clone(),
+                        type_identifier: type_identifier.clone(),
                         field_initializers: field_initializers?,
-                        type_: type_environment.borrow().get_type_from_name(type_name)
-                            .ok_or_else(|| format!("Unexpected type: {}", type_name))?.clone()
+                        type_: type_environment.borrow().get_type_from_identifier(type_identifier)
+                            .ok_or_else(|| format!("Unexpected type: {}", type_identifier))?.clone()
                     }
                 },
                 parser::Literal::Union {
-                    type_name,
+                    type_identifier,
                     member,
                     field_initializers
                 } => {
@@ -252,11 +252,11 @@ pub fn check_type<'a>(
                     };
 
                     Literal::Union {
-                        type_name: type_name.clone(),
+                        type_identifier: type_identifier.clone(),
                         member: member.clone(),
                         field_initializers: field_initializers?,
-                        type_: type_environment.borrow().get_type_from_name(type_name)
-                            .ok_or_else(|| format!("Unexpected type: {}", type_name))?.clone()
+                        type_: type_environment.borrow().get_type_from_identifier(type_identifier)
+                            .ok_or_else(|| format!("Unexpected type: {}", type_identifier))?.clone()
                     }
                 
                 },
@@ -530,7 +530,7 @@ fn check_type_member_access_recurse(
             match *member.clone() {
                 parser::Member::Identifier { symbol } => {
                     let field_type = struct_.fields.get(&symbol)
-                        .ok_or(format!("Struct {} does not have a field called '{}'", struct_.type_name, symbol))?;
+                        .ok_or(format!("Struct {} does not have a field called '{}'", struct_.type_identifier, symbol))?;
 
                     if !type_environment.borrow().lookup_type(&field_type) {
                         return Err(format!("Unexpected type: {}", field_type.full_name()));

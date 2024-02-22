@@ -133,7 +133,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         return Err(format!("Expected type annotation but found {:?}", cursor.first().kind));
     }
 
-    let type_name = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor)?;
 
     match cursor.first().kind {
         TokenKind::Equal => {
@@ -143,7 +143,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
 
             Ok(Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
-                type_annotation: type_name,
+                type_annotation,
                 identifier,
                 initializer: Some(Box::new(initializer)),
             }))
@@ -151,7 +151,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         TokenKind::Semicolon => {
             Ok(Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
-                type_annotation: type_name,
+                type_annotation,
                 identifier,
                 initializer: None,
             }))
@@ -198,7 +198,7 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
-    let TokenKind::Identifier(type_name) = cursor.first().kind else {
+    let TokenKind::Identifier(_) = cursor.first().kind else {
         return parse_union_literal(cursor);
     };
 
@@ -206,7 +206,7 @@ fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_union_literal(cursor);
     };
 
-    let type_name = parse_type_name(cursor, true)?;
+    let type_annotation = parse_type_name(cursor, true)?;
 
     let mut field_initializers = vec![];
     let mut has_comma = true;
@@ -228,7 +228,7 @@ fn parse_struct_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the }
     Ok(Expression::Literal(Literal::Struct {
-        type_name,
+        type_identifier: type_annotation,
         field_initializers 
     }))
 }
@@ -263,7 +263,7 @@ fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_assignment(cursor);
     };
 
-    let type_name = parse_type_name(cursor, true)?;
+    let type_identifier = parse_type_name(cursor, true)?;
     cursor.bump()?; // Consume the member identifier
 
     let field_initializers = {
@@ -281,7 +281,7 @@ fn parse_union_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the ) or }
     Ok(Expression::Literal(Literal::Union {
-        type_name,
+        type_identifier,
         member,
         field_initializers
     }))

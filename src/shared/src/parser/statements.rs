@@ -63,7 +63,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
     cursor.bump()?; // Consume the func keyword
 
-    let identifier = parse_type_name(cursor, false)?;
+    let type_identifier = parse_type_name(cursor, false)?;
 
     let TokenKind::OpenParen = cursor.bump()?.kind else {
         return Err(format!("Expected ( but found {:?}", cursor.first().kind));
@@ -91,7 +91,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
     Ok(Statement::FunctionDeclaration(FunctionDeclaration {
         access_modifier,
-        identifier,
+        identifier: type_identifier,
         parameters,
         return_type,
         body,
@@ -133,7 +133,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     cursor.bump()?; // Consume the struct keyword
 
-    let type_name = parse_type_name(cursor, false)?;
+    let type_identifier = parse_type_name(cursor, false)?;
 
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
@@ -161,7 +161,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     Ok(Statement::StructDeclaration(StructDeclaration {
         access_modifier,
-        type_name,
+        type_identifier,
         fields,
     }))
 }
@@ -212,7 +212,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     Ok(Statement::UnionDeclaration(UnionDeclaration {
         access_modifier,
-        type_name,
+        type_identifier: type_name,
         members,
     }))
 }

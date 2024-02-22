@@ -2,7 +2,7 @@ use crate::{parser::{
     AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, UnionMember, UnionMemberField, UnionMemberFieldInitializers, VariableDeclaration, While
 }, type_checker::{self, ast::{
     Block, TypedExpression, TypedStatement
-}, Type}, types::{GenericType, TypeAnnotation, TypeName}};
+}, Type}, types::{GenericType, TypeAnnotation, TypeIdentifier}};
 
 pub struct Indent {
     levels: Vec<bool>,
@@ -79,14 +79,14 @@ impl IndentDisplay for Statement {
             },
             Statement::StructDeclaration(StructDeclaration {
                 access_modifier,
-                type_name,
+                type_identifier,
                 fields 
             }) => {
                 let mut result = String::new();
                 result.push_str("<struct declaration>\n");
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name.indent_display(indent)).as_str());
+                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
                 result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
 
                 for (i, field) in fields.iter().enumerate() {
@@ -100,14 +100,14 @@ impl IndentDisplay for Statement {
             },
             Statement::UnionDeclaration(UnionDeclaration {
                 access_modifier,
-                type_name,
+                type_identifier,
                 members
             }) => {
                 let mut result = String::new();
                 result.push_str("<union declaration>\n");
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name.indent_display(indent)).as_str());
+                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
                 result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
 
                 for (i, member) in members.iter().enumerate() {
@@ -530,13 +530,13 @@ impl IndentDisplay for Literal {
                 result
             },
             Literal::Struct {
-                type_name,
+                type_identifier,
                 field_initializers
             } => {
                 let mut result = String::new();
                 result.push_str("<struct literal>\n");
                 indent.increase();
-                result.push_str(format!("{}type_name: {}", indent.dash(), type_name.indent_display(indent)).as_str());
+                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
                 
                 for (i, field) in field_initializers.iter().enumerate() {
                     if i < field_initializers.len() - 1 {
@@ -551,14 +551,14 @@ impl IndentDisplay for Literal {
                 result
             },
             Literal::Union {
-                type_name,
+                type_identifier,
                 member,
                 field_initializers
             } => {
                 let mut result = String::new();
                 result.push_str("<union literal>\n");
                 indent.increase_leaf();
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name.indent_display(indent)).as_str());
+                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
                 result.push_str(format!("{}member: {}\n", indent.dash_end(), member).as_str());
                 indent.increase_leaf();
                 result.push_str(format!("{}{}", indent.dash_end(), field_initializers.indent_display(indent)).as_str());
@@ -785,7 +785,7 @@ impl IndentDisplay for TypedStatement {
                 result
             },
             TypedStatement::StructDeclaration {
-                type_name,
+                type_identifier,
                 fields,
                 type_
             } => {
@@ -793,7 +793,7 @@ impl IndentDisplay for TypedStatement {
                 result.push_str(format!("<struct declaration> {}\n", type_).as_str());
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}", indent.dash(), type_name.indent_display(indent)).as_str());
+                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
 
                 for (i, field) in fields.iter().enumerate() {
                     let is_end = i == fields.len() - 1;
@@ -805,7 +805,7 @@ impl IndentDisplay for TypedStatement {
                 result
             },
             TypedStatement::UnionDeclaration {
-                type_name,
+                type_identifier,
                 members,
                 type_
             } => {
@@ -813,7 +813,7 @@ impl IndentDisplay for TypedStatement {
                 result.push_str(format!("<union declaration> {}\n", type_).as_str());
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}", indent.dash(), type_name.indent_display(indent)).as_str());
+                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
                 
                 for (i, member) in members.iter().enumerate() {
                     if i < members.len() - 1 {
@@ -1235,14 +1235,14 @@ impl IndentDisplay for type_checker::ast::Literal {
                 result
             },
             type_checker::ast::Literal::Struct {
-                type_name,
+                type_identifier,
                 field_initializers,
                 type_
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<struct literal>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}type_name: {}", indent.dash(), type_name.indent_display(indent)).as_str());
+                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
 
                 for (i, field) in field_initializers.iter().enumerate() {
                     if i < field_initializers.len() - 1 {
@@ -1257,7 +1257,7 @@ impl IndentDisplay for type_checker::ast::Literal {
                 result
             },
             type_checker::ast::Literal::Union {
-                type_name,
+                type_identifier,
                 member,
                 field_initializers,
                 type_
@@ -1265,7 +1265,7 @@ impl IndentDisplay for type_checker::ast::Literal {
                 let mut result = String::new();
                 result.push_str(format!("<union literal>: {}\n", type_).as_str());
                 indent.increase_leaf();
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_name.indent_display(indent)).as_str());
+                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
                 result.push_str(format!("{}member: {}\n", indent.dash_end(), member).as_str());
                 indent.increase_leaf();
                 result.push_str(format!("{}{}", indent.dash_end(), field_initializers.indent_display(indent)).as_str());
@@ -1440,19 +1440,19 @@ impl IndentDisplay for type_checker::ast::UnionMemberFieldInitializers {
     }
 }
 
-impl IndentDisplay for TypeName {
+impl IndentDisplay for TypeIdentifier {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
         result.push_str(format!("<type name>: {}\n", self.to_string()).as_str());
 
         match self {
-            TypeName::Type(type_name) => {
+            TypeIdentifier::Type(type_name) => {
                 indent.increase_leaf();
                 result.push_str(format!("{}type: {}", indent.dash_end(), type_name).as_str());
                 indent.decrease();
                 result
             },
-            TypeName::GenericType(type_name, generics) => {
+            TypeIdentifier::GenericType(type_name, generics) => {
                 indent.increase();
                 result.push_str(format!("{}type: {}", indent.dash(), type_name).as_str());
                 indent.end_current();
@@ -1497,7 +1497,7 @@ impl IndentDisplay for TypeAnnotation {
             TypeAnnotation::Type(type_name) => {
                 result.push_str(format!("{}type: {}", indent.dash_end(), type_name).as_str());
             },
-            TypeAnnotation::GenericType(type_name, generics) => {
+            TypeAnnotation::ConcreteType(type_name, generics) => {
                 result.push_str(format!("{}generic_type: {}", indent.dash(), type_name).as_str());
                 
                 for (i, generic) in generics.iter().enumerate() {

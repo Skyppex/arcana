@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::types::{parse_type_annotation_from_str, TypeAnnotation, TypeName};
+use crate::types::{parse_type_annotation_from_str, TypeAnnotation, TypeIdentifier};
 
 use super::{scope::{Scope, ScopeType}, FullName, Type};
 
@@ -111,7 +111,7 @@ impl TypeEnvironment {
         Ok(())
     }
 
-    pub fn add_impl_function(&mut self, type_: Type, function_name: TypeName, function_type: Type) -> Result<(), String> {
+    pub fn add_impl_function(&mut self, type_: Type, function_name: TypeIdentifier, function_type: Type) -> Result<(), String> {
         todo!()
     }
 
@@ -130,7 +130,7 @@ impl TypeEnvironment {
                     .or(self.parent.as_ref()
                         .and_then(|parent| parent.borrow().get_type_from_annotation(type_annotation)))
             },
-            TypeAnnotation::GenericType(type_name, _) =>{
+            TypeAnnotation::ConcreteType(type_name, _) =>{
                 self.types.get(type_name).cloned()
                     .or(self.parent.as_ref()
                         .and_then(|parent| parent.borrow().get_type_from_annotation(type_annotation)))
@@ -142,7 +142,7 @@ impl TypeEnvironment {
         }
     }
 
-    pub fn get_type_from_name(&self, type_name: &TypeName) -> Option<Type> {
+    pub fn get_type_from_identifier(&self, type_identifier: &TypeIdentifier) -> Option<Type> {
         todo!("get_type_from_name")
     }
 

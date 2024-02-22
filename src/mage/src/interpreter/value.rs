@@ -1,6 +1,6 @@
 use std::{fmt::Display, collections::HashMap};
 
-use shared::{type_checker::ast::TypedStatement, types::TypeName};
+use shared::{type_checker::ast::TypedStatement, types::TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -12,7 +12,7 @@ pub enum Value {
     Char(char),
     String(String),
     Array(Vec<Value>),
-    Struct { struct_name: TypeName, fields: HashMap<String, Value> },
+    Struct { struct_name: TypeIdentifier, fields: HashMap<String, Value> },
     Union { union_member: UnionMember, fields: UnionFields },
     Function { parameters: Vec<String>, body: Vec<TypedStatement> },
 }
@@ -136,7 +136,7 @@ impl Display for Number {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnionMember {
-    pub union_name: TypeName,
+    pub union_name: TypeIdentifier,
     pub member_name: String,
 }
 

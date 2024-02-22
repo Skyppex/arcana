@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{parser::{self, Impl, Statement}, types::{TypeAnnotation, TypeName}};
+use crate::{parser::{self, Impl, Statement}, types::{TypeAnnotation, TypeIdentifier}};
 
 use super::{
     ast::{self, Typed, TypedStatement}, expressions, scope::ScopeType, type_checker::DiscoveredType, type_environment::TypeEnvironment, Function, Rcrc, Struct, StructField, Type, Union, UnionMember, UnionMemberField
@@ -17,10 +17,10 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         }
         Statement::StructDeclaration(parser::StructDeclaration {
             access_modifier: _,
-            type_name,
+            type_identifier,
             fields,
         }) => Ok(vec![DiscoveredType::Struct(
-            type_name.clone(),
+            type_identifier.clone(),
             fields
                 .iter()
                 .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
@@ -28,10 +28,10 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         )]),
         Statement::UnionDeclaration(parser::UnionDeclaration {
             access_modifier: _,
-            type_name,
+            type_identifier,
             members,
         }) => Ok(vec![DiscoveredType::Union(
-            type_name.clone(),
+            type_identifier.clone(),
             members
                 .iter()
                 .map(|member| {
@@ -101,14 +101,14 @@ pub fn check_type<'a>(
         }
         Statement::StructDeclaration(parser::StructDeclaration {
             access_modifier: _,
-            type_name,
+            type_identifier,
             fields,
         }) => {
             let struct_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
 
-            if let TypeName::GenericType(_, generics) = type_name {
+            if let TypeIdentifier::GenericType(_, generics) = type_identifier {
                 for generic in generics {
                     struct_type_environment.borrow_mut().add_type(Type::Generic(generic.clone()))?;
                 }
@@ -133,7 +133,7 @@ pub fn check_type<'a>(
                 .iter()
                 .map(|f: &ast::StructField| {
                     let struct_field = Type::StructField(StructField {
-                        struct_name: type_name.clone(),
+                        struct_name: type_identifier.clone(),
                         field_name: f.identifier.clone(),
                         field_type: Box::new(f.type_.clone()),
                     });
@@ -146,28 +146,28 @@ pub fn check_type<'a>(
                 .collect();
 
             let type_ = Type::Struct(Struct {
-                type_name: type_name.clone(),
+                type_identifier: type_identifier.clone(),
                 fields: fields?,
             });
 
             type_environment.borrow_mut().add_type(type_.clone())?;
 
             Ok(TypedStatement::StructDeclaration {
-                type_name: type_name.clone(),
+                type_identifier: type_identifier.clone(),
                 fields: fs?,
                 type_,
             })
         }
         Statement::UnionDeclaration(parser::UnionDeclaration {
             access_modifier: _,
-            type_name,
+            type_identifier,
             members,
         }) => {
             let union_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
 
-            if let TypeName::GenericType(_, generics) = type_name {
+            if let TypeIdentifier::GenericType(_, generics) = type_identifier {
                 for generic in generics {
                     union_type_environment.borrow_mut().add_type(Type::Generic(generic.clone()))?;
                 }
@@ -186,7 +186,7 @@ pub fn check_type<'a>(
                                 union_type_environment.clone(),
                             ) {
                                 Ok(t) => Ok(ast::UnionMemberField {
-                                    union_name: type_name.clone(),
+                                    union_name: type_identifier.clone(),
                                     discriminant_name: member.identifier.clone(),
                                     identifier: field.identifier.clone(),
                                     type_: t,
@@ -203,7 +203,7 @@ pub fn check_type<'a>(
                             let field_name = f.identifier.clone();
 
                             let union_member_field = Type::UnionMemberField(UnionMemberField {
-                                union_name: type_name.clone(),
+                                union_name: type_identifier.clone(),
                                 discriminant_name: member.identifier.clone(),
                                 field_name: field_name.clone(),
                                 field_type: Box::new(f.type_.clone()),
@@ -217,7 +217,7 @@ pub fn check_type<'a>(
                         .collect();
 
                     let union_member = Type::UnionMember(UnionMember {
-                        union_name: type_name.clone(),
+                        union_name: type_identifier.clone(),
                         discriminant_name: member.identifier.clone(),
                         fields: fields?,
                     });
@@ -225,7 +225,7 @@ pub fn check_type<'a>(
                     type_environment.borrow_mut().add_type(union_member.clone())?;
 
                     Ok(ast::UnionMember {
-                        union_name: type_name.clone(),
+                        union_name: type_identifier.clone(),
                         discriminant_name: member.identifier.clone(),
                         fields: fs.clone()?,
                         type_: union_member,
@@ -234,7 +234,7 @@ pub fn check_type<'a>(
                 .collect();
 
             let union = Type::Union(Union {
-                type_name: type_name.clone(),
+                type_identifier: type_identifier.clone(),
                 members: ms
                     .clone()?
                     .iter()
@@ -245,7 +245,7 @@ pub fn check_type<'a>(
             type_environment.borrow_mut().add_type(union.clone())?;
 
             Ok(TypedStatement::UnionDeclaration {
-                type_name: type_name.clone(),
+                type_identifier: type_identifier.clone(),
                 members: ms?,
                 type_: union,
             })
@@ -462,24 +462,24 @@ pub fn check_type<'a>(
     }
 }
 
-fn check_type_name(
-    type_name: &TypeName,
+fn check_type_identifier(
+    type_identifier: &TypeIdentifier,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<Type, String> {
-    if let Some(type_) = type_environment.borrow().get_type_from_name(type_name) {
+    if let Some(type_) = type_environment.borrow().get_type_from_identifier(type_identifier) {
         return Ok(type_.clone());
     }
 
     match discovered_types
         .iter()
         .find(|discovered_type| match discovered_type {
-            DiscoveredType::Struct(name, ..) => name == type_name,
-            DiscoveredType::Union(name, ..) => name == type_name,
-            DiscoveredType::Function(name, ..) => name == type_name,
+            DiscoveredType::Struct(name, ..) => name == type_identifier,
+            DiscoveredType::Union(name, ..) => name == type_identifier,
+            DiscoveredType::Function(name, ..) => name == type_identifier,
         }) {
-        Some(DiscoveredType::Struct(type_name, fields)) => Ok(Type::Struct(Struct {
-            type_name: type_name.clone(),
+        Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
+            type_identifier: type_identifier.clone(),
             fields: {
                 let mut map = HashMap::new();
 
@@ -493,8 +493,8 @@ fn check_type_name(
                 map
             },
         })),
-        Some(DiscoveredType::Union(type_name, members)) => Ok(Type::Union(Union {
-            type_name: type_name.clone(),
+        Some(DiscoveredType::Union(type_identifier, members)) => Ok(Type::Union(Union {
+            type_identifier: type_identifier.clone(),
             members: {
                 let mut map = HashMap::new();
 
@@ -516,7 +516,7 @@ fn check_type_name(
                         (
                             k.clone(),
                             Type::UnionMember(UnionMember {
-                                union_name: type_name.clone(),
+                                union_name: type_identifier.clone(),
                                 discriminant_name: k.clone(),
                                 fields: v.clone(),
                             }),
@@ -525,9 +525,9 @@ fn check_type_name(
                     .collect()
             },
         })),
-        Some(DiscoveredType::Function(type_name, parameters, return_type)) => {
+        Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {
             Ok(Type::Function(Function {
-                identifier: type_name.clone(),
+                identifier: type_identifier.clone(),
                 parameters: {
                     let mut map = HashMap::new();
 
@@ -547,7 +547,7 @@ fn check_type_name(
                 )?),
             }))
         }
-        None => Type::from_string(&type_name.to_string()).ok_or(format!("Unknown type {}", type_name)),
+        None => Type::from_string(&type_identifier.to_string()).ok_or(format!("Unknown type {}", type_identifier)),
     }
 }
 
@@ -563,12 +563,12 @@ fn check_type_annotation(
     match discovered_types
         .iter()
         .find(|discovered_type| match discovered_type {
-            DiscoveredType::Struct(type_name, ..) => type_name.name() == type_annotation.name(),
-            DiscoveredType::Union(type_name, ..) => type_name.name() == type_annotation.name(),
-            DiscoveredType::Function(type_name, ..) => type_name.name() == type_annotation.name(),
+            DiscoveredType::Struct(type_identifier, ..) => type_identifier.name() == type_annotation.name(),
+            DiscoveredType::Union(type_identifier, ..) => type_identifier.name() == type_annotation.name(),
+            DiscoveredType::Function(type_identifier, ..) => type_identifier.name() == type_annotation.name(),
         }) {
-        Some(DiscoveredType::Struct(type_name, fields)) => Ok(Type::Struct(Struct {
-            type_name: type_name.clone(),
+        Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
+            type_identifier: type_identifier.clone(),
             fields: {
                 let mut map = HashMap::new();
 
@@ -582,8 +582,8 @@ fn check_type_annotation(
                 map
             },
         })),
-        Some(DiscoveredType::Union(type_name, members)) => Ok(Type::Union(Union {
-            type_name: type_name.clone(),
+        Some(DiscoveredType::Union(type_identifier, members)) => Ok(Type::Union(Union {
+            type_identifier: type_identifier.clone(),
             members: {
                 let mut map = HashMap::new();
 
@@ -605,7 +605,7 @@ fn check_type_annotation(
                         (
                             k.clone(),
                             Type::UnionMember(UnionMember {
-                                union_name: type_name.clone(),
+                                union_name: type_identifier.clone(),
                                 discriminant_name: k.clone(),
                                 fields: v.clone(),
                             }),
@@ -614,9 +614,9 @@ fn check_type_annotation(
                     .collect()
             },
         })),
-        Some(DiscoveredType::Function(type_name, parameters, return_type)) => {
+        Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {
             Ok(Type::Function(Function {
-                identifier: type_name.clone(),
+                identifier: type_identifier.clone(),
                 parameters: {
                     let mut map = HashMap::new();
 

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use shared::{type_checker::{ast::{Block, *}, Type}, types::{TypeAnnotation, TypeName}};
+use shared::{type_checker::{ast::{Block, *}, Type}, types::{TypeAnnotation, TypeIdentifier}};
 
 use crate::interpreter::scope::Scope;
 
@@ -54,7 +54,7 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
 
 fn evaluate_function_declaration(
     environment: &Rc<RefCell<Environment>>,
-    identifier: TypeName,
+    identifier: TypeIdentifier,
     parameters: Vec<Parameter>,
     body: Vec<TypedStatement>) -> Result<Value, String> {
     todo!()
@@ -296,7 +296,7 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
             Ok(Value::Array(array))
         }
         Literal::Struct {
-            type_name,
+            type_identifier,
             field_initializers,
             type_: _
         } => {
@@ -308,10 +308,10 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
                      evaluate_expression(field_initializer.initializer, environment.clone())?);
             }
 
-            Ok(Value::Struct { struct_name: type_name, fields })
+            Ok(Value::Struct { struct_name: type_identifier, fields })
         }        
         Literal::Union {
-            type_name,
+            type_identifier,
             member,
             field_initializers,
             type_: _
@@ -339,7 +339,7 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
             };
             
             Ok(Value::Union { union_member: UnionMember {
-                union_name: type_name,
+                union_name: type_identifier,
                 member_name: member,
             }, fields })
         }

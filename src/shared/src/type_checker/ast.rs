@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{parser, types::{TypeName, TypeAnnotation}};
+use crate::{parser, types::{TypeIdentifier, TypeAnnotation}};
 
 use super::Type;
 
@@ -16,17 +16,17 @@ pub enum TypedStatement {
         statements: Vec<TypedStatement>,
     },
     StructDeclaration {
-        type_name: TypeName,
+        type_identifier: TypeIdentifier,
         fields: Vec<StructField>,
         type_: Type,
     },
     UnionDeclaration {
-        type_name: TypeName,
+        type_identifier: TypeIdentifier,
         members: Vec<UnionMember>,
         type_: Type,
     },
     FunctionDeclaration {
-        identifier: TypeName,
+        identifier: TypeIdentifier,
         parameters: Vec<Parameter>,
         return_type: Type,
         body: Vec<TypedStatement>,
@@ -229,7 +229,7 @@ impl Into<AccessModifier> for parser::AccessModifier {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnionMember {
-    pub union_name: TypeName,
+    pub union_name: TypeIdentifier,
     pub discriminant_name: String,
     pub fields: Vec<UnionMemberField>,
     pub type_: Type,
@@ -237,7 +237,7 @@ pub struct UnionMember {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnionMemberField {
-    pub union_name: TypeName,
+    pub union_name: TypeIdentifier,
     pub discriminant_name: String,
     pub identifier: String,
     pub type_: Type,
@@ -263,12 +263,12 @@ pub enum Literal {
     Bool(bool),
     Array { values: Vec<TypedExpression>, type_: Type },
     Struct {
-        type_name: TypeName,
+        type_identifier: TypeIdentifier,
         field_initializers: Vec<FieldInitializer>,
         type_: Type,
     },
     Union {
-        type_name: TypeName,
+        type_identifier: TypeIdentifier,
         member: String,
         field_initializers: UnionMemberFieldInitializers,
         type_: Type,

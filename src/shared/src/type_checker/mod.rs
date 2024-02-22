@@ -13,23 +13,23 @@ pub use full_name::*;
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::types::{GenericType, TypeName};
+use crate::types::{GenericType, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Struct {
-    pub type_name: TypeName,
+    pub type_identifier: TypeIdentifier,
     pub fields: HashMap<String, Type>,
 }
 
 impl FullName for Struct {
     fn full_name(&self) -> String {
-        self.type_name.to_string()
+        self.type_identifier.to_string()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructField {
-    pub struct_name: TypeName,
+    pub struct_name: TypeIdentifier,
     pub field_name: String,
     pub field_type: Box<Type>,
 }
@@ -42,19 +42,19 @@ impl FullName for StructField {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Union {
-    pub type_name: TypeName,
+    pub type_identifier: TypeIdentifier,
     pub members: HashMap<String, Type>,
 }
 
 impl FullName for Union {
     fn full_name(&self) -> String {
-        self.type_name.to_string()
+        self.type_identifier.to_string()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnionMember {
-    pub union_name: TypeName,
+    pub union_name: TypeIdentifier,
     pub discriminant_name: String,
     pub fields: HashMap<String, Type>,
 }
@@ -67,7 +67,7 @@ impl FullName for UnionMember {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnionMemberField {
-    pub union_name: TypeName,
+    pub union_name: TypeIdentifier,
     pub discriminant_name: String,
     pub field_name: String,
     pub field_type: Box<Type>,
@@ -81,7 +81,7 @@ impl FullName for UnionMemberField {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
-    pub identifier: TypeName,
+    pub identifier: TypeIdentifier,
     pub parameters: HashMap<String, Type>,
     pub return_type: Box<Type>,
 }

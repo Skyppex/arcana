@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::types::{TypeAnnotation, TypeName};
+use crate::types::{TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone)]
 pub struct Impl{
@@ -51,28 +51,28 @@ pub enum Expression {
 #[derive(Debug, Clone)]
 pub struct StructDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub type_name: TypeName,
+    pub type_identifier: TypeIdentifier,
     pub fields: Vec<StructField>,
 }
 
 #[derive(Debug, Clone)]
 pub struct UnionDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub type_name: TypeName,
+    pub type_identifier: TypeIdentifier,
     pub members: Vec<UnionMember>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FlagsDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub type_name: TypeName,
+    pub type_identifier: TypeIdentifier,
     pub members: Vec<FlagsMember>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FunctionDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub identifier: TypeName,
+    pub identifier: TypeIdentifier,
     pub parameters: Vec<Parameter>,
     pub return_type: Option<TypeAnnotation>,
     pub body: Block,
@@ -98,11 +98,11 @@ pub enum Literal {
     Bool(bool),
     Array(Vec<Expression>),
     Struct {
-        type_name: TypeName,
+        type_identifier: TypeIdentifier,
         field_initializers: Vec<FieldInitializer>,
     },
     Union {
-        type_name: TypeName,
+        type_identifier: TypeIdentifier,
         member: String,
         field_initializers: UnionMemberFieldInitializers,
     },
