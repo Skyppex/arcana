@@ -1,5 +1,5 @@
 use crate::{parser::{
-    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, VariableDeclaration, While
+    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression, FieldInitializer, FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, VariableDeclaration, While
 }, type_checker::{self, ast::{
     Block, TypedExpression, TypedStatement
 }, Type}, types::{GenericType, TypeAnnotation, TypeIdentifier}};
@@ -119,6 +119,33 @@ impl IndentDisplay for Statement {
                     }                    
                 }
 
+                indent.decrease();
+                result
+            },
+            Statement::UnionDeclaration(UnionDeclaration {
+                access_modifier,
+                type_identifier,
+                literals
+            }) => {
+                let mut result = String::new();
+                result.push_str("<union declaration>\n");
+                indent.increase();
+
+                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
+                result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
+                result.push_str(format!("{}literals:", indent.dash()).as_str());
+                indent.increase();
+
+                for (i, literal) in literals.iter().enumerate() {
+                    if i < literals.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), literal.indent_display(indent)).as_str());
+                    } else {
+                        indent.end_current();
+                        result.push_str(format!("\n{}{}", indent.dash_end(), literal.indent_display(indent)).as_str());
+                    }                    
+                }
+
+                indent.decrease();
                 indent.decrease();
                 result
             },
@@ -821,6 +848,29 @@ impl IndentDisplay for TypedStatement {
                     } else {
                         indent.end_current();
                         result.push_str(format!("\n{}{}", indent.dash_end(), member.indent_display(indent)).as_str());
+                    }
+                }
+
+                indent.decrease();
+                result
+            },
+            TypedStatement::UnionDeclaration {
+                type_identifier,
+                literals,
+                type_
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<union declaration> {}\n", type_).as_str());
+                indent.increase();
+
+                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
+                
+                for (i, literal) in literals.iter().enumerate() {
+                    if i < literals.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), literal.indent_display(indent)).as_str());
+                    } else {
+                        indent.end_current();
+                        result.push_str(format!("\n{}{}", indent.dash_end(), literal.indent_display(indent)).as_str());
                     }
                 }
 
@@ -1545,6 +1595,9 @@ impl IndentDisplay for TypeAnnotation {
             },
             TypeAnnotation::Array(type_annotation) => {
                 result.push_str(format!("{}slice_type: {}", indent.dash_end(), type_annotation.indent_display(indent)).as_str());
+            },
+            TypeAnnotation::Literal(literal) => {
+                result.push_str(format!("{}literal: {}", indent.dash_end(), literal.indent_display(indent)).as_str());
             },
         }
 

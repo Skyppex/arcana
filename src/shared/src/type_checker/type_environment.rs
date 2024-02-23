@@ -147,6 +147,9 @@ impl TypeEnvironment {
                 self.get_type_from_annotation(type_annotation, type_environment)
                     .map(|t| Type::Array(Box::new(t)))
             },
+            TypeAnnotation::Literal(literal) => {
+                Ok(Type::from_literal(literal)?)
+            },
         }
     }
 

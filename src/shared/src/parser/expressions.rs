@@ -603,7 +603,7 @@ fn parse_index_expression(caller: Expression, cursor: &mut Cursor) -> Result<Exp
 }
 
 fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut object = parse_primary(cursor)?;
+    let mut object = parse_literal(cursor)?;
 
     while let TokenKind::Dot = cursor.first().kind {
         cursor.bump()?; // Consume the .
@@ -612,7 +612,7 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
         };
 
-        let Expression::Member(member) = parse_primary(cursor)? else {
+        let Expression::Member(member) = parse_literal(cursor)? else {
             return Err(format!("Expected member but found {:?}", cursor.first().kind));
         };
 
@@ -626,15 +626,20 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(object)
 }
 
+pub fn parse_literal(cursor: &mut Cursor) -> Result<Expression, String> {
+    let TokenKind::Literal(literal) = cursor.first().kind else {
+        return parse_primary(cursor);
+    };
+    
+    cursor.bump()?; // Consume the literal
+    to_expression_literal(literal)
+}
+
 fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
     match cursor.first().kind {
         TokenKind::Identifier(identifier) => {
             cursor.bump()?; // Consume the identifier
             Ok(Expression::Member(Member::Identifier { symbol: identifier }))
-        },
-        TokenKind::Literal(literal) => {
-            cursor.bump()?; // Consume the literal
-            to_expression_literal(literal)
         },
         TokenKind::OpenParen => {
             cursor.bump()?; // Consume the (

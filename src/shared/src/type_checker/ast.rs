@@ -25,6 +25,11 @@ pub enum TypedStatement {
         members: Vec<EnumMember>,
         type_: Type,
     },
+    UnionDeclaration {
+        type_identifier: TypeIdentifier,
+        literals: Vec<TypeAnnotation>,
+        type_: Type,
+    },
     FunctionDeclaration {
         identifier: TypeIdentifier,
         parameters: Vec<Parameter>,
@@ -62,6 +67,7 @@ impl Typed for TypedStatement {
             TypedStatement::Program { .. } => Type::Void,
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Impl { .. } => Type::Void,
             TypedStatement::Semi { .. } => Type::Void,
@@ -79,6 +85,7 @@ impl Typed for TypedStatement {
             TypedStatement::Program { .. } => Type::Void,
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Impl { .. } => Type::Void,
             TypedStatement::Semi(e) => e.get_deep_type(),

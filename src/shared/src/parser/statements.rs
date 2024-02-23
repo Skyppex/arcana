@@ -1,6 +1,6 @@
-use crate::{lexer::token::{Keyword, TokenKind}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_identifier}};
+use crate::{lexer::token::{Keyword, TokenKind}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_identifier, TypeIdentifier}};
 
-use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, FunctionDeclaration, Impl, Parameter, Statement, StructDeclaration, StructField, EnumDeclaration, EnumMember, EnumMemberField};
+use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, EnumDeclaration, EnumMember, EnumMemberField, Expression, FunctionDeclaration, Impl, Literal, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     match parse_break(cursor) {
@@ -171,7 +171,7 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Enum) {
-            return parse_impl(cursor);
+            return parse_union_declaration_statement(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -179,7 +179,7 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Enum) {
-        return parse_impl(cursor);
+        return parse_union_declaration_statement(cursor);
     }
 
     cursor.bump()?; // Consume the enum keyword
@@ -214,6 +214,65 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
         access_modifier,
         type_identifier: type_name,
         members,
+    }))
+}
+
+fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
+    let mut access_modifier = None;
+
+    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
+            return parse_impl(cursor);
+        }
+
+        cursor.bump()?; // Consume the access modifier
+        access_modifier = Some(am);
+    }
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
+        return parse_impl(cursor);
+    }
+
+    cursor.bump()?; // Consume the union keyword
+
+    let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
+        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+    };
+
+    let TokenKind::OpenBrace = cursor.bump()?.kind else {
+        return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
+    };
+
+    let mut literals = vec![];
+    let mut has_comma = true;
+
+    while cursor.first().kind != TokenKind::CloseBrace {
+        if !has_comma {
+            return Err(format!("Expected , but found {:?}", cursor.first().kind));
+        }
+
+        has_comma = true;
+        literals.push(expressions::parse_literal(cursor)?);
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        } else {
+            has_comma = false;
+        }
+    }
+
+    cursor.bump()?; // Consume the }
+
+    let literals: Result<Vec<Literal>, String> = literals.iter()
+        .map(|l| match l {
+            Expression::Literal(l) => Ok(l.clone()),
+            _ => Err(format!("Expected literal but found {:?}", l)),
+        }).collect();
+
+    Ok(Statement::UnionDeclaration(UnionDeclaration {
+        access_modifier,
+        type_identifier: TypeIdentifier::Type(type_name),
+        literals: literals?,
     }))
 }
 

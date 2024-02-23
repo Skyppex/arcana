@@ -1,20 +1,42 @@
 use std::{fmt::Display, hash::Hash};
 
-use crate::{lexer::token::{self, TokenKind}, parser::cursor::Cursor};
+use crate::{lexer::token::{self, TokenKind}, parser::{cursor::Cursor, Literal}};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeAnnotation {
     Type(String),
     ConcreteType(String, Vec<TypeAnnotation>),
     Array(Box<TypeAnnotation>),
+    Literal(Box<Literal>),
+}
+
+impl Into<TypeIdentifier> for TypeAnnotation {
+    fn into(self) -> TypeIdentifier {
+        match self {
+            TypeAnnotation::Type(name) => TypeIdentifier::Type(name),
+            TypeAnnotation::ConcreteType(name, generics) => TypeIdentifier::ConcreteType(name, generics),
+            TypeAnnotation::Array(type_annotation) => TypeIdentifier::ConcreteType("Array".to_string(), vec![*type_annotation]),
+            TypeAnnotation::Literal(literal) => TypeIdentifier::ConcreteType(literal.to_string(), vec![]),
+        }
+    }
+}
+
+pub enum LiteralType {
+    Unit,
+    Int(),
+    Float,
+    String,
+    Char,
+    Bool,
 }
 
 impl TypeAnnotation {
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> String {
         match self {
-            TypeAnnotation::Type(name) => name,
-            TypeAnnotation::ConcreteType(name, _) => name,
+            TypeAnnotation::Type(name) => name.clone(),
+            TypeAnnotation::ConcreteType(name, _) => name.clone(),
             TypeAnnotation::Array(type_identifier) => type_identifier.name(),
+            TypeAnnotation::Literal(literal) => literal.to_string(),
         }
     }
 }
@@ -34,6 +56,7 @@ impl Display for TypeAnnotation {
             },
             TypeAnnotation::Array(type_identifier) =>
                 write!(f, "[{}]", type_identifier),
+            TypeAnnotation::Literal(literal) => write!(f, "{:?}", literal),
         }
     }
 }
@@ -93,7 +116,7 @@ impl Display for TypeIdentifier {
                         .join(", "))
             },
             TypeIdentifier::MemberType(parent, member) =>
-                write!(f, "{} -> {}", parent, member),
+                write!(f, "{}->{}", parent, member),
         }
     }
 }

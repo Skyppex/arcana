@@ -11,6 +11,7 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
         TypedStatement::None => Ok(Value::Void),
         TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
         TypedStatement::EnumDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
         TypedStatement::Impl {
             type_annotation,
             functions

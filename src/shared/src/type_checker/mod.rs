@@ -13,9 +13,9 @@ pub use full_name::*;
 
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
-use crate::types::{GenericType, TypeAnnotation, TypeIdentifier};
+use crate::{parser, types::{GenericType, TypeAnnotation, TypeIdentifier}};
 
-use self::statements::check_type_annotation;
+use self::{ast::Literal, statements::check_type_annotation};
 
 #[derive(Debug, Clone)]
 pub struct Struct {
@@ -90,6 +90,18 @@ impl FullName for EnumMemberField {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Union {
+    pub type_identifier: TypeIdentifier,
+    pub literals: Vec<Type>,
+}
+
+impl FullName for Union {
+    fn full_name(&self) -> String {
+        self.type_identifier.to_string()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub identifier: TypeIdentifier,
     pub parameters: HashMap<String, Type>,
@@ -128,6 +140,7 @@ pub enum Type {
     Enum(Enum),
     EnumMember(EnumMember),
     EnumMemberField(EnumMemberField),
+    Union(Union),
     Function(Function),
     Literal {
         name: String, // String representation of the literal
@@ -163,6 +176,28 @@ impl Type {
         self.full_name()
     }
 
+    pub fn from_literal(literal: &parser::Literal) -> Result<Type, String> {
+        match literal {
+            parser::Literal::Unit => Ok(Type::Literal { name: Type::Unit.to_string(), type_: Box::new(Type::Unit) }),
+            parser::Literal::I8(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::I8) }),
+            parser::Literal::I16(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::I16) }),
+            parser::Literal::I32(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::I32) }),
+            parser::Literal::I64(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::I64) }),
+            parser::Literal::I128(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::I128) }),
+            parser::Literal::U8(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::U8) }),
+            parser::Literal::U16(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::U16) }),
+            parser::Literal::U32(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::U32) }),
+            parser::Literal::U64(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::U64) }),
+            parser::Literal::U128(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::U128) }),
+            parser::Literal::F32(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::F32) }),
+            parser::Literal::F64(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::F64) }),
+            parser::Literal::Char(v) => Ok(Type::Literal { name: format!("'{}'", v), type_: Box::new(Type::Char) }),
+            parser::Literal::String(v) => Ok(Type::Literal { name: format!("\"{}\"", v), type_: Box::new(Type::String) }),
+            parser::Literal::Bool(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::Bool) }),
+            _ => Err(format!("Cannot convert literal {:?} to type", literal)),
+        }
+    }
+
     pub fn type_identifier(&self) -> TypeIdentifier {
         match self {
             Type::Generic(name) => TypeIdentifier::Type(name.type_name.clone()),
@@ -196,6 +231,7 @@ impl Type {
                     Box::new(umf.enum_name.clone()),
                     umf.discriminant_name.clone())),
                 umf.field_name.clone()),
+            Type::Union(u) => u.type_identifier.clone(),
             _ => panic!("Cannot get type identifier for type {}", self.full_name()),
         }
     }
@@ -340,6 +376,7 @@ impl FullName for Type {
             Type::Enum(u) => u.full_name(),
             Type::EnumMember(um) => um.full_name(),
             Type::EnumMemberField(umf) => umf.full_name(),
+            Type::Union(u) => u.full_name(),
             Type::Function(f) => f.full_name(),
             Type::Literal { name, .. } => name.clone(),
         }

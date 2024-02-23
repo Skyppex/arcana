@@ -8,6 +8,7 @@ use super::{ast::TypedStatement, statements, type_environment::TypeEnvironment, 
 pub enum DiscoveredType {
     Struct(TypeIdentifier, HashMap<String, TypeAnnotation>),
     Enum(TypeIdentifier, HashMap<String, HashMap<String, TypeAnnotation>>),
+    Union(TypeIdentifier, Vec<TypeAnnotation>),
     Function(TypeIdentifier, HashMap<String, TypeAnnotation>, TypeAnnotation),
 }
 
