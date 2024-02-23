@@ -76,10 +76,10 @@ var value = match expression {
 }
 ```
 
-### Match works with unions
+### Match works with enums
 
 ```
-union Foo {
+enum Foo {
     Bar(i32);
     Baz(i32, f32);
     BarBaz;

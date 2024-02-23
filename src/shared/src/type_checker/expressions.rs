@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{parser::{self, Assignment, Expression, If, VariableDeclaration, While}, type_checker::ast::Literal};
 
-use super::{ast::{BinaryOperator, Block, ConditionBlock, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator, UnionMemberFieldInitializers
-    }, scope::ScopeType, statements, DiscoveredType, FullName, Rcrc, Struct, StructField, Type, TypeEnvironment, Union, UnionMember, UnionMemberField
+use super::{ast::{BinaryOperator, Block, ConditionBlock, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator, EnumMemberFieldInitializers
+    }, scope::ScopeType, statements, DiscoveredType, FullName, Rcrc, Struct, StructField, Type, TypeEnvironment, Enum, EnumMember, EnumMemberField
 };
 
 pub fn check_type<'a>(
@@ -237,15 +237,15 @@ pub fn check_type<'a>(
                         type_
                     }
                 },
-                parser::Literal::Union {
+                parser::Literal::Enum {
                     type_annotation,
                     member,
                     field_initializers
                 } => {
-                    let field_initializers: Result<UnionMemberFieldInitializers, String> = {
+                    let field_initializers: Result<EnumMemberFieldInitializers, String> = {
                         let field_initializers = match field_initializers {
-                            parser::UnionMemberFieldInitializers::None => UnionMemberFieldInitializers::None,
-                            parser::UnionMemberFieldInitializers::Named(field_initializers) => {
+                            parser::EnumMemberFieldInitializers::None => EnumMemberFieldInitializers::None,
+                            parser::EnumMemberFieldInitializers::Named(field_initializers) => {
                                 let mut fis: HashMap<String, TypedExpression> = HashMap::new();
 
                                 for (identifier, initializer) in field_initializers {
@@ -255,9 +255,9 @@ pub fn check_type<'a>(
                                     );
                                 }
 
-                                UnionMemberFieldInitializers::Named(fis)
+                                EnumMemberFieldInitializers::Named(fis)
                             },
-                            parser::UnionMemberFieldInitializers::Unnamed(field_initializers) => {
+                            parser::EnumMemberFieldInitializers::Unnamed(field_initializers) => {
                                 let mut fis: Vec<TypedExpression> = vec![];
 
                                 for initializer in field_initializers {
@@ -267,7 +267,7 @@ pub fn check_type<'a>(
                                     );
                                 }
 
-                                UnionMemberFieldInitializers::Unnamed(fis)
+                                EnumMemberFieldInitializers::Unnamed(fis)
                             },
                         };
 
@@ -277,22 +277,22 @@ pub fn check_type<'a>(
                     let type_ = type_environment.borrow()
                             .get_type_from_annotation(type_annotation, type_environment.clone())?;
 
-                    let Type::Union(Union { members, .. }) = type_.clone() else {
+                    let Type::Enum(Enum { members, .. }) = type_.clone() else {
                         Err(format!("{} is not a struct", type_.full_name()))?
                     };
 
-                    let Some(Type::UnionMember(UnionMember { fields, .. })) = members.get(member) else {
+                    let Some(Type::EnumMember(EnumMember { fields, .. })) = members.get(member) else {
                         Err(format!("{} is not a member of {}", member, type_.full_name()))?
                     };
 
                     let field_initializers = field_initializers?;
 
                     match field_initializers {
-                        UnionMemberFieldInitializers::None => (),
-                        UnionMemberFieldInitializers::Named(ref field_initializers) => {
+                        EnumMemberFieldInitializers::None => (),
+                        EnumMemberFieldInitializers::Named(ref field_initializers) => {
                             for ((_, field_type), (_, initializer)) in fields.iter().zip(field_initializers.iter()) {
-                                let Type::UnionMemberField(UnionMemberField { field_type, .. }) = field_type else {
-                                    return Err(format!("Field type {} is not a union member field", field_type.full_name()));
+                                let Type::EnumMemberField(EnumMemberField { field_type, .. }) = field_type else {
+                                    return Err(format!("Field type {} is not a enum member field", field_type.full_name()));
                                 };
                                 
                                 let initializer_type = initializer.get_type();
@@ -302,14 +302,14 @@ pub fn check_type<'a>(
                                 }
                             }
                         },
-                        UnionMemberFieldInitializers::Unnamed(ref field_initializers) => {
+                        EnumMemberFieldInitializers::Unnamed(ref field_initializers) => {
                             if fields.len() != field_initializers.len() {
-                                return Err(format!("Union member {} has {} fields, but {} initializers were provided", member, fields.len(), field_initializers.len()));
+                                return Err(format!("Enum member {} has {} fields, but {} initializers were provided", member, fields.len(), field_initializers.len()));
                             }
 
                             for (field, initializer) in fields.iter().zip(field_initializers.iter()) {
-                                let Type::UnionMemberField(UnionMemberField { field_type, .. }) = field.1 else {
-                                    return Err(format!("Field type {} is not a union member field", field.1.full_name()));
+                                let Type::EnumMemberField(EnumMemberField { field_type, .. }) = field.1 else {
+                                    return Err(format!("Field type {} is not a enum member field", field.1.full_name()));
                                 };
                                 
                                 let initializer_type = initializer.get_type();
@@ -321,7 +321,7 @@ pub fn check_type<'a>(
                         },
                     }                        
 
-                    Literal::Union {
+                    Literal::Enum {
                         type_annotation: type_annotation.clone(),
                         member: member.clone(),
                         field_initializers,

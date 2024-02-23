@@ -314,6 +314,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "func" => Some(TokenKind::Keyword(Keyword::Func)),
         "return" => Some(TokenKind::Keyword(Keyword::Return)),
         "struct" => Some(TokenKind::Keyword(Keyword::Struct)),
+        "enum" => Some(TokenKind::Keyword(Keyword::Enum)),
         "union" => Some(TokenKind::Keyword(Keyword::Union)),
         // "flags" => Some(TokenKind::Keyword(Keyword::Flags)),
         "impl" => Some(TokenKind::Keyword(Keyword::Impl)),

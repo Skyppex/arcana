@@ -69,7 +69,7 @@ There is no `private` keyword as it is implicit on everything which doesn't have
 Access modifiers can be used on more than just modules. Here is a comprehensive list of all legal uses of access modifiers:
 
 - Modules
-- Types (struct, union, flags, type)
+- Types (struct, enum, flags, type)
 - Struct fields
     - type statements which extend structs will inherit access from the structs fields
     - type statements which add new fields to a struct allow you to define the access inline

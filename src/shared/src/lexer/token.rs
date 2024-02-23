@@ -178,6 +178,7 @@ pub enum Keyword {
     Mut,
     Func,
     Struct,
+    Enum,
     Union,
     // Flags,
     Impl,

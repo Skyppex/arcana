@@ -28,35 +28,35 @@ Private tuple struct declaration with a field of type Foo called foo -> Statemen
 struct Wrapper(foo: Foo);
 ```
 
-## Unions
+## Enums
 
-Union declaration with two variants -> Statement
+Enum declaration with two variants -> Statement
 ```rs
-union Foo { // public union declaration -> Statement
+enum Foo { // public enum declaration -> Statement
     Bar(a: i32), // Bar variant with a field of type i32 called a
     Baz(a: i32, b: f32), // Baz variant with a field of type i32 called a and a field of type f32 called b
 }
 ```
 Here we name the fields of each variant explicitly, but you can omit them
 ```rs
-union Foo {
+enum Foo {
     Bar(i32),
     Baz(i32, f32),
 }
 ```
 
 ### Shared Fields
-Unions can have shared fields. Using this constrains each variant to use the same type of syntax for its fields.
+Enums can have shared fields. Using this constrains each variant to use the same type of syntax for its fields.
 
 ```rs
-union Foo(string) {
+enum Foo(string) {
     Bar(i32),
     Baz(i32, f32),
 }
 ```
 The shared field is appended to the end of each variant which mean its equivalent to:
 ```rs
-union Foo {
+enum Foo {
     Bar(i32, string),
     Baz(i32, f32, string),
 }
@@ -64,7 +64,7 @@ union Foo {
 
 If the shared field is named, all fields in variants must be named:
 ```rs
-union Foo(name: string, id: u64) { // Multiple shared fields
+enum Foo(name: string, id: u64) { // Multiple shared fields
     Bar(a: i32), // Must have a name
     Baz(a: i32, b: f32), // Must have a name for each field
 }
@@ -72,19 +72,19 @@ union Foo(name: string, id: u64) { // Multiple shared fields
 
 Using shared fields allows you to access that field without caring about which variant a variable is:
 ```rs
-union Foo(string) {
+enum Foo(string) {
     Bar(i32),
     Baz(i32, f32),
 }
 
-union NamedFoo(str_id: string) {
+enum NamedFoo(str_id: string) {
     Bar(a: i32),
     Baz(a: i32, b: f32),
 }
 
 fn main() {
     let foo = Foo::Bar(-5, "bar"); // Note, you have to assign the shared field here.
-    let text = foo.0; // 'foo' now has positional fields. '0' accesses the first shared field on the union.
+    let text = foo.0; // 'foo' now has positional fields. '0' accesses the first shared field on the enum.
 
     let named_foo = NamedFoo::Baz(-5, .5, "1"); // Note, you have to assign the shared field here.
     let str_id = named_foo.str_id; // When the shared fields are named, you must access them using the fields name.
@@ -289,12 +289,12 @@ Here are some examples of how to use type arithmetic.
 
 #### Example 1
 ```rs
-union Foo {
+enum Foo {
     Bar(a: i32),
     Baz(a: f32),
 }
 
-type Exclude<T: union, ..[U: memberof T]> = T - ..U;
+type Exclude<T: enum, ..[U: memberof T]> = T - ..U;
 
 fn main() {
     Foo foo = Foo.Baz;
@@ -307,12 +307,12 @@ fn main() {
 
 This lowers to the following:
 ```rs
-union Foo {
+enum Foo {
     Bar(a: i32),
     Baz(a: f32),
 }
 
-union Exclude_Foo_Bar {
+enum Exclude_Foo_Bar {
     Baz(a: f32),
 }
 

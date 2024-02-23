@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{lexer::token::{self, Keyword, TokenKind}, types::TypeAnnotation};
 
-use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, UnionMemberFieldInitializers, VariableDeclaration, While};
+use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, EnumMemberFieldInitializers, VariableDeclaration, While};
 use crate::types::{can_be_type_annotation, parse_type_annotation};
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -120,7 +120,7 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind == TokenKind::OpenBrace {
         parse_struct_literal(cursor, type_annotation)
     } else {
-        parse_union_literal(cursor, type_annotation)
+        parse_enum_literal(cursor, type_annotation)
     }
 }
 
@@ -171,7 +171,7 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
     Ok(FieldInitializer { identifier: Some(identifier), initializer })
 }
 
-fn parse_union_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) -> Result<Expression, String> {
+fn parse_enum_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) -> Result<Expression, String> {
     let TokenKind::DoubleColon = cursor.bump()?.kind else {
         return Err(format!("Expected :: but found {:?}", cursor.first().kind));
     };
@@ -184,24 +184,24 @@ fn parse_union_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) -> 
         if cursor.first().kind == TokenKind::OpenParen {
             cursor.bump()?; // Consume the (
             if matches!(cursor.second().kind, TokenKind::Colon) {
-                parse_named_union_member_field_initializers(cursor)?
+                parse_named_enum_member_field_initializers(cursor)?
             } else {
-                parse_unnamed_union_member_field_initializers(cursor)?
+                parse_unnamed_enum_member_field_initializers(cursor)?
             }
         } else {
-            UnionMemberFieldInitializers::None
+            EnumMemberFieldInitializers::None
         }
     };
 
     cursor.bump()?; // Consume the )
-    Ok(Expression::Literal(Literal::Union {
+    Ok(Expression::Literal(Literal::Enum {
         type_annotation,
         member,
         field_initializers
     }))
 }
 
-fn parse_unnamed_union_member_field_initializers(cursor: &mut Cursor) -> Result<UnionMemberFieldInitializers, String> {
+fn parse_unnamed_enum_member_field_initializers(cursor: &mut Cursor) -> Result<EnumMemberFieldInitializers, String> {
     let mut field_initializers = vec![];
     
     while cursor.first().kind != TokenKind::CloseParen {
@@ -214,10 +214,10 @@ fn parse_unnamed_union_member_field_initializers(cursor: &mut Cursor) -> Result<
         field_initializers.push(initializer);
     }
 
-    Ok(UnionMemberFieldInitializers::Unnamed(field_initializers))
+    Ok(EnumMemberFieldInitializers::Unnamed(field_initializers))
 }
 
-fn parse_named_union_member_field_initializers(cursor: &mut Cursor) -> Result<UnionMemberFieldInitializers, String> {
+fn parse_named_enum_member_field_initializers(cursor: &mut Cursor) -> Result<EnumMemberFieldInitializers, String> {
     let mut field_initializers = HashMap::new();
     
     while cursor.first().kind != TokenKind::CloseParen {
@@ -241,7 +241,7 @@ fn parse_named_union_member_field_initializers(cursor: &mut Cursor) -> Result<Un
         field_initializers.insert(identifier, initializer);
     }
 
-    Ok(UnionMemberFieldInitializers::Named(field_initializers))
+    Ok(EnumMemberFieldInitializers::Named(field_initializers))
 }
 
 fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {

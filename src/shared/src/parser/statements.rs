@@ -1,6 +1,6 @@
 use crate::{lexer::token::{Keyword, TokenKind}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_identifier}};
 
-use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, FunctionDeclaration, Impl, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration, UnionMember, UnionMemberField};
+use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, FunctionDeclaration, Impl, Parameter, Statement, StructDeclaration, StructField, EnumDeclaration, EnumMember, EnumMemberField};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     match parse_break(cursor) {
@@ -120,7 +120,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Struct) {
-            return parse_union_declaration_statement(cursor);
+            return parse_enum_declaration_statement(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -128,7 +128,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Struct) {
-        return parse_union_declaration_statement(cursor);
+        return parse_enum_declaration_statement(cursor);
     }
 
     cursor.bump()?; // Consume the struct keyword
@@ -166,11 +166,11 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
     }))
 }
 
-fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
+fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let mut access_modifier = None;
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
-        if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Enum) {
             return parse_impl(cursor);
         }
 
@@ -178,11 +178,11 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         access_modifier = Some(am);
     }
 
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Enum) {
         return parse_impl(cursor);
     }
 
-    cursor.bump()?; // Consume the union keyword
+    cursor.bump()?; // Consume the enum keyword
 
     let type_name = parse_type_identifier(cursor, false)?;
     
@@ -199,7 +199,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         }
 
         has_comma = true;
-        members.push(parse_union_member(cursor)?);
+        members.push(parse_enum_member(cursor)?);
 
         if cursor.first().kind == TokenKind::Comma {
             cursor.bump()?; // Consume the ,
@@ -210,7 +210,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     cursor.bump()?; // Consume the }
 
-    Ok(Statement::UnionDeclaration(UnionDeclaration {
+    Ok(Statement::EnumDeclaration(EnumDeclaration {
         access_modifier,
         type_identifier: type_name,
         members,
@@ -412,7 +412,7 @@ fn parse_struct_field(cursor: &mut Cursor) -> Result<StructField, String> {
     })
 }
 
-fn parse_union_member(cursor: &mut Cursor) -> Result<UnionMember, String> {
+fn parse_enum_member(cursor: &mut Cursor) -> Result<EnumMember, String> {
     let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
     };
@@ -432,7 +432,7 @@ fn parse_union_member(cursor: &mut Cursor) -> Result<UnionMember, String> {
                 }
 
                 has_comma = true;
-                fields.push(parse_union_field(cursor, field_position)?);
+                fields.push(parse_enum_field(cursor, field_position)?);
 
                 if cursor.first().kind == TokenKind::Comma {
                     cursor.bump()?; // Consume the ,
@@ -445,19 +445,19 @@ fn parse_union_member(cursor: &mut Cursor) -> Result<UnionMember, String> {
 
             cursor.bump()?; // Consume the )
 
-            Ok(UnionMember {
+            Ok(EnumMember {
                 identifier,
                 fields,
             })
         },
-        _ => Ok(UnionMember {
+        _ => Ok(EnumMember {
             identifier,
             fields: vec![],
         }),
     }
 }
 
-fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<UnionMemberField, String> {
+fn parse_enum_field(cursor: &mut Cursor, field_position: usize) -> Result<EnumMemberField, String> {
     let TokenKind::Identifier(first_ident) = cursor.bump()?.kind else {
         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
     };
@@ -472,13 +472,13 @@ fn parse_union_field(cursor: &mut Cursor, field_position: usize) -> Result<Union
 
             let type_annotation = parse_type_annotation(cursor, false)?;
 
-            Ok(UnionMemberField {
+            Ok(EnumMemberField {
                 identifier: first_ident,
                 type_annotation,
             })
         },
         _ => {
-            return Ok(UnionMemberField {
+            return Ok(EnumMemberField {
                 identifier: format!("f{}",field_position.to_string()),
                 type_annotation: parse_type_annotation_from_str(&first_ident, false)?,
             });

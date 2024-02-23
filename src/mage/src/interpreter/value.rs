@@ -13,7 +13,7 @@ pub enum Value {
     String(String),
     Array(Vec<Value>),
     Struct { struct_name: TypeAnnotation, fields: HashMap<String, Value> },
-    Union { union_member: UnionMember, fields: UnionFields },
+    Enum { enum_member: EnumMember, fields: EnumFields },
     Function { parameters: Vec<String>, body: Vec<TypedStatement> },
 }
 
@@ -57,14 +57,14 @@ impl<'a> Display for Value {
                 write!(f, " }}")
             
             },
-            Value::Union {
-                union_member,
+            Value::Enum {
+                enum_member,
                 fields
             } => {
                 match fields {
-                    UnionFields::None => write!(f, ""),
-                    UnionFields::Named(fields) => {
-                        write!(f, "{}::{}(", union_member.union_name, union_member.member_name)?;
+                    EnumFields::None => write!(f, ""),
+                    EnumFields::Named(fields) => {
+                        write!(f, "{}::{}(", enum_member.enum_name, enum_member.member_name)?;
                         
                         for (index, (identifier, value)) in fields.iter().enumerate() {
                             write!(f, "{}: {}", identifier, value)?;
@@ -76,8 +76,8 @@ impl<'a> Display for Value {
                         
                         write!(f, ")")
                     },
-                    UnionFields::Unnamed(fields) => {
-                        write!(f, "{}::{}(", union_member.union_name, union_member.member_name)?;
+                    EnumFields::Unnamed(fields) => {
+                        write!(f, "{}::{}(", enum_member.enum_name, enum_member.member_name)?;
 
                         for (index, value) in fields.iter().enumerate() {
                             write!(f, "{}", value)?;
@@ -135,14 +135,14 @@ impl Display for Number {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct UnionMember {
-    pub union_name: TypeAnnotation,
+pub struct EnumMember {
+    pub enum_name: TypeAnnotation,
     pub member_name: String,
 }
 
-impl Display for UnionMember {
+impl Display for EnumMember {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}", self.union_name, self.member_name)
+        write!(f, "{}::{}", self.enum_name, self.member_name)
     }
 }
 
@@ -170,7 +170,7 @@ impl Display for Variable {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum UnionFields {
+pub enum EnumFields {
     None,
     Named(HashMap<String, Value>),
     Unnamed(Vec<Value>),

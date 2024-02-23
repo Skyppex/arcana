@@ -12,7 +12,7 @@ pub struct Impl{
 pub enum Statement {
     Program { statements: Vec<Statement> },
     StructDeclaration(StructDeclaration),
-    UnionDeclaration(UnionDeclaration),
+    EnumDeclaration(EnumDeclaration),
     Impl(Impl),
     FunctionDeclaration(FunctionDeclaration),
     Semi(Box<Statement>),
@@ -56,10 +56,10 @@ pub struct StructDeclaration {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnionDeclaration {
+pub struct EnumDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
-    pub members: Vec<UnionMember>,
+    pub members: Vec<EnumMember>,
 }
 
 #[derive(Debug, Clone)]
@@ -101,10 +101,10 @@ pub enum Literal {
         type_annotation: TypeAnnotation,
         field_initializers: Vec<FieldInitializer>,
     },
-    Union {
+    Enum {
         type_annotation: TypeAnnotation,
         member: String,
-        field_initializers: UnionMemberFieldInitializers,
+        field_initializers: EnumMemberFieldInitializers,
     },
 }
 
@@ -136,9 +136,9 @@ pub struct FieldInitializer {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnionMember {
+pub struct EnumMember {
     pub identifier: String,
-    pub fields: Vec<UnionMemberField>,
+    pub fields: Vec<EnumMemberField>,
 }
 
 #[derive(Debug, Clone)]
@@ -163,13 +163,13 @@ impl Display for FlagsValue {
 }
 
 #[derive(Debug, Clone)]
-pub struct UnionMemberField {
+pub struct EnumMemberField {
     pub identifier: String,
     pub type_annotation: TypeAnnotation,
 }
 
 #[derive(Debug, Clone)]
-pub enum UnionMemberFieldInitializers {
+pub enum EnumMemberFieldInitializers {
     None,
     Named(HashMap<String, Expression>),
     Unnamed(Vec<Expression>),

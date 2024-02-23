@@ -4,13 +4,13 @@ use shared::{type_checker::{ast::{Block, *}, Type}, types::TypeIdentifier};
 
 use crate::interpreter::scope::Scope;
 
-use super::{environment::{Environment, Rcrc}, evaluate_binop, scope::ScopeType, value::{Value, Number, UnionMember, UnionFields}};
+use super::{environment::{Environment, Rcrc}, evaluate_binop, scope::ScopeType, value::{Value, Number, EnumMember, EnumFields}};
 
 pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environment>) -> Result<Value, String> {
     match typed_statement {
         TypedStatement::None => Ok(Value::Void),
         TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
-        TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::EnumDeclaration { .. } => Ok(Value::Void),
         TypedStatement::Impl {
             type_annotation,
             functions
@@ -310,36 +310,36 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
 
             Ok(Value::Struct { struct_name: type_annotation, fields })
         }        
-        Literal::Union {
+        Literal::Enum {
             type_annotation,
             member,
             field_initializers,
             type_: _
         } => {
-            let fields: UnionFields = match field_initializers {
-                UnionMemberFieldInitializers::None => UnionFields::None,
-                UnionMemberFieldInitializers::Named(field_initializers) => {
+            let fields: EnumFields = match field_initializers {
+                EnumMemberFieldInitializers::None => EnumFields::None,
+                EnumMemberFieldInitializers::Named(field_initializers) => {
                     let mut fields = std::collections::HashMap::new();
 
                     for (identifier, initializer) in field_initializers {
                         fields.insert(identifier, evaluate_expression(initializer, environment.clone())?);
                     }
 
-                    UnionFields::Named(fields)
+                    EnumFields::Named(fields)
                 }
-                UnionMemberFieldInitializers::Unnamed(field_initializers) => {
+                EnumMemberFieldInitializers::Unnamed(field_initializers) => {
                     let mut fields = Vec::new();
 
                     for initializer in field_initializers {
                         fields.push(evaluate_expression(initializer, environment.clone())?);
                     }
 
-                    UnionFields::Unnamed(fields)
+                    EnumFields::Unnamed(fields)
                 }
             };
             
-            Ok(Value::Union { union_member: UnionMember {
-                union_name: type_annotation,
+            Ok(Value::Enum { enum_member: EnumMember {
+                enum_name: type_annotation,
                 member_name: member,
             }, fields })
         }

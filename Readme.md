@@ -21,7 +21,7 @@ This is my WIP programming language.
 - Borrow checker
 
 ## Syntax
-- Structs and Unions
+- Structs and Enums
 - Named bit flags as a wrapper for integer types
 - Functions
 - Implementations

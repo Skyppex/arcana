@@ -1,5 +1,5 @@
 use crate::{parser::{
-    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, UnionMember, UnionMemberField, UnionMemberFieldInitializers, VariableDeclaration, While
+    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, VariableDeclaration, While
 }, type_checker::{self, ast::{
     Block, TypedExpression, TypedStatement
 }, Type}, types::{GenericType, TypeAnnotation, TypeIdentifier}};
@@ -98,13 +98,13 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             },
-            Statement::UnionDeclaration(UnionDeclaration {
+            Statement::EnumDeclaration(EnumDeclaration {
                 access_modifier,
                 type_identifier,
                 members
             }) => {
                 let mut result = String::new();
-                result.push_str("<union declaration>\n");
+                result.push_str("<enum declaration>\n");
                 indent.increase();
 
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
@@ -550,13 +550,13 @@ impl IndentDisplay for Literal {
                 indent.decrease();
                 result
             },
-            Literal::Union {
+            Literal::Enum {
                 type_annotation: type_identifier,
                 member,
                 field_initializers
             } => {
                 let mut result = String::new();
-                result.push_str("<union literal>\n");
+                result.push_str("<enum literal>\n");
                 indent.increase_leaf();
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
                 result.push_str(format!("{}member: {}\n", indent.dash_end(), member).as_str());
@@ -590,10 +590,10 @@ impl IndentDisplay for StructField {
     }
 }
 
-impl IndentDisplay for UnionMember {
+impl IndentDisplay for EnumMember {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str(format!("<union member> {}", self.identifier).as_str());
+        result.push_str(format!("<enum member> {}", self.identifier).as_str());
         indent.increase();
         
         for (i, field) in self.fields.iter().enumerate() {
@@ -610,10 +610,10 @@ impl IndentDisplay for UnionMember {
     }
 }
 
-impl IndentDisplay for UnionMemberField {
+impl IndentDisplay for EnumMemberField {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str("<union member field>\n");
+        result.push_str("<enum member field>\n");
         indent.increase_leaf();
         result.push_str(format!("{}identifier: {}\n", indent.dash(), &self.identifier).as_str());
         result.push_str(format!("{}type_annotation: {}", indent.dash_end(), self.type_annotation.indent_display(indent)).as_str());
@@ -663,11 +663,11 @@ impl IndentDisplay for FieldInitializer {
     }
 }
 
-impl IndentDisplay for UnionMemberFieldInitializers {
+impl IndentDisplay for EnumMemberFieldInitializers {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            UnionMemberFieldInitializers::None => "".to_string(),
-            UnionMemberFieldInitializers::Named(field_initializers) => {
+            EnumMemberFieldInitializers::None => "".to_string(),
+            EnumMemberFieldInitializers::Named(field_initializers) => {
                 let mut result = String::new();
                 result.push_str("<named field initializers>");
                 indent.increase();
@@ -684,7 +684,7 @@ impl IndentDisplay for UnionMemberFieldInitializers {
                 indent.decrease();
                 result
             },
-            UnionMemberFieldInitializers::Unnamed(field_initializers) => {
+            EnumMemberFieldInitializers::Unnamed(field_initializers) => {
                 let mut result = String::new();
                 result.push_str("<unnamed field initializers>");
                 indent.increase();
@@ -804,13 +804,13 @@ impl IndentDisplay for TypedStatement {
                 indent.decrease();
                 result
             },
-            TypedStatement::UnionDeclaration {
+            TypedStatement::EnumDeclaration {
                 type_identifier,
                 members,
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<union declaration> {}\n", type_).as_str());
+                result.push_str(format!("<enum declaration> {}\n", type_).as_str());
                 indent.increase();
 
                 result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
@@ -1262,14 +1262,14 @@ impl IndentDisplay for type_checker::ast::Literal {
                 indent.decrease();
                 result
             },
-            type_checker::ast::Literal::Union {
+            type_checker::ast::Literal::Enum {
                 type_annotation: type_identifier,
                 member,
                 field_initializers,
                 type_
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<union literal>: {}\n", type_).as_str());
+                result.push_str(format!("<enum literal>: {}\n", type_).as_str());
                 indent.increase_leaf();
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
                 result.push_str(format!("{}member: {}\n", indent.dash_end(), member).as_str());
@@ -1304,10 +1304,10 @@ impl IndentDisplay for type_checker::ast::Parameter {
     }
 }
 
-impl IndentDisplay for type_checker::ast::UnionMember {
+impl IndentDisplay for type_checker::ast::EnumMember {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str(format!("<union member> {}: {}", self.discriminant_name, self.type_).as_str());
+        result.push_str(format!("<enum member> {}: {}", self.discriminant_name, self.type_).as_str());
         indent.increase();
         
         for (i, field) in self.fields.iter().enumerate() {
@@ -1324,10 +1324,10 @@ impl IndentDisplay for type_checker::ast::UnionMember {
     }
 }
 
-impl IndentDisplay for type_checker::ast::UnionMemberField {
+impl IndentDisplay for type_checker::ast::EnumMemberField {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str(format!("<union member field>: {}\n", self.type_).as_str());
+        result.push_str(format!("<enum member field>: {}\n", self.type_).as_str());
         indent.increase_leaf();
         result.push_str(format!("{}identifier: {}\n", indent.dash(), self.identifier).as_str());
         result.push_str(format!("{}type: {}", indent.dash_end(), self.type_).as_str());
@@ -1404,11 +1404,11 @@ impl IndentDisplay for type_checker::ast::FieldInitializer {
     }
 }
 
-impl IndentDisplay for type_checker::ast::UnionMemberFieldInitializers {
+impl IndentDisplay for type_checker::ast::EnumMemberFieldInitializers {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::UnionMemberFieldInitializers::None => "".to_string(),
-            type_checker::ast::UnionMemberFieldInitializers::Named(field_initializers) => {
+            type_checker::ast::EnumMemberFieldInitializers::None => "".to_string(),
+            type_checker::ast::EnumMemberFieldInitializers::Named(field_initializers) => {
                 let mut result = String::new();
                 result.push_str("<named field initializer>");
                 indent.increase();
@@ -1425,7 +1425,7 @@ impl IndentDisplay for type_checker::ast::UnionMemberFieldInitializers {
                 indent.decrease();
                 result
             },
-            type_checker::ast::UnionMemberFieldInitializers::Unnamed(field_initializers) => {
+            type_checker::ast::EnumMemberFieldInitializers::Unnamed(field_initializers) => {
                 let mut result = String::new();
                 result.push_str("<unnamed field initializer>");
                 indent.increase();

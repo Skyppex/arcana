@@ -20,9 +20,9 @@ pub enum TypedStatement {
         fields: Vec<StructField>,
         type_: Type,
     },
-    UnionDeclaration {
+    EnumDeclaration {
         type_identifier: TypeIdentifier,
-        members: Vec<UnionMember>,
+        members: Vec<EnumMember>,
         type_: Type,
     },
     FunctionDeclaration {
@@ -61,7 +61,7 @@ impl Typed for TypedStatement {
             TypedStatement::None => Type::Void,
             TypedStatement::Program { .. } => Type::Void,
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
-            TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Impl { .. } => Type::Void,
             TypedStatement::Semi { .. } => Type::Void,
@@ -78,7 +78,7 @@ impl Typed for TypedStatement {
             TypedStatement::None => Type::Void,
             TypedStatement::Program { .. } => Type::Void,
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
-            TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Impl { .. } => Type::Void,
             TypedStatement::Semi(e) => e.get_deep_type(),
@@ -228,16 +228,16 @@ impl Into<AccessModifier> for parser::AccessModifier {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct UnionMember {
-    pub union_name: TypeIdentifier,
+pub struct EnumMember {
+    pub enum_name: TypeIdentifier,
     pub discriminant_name: String,
-    pub fields: Vec<UnionMemberField>,
+    pub fields: Vec<EnumMemberField>,
     pub type_: Type,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct UnionMemberField {
-    pub union_name: TypeIdentifier,
+pub struct EnumMemberField {
+    pub enum_name: TypeIdentifier,
     pub discriminant_name: String,
     pub identifier: String,
     pub type_: Type,
@@ -267,10 +267,10 @@ pub enum Literal {
         field_initializers: Vec<FieldInitializer>,
         type_: Type,
     },
-    Union {
+    Enum {
         type_annotation: TypeAnnotation,
         member: String,
-        field_initializers: UnionMemberFieldInitializers,
+        field_initializers: EnumMemberFieldInitializers,
         type_: Type,
     },
 }
@@ -296,7 +296,7 @@ impl Typed for Literal {
             Literal::Bool(_) => Type::Bool,
             Literal::Array { type_, .. } => Type::Array(Box::new(type_.clone())),
             Literal::Struct { type_, .. } => type_.clone(),
-            Literal::Union { type_, .. } => type_.clone(),
+            Literal::Enum { type_, .. } => type_.clone(),
         }
     }
 
@@ -318,7 +318,7 @@ pub struct FieldInitializer {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum UnionMemberFieldInitializers {
+pub enum EnumMemberFieldInitializers {
     None,
     Named(HashMap<String, TypedExpression>),
     Unnamed(Vec<TypedExpression>),
