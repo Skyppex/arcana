@@ -81,7 +81,7 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
 
 pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::OpenBrace {
-        return parse_variable_declaration(cursor);
+        return parse_type_literal(cursor);
     }
 
     parse_block_statements(cursor)
@@ -104,97 +104,6 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
     cursor.bump()?; // Consume the }
 
     Ok(statements)
-}
-
-fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String> {
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Let) {
-        return parse_if(cursor);
-    }
-
-    cursor.bump()?; // Consume the let
-
-    let mutable = matches!(cursor.first().kind, TokenKind::Keyword(Keyword::Mut));
-
-    if mutable {
-        cursor.bump()?; // Consume the mutable
-    }
-    
-    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-    };
-    
-    if cursor.first().kind != TokenKind::Colon {
-        return Err(format!("Expected : but found {:?}", cursor.first().kind));
-    }
-
-    cursor.bump()?; // Consume the :
-    
-    if !can_be_type_annotation(cursor) {
-        return Err(format!("Expected type annotation but found {:?}", cursor.first().kind));
-    }
-
-    let type_annotation = parse_type_annotation(cursor, false)?;
-
-    match cursor.first().kind {
-        TokenKind::Equal => {
-            cursor.bump()?; // Consume the =
-
-            let initializer = parse_expression(cursor)?;
-
-            Ok(Expression::VariableDeclaration(VariableDeclaration {
-                mutable,
-                type_annotation,
-                identifier,
-                initializer: Some(Box::new(initializer)),
-            }))
-        },
-        TokenKind::Semicolon => {
-            Ok(Expression::VariableDeclaration(VariableDeclaration {
-                mutable,
-                type_annotation,
-                identifier,
-                initializer: None,
-            }))
-        },
-        _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
-    }
-}
-
-fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
-    if cursor.first().kind != TokenKind::Keyword(Keyword::If) {
-        return parse_type_literal(cursor);
-    }
-
-    cursor.bump()?; // Consume the if
-
-    let if_condition = parse_expression(cursor)?;
-    let if_block = parse_block(cursor)?;
-
-    let mut else_ifs = vec![];
-    let mut r#else = None;
-
-    while cursor.first().kind == TokenKind::Keyword(Keyword::Else) {
-        cursor.bump()?; // Consume the else
-
-        if cursor.first().kind == TokenKind::Keyword(Keyword::If) {
-            cursor.bump()?; // Consume the if
-
-            let condition = parse_expression(cursor)?;
-            let block = parse_block(cursor)?;
-
-            else_ifs.push(ConditionBlock { condition: Box::new(condition), block: Box::new(block) });
-        } else {
-            let block = parse_block(cursor)?;
-            r#else = Some(Box::new(block));
-        }
-    }
-
-    return Ok(Expression::If(If
-    {
-        r#if: ConditionBlock { condition: Box::new(if_condition), block: Box::new(if_block) },
-        else_ifs: if else_ifs.len() > 0 { Some(else_ifs) } else { None },
-        r#else
-    }))
 }
 
 fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -492,11 +401,11 @@ fn parse_additive(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_unary(cursor)?;
+    let mut expression = parse_variable_declaration(cursor)?;
 
     while matches!(cursor.first().kind, TokenKind::Star | TokenKind::Slash | TokenKind::Percent) {
         let operator = cursor.bump()?.kind; // Consume the *, /, or %
-        let right = parse_unary(cursor)?;
+        let right = parse_variable_declaration(cursor)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
@@ -511,6 +420,97 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
     }
 
     Ok(expression)
+}
+
+fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Let) {
+        return parse_if(cursor);
+    }
+
+    cursor.bump()?; // Consume the let
+
+    let mutable = matches!(cursor.first().kind, TokenKind::Keyword(Keyword::Mut));
+
+    if mutable {
+        cursor.bump()?; // Consume the mutable
+    }
+    
+    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
+        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+    };
+    
+    if cursor.first().kind != TokenKind::Colon {
+        return Err(format!("Expected : but found {:?}", cursor.first().kind));
+    }
+
+    cursor.bump()?; // Consume the :
+    
+    if !can_be_type_annotation(cursor) {
+        return Err(format!("Expected type annotation but found {:?}", cursor.first().kind));
+    }
+
+    let type_annotation = parse_type_annotation(cursor, false)?;
+
+    match cursor.first().kind {
+        TokenKind::Equal => {
+            cursor.bump()?; // Consume the =
+
+            let initializer = parse_expression(cursor)?;
+
+            Ok(Expression::VariableDeclaration(VariableDeclaration {
+                mutable,
+                type_annotation,
+                identifier,
+                initializer: Some(Box::new(initializer)),
+            }))
+        },
+        TokenKind::Semicolon => {
+            Ok(Expression::VariableDeclaration(VariableDeclaration {
+                mutable,
+                type_annotation,
+                identifier,
+                initializer: None,
+            }))
+        },
+        _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
+    }
+}
+
+fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::If) {
+        return parse_unary(cursor);
+    }
+
+    cursor.bump()?; // Consume the if
+
+    let if_condition = parse_expression(cursor)?;
+    let if_block = parse_block(cursor)?;
+
+    let mut else_ifs = vec![];
+    let mut r#else = None;
+
+    while cursor.first().kind == TokenKind::Keyword(Keyword::Else) {
+        cursor.bump()?; // Consume the else
+
+        if cursor.first().kind == TokenKind::Keyword(Keyword::If) {
+            cursor.bump()?; // Consume the if
+
+            let condition = parse_expression(cursor)?;
+            let block = parse_block(cursor)?;
+
+            else_ifs.push(ConditionBlock { condition: Box::new(condition), block: Box::new(block) });
+        } else {
+            let block = parse_block(cursor)?;
+            r#else = Some(Box::new(block));
+        }
+    }
+
+    return Ok(Expression::If(If
+    {
+        r#if: ConditionBlock { condition: Box::new(if_condition), block: Box::new(if_block) },
+        else_ifs: if else_ifs.len() > 0 { Some(else_ifs) } else { None },
+        r#else
+    }))
 }
 
 fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {

@@ -30,7 +30,7 @@ pub fn check_type<'a>(
 
             if let Some(initializer) = &initializer {
                 if initializer.get_type() != type_ {
-                    return Err(format!("Initializer type {:?} does not match variable type {:?}", initializer.get_type(), type_));
+                    return Err(format!("Initializer type {} does not match variable type {}", initializer.get_type(), type_));
                 }
             }
 
@@ -115,9 +115,6 @@ pub fn check_type<'a>(
         }) => {
             let member = check_type(&Expression::Member(*member.clone()), discovered_types, type_environment.clone())?;
             let initializer = check_type(initializer, discovered_types, type_environment)?;
-
-            println!("member: {:?}", member.get_type());
-            println!("initializer: {:?}", initializer.get_type());
 
             if member.get_type() != initializer.get_type() {
                 return Err(format!("Member type {} does not match initializer type {}", member.get_type(), initializer.get_type()));
@@ -542,30 +539,49 @@ pub fn check_type<'a>(
             statements: block,
             else_statements: else_block
         }) => {
+            let while_and_else_environment =
+                Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment)));
+    
             let while_environment =
                 Rc::new(RefCell::new(TypeEnvironment::new_scope(
-                    type_environment,
+                    while_and_else_environment.clone(),
                     ScopeType::Break)));
 
-            let condition = check_type(condition, discovered_types, while_environment.clone())?;
-            let block = check_type(&Expression::Block(block.clone()), discovered_types, while_environment.clone())?;
-            let else_block = match else_block {
-                Some(else_block) => Some(check_type(&Expression::Block(else_block.clone()), discovered_types, while_environment)?),
-                None => None
-            };
-            let type_ = block.get_type();
-
+            let condition = check_type(condition, discovered_types, while_and_else_environment.clone())?;
+            
             let Type::Bool = condition.get_type() else {
                 return Err(format!("While condition must be of type bool"));
             };
 
+            let block = check_type(&Expression::Block(block.clone()), discovered_types, while_environment.clone())?;
+            
             let TypedExpression::Block(block) = block else {
                 return Err("While block must be a block".to_string())
             };
 
             let else_block = match else_block {
-                Some(TypedExpression::Block(block)) => Some(block.statements),
-                None => None,
+                Some(else_block) => Some(check_type(&Expression::Block(else_block.clone()), discovered_types, while_and_else_environment)?),
+                None => None
+            };
+
+            let type_ = while_environment.borrow().get_scope(&ScopeType::Break)
+                .map(|scope| scope.fold()).unwrap_or(Ok(Type::Void))?;
+
+            let else_block = match else_block {
+                Some(TypedExpression::Block(block)) => {
+                    if type_ != Type::Void && type_ != block.type_ {
+                        return Err(format!("While block breaks with value of type {} which does not match else blocks type {}", type_, block.type_));
+                    }
+
+                    Some(block.statements)
+                },
+                None => {
+                    if type_ != Type::Void {
+                        return Err(format!("Must have an else block if the while block breaks with a value"));
+                    }
+
+                    None
+                },
                 _ => return Err("Else block must be a block".to_string())
             };
             

@@ -693,7 +693,8 @@ fn evaluate_break(
     
     match expression {
         Some(expression) => {
-            environment.borrow_mut().activate_scope(Scope::Break(Some(evaluate_expression(expression, environment.clone())?)))?;
+            let value = evaluate_expression(expression, environment.clone())?;
+            environment.borrow_mut().activate_scope(Scope::Break(Some(value)))?;
             Ok(Value::Void)
         },
         None => {
