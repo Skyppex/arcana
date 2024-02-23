@@ -424,8 +424,7 @@ impl IndentDisplay for Expression {
                 result.push_str("<while>\n");
                 indent.increase();
                 result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
-                indent.end_current();
-                result.push_str(format!("{}<block>", indent.dash()).as_str());
+                result.push_str(format!("{}block: <block>", indent.dash()).as_str());
                 indent.increase();
                 
                 for (i, statement) in statements.iter().enumerate() {
@@ -438,9 +437,10 @@ impl IndentDisplay for Expression {
                 }
 
                 indent.decrease();
-                
+                indent.end_current();
+
                 if let Some(else_statements) = else_statements {
-                    result.push_str(format!("\n{}else: <block>", indent.dash()).as_str());
+                    result.push_str(format!("\n{}else: <block>", indent.dash_end()).as_str());
                     indent.increase();
                     
                     for (i, statement) in else_statements.iter().enumerate() {
@@ -1130,8 +1130,8 @@ impl IndentDisplay for TypedExpression {
                 result.push_str(format!("<while>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
-                indent.end_current();
-                result.push_str(format!("{}<block>", indent.dash()).as_str());
+                result.push_str(format!("{}block: <block>", indent.dash()).as_str());
+                indent.increase();
                 
                 for (i, statement) in block.iter().enumerate() {
                     if i < block.len() - 1 {
@@ -1142,8 +1142,12 @@ impl IndentDisplay for TypedExpression {
                     }
                 }
 
+                indent.decrease();
+                indent.end_current();
+
                 if let Some(else_block) = else_block {
-                    result.push_str(format!("\n{}else:", indent.dash()).as_str());
+                    result.push_str(format!("\n{}else: <block>", indent.dash_end()).as_str());
+                    indent.increase();
                     
                     for (i, statement) in else_block.iter().enumerate() {
                         if i < else_block.len() - 1 {
@@ -1153,6 +1157,8 @@ impl IndentDisplay for TypedExpression {
                             result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
                         }
                     }
+
+                    indent.decrease();
                 } else {
                     result.push_str(format!("\n{}else: None", indent.dash_end()).as_str());
                 }
