@@ -55,3 +55,54 @@ In this example, we define a trait called `Equals` which has a function called `
 We also define a default implementation for the `not_equals` function which returns the opposite of the result of `equals`.
 This means that if you implement `equals` for your own type, you get `not_equals` for free.
 Implementors of the trait can still override the default implementation if they want to.
+
+## Full Example of the New trait
+
+Defining the `New` trait is quite trivial. We want the trait be implemented only once for each type to avoid ambiguity when calling the new function.
+
+```rs
+trait New<[..T: param]> {
+    type Return;
+
+    func new([..T]) -> Self::Return;
+}
+```
+
+This defines the `New` trait as a generic trait which takes an array of possibly different generic types which must all be `param` types.
+These generic parameters are then use in the function signature for `new()` which allows the new function to take any amount of different arguments when implemented, but only those exact arguments when called.
+
+When implementing the `New` trait you have to specify the parameters as generic types. Note that you can have zero of them.
+
+```rs
+struct MyStruct {
+    a: i64,
+    b: string,
+}
+
+// Would be nice to avoid defining the parameters twice using type inference somehow
+impl New<[..a: i64, b: string]> for MyStruct {
+    type Return = MyStruct;
+
+    func new(a: i64, b: string): Self::Return {
+        MyStruct { a, b }
+    }
+}
+
+// Here's how you would define it with no input parameters
+impl New<[..]> for MyStruct {
+    type Return = MyStruct;
+
+    func new(): Self::Return {
+        MyStruct { 0, "" }
+    }
+}
+```
+
+Here's how you would constrain your function to take a generic type which has en empty constructor:
+
+```rs
+func create_with_extra_logic<T: New<[..]>(): T {
+    T::new()
+    // Extra logic
+}
+```
