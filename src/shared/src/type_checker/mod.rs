@@ -90,12 +90,15 @@ impl FullName for EnumMemberField {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Union {
     pub type_identifier: TypeIdentifier,
+    pub literal_type: Box<Type>,
     pub literals: Vec<Type>,
 }
 
 impl FullName for Union {
     fn full_name(&self) -> String {
-        self.type_identifier.to_string()
+        format!("{} {{ {} }}",
+            self.type_identifier.to_string(),
+            self.literals.iter().map(|l| l.to_string()).collect::<Vec<String>>().join(" | "))
     }
 }
 
@@ -230,6 +233,7 @@ impl Type {
                     umf.discriminant_name.clone())),
                 umf.field_name.clone()),
             Type::Union(u) => u.type_identifier.clone(),
+            Type::Function(f) => f.identifier.clone(),
             _ => panic!("Cannot get type identifier for type {}", self.full_name()),
         }
     }
@@ -376,7 +380,7 @@ impl FullName for Type {
             Type::EnumMemberField(umf) => umf.full_name(),
             Type::Union(u) => u.full_name(),
             Type::Function(f) => f.full_name(),
-            Type::Literal { name, .. } => name.clone(),
+            Type::Literal { name, type_ } => format!("LIT {}: {}", type_.full_name(), name),
         }
     }
 }

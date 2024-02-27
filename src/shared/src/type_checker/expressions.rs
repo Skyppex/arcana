@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{parser::{self, Assignment, Expression, If, VariableDeclaration, While}, type_checker::ast::Literal};
 
-use super::{ast::{BinaryOperator, Block, ConditionBlock, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator, EnumMemberFieldInitializers
-    }, scope::ScopeType, statements, DiscoveredType, FullName, Rcrc, Struct, StructField, Type, TypeEnvironment, Enum, EnumMember, EnumMemberField
+use super::{ast::{BinaryOperator, Block, ConditionBlock, EnumMemberFieldInitializers, FieldInitializer, Member, Typed, TypedExpression, TypedStatement, UnaryOperator
+    }, scope::ScopeType, statements, DiscoveredType, Enum, EnumMember, EnumMemberField, FullName, Rcrc, Struct, StructField, Type, TypeEnvironment, Union
 };
 
 pub fn check_type<'a>(
@@ -29,7 +29,7 @@ pub fn check_type<'a>(
             };
 
             if let Some(initializer) = &initializer {
-                if initializer.get_type() != type_ {
+                if !type_equals(&initializer.get_type(), &type_) {
                     return Err(format!("Initializer type {} does not match variable type {}", initializer.get_type(), type_));
                 }
             }
@@ -74,7 +74,7 @@ pub fn check_type<'a>(
                     let else_if_block = check_type(&else_if.block, discovered_types, else_if_environment)?;
                     let else_if_block_type = else_if_block.get_type();
 
-                    if if_block_type != else_if_block_type {
+                    if !type_equals(&if_block_type, &else_if_block_type) {
                         return Err(format!("If block type {:?} does not match else if block type {:?}", if_block_type, else_if_block_type));
                     }
 
@@ -94,7 +94,7 @@ pub fn check_type<'a>(
             let else_type = else_block.clone().map(|e| e.get_type());
 
             if let Some(else_type) = else_type {
-                if if_block_type != else_type {
+                if !type_equals(&if_block_type, &else_type) {
                     return Err(format!("If block type {:?} does not match else block type {:?}", if_block_type, else_type));
                 }
             }
@@ -116,7 +116,7 @@ pub fn check_type<'a>(
             let member = check_type(&Expression::Member(*member.clone()), discovered_types, type_environment.clone())?;
             let initializer = check_type(initializer, discovered_types, type_environment)?;
 
-            if member.get_type() != initializer.get_type() {
+            if !type_equals(&member.get_type(), &initializer.get_type()) {
                 return Err(format!("Member type {} does not match initializer type {}", member.get_type(), initializer.get_type()));
             }
 
@@ -178,7 +178,8 @@ pub fn check_type<'a>(
                             let value = check_type(&e, discovered_types, type_environment.clone())?;
                             let type_ = value.get_type();
                             
-                            if previous_type != Type::Void && type_ != previous_type {
+                            if !type_equals(&previous_type, &Type::Void) &&
+                               !type_equals(&type_, &previous_type) {
                                 return Err(format!("Array element type {:?} does not match previous element type {:?}", type_, previous_type));
                             }
 
@@ -226,7 +227,7 @@ pub fn check_type<'a>(
                         
                         let initializer_type = initializer.initializer.get_type();
 
-                        if **field_type != initializer_type {
+                        if !type_equals(field_type, &initializer_type) {
                             return Err(format!("Field type {} does not match initializer type {}", field_type, initializer_type));
                         }
                     }
@@ -297,7 +298,7 @@ pub fn check_type<'a>(
                                 
                                 let initializer_type = initializer.get_type();
 
-                                if **field_type != initializer_type {
+                                if !type_equals(field_type, &initializer_type) {
                                     return Err(format!("Field type {} does not match initializer type {}", field_type, initializer_type));
                                 }
                             }
@@ -314,7 +315,7 @@ pub fn check_type<'a>(
                                 
                                 let initializer_type = initializer.get_type();
 
-                                if **field_type != initializer_type {
+                                if !type_equals(field_type, &initializer_type) {
                                     return Err(format!("Field type {} does not match initializer type {}", field_type, initializer_type));
                                 }
                             }
@@ -356,7 +357,7 @@ pub fn check_type<'a>(
                         
                         let arg_typed_expression = check_type(arg, discovered_types, type_environment.clone())?;
 
-                        if &arg_typed_expression.get_deep_type() != type_ {
+                        if !type_equals(&arg_typed_expression.get_deep_type(), type_) {
                             Err(format!("Argument {} type {} does not match parameter type {}", i, arg_typed_expression.get_type(), type_))?
                         }
 
@@ -386,7 +387,7 @@ pub fn check_type<'a>(
 
             let index = check_type(&index.index, discovered_types, type_environment)?;
 
-            if index.get_type() != Type::U64 {
+            if !type_equals(&index.get_type(), &Type::U64) {
                 return Err(format!("Index type {:?} is not a u64", index.get_type()));
             }
 
@@ -461,7 +462,7 @@ pub fn check_type<'a>(
                 return Err(format!("Ternary condition must be of type bool"));
             };
 
-            if true_expression.get_type() != false_expression.get_type() {
+            if !type_equals(&true_expression.get_type(), &false_expression.get_type()) {
                 return Err(format!("Ternary true expression type {:?} does not match false expression type {:?}", true_expression.get_type(), false_expression.get_type()));
             }
 
@@ -569,14 +570,15 @@ pub fn check_type<'a>(
 
             let else_block = match else_block {
                 Some(TypedExpression::Block(block)) => {
-                    if type_ != Type::Void && type_ != block.type_ {
+                    if !type_equals(&type_,&Type::Void) &&
+                       !type_equals(&type_, &block.type_) {
                         return Err(format!("While block breaks with value of type {} which does not match else blocks type {}", type_, block.type_));
                     }
 
                     Some(block.statements)
                 },
                 None => {
-                    if type_ != Type::Void {
+                    if !type_equals(&type_, &Type::Void) {
                         return Err(format!("Must have an else block if the while block breaks with a value"));
                     }
 
@@ -588,10 +590,28 @@ pub fn check_type<'a>(
             Ok(TypedExpression::While {
                 condition: Box::new(condition),
                 block: block.statements,
-                else_block: else_block,
+                else_block,
                 type_: type_.clone()
             })
         },
+    }
+}
+
+fn type_equals(left: &Type, right: &Type) -> bool {
+    match (left, right) {
+        (Type::Union(Union { literals, .. }),
+         Type::Literal { .. }) => {
+            let x = literals.contains(right);
+            x
+        },
+        (Type::Literal { .. },
+         Type::Union(_)) => {
+            type_equals(right, left)
+        },
+        (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => type_equals(type_, type_2),
+        (Type::Literal { type_, .. }, other) => type_equals(type_, other),
+        (other, Type::Literal { type_, .. }) => type_equals(other, type_),
+        _ => left == right
     }
 }
 

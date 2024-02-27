@@ -276,21 +276,43 @@ pub fn check_type<'a>(
                 }
             }
 
-            let type_ = Type::Union(Union {
-                type_identifier: type_identifier.clone(),
-                literals: literals
+            let literal_types = literals
                     .iter()
                     .map(|literal| check_type_annotation(
                         &TypeAnnotation::Literal(Box::new(literal.clone())),
                              discovered_types, union_type_environment.clone()))
-                    .collect::<Result<Vec<Type>, String>>()?,
+                    .collect::<Result<Vec<Type>, String>>()?;
+
+            let literal_type = literal_types.iter()
+                .fold(Ok(Type::Void), |acc, t| {
+                    let Type::Literal { type_, .. } = t else {
+                        return Err(format!("Expected literal, found {}", t));
+                    };
+                    
+                    if acc.clone()? == Type::Void {
+                        Ok(*type_.clone())
+                    } else if acc.clone()? != *type_.clone() {
+                        Err(format!("All literals in a union must have the same type. Expected {}, found {}",
+                            acc.as_ref().unwrap(), type_))
+                    } else {
+                        acc
+                    }
+                })?;
+
+            let type_ = Type::Union(Union {
+                type_identifier: type_identifier.clone(),
+                literal_type: Box::new(literal_type.clone()),
+                literals: literal_types,
             });
 
             type_environment.borrow_mut().add_type(type_.clone())?;
 
             Ok(TypedStatement::UnionDeclaration {
                 type_identifier: type_identifier.clone(),
-                literals: literals.clone().iter().map(|l| TypeAnnotation::Literal(Box::new(l.clone()))).collect(),
+                literals: literals.clone()
+                    .iter()
+                    .map(|l| TypeAnnotation::Literal(Box::new(l.clone())))
+                    .collect(),
                 type_,
             })
         },
@@ -571,12 +593,26 @@ fn check_type_identifier(
             },
         })),
         Some(DiscoveredType::Union(type_identifier, literals)) => {
+            let literal_types = literals.iter()
+                .map(|literal| check_type_annotation(literal, discovered_types, type_environment.clone()))
+                .collect::<Result<Vec<Type>, String>>()?;
+
+            let literal_type = literal_types.iter()
+                .fold(Ok(Type::Void), |acc, t| {
+                    if acc == Ok(Type::Void) {
+                        Ok(t.clone())
+                    } else if acc != Ok(t.clone()) {
+                        Err(format!("All literals in a union must have the same type. Expected {}, found {}",
+                            acc.as_ref().unwrap(), t))
+                    } else {
+                        acc
+                    }
+                })?;
+
             Ok(Type::Union(Union {
                 type_identifier: type_identifier.clone(),
-                literals: literals
-                    .iter()
-                    .map(|literal| check_type_annotation(literal, discovered_types, type_environment.clone()))
-                    .collect::<Result<Vec<Type>, String>>()?,
+                literal_type: Box::new(literal_type.clone()),
+                literals: literal_types,
             }))
         }
         Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {
@@ -670,12 +706,26 @@ pub fn check_type_annotation(
             },
         })),
         Some(DiscoveredType::Union(type_identifier, literals)) => {
+            let literal_types = literals.iter()
+                .map(|literal| check_type_annotation(literal, discovered_types, type_environment.clone()))
+                .collect::<Result<Vec<Type>, String>>()?;
+
+            let literal_type = literal_types.iter()
+                .fold(Ok(Type::Void), |acc, t| {
+                    if acc == Ok(Type::Void) {
+                        Ok(t.clone())
+                    } else if acc != Ok(t.clone()) {
+                        Err(format!("All literals in a union must have the same type. Expected {}, found {}",
+                            acc.as_ref().unwrap(), t))
+                    } else {
+                        acc
+                    }
+                })?;
+
             Ok(Type::Union(Union {
                 type_identifier: type_identifier.clone(),
-                literals: literals
-                    .iter()
-                    .map(|literal| check_type_annotation(literal, discovered_types, type_environment.clone()))
-                    .collect::<Result<Vec<Type>, String>>()?,
+                literal_type: Box::new(literal_type.clone()),
+                literals: literal_types,
             }))
         }
         Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {

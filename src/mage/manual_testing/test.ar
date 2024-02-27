@@ -1,11 +1,12 @@
-let mut i: i64 = 0;
-
-let x: i64 = while i < let f: i64 = 10 {
-    i = i + 1;
-
-    if i > 50 {
-        break f * 2;
-    }
-} else {
-    f / 2
+union Level {
+    1,
+    2,
+    3
 }
+
+enum Option<T> {
+    Some(T),
+    None
+}
+
+let level: Option<Level> = Option::<Level>::Some(1);
