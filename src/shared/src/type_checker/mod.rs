@@ -31,8 +31,6 @@ impl FullName for Struct {
 
 impl PartialEq for Struct {
     fn eq(&self, other: &Self) -> bool {
-        println!("self.type_identifier == other.type_identifier: {}", self.type_identifier == other.type_identifier);
-        println!("self.fields == other.fields: {}", self.fields == other.fields);
         self.type_identifier == other.type_identifier && self.fields == other.fields
     }
 }

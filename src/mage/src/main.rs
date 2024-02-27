@@ -1,85 +1,68 @@
 mod interpreter;
+mod mage_args;
+mod interactive;
 
-use std::{cell::RefCell, fs::{self}, io::{stdin, stdout, Write}, path::Path, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
+use clap::Parser;
 use interpreter::environment::Environment;
-use shared::{type_checker::{create_typed_ast, TypeEnvironment}, display::{Indent, IndentDisplay}, parser::create_ast};
+use mage_args::MageArgs;
+
+use interactive::interactive;
+use shared::{display::{Indent, IndentDisplay}, parser::create_ast, type_checker::{create_typed_ast, TypeEnvironment}};
 
 fn main() {
-    let result = run_program();
+    let args = MageArgs::parse();
+    
+    let result = if let Some(ref source) = args.source {
+        run_source(source, &args)
+    } else {
+        interactive()
+    };
 
     if let Err(error) = result {
-        println!("Fatal: {}", error);
+        eprintln!("Fatal: {}", error);
     }
 }
 
-fn run_program() -> Result<(), String> {
+fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
+    let source = std::fs::read_to_string(source)
+            .map_err(|error| format!("Failed to read file: {}", error))?;
+
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    loop {
-        let type_environment = type_environment.clone();
-        let _ = stdout().flush();
-        let mut input = String::new();
-        stdin().read_line(&mut input).expect("Failed to read line");
+    let result = read_input(source, type_environment.clone(), environment.clone());
 
-        if let "q" | "quit" | "exit" = input.trim() {
-            break Ok(());
+    if args.variables {
+        if args.label {
+            println!("// Variables:");
         }
 
-        if input.trim().starts_with("read") {
-            let path = Path::new("src/mage/manual_testing");
-
-            let file_name = input
-                .split(" ")
-                .skip(1)
-                .collect::<Vec<&str>>()
-                .join(" ")
-                .replace("\r", "")
-                .replace("\n", "");
-
-            let path = path.join(file_name)
-                .with_extension("ar");
-
-            println!("Reading file: {:?}", path);
-
-            match fs::read_to_string(path) {
-                Ok(source) => input = source,
-                Err(e) => {
-                    println!("Failed to read file: {}", e);
-                    continue;
-                }
-            }
-        }
-
-        if let "types" = input.trim() {
-            for (.., type_) in type_environment.borrow().get_types() {
-                println!("{}", type_);
-            }
-            continue;
-        }
-
-        if let "vars" = input.trim() {
-            for (name, variable) in type_environment.borrow().get_variables() {
-                println!("{}: {}", name, variable);
-            }
-            continue;
-        }
-
-        if let "varsd" = input.trim() {
-            for (name, variable) in type_environment.borrow().get_variables() {
-                println!("{}: {:?}", name, variable);
-            }
-            continue;
-        }
-
-        if let Err(message) = read_input(input, type_environment, environment.clone()) {
-            println!("Error: {}", message);
+        for (name, variable) in environment.borrow().get_variables() {
+            println!("{}: {}", name, variable.clone().borrow().value);
         }
     }
+
+    if args.variables && args.types {
+        println!();
+    }
+
+    if args.types {
+        if args.label {
+            println!("// Types:");
+        }
+
+        for (.., type_) in type_environment.borrow().get_types() {
+            println!("{}", type_);
+        }
+    }
+
+    result
 }
 
-fn read_input(
+
+pub fn read_input(
     input: String,
     type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>) -> Result<(), String> {
@@ -89,19 +72,19 @@ fn read_input(
 
     let tokens = shared::lexer::tokenize(&input)?;
     if PRINT_TOKENS {
-        println!("{:?}\n", tokens);
+        eprintln!("{:?}\n", tokens);
     }
 
     let program = create_ast(tokens)?;
     if PRINT_PARSER_AST {
         let mut indent = Indent::new();
-        println!("{}\n", program.indent_display(&mut indent));
+        eprintln!("{}\n", program.indent_display(&mut indent));
     }
 
     let typed_program = create_typed_ast(program, type_environment)?;
     if PRINT_TYPE_CHECKER_AST {
         let mut indent = Indent::new();
-        println!("{}\n", typed_program.indent_display(&mut indent));
+        eprintln!("{}\n", typed_program.indent_display(&mut indent));
     }
 
     let result = interpreter::evaluate(
@@ -109,9 +92,9 @@ fn read_input(
         environment)?;
 
     if PRINT_TOKENS | PRINT_PARSER_AST || PRINT_TYPE_CHECKER_AST {
-        println!("{}", input);
+        eprintln!("{}", input);
     }
 
-    println!("{}\n", result);
+    println!("{}", result);
     Ok(())
 }

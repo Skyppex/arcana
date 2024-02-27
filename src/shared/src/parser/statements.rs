@@ -25,7 +25,6 @@ fn parse_break(cursor: &mut Cursor) -> Result<Statement, String> {
 
     let expression = if cursor.first().kind != TokenKind::Semicolon {
         let expression = parse_expression(cursor)?;
-        println!("{:?}", expression);
         expect_semicolon(cursor)?;
         Some(expression)
     } else {

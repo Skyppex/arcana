@@ -89,6 +89,10 @@ impl Environment {
         self.resolve(identifier)
     }
 
+    pub fn get_variables(&self) -> &HashMap<String, Rcrc<Variable>> {
+        &self.variables
+    }
+
     pub fn set_variable(&mut self, member: Member, value: Value) -> Result<Value, String> {
         match member {
             Member::Identifier {

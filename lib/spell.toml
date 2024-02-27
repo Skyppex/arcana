@@ -4,4 +4,6 @@ version = "0.1.0"
 
 [bin]
 name = "my-package"
-path = "src/main.ar"
+path = "src/target/lib.exe"
+
+[dependencies]
