@@ -44,21 +44,21 @@ pub(crate) fn interactive() -> Result<(), String> {
             }
         }
 
-        if let "types" = input.trim() {
+        if input.trim() == "types" {
             for (.., type_) in type_environment.borrow().get_types() {
                 println!("{}", type_);
             }
             continue;
         }
 
-        if let "vars" = input.trim() {
+        if input.trim() == "vars" {
             for (name, variable) in type_environment.borrow().get_variables() {
                 println!("{}: {}", name, variable);
             }
             continue;
         }
 
-        if let "varsd" = input.trim() {
+        if input.trim() == "varsd" {
             for (name, variable) in type_environment.borrow().get_variables() {
                 println!("{}: {:?}", name, variable);
             }
