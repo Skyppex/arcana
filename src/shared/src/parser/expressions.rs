@@ -245,7 +245,7 @@ fn parse_named_enum_member_field_initializers(cursor: &mut Cursor) -> Result<Enu
 }
 
 fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_ternary(cursor)?;
+    let mut expression = parse_compound_assignement(cursor)?;
 
     while matches!(cursor.first().kind, TokenKind::Equal) {
         cursor.bump()?; // Consume the =
@@ -258,6 +258,48 @@ fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
         expression = Expression::Assignment(Assignment {
             member: Box::new(member),
             initializer: Box::new(initializer),
+        });
+    }
+
+    Ok(expression)
+}
+
+fn parse_compound_assignement(cursor: &mut Cursor) -> Result<Expression, String> {
+    let mut expression = parse_ternary(cursor)?;
+
+    while matches!(cursor.first().kind,
+        TokenKind::PlusEqual
+        | TokenKind::MinusEqual
+        | TokenKind::StarEqual
+        | TokenKind::SlashEqual
+        | TokenKind::PercentEqual
+        | TokenKind::AmpersandEqual
+        | TokenKind::PipeEqual
+        | TokenKind::CaretEqual) {
+        let operator = cursor.bump()?.kind; // Consume the +=, -=, *=, /=, %=, &=, |=, ^=, >>=, or <<=
+        let initializer = parse_expression(cursor)?;
+
+        let Expression::Member(ref member) = expression else {
+            return Err(format!("Expected member but found {:?}", expression));
+        };
+
+        expression = Expression::Assignment(Assignment {
+            member: Box::new(member.clone()),
+            initializer: Box::new(Expression::Binary(Binary {
+                left: Box::new(expression),
+                right: Box::new(initializer),
+                operator: match operator {
+                    TokenKind::PlusEqual => BinaryOperator::Add,
+                    TokenKind::MinusEqual => BinaryOperator::Subtract,
+                    TokenKind::StarEqual => BinaryOperator::Multiply,
+                    TokenKind::SlashEqual => BinaryOperator::Divide,
+                    TokenKind::PercentEqual => BinaryOperator::Modulo,
+                    TokenKind::AmpersandEqual => BinaryOperator::BitwiseAnd,
+                    TokenKind::PipeEqual => BinaryOperator::BitwiseOr,
+                    TokenKind::CaretEqual => BinaryOperator::BitwiseXor,
+                    _ => unreachable!("Expected +=, -=, *=, /=, %=, &=, |=, or ^=, but found {:?}", operator),
+                },
+            })),
         });
     }
 
@@ -475,7 +517,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
     }
 }
-
+ 
 fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::If) {
         return parse_unary(cursor);
