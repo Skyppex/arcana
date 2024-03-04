@@ -1,9 +1,9 @@
 # Syntax Examples
 
-`let x: i32;` Variable declaration -> Statement \
-`mutable i32 x;` Mutable variable declaration -> Statement \
-`i32 x = 0;` Variable declaration with initialization -> Expression \
-`mutable i32 x = 0;` Mutable variable declaration with initialization -> Expression
+`let x: i64;` Variable declaration -> Statement \
+`let mut x: i64;` Mutable variable declaration -> Statement \
+`let x = 0;` Variable declaration with initialization -> Expression \
+`let mut x: i64 = 0;` Mutable variable declaration with initialization -> Expression
 
 `x = 0;` Variable assignment -> Expression
 

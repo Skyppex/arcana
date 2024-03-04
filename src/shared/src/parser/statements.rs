@@ -1,4 +1,6 @@
-use crate::{lexer::token::{Keyword, TokenKind}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_identifier, TypeIdentifier}};
+use std::vec;
+
+use crate::{lexer::token::{Keyword, TokenKind}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_identifier, GenericConstraint, GenericType, TypeIdentifier}};
 
 use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, EnumDeclaration, EnumMember, EnumMemberField, Expression, FunctionDeclaration, Impl, Literal, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration};
 
@@ -134,6 +136,8 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     let type_identifier = parse_type_identifier(cursor, false)?;
 
+    let where_clause = parse_where_clause(cursor)?;
+    
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
     };
@@ -161,6 +165,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
     Ok(Statement::StructDeclaration(StructDeclaration {
         access_modifier,
         type_identifier,
+        where_clause,
         fields,
     }))
 }
@@ -554,6 +559,58 @@ fn parse_enum_field(cursor: &mut Cursor, field_position: usize) -> Result<EnumMe
 //         value: FlagsValue::Default,
 //     })
 // }
+
+fn parse_where_clause(cursor: &mut Cursor) -> Result<Option<Vec<GenericConstraint>>, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Where) {
+        return Ok(None);
+    }
+
+    cursor.bump()?; // Consume the where
+
+    let mut constraints = vec![];
+
+    while !matches!(cursor.first().kind, TokenKind::Comma | TokenKind::OpenBrace) {
+        constraints.push(parse_generic_constraint(cursor)?);
+    }
+
+    Ok(Some(constraints))
+}
+
+fn parse_generic_constraint(cursor: &mut Cursor) -> Result<GenericConstraint, String> {
+    let generic = parse_type_identifier(cursor, false)?;
+
+    let TypeIdentifier::Type(generic_name) = generic else {
+        return Err(format!("Expected type identifier variant Type but found {:?}", generic));
+    };
+
+    let TokenKind::Keyword(Keyword::Is) = cursor.bump()?.kind else {
+        return Err(format!("Expected 'is' but found {:?}", cursor.first().kind));
+    };
+
+    let mut constraints = vec![];
+
+    let mut has_and = true;
+
+    while let TokenKind::Identifier(_) = cursor.first().kind {
+        if !has_and {
+            break;
+        }
+
+        let type_identifier = parse_type_identifier(cursor, false)?;
+        constraints.push(type_identifier);
+
+        if cursor.first().kind == TokenKind::Keyword(Keyword::And) {
+            cursor.bump()?; // Consume the and
+        } else {
+            has_and = false;
+        }
+    }
+
+    Ok(GenericConstraint {
+        generic: GenericType { type_name: generic_name },
+        constraints,
+    })
+}
 
 fn expect_semicolon(cursor: &mut Cursor) -> Result<(), String> {
     if cursor.first().kind != TokenKind::Semicolon {

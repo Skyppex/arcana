@@ -132,6 +132,12 @@ impl Display for GenericType {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct GenericConstraint {
+    pub generic: GenericType,
+    pub constraints: Vec<TypeIdentifier>,
+}
+
 pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
     let mut cloned_cursor = cursor.clone();
 

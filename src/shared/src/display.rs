@@ -2,7 +2,7 @@ use crate::{parser::{
     AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression, FieldInitializer, FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, VariableDeclaration, While
 }, type_checker::{self, ast::{
     Block, TypedExpression, TypedStatement
-}, Type}, types::{GenericType, TypeAnnotation, TypeIdentifier}};
+}, Type}, types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier}};
 
 pub struct Indent {
     levels: Vec<bool>,
@@ -80,6 +80,7 @@ impl IndentDisplay for Statement {
             Statement::StructDeclaration(StructDeclaration {
                 access_modifier,
                 type_identifier,
+                where_clause,
                 fields 
             }) => {
                 let mut result = String::new();
@@ -88,11 +89,20 @@ impl IndentDisplay for Statement {
 
                 result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
                 result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
+                
+                if let Some(where_clause) = where_clause {
+                    result.push_str(format!("{}where_clause: {}", indent.dash(), indent_display_vec(where_clause, "generic constraints", "constraint", indent)).as_str());
+                } else {
+                    result.push_str(format!("{}where_clause: None", indent.dash()).as_str());
+                }
 
                 for (i, field) in fields.iter().enumerate() {
-                    let is_end = i == fields.len() - 1;
-                    indent.end_current();
-                    result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
+                    if i < fields.len() - 1 {
+                        result.push_str(format!("\n{}{}", indent.dash(), field.indent_display(indent)).as_str());
+                    } else {
+                        indent.end_current();
+                        result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
+                    }
                 }
 
                 indent.decrease();
@@ -813,6 +823,7 @@ impl IndentDisplay for TypedStatement {
             },
             TypedStatement::StructDeclaration {
                 type_identifier,
+                where_clause,
                 fields,
                 type_
             } => {
@@ -821,6 +832,12 @@ impl IndentDisplay for TypedStatement {
                 indent.increase();
 
                 result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
+
+                if let Some(where_clause) = where_clause {
+                    result.push_str(format!("{}where_clause: {}", indent.dash(), indent_display_vec(where_clause, "generic constraints", "constraint", indent)).as_str());
+                } else {
+                    result.push_str(format!("{}where_clause: None", indent.dash()).as_str());
+                }
 
                 for (i, field) in fields.iter().enumerate() {
                     let is_end = i == fields.len() - 1;
@@ -1571,6 +1588,31 @@ impl IndentDisplay for GenericType {
     }
 }
 
+impl IndentDisplay for GenericConstraint {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<generic constraint>\n");
+        indent.increase_leaf();
+        result.push_str(format!("{}type: {}\n", indent.dash_end(), self.generic.indent_display(indent)).as_str());
+        result.push_str(format!("{}constraints:", indent.dash_end()).as_str());
+        indent.increase();
+
+        for (i, constraint) in self.constraints.iter().enumerate() {
+            if i < self.constraints.len() - 1 {
+                result.push_str(format!("\n{}constraint: {},", indent.dash(), constraint.indent_display(indent)).as_str());
+            } else {
+                indent.end_current();
+                result.push_str(format!("\n{}constraint: {}", indent.dash_end(), constraint.indent_display(indent)).as_str());
+            }
+        }
+
+        indent.decrease();
+        indent.decrease();
+        result
+    }
+
+}
+
 impl IndentDisplay for TypeAnnotation {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
@@ -1625,4 +1667,23 @@ impl IndentDisplay for String {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         self.clone()
     }
+}
+
+fn indent_display_vec<T: IndentDisplay>(vec: &Vec<T>, parent_type_name: &str, item_field_name: &str, indent: &mut Indent) -> String {
+    let mut result = String::new();
+    
+    result.push_str(format!("<{}>", parent_type_name).as_str());
+    indent.increase();
+
+    for (i, item) in vec.iter().enumerate() {
+        if i < vec.len() - 1 {
+            result.push_str(format!("\n{}{}: {},", indent.dash(), item_field_name, item.indent_display(indent)).as_str());
+        } else {
+            indent.end_current();
+            result.push_str(format!("\n{}{}: {}", indent.dash_end(), item_field_name, item.indent_display(indent)).as_str());
+        }
+    }
+
+    indent.decrease();
+    result
 }

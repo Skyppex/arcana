@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 use std::hash::Hash;
 
-use crate::types::{TypeAnnotation, TypeIdentifier};
+use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Impl{
@@ -54,6 +54,7 @@ pub enum Expression {
 pub struct StructDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
+    pub where_clause: Option<Vec<GenericConstraint>>,
     pub fields: Vec<StructField>,
 }
 

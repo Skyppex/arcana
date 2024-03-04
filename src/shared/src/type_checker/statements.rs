@@ -18,6 +18,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         Statement::StructDeclaration(parser::StructDeclaration {
             access_modifier: _,
             type_identifier,
+            where_clause: _,
             fields,
         }) => Ok(vec![DiscoveredType::Struct(
             type_identifier.clone(),
@@ -113,6 +114,7 @@ pub fn check_type<'a>(
         Statement::StructDeclaration(parser::StructDeclaration {
             access_modifier: _,
             type_identifier,
+            where_clause,
             fields,
         }) => {
             let struct_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
@@ -125,7 +127,15 @@ pub fn check_type<'a>(
                 }
             }
 
-            let fs: Result<Vec<ast::StructField>, String> = fields
+            if let Some(where_clause) = where_clause {
+                for constraint in where_clause {
+                    if !struct_type_environment.borrow().lookup_type_str(&constraint.generic.type_name) {
+                        return Err(format!("Generic type {} not found in struct declaration", constraint.generic.type_name));
+                    }
+                }
+            }
+
+            let fields: Result<Vec<ast::StructField>, String> = fields
                 .iter()
                 .map(|field| {
                     match check_type_annotation(&field.type_annotation, &discovered_types, struct_type_environment.clone()) {
@@ -139,7 +149,7 @@ pub fn check_type<'a>(
                 })
                 .collect();
 
-            let fields: Result<HashMap<String, Type>, String> = fs
+            let field_types: Result<HashMap<String, Type>, String> = fields
                 .clone()?
                 .iter()
                 .map(|f: &ast::StructField| {
@@ -158,14 +168,15 @@ pub fn check_type<'a>(
 
             let type_ = Type::Struct(Struct {
                 type_identifier: type_identifier.clone(),
-                fields: fields?,
+                fields: field_types?,
             });
 
             type_environment.borrow_mut().add_type(type_.clone())?;
 
             Ok(TypedStatement::StructDeclaration {
                 type_identifier: type_identifier.clone(),
-                fields: fs?,
+                where_clause: where_clause.clone(),
+                fields: fields?,
                 type_,
             })
         }
@@ -184,10 +195,10 @@ pub fn check_type<'a>(
                 }
             }
 
-            let ms: Result<Vec<ast::EnumMember>, String> = members
+            let members: Result<Vec<ast::EnumMember>, String> = members
                 .iter()
                 .map(|member| {
-                    let fs: Result<Vec<ast::EnumMemberField>, String> = member
+                    let fields: Result<Vec<ast::EnumMemberField>, String> = member
                         .fields
                         .iter()
                         .map(|field| {
@@ -207,7 +218,7 @@ pub fn check_type<'a>(
                         })
                         .collect();
 
-                    let fields: Result<HashMap<String, Type>, String> = fs
+                    let field_types: Result<HashMap<String, Type>, String> = fields
                         .clone()?
                         .iter()
                         .map(|f| {
@@ -230,7 +241,7 @@ pub fn check_type<'a>(
                     let enum_member = Type::EnumMember(EnumMember {
                         enum_name: type_identifier.clone(),
                         discriminant_name: member.identifier.clone(),
-                        fields: fields?,
+                        fields: field_types?,
                     });
 
                     type_environment.borrow_mut().add_type(enum_member.clone())?;
@@ -238,27 +249,27 @@ pub fn check_type<'a>(
                     Ok(ast::EnumMember {
                         enum_name: type_identifier.clone(),
                         discriminant_name: member.identifier.clone(),
-                        fields: fs.clone()?,
+                        fields: fields.clone()?,
                         type_: enum_member,
                     })
                 })
                 .collect();
 
-            let enum_ = Type::Enum(Enum {
+            let enum_type = Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
-                members: ms
+                members: members
                     .clone()?
                     .iter()
                     .map(|m| (m.discriminant_name.clone(), m.type_.clone()))
                     .collect(),
             });
 
-            type_environment.borrow_mut().add_type(enum_.clone())?;
+            type_environment.borrow_mut().add_type(enum_type.clone())?;
 
             Ok(TypedStatement::EnumDeclaration {
                 type_identifier: type_identifier.clone(),
-                members: ms?,
-                type_: enum_,
+                members: members?,
+                type_: enum_type,
             })
         },
         Statement::UnionDeclaration(UnionDeclaration {

@@ -4,9 +4,7 @@ union Level {
     3
 }
 
-enum Option<T> {
-    Some(T),
-    None
+struct A<T>
+where T is Level {
+    level: T
 }
-
-let level: Option<Level> = Option::<Level>::Some(1);

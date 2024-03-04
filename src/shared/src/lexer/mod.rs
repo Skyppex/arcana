@@ -301,29 +301,43 @@ fn escapable_is_char(c: char) -> Option<char> {
 
 fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
     match string {
+        // Access modifiers
+        "public" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Public))),
+        "internal" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
+        "super" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
+
+        // Variable declarations
         "let" => Some(TokenKind::Keyword(Keyword::Let)),
+
+        // Types
         "mut" => Some(TokenKind::Keyword(Keyword::Mut)),
-        "if" => Some(TokenKind::Keyword(Keyword::If)),
-        "else" => Some(TokenKind::Keyword(Keyword::Else)),
-        "loop" => Some(TokenKind::Keyword(Keyword::Loop)),
-        "while" => Some(TokenKind::Keyword(Keyword::While)),
-        // "for" => Some(TokenKind::Keyword(Keyword::For)),
-        // "match" => Some(TokenKind::Keyword(Keyword::Match)),
-        "break" => Some(TokenKind::Keyword(Keyword::Break)),
-        "continue" => Some(TokenKind::Keyword(Keyword::Continue)),
         "func" => Some(TokenKind::Keyword(Keyword::Func)),
-        "return" => Some(TokenKind::Keyword(Keyword::Return)),
         "struct" => Some(TokenKind::Keyword(Keyword::Struct)),
         "enum" => Some(TokenKind::Keyword(Keyword::Enum)),
         "union" => Some(TokenKind::Keyword(Keyword::Union)),
         // "flags" => Some(TokenKind::Keyword(Keyword::Flags)),
         "impl" => Some(TokenKind::Keyword(Keyword::Impl)),
-        "public" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Public))),
-        "internal" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
-        "super" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
+
+        // Generics
+        "where" => Some(TokenKind::Keyword(Keyword::Where)),
+        "is" => Some(TokenKind::Keyword(Keyword::Is)),
+        "and" => Some(TokenKind::Keyword(Keyword::And)),
+
+        // Control flow
+        "if" => Some(TokenKind::Keyword(Keyword::If)),
+        "else" => Some(TokenKind::Keyword(Keyword::Else)),
+        // "match" => Some(TokenKind::Keyword(Keyword::Match)),
+        "loop" => Some(TokenKind::Keyword(Keyword::Loop)),
+        "while" => Some(TokenKind::Keyword(Keyword::While)),
+        // "for" => Some(TokenKind::Keyword(Keyword::For)),
+        "return" => Some(TokenKind::Keyword(Keyword::Return)),
+        "break" => Some(TokenKind::Keyword(Keyword::Break)),
+        "continue" => Some(TokenKind::Keyword(Keyword::Continue)),
+
+        // Literals
+        "unit" => Some(TokenKind::Literal(Literal::Unit)),
         "true" => Some(TokenKind::Literal(Literal::Bool(true))),
         "false" => Some(TokenKind::Literal(Literal::Bool(false))),
-        "unit" => Some(TokenKind::Literal(Literal::Unit)),
 
         #[cfg(feature = "interpreter")]
         "drop" => Some(TokenKind::Keyword(Keyword::Drop)),

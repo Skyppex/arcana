@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{parser, types::{TypeIdentifier, TypeAnnotation}};
+use crate::{parser, types::{GenericConstraint, TypeAnnotation, TypeIdentifier}};
 
 use super::Type;
 
@@ -17,6 +17,7 @@ pub enum TypedStatement {
     },
     StructDeclaration {
         type_identifier: TypeIdentifier,
+        where_clause: Option<Vec<GenericConstraint>>,
         fields: Vec<StructField>,
         type_: Type,
     },

@@ -56,22 +56,28 @@ We also define a default implementation for the `not_equals` function which retu
 This means that if you implement `equals` for your own type, you get `not_equals` for free.
 Implementors of the trait can still override the default implementation if they want to.
 
-## Full Example of the New trait
+## Full Example of the Newable trait
 
-Defining the `New` trait is quite trivial. We want the trait be implemented only once for each type to avoid ambiguity when calling the new function.
+Defining the `Newable` trait is quite trivial. We want the trait be implemented only once for each type to avoid ambiguity when calling the new function.
 
 ```rs
-trait New<[..T: param]> {
+trait Newable<[..T: param]> {
     type Return;
 
     func new([..T]) -> Self::Return;
 }
 ```
 
-This defines the `New` trait as a generic trait which takes an array of possibly different generic types which must all be `param` types.
+This defines the `Newable` trait as a generic trait which takes any number of possibly different generic types which must all be `param` types.
+
+> The *possibly different* part of it from the `..` syntax.
+> If it was omitted it would take any number of the **same** generic type. 
+
+> Also note that the generic `[T]` is coercible to `[..T]` because the *possibly different* types can theoretically be the same type.
+
 These generic parameters are then use in the function signature for `new()` which allows the new function to take any amount of different arguments when implemented, but only those exact arguments when called.
 
-When implementing the `New` trait you have to specify the parameters as generic types. Note that you can have zero of them.
+When implementing the `Newable` trait you have to specify the parameters as generic types. Note that you can have zero of them.
 
 ```rs
 struct MyStruct {
@@ -80,7 +86,7 @@ struct MyStruct {
 }
 
 // Would be nice to avoid defining the parameters twice using type inference somehow
-impl New<[..a: i64, b: string]> for MyStruct {
+impl Newable<[..a: i64, b: string]> for MyStruct {
     type Return = MyStruct;
 
     func new(a: i64, b: string): Self::Return {
@@ -89,7 +95,7 @@ impl New<[..a: i64, b: string]> for MyStruct {
 }
 
 // Here's how you would define it with no input parameters
-impl New<[..]> for MyStruct {
+impl Newable<[..]> for MyStruct {
     type Return = MyStruct;
 
     func new(): Self::Return {
@@ -101,7 +107,7 @@ impl New<[..]> for MyStruct {
 Here's how you would constrain your function to take a generic type which has en empty constructor:
 
 ```rs
-func create_with_extra_logic<T: New<[..]>(): T {
+func create_with_extra_logic<T: Newable<[..]>(): T {
     T::new()
     // Extra logic
 }

@@ -218,6 +218,8 @@ pub fn check_type<'a>(
                         Err(format!("{} is not a struct", type_.full_name()))?
                     };
 
+                    println!("{:?}", fields);
+
                     let field_initializers = field_initializers?;
 
                     for (field, initializer) in fields.iter().zip(field_initializers.iter()) {

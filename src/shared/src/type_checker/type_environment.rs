@@ -181,4 +181,11 @@ impl TypeEnvironment {
                 .map_or(false, |parent|
                     parent.borrow().lookup_type(type_))
     }
+
+    pub fn lookup_type_str(&self, type_name: &str) -> bool {
+        self.types.values().into_iter().any(|t| t.full_name() == type_name) ||
+            self.parent.as_ref()
+                .map_or(false, |parent|
+                    parent.borrow().lookup_type_str(type_name))
+    }
 }

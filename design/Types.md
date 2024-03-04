@@ -152,6 +152,39 @@ implement Foo {
 }
 ```
 
+## Literal Type Annotation
+
+Literal type annotation exists to annotate literal types in situations where just having the actual literal value isn't good enough
+
+### Syntax
+```rs
+lit a = #"Hello World";
+
+lit b = #255;
+```
+
+### Example
+
+Here's an example of when you'd have to use the literal syntax if you wished to specify the generic type.
+Note that this example doesn't require the explicit generic annotation because it can be inferred.
+
+```rs
+struct A<T>
+where T is 1 or 2 or 3 {
+    a: T
+}
+
+let a = A::<#2> { a: 2 }
+```
+
+```rs
+struct A {
+    a: 1 or 2 or 3
+}
+
+let a = A { a: 2 }
+```
+
 ## Type Aliases
 
 Type aliases are used to give a type a different name. \
@@ -224,7 +257,8 @@ They are similar to generic constraints in other languages.
 ### Syntax
 
 ```rs
-struct Foo<T: Trait> {
+struct Foo<T>
+where T is Trait {
     bar: T,
 }
 ```
@@ -232,40 +266,14 @@ struct Foo<T: Trait> {
 ### Example
 
 Here the `Foo` type has a type parameter `T` which is used as the type of the `bar` field. \
-The type parameter `T` must implement the `Newable` trait.
+The type parameter `T` must implement the `New` trait.
 ```rs
 trait Newable {
     fn new(): Self;
 }
 
-struct Foo<T: Trait> {
-    bar: T,
-}
-```
-
-## Type Bounds
-
-Type bounds are used to restrict the types which can be used as type parameters. \
-They are similar to generic constraints in other languages.
-
-### Syntax
-
-```rs
-struct Foo<T> where T: Trait {
-    bar: T,
-}
-```
-
-### Example
-
-Here the `Foo` type has a type parameter `T` which is used as the type of the `bar` field. \
-The type parameter `T` must implement the `Newable` trait.
-```rs
-trait Newable {
-    fn new(): Self;
-}
-
-struct Foo<T> where T: Trait {
+struct Foo<T>
+where T is Newable {
     bar: T,
 }
 ```
@@ -404,3 +412,24 @@ public struct Foo {
 
 type FooBarBaz = Extend<Foo, public barBaz: bool>;
 ```
+
+## Easy way to new a Vec
+
+```rs
+struct Vec<T> {
+    items: ¤[T], // Boxed slice of Ts
+}
+
+impl<T> Vec<T> {
+    func new<[T]>(items: T): Self {
+        Vec { items: ¤items }
+    }
+}
+
+// Usage
+func main() {
+    let nums = Vec::new(1, 2, 3);
+}
+```
+
+In this example the `new` function takes any number of arguments with type `T`. The arguments passed in are converted to a fixed size stack allocated array, in this case `[i64; 3]`. The `items` are then boxed and put into the `Vec`.

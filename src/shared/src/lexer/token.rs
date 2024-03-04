@@ -171,7 +171,7 @@ pub enum Keyword {
     // Access modifiers
     AccessModifier(AccessModifier),
 
-    // Variable Declarations
+    // Variable declarations
     Let,
 
     // Types
@@ -183,6 +183,11 @@ pub enum Keyword {
     // Flags,
     Impl,
 
+    // Generics
+    Where,
+    Is,
+    And,
+
     // Control flow
     If,
     Else,
@@ -190,13 +195,9 @@ pub enum Keyword {
     Loop,
     While,
     // For,
+    Return,
     Break,
     Continue,
-    Return,
-
-    // Literals
-    True,
-    False,
 
     // Interpreter specific
     #[cfg(feature = "interpreter")]
