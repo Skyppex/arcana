@@ -380,7 +380,7 @@ impl FullName for Type {
             Type::EnumMemberField(umf) => umf.full_name(),
             Type::Union(u) => u.full_name(),
             Type::Function(f) => f.full_name(),
-            Type::Literal { name, type_ } => format!("LIT {}: {}", type_.full_name(), name),
+            Type::Literal { name, type_ } => format!("#{}: {}", type_.full_name(), name),
         }
     }
 }

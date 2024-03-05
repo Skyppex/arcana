@@ -64,3 +64,9 @@ The struct literal syntax is as follows:
 Foo { bar: 5, baz: 10 }
 ```
 This is assignable to a value of type Foo
+
+## Defining literal values
+
+```rs
+lit x = 1;
+```

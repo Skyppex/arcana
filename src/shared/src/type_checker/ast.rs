@@ -309,7 +309,27 @@ impl Typed for Literal {
     }
 
     fn get_deep_type(&self) -> Type {
-        self.get_type()
+        match self {
+            Literal::Unit => Type::Unit,
+            Literal::I8(_) => Type::I8,
+            Literal::I16(_) => Type::I16,
+            Literal::I32(_) => Type::I32,
+            Literal::I64(_) => Type::I64,
+            Literal::I128(_) => Type::I128,
+            Literal::U8(_) => Type::U8,
+            Literal::U16(_) => Type::U16,
+            Literal::U32(_) => Type::U32,
+            Literal::U64(_) => Type::U64,
+            Literal::U128(_) => Type::U128,
+            Literal::F32(_) => Type::F32,
+            Literal::F64(_) => Type::F64,
+            Literal::String(_) => Type::String,
+            Literal::Char(_) => Type::Char,
+            Literal::Bool(_) => Type::Bool,
+            Literal::Array { type_, .. } => type_.clone(),
+            Literal::Struct { type_, .. } => type_.clone(),
+            Literal::Enum { type_, .. } => type_.clone(),
+        }
     }
 }
 

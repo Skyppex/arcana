@@ -176,7 +176,7 @@ pub fn check_type<'a>(
 
                         for e in v {
                             let value = check_type(&e, discovered_types, type_environment.clone())?;
-                            let type_ = value.get_type();
+                            let type_ = value.get_deep_type();
                             
                             if !type_equals(&previous_type, &Type::Void) &&
                                !type_equals(&type_, &previous_type) {

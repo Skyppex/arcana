@@ -1,10 +1,1 @@
-union Level {
-    1,
-    2,
-    3
-}
-
-struct A<T>
-where T is Level {
-    level: T
-}
+let arr: [i64] = [1, 2, 3]
