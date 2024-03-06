@@ -134,7 +134,7 @@ pub fn check_type<'a>(
             match member {
                 crate::parser::Member::Identifier { symbol } => {
                     let type_ = type_environment.borrow().get_variable(symbol)
-                        // .or(type_environment.borrow().get_type_from_annotation(symbol)) // I can't remember why i added this
+                        .or(type_environment.borrow().get_type_from_str(symbol))
                         .ok_or_else(|| format!("Unexpected variable: {}", symbol))?.clone();
 
                     Ok(TypedExpression::Member(Member::Identifier {

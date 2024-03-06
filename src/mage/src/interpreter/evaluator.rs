@@ -58,7 +58,9 @@ fn evaluate_function_declaration(
     identifier: TypeIdentifier,
     parameters: Vec<Parameter>,
     body: Vec<TypedStatement>) -> Result<Value, String> {
-    todo!()
+    let function = Value::Function { parameters: parameters.into_iter().map(|p| p.identifier).collect(), body };
+    environment.borrow_mut().add_variable(identifier.to_string(), function, false);
+    Ok(Value::Void)
 }
 
 fn evaluate_expression<'a>(typed_expression: TypedExpression, environment: Rcrc<Environment>) -> Result<Value, String> {

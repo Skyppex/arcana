@@ -1,1 +1,9 @@
-let arr: [i64] = [1, 2, 3]
+struct A {
+    a: i64
+}
+
+impl A {
+    func new(a: i64): A {
+        return A { a: a };
+    }
+}

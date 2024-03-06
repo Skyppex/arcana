@@ -341,11 +341,17 @@ fn parse_impl(cursor: &mut Cursor) -> Result<Statement, String> {
     cursor.bump()?; // Consume the impl
 
     if !can_be_type_annotation(cursor) {
-        return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
+        return Err(format!("Expected type annotation but found {:?}", cursor.first().kind));
     }
 
     let type_annotation = parse_type_annotation(cursor, false)?;
     let methods = parse_block_statements(cursor)?;
+
+    for method in methods.iter() {
+        if !matches!(method, Statement::FunctionDeclaration(_)) {
+            return Err(format!("Expected function declaration but found {:?}", method));
+        }
+    }
 
     Ok(Statement::Impl(Impl { type_annotation, functions: methods }))
 }

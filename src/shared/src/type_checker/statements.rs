@@ -366,8 +366,6 @@ pub fn check_type<'a>(
             type_annotation,
             functions,
         }) => {
-            let impl_type = check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
-
             let mut typed_functions = vec![];
 
             for function in functions {
@@ -396,7 +394,7 @@ pub fn check_type<'a>(
                 });
 
                 type_environment.borrow_mut().add_impl_function(
-                    impl_type.clone(),
+                    type_annotation.clone(),
                     identifier.clone(),
                     function_type.clone(),
                 )?;
@@ -459,7 +457,10 @@ pub fn check_type<'a>(
             let return_scope = block_environment.borrow().get_scope(&ScopeType::Return);
 
             let body_type = return_scope.map(|s| s.fold())
-                .unwrap_or(Ok(Type::Void))?;
+                .unwrap_or_else(|| Ok(body_typed_statement.iter()
+                    .last()
+                    .map(|ts| ts.get_type())
+                    .unwrap_or(Type::Void)))?;
 
             if return_type != body_type {
                 return Err(format!("Function body's return type {} does not match function return type {}", body_type, return_type));

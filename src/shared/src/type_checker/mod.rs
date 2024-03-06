@@ -15,7 +15,7 @@ use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{parser, types::{GenericType, TypeAnnotation, TypeIdentifier}};
 
-use self::{ast::Literal, statements::check_type_annotation};
+use self::statements::check_type_annotation;
 
 #[derive(Debug, Clone)]
 pub struct Struct {

@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::types::{TypeAnnotation, TypeIdentifier};
 
-use super::{scope::{Scope, ScopeType}, FullName, Type};
+use super::{scope::{Scope, ScopeType}, FullName, Function, Type};
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
 
@@ -11,7 +11,8 @@ pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
     types: HashMap<TypeIdentifier, Type>,
     variables: HashMap<String, Type>,
-    impls: HashMap<String, HashMap<String, Type>>,
+    static_member_functions: HashMap<TypeAnnotation, HashMap<TypeIdentifier, Type>>,
+    instance_member_functions: HashMap<TypeAnnotation, HashMap<TypeIdentifier, Type>>,
     scopes: Vec<Scope>,
 }
 
@@ -39,7 +40,8 @@ impl TypeEnvironment {
                 (TypeIdentifier::Type("string".to_string()), Type::String),
             ]),
             variables: HashMap::new(),
-            impls: HashMap::new(),
+            static_member_functions: HashMap::new(),
+            instance_member_functions: HashMap::new(),
             scopes: Vec::new(),
         }
     }
@@ -49,7 +51,8 @@ impl TypeEnvironment {
             parent: Some(parent),
             types: HashMap::new(),
             variables: HashMap::new(),
-            impls: HashMap::new(),
+            static_member_functions: HashMap::new(),
+            instance_member_functions: HashMap::new(),
             scopes: Vec::new(),
         }
     }
@@ -64,7 +67,8 @@ impl TypeEnvironment {
             parent: Some(parent),
             variables: HashMap::new(),
             types: HashMap::new(),
-            impls: HashMap::new(),
+            static_member_functions: HashMap::new(),
+            instance_member_functions: HashMap::new(),
             scopes: scopes.into_iter()
                 .map(|scope| scope.into())
                 .collect::<Vec<Scope>>(),
@@ -110,8 +114,49 @@ impl TypeEnvironment {
         Ok(())
     }
 
-    pub fn add_impl_function(&mut self, type_: Type, function_name: TypeIdentifier, function_type: Type) -> Result<(), String> {
-        todo!()
+    pub fn add_impl_function(&mut self, type_annotation: TypeAnnotation, function_name: TypeIdentifier, function_type: Type) -> Result<(), String> {
+        let Type::Function(Function { parameters, .. }) = &function_type else {
+            return Err("Impl function must be a function".to_string());
+        };
+
+        if let Some((param_name, _)) = parameters.iter().next() {
+            if param_name == "self" {
+                // There probably needs to be a check here
+                return self.add_instance_member_function(type_annotation, function_name, function_type);
+            }
+        }
+
+        return self.add_static_member_function(type_annotation, function_name, function_type);
+    }
+
+    fn add_instance_member_function(&mut self, type_annotation: TypeAnnotation, function_name: TypeIdentifier, function_type: Type) -> Result<(), String> {
+        if !self.instance_member_functions.contains_key(&type_annotation) {
+            self.instance_member_functions.insert(type_annotation.clone(), HashMap::new());
+        }
+
+        let functions = self.instance_member_functions.get_mut(&type_annotation).expect("Just inserted");
+
+        if functions.contains_key(&function_name) {
+            return Err(format!("Function {} already exists", function_name));
+        }
+
+        functions.insert(function_name, function_type);
+        Ok(())
+    }
+
+    fn add_static_member_function(&mut self, type_annotation: TypeAnnotation, function_name: TypeIdentifier, function_type: Type) -> Result<(), String> {
+        if !self.static_member_functions.contains_key(&type_annotation) {
+            self.static_member_functions.insert(type_annotation.clone(), HashMap::new());
+        }
+
+        let functions = self.static_member_functions.get_mut(&type_annotation).expect("Just inserted");
+
+        if functions.contains_key(&function_name) {
+            return Err(format!("Function {} already exists", function_name));
+        }
+
+        functions.insert(function_name, function_type);
+        Ok(())
     }
 
     pub fn add_variable(&mut self, name: String, type_: Type) {
@@ -119,7 +164,8 @@ impl TypeEnvironment {
     }
 
     pub fn get_type_from_str(&self, type_str: &str) -> Option<Type> {
-        todo!()          
+        self.types.get(&TypeIdentifier::Type(type_str.to_string())).cloned()
+            .or_else(|| self.parent.as_ref().and_then(|p| p.borrow().get_type_from_str(type_str)))
     }
 
     pub fn get_type_from_annotation(&self, type_annotation: &TypeAnnotation, type_environment: Rc<RefCell<TypeEnvironment>>) -> Result<Type, String> {
