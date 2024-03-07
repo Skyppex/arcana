@@ -107,7 +107,7 @@ impl Newable<[..]> for MyStruct {
 Here's how you would constrain your function to take a generic type which has en empty constructor:
 
 ```rs
-func create_with_extra_logic<T: Newable<[..]>(): T {
+func create_with_extra_logic<T is Newable<[..]>(): T {
     T::new()
     // Extra logic
 }
