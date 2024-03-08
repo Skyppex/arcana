@@ -1,6 +1,6 @@
 use std::{fmt::Display, collections::HashMap};
 
-use shared::{type_checker::ast::TypedStatement, types::{TypeAnnotation, TypeIdentifier}};
+use shared::{type_checker::ast::TypedStatement, types::TypeAnnotation};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -15,6 +15,7 @@ pub enum Value {
     Struct { struct_name: TypeAnnotation, fields: HashMap<String, Value> },
     Enum { enum_member: EnumMember, fields: EnumFields },
     Function { parameters: Vec<String>, body: Vec<TypedStatement> },
+    MemberFunction { type_name: TypeAnnotation, parameters: Vec<String>, body: Vec<TypedStatement> },
 }
 
 impl<'a> Display for Value {
@@ -92,9 +93,16 @@ impl<'a> Display for Value {
                 }
             },
             Value::Function {
-                parameters: _,
+                parameters,
                 body: _
-            } => todo!("Display for function value"),
+            } => {
+                write!(f, "({})", parameters.iter().map(|p| p.to_string()).collect::<Vec<String>>().join(", "))
+            },
+            Value::MemberFunction {
+                type_name,
+                parameters,
+                body: _
+            } => write!(f, "{}.({})", type_name, parameters.iter().map(|p| p.to_string()).collect::<Vec<String>>().join(", ")),
         }
     }
 }

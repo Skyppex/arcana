@@ -172,13 +172,17 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
 }
 
 fn parse_enum_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) -> Result<Expression, String> {
-    let TokenKind::DoubleColon = cursor.bump()?.kind else {
+    let TokenKind::DoubleColon = cursor.first().kind else {
         return Err(format!("Expected :: but found {:?}", cursor.first().kind));
     };
+
+    cursor.bump()?; // Consume the ::
     
-    let TokenKind::Identifier(member) = cursor.bump()?.kind else {
+    let TokenKind::Identifier(member) = cursor.first().kind else {
         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
     };
+
+    cursor.bump()?; // Consume the identifier
 
     let field_initializers = {
         if cursor.first().kind == TokenKind::OpenParen {
@@ -245,7 +249,7 @@ fn parse_named_enum_member_field_initializers(cursor: &mut Cursor) -> Result<Enu
 }
 
 fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_compound_assignement(cursor)?;
+    let mut expression = parse_compound_assignment(cursor)?;
 
     while matches!(cursor.first().kind, TokenKind::Equal) {
         cursor.bump()?; // Consume the =
@@ -264,7 +268,7 @@ fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
-fn parse_compound_assignement(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_ternary(cursor)?;
 
     while matches!(cursor.first().kind,
@@ -646,6 +650,24 @@ fn parse_index_expression(caller: Expression, cursor: &mut Cursor) -> Result<Exp
 
 fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut object = parse_literal(cursor)?;
+
+    while let TokenKind::DoubleColon = cursor.first().kind {
+        cursor.bump()?; // Consume the .
+
+        let TokenKind::Identifier(identifier) = cursor.first().kind else {
+            return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+        };
+
+        let Expression::Member(member) = parse_literal(cursor)? else {
+            return Err(format!("Expected member but found {:?}", cursor.first().kind));
+        };
+
+        object = Expression::Member(Member::MemberAccess {
+            object: Box::new(object),
+            member: Box::new(member),
+            symbol: identifier,
+        });
+    }
 
     while let TokenKind::Dot = cursor.first().kind {
         cursor.bump()?; // Consume the .

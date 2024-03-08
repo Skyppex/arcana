@@ -351,11 +351,13 @@ pub fn check_type<'a>(
                         Err(format!("Expected function type, found {}", function_type.full_name()))?
                     };
 
+                    if function.clone().parameters.len() != call.arguments.len() {
+                        Err(format!("Expected {} arguments, found {}", function.clone().parameters.len(), call.arguments.len()))?
+                    }
+
                     let mut args = vec![];
                     for (i, (.., type_)) in function.clone().parameters.iter().enumerate() {
-                        let Some(arg) = call.arguments.get(i) else {
-                            Err("Not enough arguments")?
-                        };
+                        let arg = &call.arguments[i];
                         
                         let arg_typed_expression = check_type(arg, discovered_types, type_environment.clone())?;
 

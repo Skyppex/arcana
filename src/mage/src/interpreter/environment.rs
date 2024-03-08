@@ -10,6 +10,7 @@ pub type Rcrc<T> = Rc<RefCell<T>>;
 pub struct Environment {
     pub parent: Option<Rcrc<Environment>>,
     pub variables: HashMap<String, Rcrc<Variable>>,
+    pub functions: HashMap<String, Rcrc<Variable>>,
     pub scopes: Vec<ScopeState>,
 }
 
@@ -18,6 +19,7 @@ impl Environment {
         Self {
             parent: None,
             variables: HashMap::new(),
+            functions: HashMap::new(),
             scopes: vec![],
         }
     }
@@ -26,6 +28,7 @@ impl Environment {
         Self {
             parent: Some(parent),
             variables: HashMap::new(),
+            functions: HashMap::new(),
             scopes: vec![],
         }
     }
@@ -39,6 +42,7 @@ impl Environment {
         Self {
             parent: Some(parent),
             variables: HashMap::new(),
+            functions: HashMap::new(),
             scopes: scopes.into_iter()
                 .map(|scope| scope.into())
                 .collect::<Vec<ScopeState>>(),
@@ -85,12 +89,20 @@ impl Environment {
         self.variables.insert(identifier.clone(), Rc::new(RefCell::new(Variable::new(identifier, value, mutable))));
     }
 
+    pub fn add_function(&mut self, identifier: String, value: Value, mutable: bool) {
+        self.functions.insert(identifier.clone(), Rc::new(RefCell::new(Variable::new(identifier, value, mutable))));
+    }
+
     pub fn get_variable(&self, identifier: &str) -> Option<Rcrc<Variable>> {
         self.resolve(identifier)
     }
 
     pub fn get_variables(&self) -> &HashMap<String, Rcrc<Variable>> {
         &self.variables
+    }
+
+    pub fn get_function(&self, identifier: &str) -> Option<Rcrc<Variable>> {
+        self.resolve_function(identifier)
     }
 
     pub fn set_variable(&mut self, member: Member, value: Value) -> Result<Value, String> {
@@ -127,6 +139,16 @@ impl Environment {
     pub fn resolve(&self, name: &str) -> Option<Rcrc<Variable>> {
         if let Some(variable) = self.variables.get(name) {
             Some(variable.clone())
+        } else if let Some(parent) = &self.parent {
+            parent.borrow().resolve(name)
+        } else {
+            None
+        }
+    }
+    
+    pub fn resolve_function(&self, name: &str) -> Option<Rcrc<Variable>> {
+        if let Some(functions) = self.functions.get(name) {
+            Some(functions.clone())
         } else if let Some(parent) = &self.parent {
             parent.borrow().resolve(name)
         } else {

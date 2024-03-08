@@ -17,7 +17,15 @@ pub fn evaluate<'a>(typed_statement: TypedStatement, environment: Rcrc<Environme
             functions
         } => {
             for function in functions {
-                todo!()
+                let TypedStatement::FunctionDeclaration { identifier, parameters, return_type, body, type_ } = function else {
+                    return Err("Impl function must be a function".to_string())?;
+                };
+
+                let function_value = evaluate_function_declaration(
+                    &environment,
+                    identifier,
+                    parameters,
+                    body)?;
             }
 
             Ok(Value::Void)
@@ -59,7 +67,7 @@ fn evaluate_function_declaration(
     parameters: Vec<Parameter>,
     body: Vec<TypedStatement>) -> Result<Value, String> {
     let function = Value::Function { parameters: parameters.into_iter().map(|p| p.identifier).collect(), body };
-    environment.borrow_mut().add_variable(identifier.to_string(), function, false);
+    environment.borrow_mut().add_function(identifier.to_string(), function, false);
     Ok(Value::Void)
 }
 
@@ -227,6 +235,7 @@ fn evaluate_member<'a>(member: Member, environment: Rcrc<Environment>) -> Result
             type_: _
         } => {
             Ok(environment.borrow().get_variable(&symbol)
+                .or(environment.borrow().get_function(&symbol))
                 .ok_or(format!("Variable '{}' not found", symbol))?
                 .borrow().value.clone())
         }

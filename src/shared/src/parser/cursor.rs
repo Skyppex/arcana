@@ -49,6 +49,7 @@ impl Cursor {
     }
 
     pub(crate) fn bump(&mut self) -> Result<Token, String> {
+        println!("Bumping: {:?}", self.first());
         self.tokens.pop().ok_or("Unexpected end of file".to_string())
     }
 }
