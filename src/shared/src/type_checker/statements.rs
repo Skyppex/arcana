@@ -1,9 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{parser::{self, Impl, Statement, UnionDeclaration}, types::{TypeAnnotation, TypeIdentifier}};
+use crate::{parser::{self, Impl, Statement, UnionDeclaration}, types::{GenericType, TypeAnnotation, TypeIdentifier}};
 
 use super::{
-    ast::{self, Typed, TypedStatement}, expressions, scope::ScopeType, type_checker::DiscoveredType, type_environment::TypeEnvironment, Enum, EnumMember, EnumMemberField, Function, Rcrc, Struct, StructField, Type, Union
+    ast::{self, Typed, TypedStatement}, expressions, scope::ScopeType, type_checker::DiscoveredType, type_environment::TypeEnvironment, Enum, EnumMember, EnumMemberField, Function, Rcrc, Struct, StructField, Trait, Type, Union
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -58,6 +58,23 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .map(|literal| TypeAnnotation::Literal(Box::new(literal.clone())))
                 .collect(),
         )]),
+        Statement::TraitDeclaration(parser::TraitDeclaration {
+            access_modifier: _,
+            type_identifier,
+            associated_types,
+            functions,
+        }) => {
+            let mut discovered_types = vec![];
+
+            let trait_type = DiscoveredType::Trait(
+                type_identifier.clone(),
+                associated_types.iter().cloned().collect(),
+                functions.iter().map(|f| f.identifier).collect(),
+            );
+
+            discovered_types.push(trait_type);
+            Ok(discovered_types)
+        },
         // Statement::FlagsDeclaration(parser::FlagsDeclaration {
         //     access_modifier: _,
         //     type_name,
@@ -327,6 +344,46 @@ pub fn check_type<'a>(
                 type_,
             })
         },
+        Statement::TraitDeclaration(parser::TraitDeclaration {
+            access_modifier: _,
+            type_identifier,
+            associated_types,
+            functions: _,
+        }) => {
+            let trait_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment.clone())));
+
+            for associated_type in associated_types {
+                trait_type_environment.borrow_mut().add_type(Type::Generic(GenericType { type_name: associated_type.name().to_string() }))?;
+            }
+
+            let associated_types = associated_types
+                    .iter()
+                    .map(|ti| {
+                        let check_type_identifier = check_type_identifier(ti, discovered_types, type_environment.clone());
+                        (ti.name().to_string(), check_type_identifier)
+                    })
+                    .collect::<HashMap<String, Result<Type, String>>>();
+
+            let values: Result<Vec<Type>, String> = associated_types.clone().into_values()
+                .map(|r| r)
+                .collect();
+
+            let values = values?;
+
+            let associated_types = associated_types.into_iter().zip(values)
+                .map(|((k, _), v)| (k, v.clone()))
+                .collect::<HashMap<String, Type>>();
+
+            let type_ = Type::Trait(Trait {
+                type_identifier: type_identifier.clone(),
+                associated_types,
+                functions: HashMap::new(),
+            });
+
+            type_environment.borrow_mut().add_type(type_.clone())?;
+
+            Ok(TypedStatement::None)
+        },
         // Statement::FlagsDeclaration(parser::FlagsDeclaration {
         //     access_modifier: _,
         //     type_name,
@@ -555,6 +612,7 @@ fn check_type_identifier(
             DiscoveredType::Struct(name, ..) => name == type_identifier,
             DiscoveredType::Enum(name, ..) => name == type_identifier,
             DiscoveredType::Union(name, ..) => name == type_identifier,
+            DiscoveredType::Trait(name, ..) => name == type_identifier,
             DiscoveredType::Function(name, ..) => name == type_identifier,
         }) {
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
@@ -627,6 +685,27 @@ fn check_type_identifier(
                 literals: literal_types,
             }))
         }
+        Some(DiscoveredType::Trait(type_identifier, associated_types, functions)) => {
+            let associated_types = associated_types.iter()
+                .map(|ti| (ti.name().to_string(), check_type_identifier(ti, discovered_types, type_environment.clone())))
+                .collect::<HashMap<String, Result<Type, String>>>();
+
+            let values: Result<Vec<Type>, String> = associated_types.clone().into_values()
+                .map(|r| r)
+                .collect();
+
+            let values = values?;
+
+            let associated_types = associated_types.into_iter().zip(values)
+                .map(|((k, _), v)| (k, v.clone()))
+                .collect::<HashMap<String, Type>>();
+
+            Ok(Type::Trait(Trait {
+                type_identifier: type_identifier.clone(),
+                associated_types,
+                functions: functions,
+            }))
+        },
         Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {
             Ok(Type::Function(Function {
                 identifier: type_identifier.clone(),
@@ -668,6 +747,7 @@ pub fn check_type_annotation(
             DiscoveredType::Struct(type_identifier, ..) => type_identifier.name() == type_annotation.name(),
             DiscoveredType::Enum(type_identifier, ..) => type_identifier.name() == type_annotation.name(),
             DiscoveredType::Union(type_identifier, ..) => type_identifier.name() == type_annotation.name(),
+            DiscoveredType::Trait(type_identifier) => type_identifier.name() == type_annotation.name(),
             DiscoveredType::Function(type_identifier, ..) => type_identifier.name() == type_annotation.name(),
         }) {
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
@@ -739,7 +819,12 @@ pub fn check_type_annotation(
                 literal_type: Box::new(literal_type.clone()),
                 literals: literal_types,
             }))
-        }
+        },
+        Some(DiscoveredType::Trait(type_identifier)) => Ok(Type::Trait(Trait {
+            type_identifier: type_identifier.clone(),
+            associated_types: HashMap::new(),
+            functions: HashMap::new(),
+        })),
         Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {
             Ok(Type::Function(Function {
                 identifier: type_identifier.clone(),

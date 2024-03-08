@@ -317,6 +317,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "union" => Some(TokenKind::Keyword(Keyword::Union)),
         // "flags" => Some(TokenKind::Keyword(Keyword::Flags)),
         "impl" => Some(TokenKind::Keyword(Keyword::Impl)),
+        "trait" => Some(TokenKind::Keyword(Keyword::Trait)),
 
         // Generics
         "where" => Some(TokenKind::Keyword(Keyword::Where)),

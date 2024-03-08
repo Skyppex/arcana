@@ -3,6 +3,7 @@ use crate::lexer::token::Token;
 #[derive(Debug, Clone)]
 pub struct Cursor {
     tokens: Vec<Token>,
+    prev: Token,
 }
 
 const END_OF_FILE_TOKEN: Token = Token {
@@ -16,7 +17,12 @@ impl Cursor {
 
         Cursor {
             tokens,
+            prev: END_OF_FILE_TOKEN,
         }
+    }
+
+    pub fn prev(&self) -> Token {
+        self.prev.clone()
     }
 
     pub(crate) fn first(&self) -> Token {
@@ -50,6 +56,8 @@ impl Cursor {
 
     pub(crate) fn bump(&mut self) -> Result<Token, String> {
         println!("Bumping: {:?}", self.first());
-        self.tokens.pop().ok_or("Unexpected end of file".to_string())
+        let token = self.tokens.pop().ok_or("Unexpected end of file".to_string())?;
+        self.prev = token.clone();
+        Ok(token)
     }
 }

@@ -182,6 +182,8 @@ pub enum Keyword {
     Union,
     // Flags,
     Impl,
+    Trait,
+    Type,
 
     // Generics
     Where,

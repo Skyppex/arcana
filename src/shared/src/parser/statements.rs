@@ -2,7 +2,7 @@ use std::vec;
 
 use crate::{lexer::token::{Keyword, TokenKind}, types::{can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str, parse_type_identifier, GenericConstraint, GenericType, TypeIdentifier}};
 
-use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, EnumDeclaration, EnumMember, EnumMemberField, Expression, FunctionDeclaration, Impl, Literal, Parameter, Statement, StructDeclaration, StructField, UnionDeclaration};
+use super::{cursor::Cursor, expressions::{self, parse_block_statements, parse_expression}, EnumDeclaration, EnumMember, EnumMemberField, Expression, FunctionDeclaration, Impl, Literal, Parameter, Statement, StructDeclaration, StructField, TraitDeclaration, UnionDeclaration};
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     match parse_break(cursor) {
@@ -226,7 +226,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
-            return parse_impl(cursor);
+            return parse_trait_declaration_statement(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -234,17 +234,17 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
-        return parse_impl(cursor);
+        return parse_trait_declaration_statement(cursor);
     }
 
     cursor.bump()?; // Consume the union keyword
 
     let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+        return Err(format!("Expected identifier but found {:?}", cursor.prev().kind));
     };
 
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
-        return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
+        return Err(format!("Expected {{ but found {:?}", cursor.prev().kind));
     };
 
     let mut literals = vec![];
@@ -277,6 +277,66 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         access_modifier,
         type_identifier: TypeIdentifier::Type(type_name),
         literals: literals?,
+    }))
+}
+
+fn parse_trait_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
+    let mut access_modifier = None;
+
+    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Trait) {
+            return parse_impl(cursor);
+        }
+
+        cursor.bump()?; // Consume the access modifier
+        access_modifier = Some(am);
+    }
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Trait) {
+        return parse_impl(cursor);
+    }
+
+    let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
+        return Err(format!("Expected identifier but found {:?}", cursor.prev().kind));
+    };
+
+    let TokenKind::OpenBrace = cursor.bump()?.kind else {
+        return Err(format!("Expected {{ but found {:?}", cursor.prev().kind));
+    };
+
+    let mut associated_types = vec![];
+
+    while cursor.first().kind == TokenKind::Keyword(Keyword::Type) {
+        cursor.bump()?; // Consume the type keyword
+
+        let associated_type = parse_type_identifier(cursor, false)?;
+
+        let TokenKind::Semicolon = cursor.bump()?.kind else {
+            return Err(format!("Expected ; but found {:?}", cursor.prev().kind));
+        };
+
+        associated_types.push(associated_type);
+    }
+
+    let mut functions = vec![];
+
+    while cursor.first().kind != TokenKind::CloseBrace {
+        let function_declaration_statement = parse_function_declaration_statement(cursor)?;
+
+        let Statement::FunctionDeclaration(function_declaration) = function_declaration_statement.clone() else {
+            return Err(format!("Expected function declaration but found {:?}", function_declaration_statement));
+        };
+
+        functions.push(function_declaration);
+    }
+
+    cursor.bump()?; // Consume the }
+
+    Ok(Statement::TraitDeclaration(TraitDeclaration {
+        access_modifier,
+        type_identifier: TypeIdentifier::Type(type_name),
+        associated_types,
+        functions: functions
     }))
 }
 

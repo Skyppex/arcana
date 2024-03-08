@@ -103,6 +103,19 @@ impl FullName for Union {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Trait {
+    pub type_identifier: TypeIdentifier,
+    pub associated_types: HashMap<String, Type>,
+    pub functions: HashMap<String, Function>,
+}
+
+impl FullName for Trait {
+    fn full_name(&self) -> String {
+        self.type_identifier.to_string()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub identifier: TypeIdentifier,
     pub parameters: HashMap<String, Type>,
@@ -142,6 +155,7 @@ pub enum Type {
     EnumMember(EnumMember),
     EnumMemberField(EnumMemberField),
     Union(Union),
+    Trait(Trait),
     Function(Function),
     Literal {
         name: String, // String representation of the literal

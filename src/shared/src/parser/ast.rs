@@ -15,6 +15,7 @@ pub enum Statement {
     StructDeclaration(StructDeclaration),
     EnumDeclaration(EnumDeclaration),
     UnionDeclaration(UnionDeclaration),
+    TraitDeclaration(TraitDeclaration),
     Impl(Impl),
     FunctionDeclaration(FunctionDeclaration),
     Semi(Box<Statement>),
@@ -70,6 +71,14 @@ pub struct UnionDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
     pub literals: Vec<Literal>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TraitDeclaration {
+    pub access_modifier: Option<AccessModifier>,
+    pub type_identifier: TypeIdentifier,
+    pub associated_types: Vec<TypeIdentifier>,
+    pub functions: Vec<FunctionDeclaration>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
