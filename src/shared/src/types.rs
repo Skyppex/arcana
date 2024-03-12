@@ -1,4 +1,4 @@
-use std::{fmt::Display, hash::Hash};
+use std::{fmt::Display, hash::Hash, ops::Deref};
 
 use crate::{lexer::token::{self, TokenKind}, parser::{cursor::Cursor, Literal}};
 
@@ -16,7 +16,18 @@ impl Into<TypeIdentifier> for TypeAnnotation {
             TypeAnnotation::Type(name) => TypeIdentifier::Type(name),
             TypeAnnotation::ConcreteType(name, generics) => TypeIdentifier::ConcreteType(name, generics),
             TypeAnnotation::Array(type_annotation) => TypeIdentifier::ConcreteType("Array".to_string(), vec![*type_annotation]),
-            TypeAnnotation::Literal(literal) => TypeIdentifier::ConcreteType(literal.to_string(), vec![]),
+            TypeAnnotation::Literal(literal) => TypeIdentifier::ConcreteType(literal.deref().to_string(), vec![]),
+        }
+    }
+}
+
+impl From<TypeIdentifier> for TypeAnnotation {
+    fn from(type_identifier: TypeIdentifier) -> Self {
+        match type_identifier {
+            TypeIdentifier::Type(name) => TypeAnnotation::Type(name),
+            TypeIdentifier::GenericType(name, generics) => TypeAnnotation::ConcreteType(name, generics.into_iter().map(|g| g.type_annotation()).collect()),
+            TypeIdentifier::ConcreteType(name, generics) => TypeAnnotation::ConcreteType(name, generics),
+            TypeIdentifier::MemberType(_, _) => panic!("Cannot convert member type to type annotation"),
         }
     }
 }
@@ -124,6 +135,12 @@ impl Display for TypeIdentifier {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GenericType {
     pub type_name: String,
+}
+
+impl GenericType {
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        TypeAnnotation::Type(self.type_name.clone())
+    }
 }
 
 impl Display for GenericType {

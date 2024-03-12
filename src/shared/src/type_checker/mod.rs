@@ -23,6 +23,12 @@ pub struct Struct {
     pub fields: HashMap<String, Type>,
 }
 
+impl Struct {
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        TypeAnnotation::from(self.type_identifier.clone())
+    }
+}
+
 impl FullName for Struct {
     fn full_name(&self) -> String {
         self.type_identifier.to_string()
@@ -52,6 +58,12 @@ impl FullName for StructField {
 pub struct Enum {
     pub type_identifier: TypeIdentifier,
     pub members: HashMap<String, Type>,
+}
+
+impl Enum {
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        TypeAnnotation::from(self.type_identifier.clone())
+    }
 }
 
 impl FullName for Enum {
@@ -94,6 +106,12 @@ pub struct Union {
     pub literals: Vec<Type>,
 }
 
+impl Union {
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        TypeAnnotation::from(self.type_identifier.clone())
+    }
+}
+
 impl FullName for Union {
     fn full_name(&self) -> String {
         format!("{} {{ {} }}",
@@ -120,6 +138,12 @@ pub struct Function {
     pub identifier: TypeIdentifier,
     pub parameters: HashMap<String, Type>,
     pub return_type: Box<Type>,
+}
+
+impl Function {
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        TypeAnnotation::from(self.identifier.clone())
+    }
 }
 
 impl FullName for Function {
@@ -164,6 +188,71 @@ pub enum Type {
 }
 
 impl Type {
+    pub fn option() -> Type {
+        let option_name = "Option".to_string();
+        
+        let option_ident = TypeIdentifier::GenericType(
+            option_name,
+            vec![GenericType { type_name: "T".to_string() }]);
+
+        let some_member_ident = TypeIdentifier::MemberType(
+            Box::new(option_ident.clone()),
+            "Some".to_string());
+
+        let some_member_field_ident = TypeIdentifier::MemberType(
+            Box::new(some_member_ident.clone()),
+            "f0".to_string());
+
+        let none_member_ident = TypeIdentifier::MemberType(
+            Box::new(option_ident.clone()),
+            "None".to_string());
+
+        Type::Enum(Enum {
+            type_identifier: option_ident,
+            members: vec![
+                ("Some".to_string(), Type::EnumMember(EnumMember {
+                    enum_name: some_member_ident,
+                    discriminant_name: "Some".to_string(),
+                    fields: vec![("f0".to_string(), Type::EnumMemberField(EnumMemberField {
+                        enum_name: some_member_field_ident,
+                        discriminant_name: "Some".to_string(),
+                        field_name: "f0".to_string(),
+                        field_type: Box::new(Type::Generic(GenericType { type_name: "T".to_string() })),
+                    }))].into_iter().collect(),
+                })),
+                ("None".to_string(), Type::EnumMember(EnumMember {
+                    enum_name: none_member_ident,
+                    discriminant_name: "None".to_string(),
+                    fields: HashMap::new(),
+                })),
+            ].into_iter().collect(),
+        })
+    }
+
+    pub fn option_of(concrete: Type) -> Type {
+        Type::Enum(Enum {
+            type_identifier: TypeIdentifier::ConcreteType(
+                "Option".to_string(),
+                vec![concrete.type_annotation()]),
+            members: vec![
+                ("Some".to_string(), Type::EnumMember(EnumMember {
+                    enum_name: TypeIdentifier::ConcreteType(
+                        "Option".to_string(),
+                        vec![concrete.type_annotation()]),
+                    discriminant_name: "Some".to_string(),
+                    fields: vec![("f0".to_string(), concrete.clone())].into_iter().collect(),
+                })),
+                ("None".to_string(), Type::EnumMember(EnumMember {
+                    enum_name: TypeIdentifier::ConcreteType(
+                        "Option".to_string(),
+                        vec![concrete.type_annotation()]),
+                    discriminant_name: "None".to_string(),
+                    fields: HashMap::new(),
+                })),
+            ].into_iter().collect(),
+        })
+    }
+
     pub fn from_string(type_name: &str) -> Option<Type> {
         match type_name {
             "void" => Some(Type::Void),
@@ -249,6 +338,36 @@ impl Type {
             Type::Union(u) => u.type_identifier.clone(),
             Type::Function(f) => f.identifier.clone(),
             _ => panic!("Cannot get type identifier for type {}", self.full_name()),
+        }
+    }
+
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        match self {
+            Type::Generic(name) => TypeAnnotation::Type(name.type_name.clone()),
+            Type::Void => TypeAnnotation::Type("void".to_string()),
+            Type::Unit => TypeAnnotation::Type("unit".to_string()),
+            Type::I8 => TypeAnnotation::Type("i8".to_string()),
+            Type::I16 => TypeAnnotation::Type("i16".to_string()),
+            Type::I32 => TypeAnnotation::Type("i32".to_string()),
+            Type::I64 => TypeAnnotation::Type("i64".to_string()),
+            Type::I128 => TypeAnnotation::Type("i128".to_string()),
+            Type::U8 => TypeAnnotation::Type("u8".to_string()),
+            Type::U16 => TypeAnnotation::Type("u16".to_string()),
+            Type::U32 => TypeAnnotation::Type("u32".to_string()),
+            Type::U64 => TypeAnnotation::Type("u64".to_string()),
+            Type::U128 => TypeAnnotation::Type("u128".to_string()),
+            Type::F32 => TypeAnnotation::Type("f32".to_string()),
+            Type::F64 => TypeAnnotation::Type("f64".to_string()),
+            Type::String => TypeAnnotation::Type("string".to_string()),
+            Type::Char => TypeAnnotation::Type("char".to_string()),
+            Type::Bool => TypeAnnotation::Type("bool".to_string()),
+            Type::Array(type_) => TypeAnnotation::Array(Box::new(type_.type_annotation())),
+            Type::Struct(s) => s.type_annotation(),
+            Type::Enum(e) => e.type_annotation(),
+            Type::Union(u) => u.type_annotation(),
+            Type::Function(f) => f.type_annotation(),
+            Type::Literal { type_, .. } => TypeAnnotation::Literal(Box::new((*type_.clone()).into())),
+            _ => panic!("Cannot get type annotation for type {}", self.full_name()),
         }
     }
 
@@ -396,6 +515,32 @@ impl FullName for Type {
             Type::Function(f) => f.full_name(),
             Type::Literal { name, type_ } => format!("#{}: {}", type_.full_name(), name),
         }
+    }
+}
+
+impl Into<parser::Literal> for Type {
+    fn into(self) -> parser::Literal {
+        match self {
+            Type::Void => parser::Literal::Unit,
+            Type::Unit => parser::Literal::Unit,
+            Type::I8 => parser::Literal::I8(0),
+            Type::I16 => parser::Literal::I16(0),
+            Type::I32 => parser::Literal::I32(0),
+            Type::I64 => parser::Literal::I64(0),
+            Type::I128 => parser::Literal::I128(0),
+            Type::U8 => parser::Literal::U8(0),
+            Type::U16 => parser::Literal::U16(0),
+            Type::U32 => parser::Literal::U32(0),
+            Type::U64 => parser::Literal::U64(0),
+            Type::U128 => parser::Literal::U128(0),
+            Type::F32 => parser::Literal::F32(0.0),
+            Type::F64 => parser::Literal::F64(0.0),
+            Type::String => parser::Literal::String("".to_string()),
+            Type::Char => parser::Literal::Char(' '),
+            Type::Bool => parser::Literal::Bool(false),
+            _ => panic!("Cannot convert type {} to literal", self.full_name()),
+        }
+    
     }
 }
 
