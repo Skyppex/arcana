@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::types::{TypeAnnotation, TypeIdentifier};
+use crate::types::{GenericType, TypeAnnotation, TypeIdentifier};
 
 use super::{scope::{Scope, ScopeType}, FullName, Function, Type};
 
@@ -38,6 +38,7 @@ impl TypeEnvironment {
                 (TypeIdentifier::Type("f64".to_string()), Type::F64),
                 (TypeIdentifier::Type("char".to_string()), Type::Char),
                 (TypeIdentifier::Type("string".to_string()), Type::String),
+                (TypeIdentifier::GenericType("Option".to_string(), vec![GenericType { type_name: "T".to_string() }]), Type::option()),
             ]),
             variables: HashMap::new(),
             static_member_functions: HashMap::new(),

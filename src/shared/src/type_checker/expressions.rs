@@ -52,8 +52,9 @@ pub fn check_type<'a>(
                 Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment.clone())));
 
             let if_condition = check_type(&r#if.condition, discovered_types, if_else_environment.clone())?;
-            let Type::Bool = if_condition.get_type() else {
-                return Err(format!("If condition must be of type bool | {}", if_condition.get_type()));
+            
+            if !type_equals(&if_condition.get_type(), &Type::Bool) {
+                return Err(format!("If condition must be of type bool but found {}", if_condition.get_type()));
             };
 
             let if_block = check_type(&r#if.block, discovered_types, if_else_environment.clone())?;
@@ -93,10 +94,14 @@ pub fn check_type<'a>(
 
             let else_type = else_block.clone().map(|e| e.get_type());
 
+            let mut type_ = Type::Void;
+
             if let Some(else_type) = else_type {
                 if !type_equals(&if_block_type, &else_type) {
                     return Err(format!("If block type {:?} does not match else block type {:?}", if_block_type, else_type));
                 }
+            } else {
+                type_ = Type::option_of(if_block_type.clone());
             }
 
             Ok(TypedExpression::If {
@@ -106,7 +111,7 @@ pub fn check_type<'a>(
                 },
                 else_ifs: else_if_condition_blocks,
                 r#else: else_block.map(|e| Box::new(e.clone())),
-                type_: if_block_type.clone()
+                type_: type_
             })
         },
         Expression::Assignment(Assignment {
@@ -229,7 +234,7 @@ pub fn check_type<'a>(
                         
                         let initializer_type = initializer.initializer.get_type();
 
-                        if !type_equals(field_type, &initializer_type) {
+                        if !type_equals(field_type.as_ref(), &initializer_type) {
                             return Err(format!("Field type {} does not match initializer type {}", field_type, initializer_type));
                         }
                     }
@@ -300,7 +305,7 @@ pub fn check_type<'a>(
                                 
                                 let initializer_type = initializer.get_type();
 
-                                if !type_equals(field_type, &initializer_type) {
+                                if !type_equals(field_type.as_ref(), &initializer_type) {
                                     return Err(format!("Field type {} does not match initializer type {}", field_type, initializer_type));
                                 }
                             }
@@ -317,7 +322,7 @@ pub fn check_type<'a>(
                                 
                                 let initializer_type = initializer.get_type();
 
-                                if !type_equals(field_type, &initializer_type) {
+                                if !type_equals(field_type.as_ref(), &initializer_type) {
                                     return Err(format!("Field type {} does not match initializer type {}", field_type, initializer_type));
                                 }
                             }
