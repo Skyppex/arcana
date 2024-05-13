@@ -124,7 +124,7 @@ impl FullName for Union {
 pub struct Trait {
     pub type_identifier: TypeIdentifier,
     pub associated_types: HashMap<String, Type>,
-    pub functions: HashMap<String, Function>,
+    pub functions: Vec<TypeIdentifier>,
 }
 
 impl FullName for Trait {
@@ -514,6 +514,7 @@ impl FullName for Type {
             Type::Union(u) => u.full_name(),
             Type::Function(f) => f.full_name(),
             Type::Literal { name, type_ } => format!("#{}: {}", type_.full_name(), name),
+            Type::Trait(t) => t.full_name(),
         }
     }
 }

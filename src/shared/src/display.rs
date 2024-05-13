@@ -152,7 +152,7 @@ impl IndentDisplay for Statement {
                     } else {
                         indent.end_current();
                         result.push_str(format!("\n{}{}", indent.dash_end(), literal.indent_display(indent)).as_str());
-                    }                    
+                    }
                 }
 
                 indent.decrease();
@@ -178,6 +178,24 @@ impl IndentDisplay for Statement {
             //     indent.decrease();
             //     result
             // },
+            Statement::TraitDeclaration(trait_declaration) => {
+                let mut result = String::new();
+                result.push_str("<trait declaration>\n");
+                indent.increase();
+                result.push_str(format!("{}type_name: {}\n", indent.dash(), trait_declaration.type_identifier.indent_display(indent)).as_str());
+                
+                for (i, function_declaration) in trait_declaration.functions.iter().enumerate() {
+                    if i < trait_declaration.functions.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), function_declaration.indent_display(indent)).as_str());
+                    } else {
+                        indent.end_current();
+                        result.push_str(format!("\n{}{}", indent.dash_end(), function_declaration.indent_display(indent)).as_str());
+                    }
+                }
+
+                indent.decrease();
+                result
+            },
             Statement::Impl(impl_) => {
                 let mut result = String::new();
                 result.push_str("<impl>\n");
@@ -185,50 +203,19 @@ impl IndentDisplay for Statement {
                 result.push_str(format!("{}type_annotation: {}", indent.dash(), impl_.type_annotation.indent_display(indent)).as_str());
 
                 for (i, function) in impl_.functions.iter().enumerate() {
-                    let is_end = i == impl_.functions.len() - 1;
-                    indent.end_current();
-                    result.push_str(format!("\n{}{}", indent.dash_end(), function.indent_display(indent)).as_str());
+                    if i < impl_.functions.len() - 1 {
+                        result.push_str(format!("\n{}{},", indent.dash(), function.indent_display(indent)).as_str());
+                    } else {
+                        indent.end_current();
+                        result.push_str(format!("\n{}{}", indent.dash_end(), function.indent_display(indent)).as_str());
+                    }
                 }
 
                 indent.decrease();
                 result
             },
-            Statement::FunctionDeclaration(FunctionDeclaration {
-                access_modifier,
-                identifier,
-                parameters,
-                return_type,
-                body
-            }) => {
-                let mut result = String::new();
-                result.push_str("<function declaration>\n");
-                indent.increase();
-
-                result.push_str(format!("{}identifier: {}\n", indent.dash(), identifier).as_str());
-                result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
-
-                for parameter in parameters {
-                    result.push_str(format!("\n{}{}", indent.dash(), parameter.indent_display(indent)).as_str());
-                }
-
-                result.push_str(format!("\n{}return_type: {}\n", indent.dash(), return_type.indent_display(indent)).as_str());
-                
-                indent.end_current();
-                result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
-                indent.increase();
-
-                for (i, statement) in body.iter().enumerate() {
-                    if i < body.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
-                    } else {
-                        indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
-                    }
-                }
-
-                indent.decrease();
-                indent.decrease();
-                result
+            Statement::FunctionDeclaration(function_declaration) => {
+                function_declaration.indent_display(indent)
             },
             Statement::Semi(statement) => {
                 let mut result = String::new();
@@ -265,6 +252,46 @@ impl IndentDisplay for Statement {
             Statement::Expression(e) => e.indent_display(indent),
             Statement::Print(e) => e.indent_display(indent),
         }
+    }
+}
+
+impl IndentDisplay for FunctionDeclaration {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let identifier = &self.identifier;
+        let access_modifier = &self.access_modifier;
+        let parameters = &self.parameters;
+        let return_type = &self.return_type;
+        let body = &self.body;
+
+        let mut result = String::new();
+        result.push_str("<function declaration>\n");
+        indent.increase();
+
+        result.push_str(format!("{}identifier: {}\n", indent.dash(), identifier).as_str());
+        result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
+
+        for parameter in parameters {
+            result.push_str(format!("\n{}{}", indent.dash(), parameter.indent_display(indent)).as_str());
+        }
+
+        result.push_str(format!("\n{}return_type: {}\n", indent.dash(), return_type.indent_display(indent)).as_str());
+        
+        indent.end_current();
+        result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
+        indent.increase();
+
+        for (i, statement) in body.iter().enumerate() {
+            if i < body.len() - 1 {
+                result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+            } else {
+                indent.end_current();
+                result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+            }
+        }
+
+        indent.decrease();
+        indent.decrease();
+        result
     }
 }
 
