@@ -1,8 +1,14 @@
-use std::{cell::RefCell, fs, io::{stdin, stdout, Write}, path::Path, rc::Rc};
+use std::{
+    cell::RefCell,
+    fs,
+    io::{stdin, stdout, Write},
+    path::Path,
+    rc::Rc,
+};
 
-use shared::type_checker::TypeEnvironment;
-use interpreter::Environment;
 use crate::read_input;
+use interpreter::Environment;
+use shared::type_checker::TypeEnvironment;
 
 pub(crate) fn interactive() -> Result<(), String> {
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
@@ -22,15 +28,13 @@ pub(crate) fn interactive() -> Result<(), String> {
             let path = Path::new("src/mage/manual_testing");
 
             let file_name = input
-                .split(" ")
+                .split(' ')
                 .skip(1)
                 .collect::<Vec<&str>>()
                 .join(" ")
-                .replace("\r", "")
-                .replace("\n", "");
+                .replace(['\r', '\n'], "");
 
-            let path = path.join(file_name)
-                .with_extension("ar");
+            let path = path.join(file_name).with_extension("ar");
 
             println!("Reading file: {:?}", path);
 

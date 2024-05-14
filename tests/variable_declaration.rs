@@ -2,8 +2,11 @@ mod common;
 
 use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
-use shared::type_checker::{ast::{Literal, TypedExpression}, Type};
-use interpreter::{Environment, Value};
+use interpreter::{Value};
+use shared::type_checker::{
+    ast::{Literal, Typed, TypedExpression},
+    Type,
+};
 
 #[test]
 fn variable_declaration_is_immutable() {
@@ -14,16 +17,20 @@ fn variable_declaration_is_immutable() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_semi()
         .unwrap_expression();
-    
+
     match expression {
         TypedExpression::VariableDeclaration { mutable, .. } => {
-            assert_eq!(mutable, false);
-        },
-        _ => panic!("Expected a variable declaration, but found {:?}", expression),
+            assert!(!mutable);
+        }
+        _ => panic!(
+            "Expected a variable declaration, but found {:?}",
+            expression
+        ),
     }
 }
 
@@ -36,16 +43,20 @@ fn variable_declaration_is_mutable() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_semi()
         .unwrap_expression();
-        
+
     match expression {
         TypedExpression::VariableDeclaration { mutable, .. } => {
-            assert_eq!(mutable, true);
-        },
-        _ => panic!("Expected a variable declaration, but found {:?}", expression),
+            assert!(mutable);
+        }
+        _ => panic!(
+            "Expected a variable declaration, but found {:?}",
+            expression
+        ),
     }
 }
 
@@ -58,16 +69,20 @@ fn variable_declaration_has_correct_identifier() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_semi()
         .unwrap_expression();
-        
+
     match expression {
         TypedExpression::VariableDeclaration { identifier, .. } => {
             assert_eq!(identifier, "x");
-        },
-        _ => panic!("Expected a variable declaration, but found {:?}", expression),
+        }
+        _ => panic!(
+            "Expected a variable declaration, but found {:?}",
+            expression
+        ),
     }
 }
 
@@ -80,17 +95,13 @@ fn variable_declaration_has_correct_type() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_semi()
         .unwrap_expression();
-        
-    match expression {
-        TypedExpression::VariableDeclaration { type_, .. } => {
-            assert_eq!(type_, Type::Bool);
-        },
-        _ => panic!("Expected a variable declaration, but found {:?}", expression),
-    }
+
+    assert_eq!(expression.get_type(), Type::Bool);
 }
 
 #[test]
@@ -102,16 +113,20 @@ fn variable_declaration_has_no_initializer() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_semi()
         .unwrap_expression();
-        
+
     match expression {
         TypedExpression::VariableDeclaration { initializer, .. } => {
             assert_eq!(initializer, None);
-        },
-        _ => panic!("Expected a variable declaration, but found {:?}", expression),
+        }
+        _ => panic!(
+            "Expected a variable declaration, but found {:?}",
+            expression
+        ),
     }
 }
 
@@ -124,19 +139,23 @@ fn variable_declaration_has_value() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_semi()
         .unwrap_expression();
-    
+
     match expression {
         TypedExpression::VariableDeclaration { initializer, .. } => {
-            assert!(matches!(initializer, Some(_)));
+            assert!(initializer.is_some());
 
             let initializer = *initializer.unwrap();
             assert_eq!(initializer, TypedExpression::Literal(Literal::Bool(true)));
-        },
-        _ => panic!("Expected a variable declaration, but found {:?}", expression),
+        }
+        _ => panic!(
+            "Expected a variable declaration, but found {:?}",
+            expression
+        ),
     }
 }
 

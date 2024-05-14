@@ -2,8 +2,11 @@ mod common;
 
 use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
-use shared::type_checker::{ast::TypedExpression, Type};
 use interpreter::{value, Value};
+use shared::type_checker::{
+    ast::{Typed, TypedExpression},
+    Type,
+};
 
 use crate::common::create_env;
 
@@ -16,7 +19,8 @@ fn if_is_if() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_expression();
 
@@ -32,16 +36,18 @@ fn if_has_correct_type() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_expression();
 
-    match expression {
-        TypedExpression::If { type_, ..} => {
-            assert_eq!(type_, Type::Literal { name: "1".to_owned(), type_: Box::new(Type::Int) });
-        },
-        _ => panic!("Expected an if expression, but found {:?}", expression),
-    }
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "1".to_owned(),
+            type_: Box::new(Type::Int)
+        }
+    );
 }
 
 #[test]
@@ -85,7 +91,10 @@ fn if_returns_option_some() {
     let value = evaluate_expression(input, create_env(), false);
 
     // Assert
-    assert_eq!(value, Value::option_some(Value::Number(value::Number::Int(1))));
+    assert_eq!(
+        value,
+        Value::option_some(Value::Number(value::Number::Int(1)))
+    );
 }
 
 #[test]
@@ -96,7 +105,10 @@ fn if_returns_option_some_2() {
     let value = evaluate_expression(input, create_env(), false);
 
     // Assert
-    assert_eq!(value, Value::option_some(Value::Number(value::Number::Int(2))));
+    assert_eq!(
+        value,
+        Value::option_some(Value::Number(value::Number::Int(2)))
+    );
 }
 
 #[test]

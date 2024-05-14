@@ -1,10 +1,10 @@
 pub mod environment;
-pub mod value;
-pub mod evaluator;
 pub mod evaluate_binop;
+pub mod evaluator;
 pub mod scope;
+pub mod value;
 
-pub use evaluator::evaluate;
 pub use environment::Environment;
-pub use value::Value;
+pub use evaluator::evaluate;
 pub use scope::Scope;
+pub use value::Value;

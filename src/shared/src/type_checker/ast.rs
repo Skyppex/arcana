@@ -1,7 +1,10 @@
-use std::{collections::HashMap, fmt::Display};
 use std::hash::Hash;
+use std::{collections::HashMap, fmt::Display};
 
-use crate::{parser, types::{GenericConstraint, TypeAnnotation, TypeIdentifier}};
+use crate::{
+    parser,
+    types::{GenericConstraint, TypeAnnotation, TypeIdentifier},
+};
 
 use super::Type;
 
@@ -104,16 +107,111 @@ impl Display for TypedStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TypedStatement::None => write!(f, "None"),
-            TypedStatement::Program { statements } => write!(f, "{}", statements.iter().map(|s| s.to_string()).collect::<Vec<String>>().join(", ")),
-            TypedStatement::StructDeclaration { type_identifier, fields, .. } => write!(f, "struct {} {{{}}}", type_identifier, fields.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(", ")),
-            TypedStatement::EnumDeclaration { type_identifier, members, .. } => write!(f, "enum {} {{{}}}", type_identifier, members.iter().map(|m| m.to_string()).collect::<Vec<String>>().join(", ")),
-            TypedStatement::UnionDeclaration { type_identifier, literals, .. } => write!(f, "union {} {{{}}}", type_identifier, literals.iter().map(|l| l.to_string()).collect::<Vec<String>>().join(", ")),
-            TypedStatement::FunctionDeclaration { identifier, parameters, return_type, body, .. } => write!(f, "fn {}({}) -> {} {{{}}}", identifier, parameters.iter().map(|p| p.to_string()).collect::<Vec<String>>().join(", "), return_type, body.iter().map(|s| s.to_string()).collect::<Vec<String>>().join(", ")),
-            TypedStatement::Impl { type_annotation, functions } => write!(f, "impl {} {{{}}}", type_annotation, functions.iter().map(|s| s.to_string()).collect::<Vec<String>>().join(", ")),
+            TypedStatement::Program { statements } => write!(
+                f,
+                "{}",
+                statements
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            TypedStatement::StructDeclaration {
+                type_identifier,
+                fields,
+                ..
+            } => write!(
+                f,
+                "struct {} {{{}}}",
+                type_identifier,
+                fields
+                    .iter()
+                    .map(|f| f.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            TypedStatement::EnumDeclaration {
+                type_identifier,
+                members,
+                ..
+            } => write!(
+                f,
+                "enum {} {{{}}}",
+                type_identifier,
+                members
+                    .iter()
+                    .map(|m| m.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            TypedStatement::UnionDeclaration {
+                type_identifier,
+                literals,
+                ..
+            } => write!(
+                f,
+                "union {} {{{}}}",
+                type_identifier,
+                literals
+                    .iter()
+                    .map(|l| l.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            TypedStatement::FunctionDeclaration {
+                identifier,
+                parameters,
+                return_type,
+                body,
+                ..
+            } => write!(
+                f,
+                "fn {}({}) -> {} {{{}}}",
+                identifier,
+                parameters
+                    .iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                return_type,
+                body.iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            TypedStatement::Impl {
+                type_annotation,
+                functions,
+            } => write!(
+                f,
+                "impl {} {{{}}}",
+                type_annotation,
+                functions
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
             TypedStatement::Semi(s) => write!(f, "{};", s),
-            TypedStatement::Break(e) => write!(f, "break{}", if let Some(e) = e { format!(" {}", e) } else { "".to_string() }),
+            TypedStatement::Break(e) => write!(
+                f,
+                "break{}",
+                if let Some(e) = e {
+                    format!(" {}", e)
+                } else {
+                    "".to_string()
+                }
+            ),
             TypedStatement::Continue => write!(f, "continue"),
-            TypedStatement::Return(e) => write!(f, "return{}", if let Some(e) = e { format!(" {}", e) } else { "".to_string() }),
+            TypedStatement::Return(e) => write!(
+                f,
+                "return{}",
+                if let Some(e) = e {
+                    format!(" {}", e)
+                } else {
+                    "".to_string()
+                }
+            ),
             TypedStatement::Expression(e) => write!(f, "{}", e),
             TypedStatement::Print(e) => write!(f, "print {}", e),
         }
@@ -121,7 +219,7 @@ impl Display for TypedStatement {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Block{
+pub struct Block {
     pub statements: Vec<TypedStatement>,
     pub type_: Type,
 }
@@ -138,7 +236,15 @@ impl Typed for Block {
 
 impl Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{{}}}", self.statements.iter().map(|s| s.to_string()).collect::<Vec<String>>().join(", "))
+        write!(
+            f,
+            "{{{}}}",
+            self.statements
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
     }
 }
 
@@ -150,7 +256,7 @@ pub enum TypedExpression {
         mutable: bool,
         identifier: String,
         initializer: Option<Box<TypedExpression>>,
-        type_: Type
+        type_: Type,
     },
     If {
         r#if: ConditionBlock,
@@ -195,7 +301,7 @@ pub enum TypedExpression {
     Block(Block),
     Drop {
         identifier: String,
-        type_: Type
+        type_: Type,
     },
     Loop(Block),
     While {
@@ -252,14 +358,30 @@ impl Display for TypedExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TypedExpression::None => write!(f, "None"),
-            TypedExpression::VariableDeclaration { mutable, identifier, initializer, .. } => {
+            TypedExpression::VariableDeclaration {
+                mutable,
+                identifier,
+                initializer,
+                ..
+            } => {
                 if let Some(initializer) = initializer {
-                    write!(f, "{}{} = {}", if *mutable { "mut " } else { "" }, identifier, initializer)
+                    write!(
+                        f,
+                        "{}{} = {}",
+                        if *mutable { "mut " } else { "" },
+                        identifier,
+                        initializer
+                    )
                 } else {
                     write!(f, "{}{}", if *mutable { "mut " } else { "" }, identifier)
                 }
-            },
-            TypedExpression::If { r#if, else_ifs, r#else, .. } => {
+            }
+            TypedExpression::If {
+                r#if,
+                else_ifs,
+                r#else,
+                ..
+            } => {
                 write!(f, "if {} {{ {} }}", r#if.condition, r#if.block)?;
                 for else_if in else_ifs {
                     write!(f, " else if {} {{ {} }}", else_if.condition, else_if.block)?;
@@ -268,25 +390,82 @@ impl Display for TypedExpression {
                     write!(f, " else {{ {} }}", r#else)?;
                 }
                 Ok(())
-            },
-            TypedExpression::Assignment { member, initializer, .. } => write!(f, "{} = {}", member, initializer),
+            }
+            TypedExpression::Assignment {
+                member,
+                initializer,
+                ..
+            } => write!(f, "{} = {}", member, initializer),
             TypedExpression::Member(member) => write!(f, "{}", member),
             TypedExpression::Literal(literal) => write!(f, "{}", literal),
-            TypedExpression::Call { caller, arguments, .. } => write!(f, "{}({})", caller, arguments.iter().map(|a| a.to_string()).collect::<Vec<String>>().join(", ")),
-            TypedExpression::Index { caller, argument, .. } => write!(f, "{}[{}]", caller, argument),
-            TypedExpression::Unary { operator, expression, .. } => write!(f, "{}{}", operator, expression),
-            TypedExpression::Binary { left, operator, right, .. } => write!(f, "{} {} {}", left, operator, right),
-            TypedExpression::Ternary { condition, true_expression, false_expression, .. } => write!(f, "{} ? {} : {}", condition, true_expression, false_expression),
+            TypedExpression::Call {
+                caller, arguments, ..
+            } => write!(
+                f,
+                "{}({})",
+                caller,
+                arguments
+                    .iter()
+                    .map(|a| a.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            TypedExpression::Index {
+                caller, argument, ..
+            } => write!(f, "{}[{}]", caller, argument),
+            TypedExpression::Unary {
+                operator,
+                expression,
+                ..
+            } => write!(f, "{}{}", operator, expression),
+            TypedExpression::Binary {
+                left,
+                operator,
+                right,
+                ..
+            } => write!(f, "{} {} {}", left, operator, right),
+            TypedExpression::Ternary {
+                condition,
+                true_expression,
+                false_expression,
+                ..
+            } => write!(
+                f,
+                "{} ? {} : {}",
+                condition, true_expression, false_expression
+            ),
             TypedExpression::Block(block) => write!(f, "{}", block),
             TypedExpression::Drop { identifier, .. } => write!(f, "drop {}", identifier),
             TypedExpression::Loop(block) => write!(f, "loop {}", block),
-            TypedExpression::While { condition, block, else_block, .. } => {
-                write!(f, "while {} {{ {} }}", condition, block.iter().map(|s| s.to_string()).collect::<Vec<String>>().join(", "))?;
+            TypedExpression::While {
+                condition,
+                block,
+                else_block,
+                ..
+            } => {
+                write!(
+                    f,
+                    "while {} {{ {} }}",
+                    condition,
+                    block
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )?;
                 if let Some(else_block) = else_block {
-                    write!(f, " else {{ {} }}", else_block.iter().map(|s| s.to_string()).collect::<Vec<String>>().join(", "))?;
+                    write!(
+                        f,
+                        " else {{ {} }}",
+                        else_block
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )?;
                 }
                 Ok(())
-            },
+            }
         }
     }
 }
@@ -300,7 +479,13 @@ pub struct StructField {
 
 impl Display for StructField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}: {}", if self.mutable { "mut " } else { "" }, self.identifier, self.type_)
+        write!(
+            f,
+            "{}{}: {}",
+            if self.mutable { "mut " } else { "" },
+            self.identifier,
+            self.type_
+        )
     }
 }
 
@@ -331,7 +516,16 @@ pub struct EnumMember {
 
 impl Display for EnumMember {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {{{}}}", self.enum_name, self.fields.iter().map(|f| f.to_string()).collect::<Vec<String>>().join(", "))
+        write!(
+            f,
+            "{} {{{}}}",
+            self.enum_name,
+            self.fields
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
     }
 }
 
@@ -358,7 +552,10 @@ pub enum Literal {
     String(String),
     Char(char),
     Bool(bool),
-    Array { values: Vec<TypedExpression>, type_: Type },
+    Array {
+        values: Vec<TypedExpression>,
+        type_: Type,
+    },
     Struct {
         type_annotation: TypeAnnotation,
         field_initializers: Vec<FieldInitializer>,
@@ -382,13 +579,34 @@ impl Hash for Literal {
 impl Typed for Literal {
     fn get_type(&self) -> Type {
         match self {
-            Literal::Unit => Type::Literal { name: "unit".to_string(), type_: Box::new(Type::Unit) },
-            Literal::Int(v) => Type::Literal { name: v.to_string(), type_: Box::new(Type::Int) },
-            Literal::UInt(v) => Type::Literal { name: v.to_string(), type_: Box::new(Type::UInt) },
-            Literal::Float(v) => Type::Literal { name: v.to_string(), type_: Box::new(Type::Float) },
-            Literal::String(v) => Type::Literal { name: format!("\"{}\"", v.to_string()), type_: Box::new(Type::String) },
-            Literal::Char(v) => Type::Literal { name: format!("'{}'", v.to_string()), type_: Box::new(Type::Char) },
-            Literal::Bool(v) => Type::Literal { name: v.to_string(), type_: Box::new(Type::Bool) },
+            Literal::Unit => Type::Literal {
+                name: "unit".to_string(),
+                type_: Box::new(Type::Unit),
+            },
+            Literal::Int(v) => Type::Literal {
+                name: v.to_string(),
+                type_: Box::new(Type::Int),
+            },
+            Literal::UInt(v) => Type::Literal {
+                name: v.to_string(),
+                type_: Box::new(Type::UInt),
+            },
+            Literal::Float(v) => Type::Literal {
+                name: v.to_string(),
+                type_: Box::new(Type::Float),
+            },
+            Literal::String(v) => Type::Literal {
+                name: format!("\"{}\"", v.to_string()),
+                type_: Box::new(Type::String),
+            },
+            Literal::Char(v) => Type::Literal {
+                name: format!("'{}'", v.to_string()),
+                type_: Box::new(Type::Char),
+            },
+            Literal::Bool(v) => Type::Literal {
+                name: v.to_string(),
+                type_: Box::new(Type::Bool),
+            },
             Literal::Array { type_, .. } => Type::Array(Box::new(type_.clone())),
             Literal::Struct { type_, .. } => type_.clone(),
             Literal::Enum { type_, .. } => type_.clone(),
@@ -421,15 +639,35 @@ impl Display for Literal {
             Literal::String(v) => write!(f, "\"{}\"", v),
             Literal::Char(v) => write!(f, "'{}'", v),
             Literal::Bool(v) => write!(f, "{}", v),
-            Literal::Array { values, .. } => write!(f, "[{}]", values.iter().map(|e| e.to_string()).collect::<Vec<String>>().join(", ")),
-            Literal::Struct { field_initializers, .. } => write!(f, "{{{}}}", field_initializers.iter().map(|fi| {
-                if let Some(identifier) = &fi.identifier {
-                    format!("{}: {}", identifier, fi.initializer.to_string())
-                } else {
-                    fi.initializer.to_string()
-                }
-            }).collect::<Vec<String>>().join(", ")),
-            Literal::Enum { field_initializers, .. } => write!(f, "{}", field_initializers.to_string()),
+            Literal::Array { values, .. } => write!(
+                f,
+                "[{}]",
+                values
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Literal::Struct {
+                field_initializers, ..
+            } => write!(
+                f,
+                "{{{}}}",
+                field_initializers
+                    .iter()
+                    .map(|fi| {
+                        if let Some(identifier) = &fi.identifier {
+                            format!("{}: {}", identifier, fi.initializer.to_string())
+                        } else {
+                            fi.initializer.to_string()
+                        }
+                    })
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Literal::Enum {
+                field_initializers, ..
+            } => write!(f, "{}", field_initializers.to_string()),
         }
     }
 }
@@ -473,8 +711,24 @@ impl Display for EnumMemberFieldInitializers {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EnumMemberFieldInitializers::None => write!(f, ""),
-            EnumMemberFieldInitializers::Named(field_initializers) => write!(f, "{{{}}}", field_initializers.iter().map(|(k, v)| format!("{}: {}", k, v)).collect::<Vec<String>>().join(", ")),
-            EnumMemberFieldInitializers::Unnamed(field_initializers) => write!(f, "({})", field_initializers.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(", ")),
+            EnumMemberFieldInitializers::Named(field_initializers) => write!(
+                f,
+                "{{{}}}",
+                field_initializers
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            EnumMemberFieldInitializers::Unnamed(field_initializers) => write!(
+                f,
+                "({})",
+                field_initializers
+                    .iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }
@@ -526,9 +780,7 @@ impl Typed for Member {
     fn get_deep_type(&self) -> Type {
         match self {
             Member::Identifier { type_, .. } => type_.clone(),
-            Member::MemberAccess { member, .. } => {
-                member.get_deep_type()
-            },
+            Member::MemberAccess { member, .. } => member.get_deep_type(),
         }
     }
 }
@@ -537,7 +789,12 @@ impl Display for Member {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Member::Identifier { symbol, .. } => write!(f, "{}", symbol),
-            Member::MemberAccess { object, member, symbol, .. } => write!(f, "{}.{}", object, member),
+            Member::MemberAccess {
+                object,
+                member,
+                symbol,
+                ..
+            } => write!(f, "{}.{}", object, member),
         }
     }
 }

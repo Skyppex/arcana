@@ -36,7 +36,10 @@ pub enum ScopeType {
 
 impl Into<Scope> for ScopeType {
     fn into(self) -> Scope {
-        Scope { scope_type: self, types: vec![] }
+        Scope {
+            scope_type: self,
+            types: vec![],
+        }
     }
 }
 

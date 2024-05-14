@@ -1,11 +1,12 @@
 mod common;
 
-use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
+use common::{create_typed_ast, StatementExt, VecStatementExt};
 
-use shared::type_checker::{ast::{Literal, Typed, TypedExpression}, Type};
-use interpreter::{value, Value};
+use shared::type_checker::{
+    ast::{Typed, TypedExpression},
+    Type,
+};
 
-use crate::common::create_env;
 
 #[test]
 fn call_is_call() {
@@ -19,7 +20,8 @@ fn call_is_call() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(1)
         .unwrap_expression();
 
@@ -38,7 +40,8 @@ fn call_has_void_return_type() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(1)
         .unwrap_expression();
 
@@ -57,7 +60,8 @@ fn call_has_return_type() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(1)
         .unwrap_expression();
 

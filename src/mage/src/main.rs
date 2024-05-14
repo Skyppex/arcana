@@ -5,8 +5,8 @@ use clap::Parser;
 
 use std::{cell::RefCell, rc::Rc};
 
-use interpreter::Environment;
 use crate::mage_args::MageArgs;
+use interpreter::Environment;
 
 use shared::{
     display::{Indent, IndentDisplay},

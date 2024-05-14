@@ -1,8 +1,15 @@
 use std::collections::HashMap;
 
-use crate::{lexer::token::{self, Keyword, TokenKind}, types::TypeAnnotation};
+use crate::{
+    lexer::token::{self, Keyword, TokenKind},
+    types::TypeAnnotation,
+};
 
-use super::{cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, ConditionBlock, Expression, FieldInitializer, If, Index, Literal, Member, Statement, Ternary, Unary, UnaryOperator, EnumMemberFieldInitializers, VariableDeclaration, While};
+use super::{
+    cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call,
+    ConditionBlock, EnumMemberFieldInitializers, Expression, FieldInitializer, If, Index, Literal,
+    Member, Statement, Ternary, Unary, UnaryOperator, VariableDeclaration, While,
+};
 use crate::types::{can_be_type_annotation, parse_type_annotation};
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -28,7 +35,10 @@ fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     };
 
     let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+        return Err(format!(
+            "Expected identifier but found {:?}",
+            cursor.first().kind
+        ));
     };
 
     let TokenKind::CloseParen = cursor.bump()?.kind else {
@@ -64,7 +74,7 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
         return Ok(Expression::While(While {
             condition: Box::new(condition),
             statements: block,
-            else_statements: None
+            else_statements: None,
         }));
     }
 
@@ -75,7 +85,7 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(Expression::While(While {
         condition: Box::new(condition),
         statements: block,
-        else_statements: Some(else_block)
+        else_statements: Some(else_block),
     }))
 }
 
@@ -84,8 +94,7 @@ pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_type_literal(cursor);
     }
 
-    parse_block_statements(cursor)
-        .map(|statements| Expression::Block(statements))
+    parse_block_statements(cursor).map(|statements| Expression::Block(statements))
 }
 
 pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
@@ -94,7 +103,7 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
     }
 
     cursor.bump()?; // Consume the {
-    
+
     let mut statements = vec![];
 
     while cursor.first().kind != TokenKind::CloseBrace {
@@ -111,7 +120,10 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_assignment(cursor);
     };
 
-    if !matches!(cursor.second().kind, TokenKind::OpenBrace | TokenKind::DoubleColon) {
+    if !matches!(
+        cursor.second().kind,
+        TokenKind::OpenBrace | TokenKind::DoubleColon
+    ) {
         return parse_assignment(cursor);
     };
 
@@ -124,7 +136,10 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
     }
 }
 
-fn parse_struct_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) -> Result<Expression, String> {
+fn parse_struct_literal(
+    cursor: &mut Cursor,
+    type_annotation: TypeAnnotation,
+) -> Result<Expression, String> {
     if cursor.bump()?.kind != TokenKind::OpenBrace {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
     }
@@ -150,17 +165,23 @@ fn parse_struct_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) ->
     cursor.bump()?; // Consume the }
     Ok(Expression::Literal(Literal::Struct {
         type_annotation,
-        field_initializers 
+        field_initializers,
     }))
 }
 
 fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, String> {
     let TokenKind::Identifier(identifier) = cursor.first().kind else {
-        return Ok(FieldInitializer { identifier: None, initializer: parse_expression(cursor)? });
+        return Ok(FieldInitializer {
+            identifier: None,
+            initializer: parse_expression(cursor)?,
+        });
     };
 
     let TokenKind::Colon = cursor.second().kind else {
-        return Ok(FieldInitializer { identifier: None, initializer: parse_expression(cursor)? });
+        return Ok(FieldInitializer {
+            identifier: None,
+            initializer: parse_expression(cursor)?,
+        });
     };
 
     cursor.bump()?; // Consume the identifier
@@ -168,18 +189,27 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
 
     let initializer = parse_expression(cursor)?;
 
-    Ok(FieldInitializer { identifier: Some(identifier), initializer })
+    Ok(FieldInitializer {
+        identifier: Some(identifier),
+        initializer,
+    })
 }
 
-fn parse_enum_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) -> Result<Expression, String> {
+fn parse_enum_literal(
+    cursor: &mut Cursor,
+    type_annotation: TypeAnnotation,
+) -> Result<Expression, String> {
     let TokenKind::DoubleColon = cursor.first().kind else {
         return Err(format!("Expected :: but found {:?}", cursor.first().kind));
     };
 
     cursor.bump()?; // Consume the ::
-    
+
     let TokenKind::Identifier(member) = cursor.first().kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+        return Err(format!(
+            "Expected identifier but found {:?}",
+            cursor.first().kind
+        ));
     };
 
     cursor.bump()?; // Consume the identifier
@@ -201,13 +231,15 @@ fn parse_enum_literal(cursor: &mut Cursor, type_annotation: TypeAnnotation) -> R
     Ok(Expression::Literal(Literal::Enum {
         type_annotation,
         member,
-        field_initializers
+        field_initializers,
     }))
 }
 
-fn parse_unnamed_enum_member_field_initializers(cursor: &mut Cursor) -> Result<EnumMemberFieldInitializers, String> {
+fn parse_unnamed_enum_member_field_initializers(
+    cursor: &mut Cursor,
+) -> Result<EnumMemberFieldInitializers, String> {
     let mut field_initializers = vec![];
-    
+
     while cursor.first().kind != TokenKind::CloseParen {
         let initializer = parse_expression(cursor)?;
 
@@ -221,12 +253,17 @@ fn parse_unnamed_enum_member_field_initializers(cursor: &mut Cursor) -> Result<E
     Ok(EnumMemberFieldInitializers::Unnamed(field_initializers))
 }
 
-fn parse_named_enum_member_field_initializers(cursor: &mut Cursor) -> Result<EnumMemberFieldInitializers, String> {
+fn parse_named_enum_member_field_initializers(
+    cursor: &mut Cursor,
+) -> Result<EnumMemberFieldInitializers, String> {
     let mut field_initializers = HashMap::new();
-    
+
     while cursor.first().kind != TokenKind::CloseParen {
         let TokenKind::Identifier(identifier) = cursor.first().kind else {
-            return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+            return Err(format!(
+                "Expected identifier but found {:?}",
+                cursor.first().kind
+            ));
         };
 
         let TokenKind::Colon = cursor.second().kind else {
@@ -271,15 +308,17 @@ fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_ternary(cursor)?;
 
-    while matches!(cursor.first().kind,
+    while matches!(
+        cursor.first().kind,
         TokenKind::PlusEqual
-        | TokenKind::MinusEqual
-        | TokenKind::StarEqual
-        | TokenKind::SlashEqual
-        | TokenKind::PercentEqual
-        | TokenKind::AmpersandEqual
-        | TokenKind::PipeEqual
-        | TokenKind::CaretEqual) {
+            | TokenKind::MinusEqual
+            | TokenKind::StarEqual
+            | TokenKind::SlashEqual
+            | TokenKind::PercentEqual
+            | TokenKind::AmpersandEqual
+            | TokenKind::PipeEqual
+            | TokenKind::CaretEqual
+    ) {
         let operator = cursor.bump()?.kind; // Consume the +=, -=, *=, /=, %=, &=, |=, ^=, >>=, or <<=
         let initializer = parse_expression(cursor)?;
 
@@ -301,7 +340,10 @@ fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> 
                     TokenKind::AmpersandEqual => BinaryOperator::BitwiseAnd,
                     TokenKind::PipeEqual => BinaryOperator::BitwiseOr,
                     TokenKind::CaretEqual => BinaryOperator::BitwiseXor,
-                    _ => unreachable!("Expected +=, -=, *=, /=, %=, &=, |=, or ^=, but found {:?}", operator),
+                    _ => unreachable!(
+                        "Expected +=, -=, *=, /=, %=, &=, |=, or ^=, but found {:?}",
+                        operator
+                    ),
                 },
             })),
         });
@@ -327,20 +369,23 @@ fn parse_ternary(cursor: &mut Cursor) -> Result<Expression, String> {
                 Expression::Ternary(Ternary {
                     condition: Box::new(expression),
                     true_expression: Box::new(true_expression),
-                    false_expression: Box::new(false_expression)
+                    false_expression: Box::new(false_expression),
                 })
-            },
+            }
             _ => return Err(format!("Expected : but found {:?}", cursor.first().kind)),
         };
     }
-    
+
     Ok(expression)
 }
 
 fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_comparison(cursor)?;
 
-    while matches!(cursor.first().kind, TokenKind::DoubleAmpersand | TokenKind::DoublePipe) {
+    while matches!(
+        cursor.first().kind,
+        TokenKind::DoubleAmpersand | TokenKind::DoublePipe
+    ) {
         let operator = cursor.bump()?.kind; // Consume the && or ||
         let right = parse_comparison(cursor)?;
 
@@ -361,13 +406,15 @@ fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_comparison(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_bitwise_logical(cursor)?;
 
-    while matches!(cursor.first().kind, 
+    while matches!(
+        cursor.first().kind,
         TokenKind::DoubleEqual
-        | TokenKind::BangEqual
-        | TokenKind::Greater
-        | TokenKind::Less
-        | TokenKind::GreaterEqual
-        | TokenKind::LessEqual) {
+            | TokenKind::BangEqual
+            | TokenKind::Greater
+            | TokenKind::Less
+            | TokenKind::GreaterEqual
+            | TokenKind::LessEqual
+    ) {
         let operator = cursor.bump()?.kind; // Consume the ==, !=, >, <, >=, or <=
         let right = parse_bitwise_logical(cursor)?;
 
@@ -392,13 +439,13 @@ fn parse_comparison(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_additive(cursor)?;
 
-    while matches!(cursor.first().kind,
-          TokenKind::Caret
-        | TokenKind::Ampersand
-        | TokenKind::Pipe) ||
-        matches!((cursor.first().kind, cursor.second().kind),
-          (TokenKind::Greater, TokenKind::Greater)
-        | (TokenKind::Less   , TokenKind::Less   )) {
+    while matches!(
+        cursor.first().kind,
+        TokenKind::Caret | TokenKind::Ampersand | TokenKind::Pipe
+    ) || matches!(
+        (cursor.first().kind, cursor.second().kind),
+        (TokenKind::Greater, TokenKind::Greater) | (TokenKind::Less, TokenKind::Less)
+    ) {
         let operator = cursor.bump()?.kind; // Consume the >>, <<, ^, &, or |
         let right = parse_additive(cursor)?;
 
@@ -409,11 +456,11 @@ fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::Greater => {
                     cursor.bump()?; // Consume the >
                     BinaryOperator::BitwiseRightShift
-                },
+                }
                 TokenKind::Less => {
                     cursor.bump()?; // Consume the <
                     BinaryOperator::BitwiseLeftShift
-                },
+                }
                 TokenKind::Caret => BinaryOperator::BitwiseXor,
                 TokenKind::Ampersand => BinaryOperator::BitwiseAnd,
                 TokenKind::Pipe => BinaryOperator::BitwiseOr,
@@ -421,7 +468,7 @@ fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
             },
         });
     }
-    
+
     Ok(expression)
 }
 
@@ -442,14 +489,17 @@ fn parse_additive(cursor: &mut Cursor) -> Result<Expression, String> {
             },
         });
     }
-    
+
     Ok(expression)
 }
 
 fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_variable_declaration(cursor)?;
 
-    while matches!(cursor.first().kind, TokenKind::Star | TokenKind::Slash | TokenKind::Percent) {
+    while matches!(
+        cursor.first().kind,
+        TokenKind::Star | TokenKind::Slash | TokenKind::Percent
+    ) {
         let operator = cursor.bump()?.kind; // Consume the *, /, or %
         let right = parse_variable_declaration(cursor)?;
 
@@ -480,19 +530,25 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
     if mutable {
         cursor.bump()?; // Consume the mutable
     }
-    
+
     let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-        return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+        return Err(format!(
+            "Expected identifier but found {:?}",
+            cursor.first().kind
+        ));
     };
-    
+
     if cursor.first().kind != TokenKind::Colon {
         return Err(format!("Expected : but found {:?}", cursor.first().kind));
     }
 
     cursor.bump()?; // Consume the :
-    
+
     if !can_be_type_annotation(cursor) {
-        return Err(format!("Expected type annotation but found {:?}", cursor.first().kind));
+        return Err(format!(
+            "Expected type annotation but found {:?}",
+            cursor.first().kind
+        ));
     }
 
     let type_annotation = parse_type_annotation(cursor, false)?;
@@ -509,19 +565,20 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
                 identifier,
                 initializer: Some(Box::new(initializer)),
             }))
-        },
-        TokenKind::Semicolon => {
-            Ok(Expression::VariableDeclaration(VariableDeclaration {
-                mutable,
-                type_annotation,
-                identifier,
-                initializer: None,
-            }))
-        },
-        _ => Err(format!("Expected = or ; but found {:?}", cursor.first().kind)),
+        }
+        TokenKind::Semicolon => Ok(Expression::VariableDeclaration(VariableDeclaration {
+            mutable,
+            type_annotation,
+            identifier,
+            initializer: None,
+        })),
+        _ => Err(format!(
+            "Expected = or ; but found {:?}",
+            cursor.first().kind
+        )),
     }
 }
- 
+
 fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::If) {
         return parse_unary(cursor);
@@ -544,23 +601,35 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
             let condition = parse_expression(cursor)?;
             let block = parse_block(cursor)?;
 
-            else_ifs.push(ConditionBlock { condition: Box::new(condition), block: Box::new(block) });
+            else_ifs.push(ConditionBlock {
+                condition: Box::new(condition),
+                block: Box::new(block),
+            });
         } else {
             let block = parse_block(cursor)?;
             r#else = Some(Box::new(block));
         }
     }
 
-    return Ok(Expression::If(If
-    {
-        r#if: ConditionBlock { condition: Box::new(if_condition), block: Box::new(if_block) },
-        else_ifs: if else_ifs.len() > 0 { Some(else_ifs) } else { None },
-        r#else
-    }))
+    return Ok(Expression::If(If {
+        r#if: ConditionBlock {
+            condition: Box::new(if_condition),
+            block: Box::new(if_block),
+        },
+        else_ifs: if else_ifs.len() > 0 {
+            Some(else_ifs)
+        } else {
+            None
+        },
+        r#else,
+    }));
 }
 
 fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
-    if matches!(cursor.first().kind, TokenKind::Plus | TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde) {
+    if matches!(
+        cursor.first().kind,
+        TokenKind::Plus | TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde
+    ) {
         let operator = cursor.bump()?.kind; // Consume the +, -, !, or ~
         let right = parse_unary(cursor)?;
 
@@ -596,8 +665,11 @@ fn parse_call_member(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_call_expression(caller: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
     let arguments = parse_args(cursor)?;
     cursor.bump()?; // Consume the )
-    
-    let mut call = Expression::Call(Call { caller: Box::new(caller.clone()), arguments });
+
+    let mut call = Expression::Call(Call {
+        caller: Box::new(caller.clone()),
+        arguments,
+    });
 
     if let TokenKind::OpenParen = cursor.first().kind {
         call = parse_call_expression(call, cursor)?;
@@ -619,8 +691,7 @@ fn parse_args(cursor: &mut Cursor) -> Result<Vec<Expression>, String> {
 }
 
 fn parse_args_list(cursor: &mut Cursor) -> Result<Vec<Expression>, String> {
-    let mut args = parse_expression(cursor)
-        .map(|e| vec![e])?;
+    let mut args = parse_expression(cursor).map(|e| vec![e])?;
 
     while let TokenKind::Comma = cursor.first().kind {
         cursor.bump()?; // Consume the ,
@@ -635,10 +706,10 @@ fn parse_index_expression(caller: Expression, cursor: &mut Cursor) -> Result<Exp
     cursor.bump()?; // Consume the [
     let argument = parse_expression(cursor)?;
     cursor.bump()?; // Consume the ]
-    
+
     let mut index = Expression::Index(Index {
         caller: Box::new(caller.clone()),
-        index: Box::new(argument)
+        index: Box::new(argument),
     });
 
     if let TokenKind::OpenBracket = cursor.first().kind {
@@ -655,11 +726,17 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
         cursor.bump()?; // Consume the .
 
         let TokenKind::Identifier(identifier) = cursor.first().kind else {
-            return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+            return Err(format!(
+                "Expected identifier but found {:?}",
+                cursor.first().kind
+            ));
         };
 
         let Expression::Member(member) = parse_literal(cursor)? else {
-            return Err(format!("Expected member but found {:?}", cursor.first().kind));
+            return Err(format!(
+                "Expected member but found {:?}",
+                cursor.first().kind
+            ));
         };
 
         object = Expression::Member(Member::MemberAccess {
@@ -673,11 +750,17 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
         cursor.bump()?; // Consume the .
 
         let TokenKind::Identifier(identifier) = cursor.first().kind else {
-            return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
+            return Err(format!(
+                "Expected identifier but found {:?}",
+                cursor.first().kind
+            ));
         };
 
         let Expression::Member(member) = parse_literal(cursor)? else {
-            return Err(format!("Expected member but found {:?}", cursor.first().kind));
+            return Err(format!(
+                "Expected member but found {:?}",
+                cursor.first().kind
+            ));
         };
 
         object = Expression::Member(Member::MemberAccess {
@@ -694,7 +777,7 @@ pub fn parse_literal(cursor: &mut Cursor) -> Result<Expression, String> {
     let TokenKind::Literal(literal) = cursor.first().kind else {
         return parse_primary(cursor);
     };
-    
+
     cursor.bump()?; // Consume the literal
     to_expression_literal(literal)
 }
@@ -703,8 +786,10 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
     match cursor.first().kind {
         TokenKind::Identifier(identifier) => {
             cursor.bump()?; // Consume the identifier
-            Ok(Expression::Member(Member::Identifier { symbol: identifier }))
-        },
+            Ok(Expression::Member(Member::Identifier {
+                symbol: identifier,
+            }))
+        }
         TokenKind::OpenParen => {
             cursor.bump()?; // Consume the (
 
@@ -714,10 +799,10 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::CloseParen => {
                     cursor.bump()?; // Consume the )
                     Ok(expression)
-                },
+                }
                 _ => Err(format!("Expected ) but found {:?}", cursor.first().kind)),
             }
-        },
+        }
         TokenKind::OpenBracket => {
             cursor.bump()?; // Consume the [
 
@@ -735,7 +820,10 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 
             Ok(Expression::Literal(Literal::Array(elements)))
         }
-        _ => Err(format!("Expected primary expression but found {:?}", cursor.first().kind)),
+        _ => Err(format!(
+            "Expected primary expression but found {:?}",
+            cursor.first().kind
+        )),
     }
 }
 
@@ -746,7 +834,9 @@ fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> 
         token::Literal::UInt(literal) => Ok(Expression::Literal(Literal::UInt(literal.value))),
         token::Literal::Float(value) => Ok(Expression::Literal(Literal::Float(value))),
         token::Literal::String(value) => Ok(Expression::Literal(Literal::String(value))),
-        token::Literal::Char(value) => Ok(Expression::Literal(Literal::Char(value.parse::<char>().unwrap()))),
+        token::Literal::Char(value) => Ok(Expression::Literal(Literal::Char(
+            value.parse::<char>().unwrap(),
+        ))),
         token::Literal::Bool(value) => Ok(Expression::Literal(Literal::Bool(value))),
     }
 }

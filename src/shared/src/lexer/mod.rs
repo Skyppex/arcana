@@ -1,13 +1,13 @@
-use token::{Token, TokenKind, Literal};
 use cursor::Cursor;
+use token::{Literal, Token, TokenKind};
 
 use crate::parser::AccessModifier;
 
 use self::{num_lit::parse_numeric_literal, token::Keyword};
 
-pub mod token;
 pub mod cursor;
 mod num_lit;
+pub mod token;
 
 pub fn tokenize(source_code: &str) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
@@ -49,7 +49,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             } else {
                 Ok(create_token(TokenKind::Colon, cursor))
             }
-        },
+        }
         ';' => Ok(create_token(TokenKind::Semicolon, cursor)),
         '.' => Ok(create_token(TokenKind::Dot, cursor)),
         '?' => Ok(create_token(TokenKind::QuestionMark, cursor)),
@@ -117,7 +117,6 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             } else if cursor.second() == '=' {
                 cursor.bump();
                 Ok(create_token(TokenKind::PipeEqual, cursor))
-            
             } else {
                 Ok(create_token(TokenKind::Pipe, cursor))
             }
@@ -130,9 +129,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
                 Ok(create_token(TokenKind::Caret, cursor))
             }
         }
-        '~' => {
-            Ok(create_token(TokenKind::Tilde, cursor))
-        }
+        '~' => Ok(create_token(TokenKind::Tilde, cursor)),
         '=' => {
             if cursor.second() == '=' {
                 cursor.bump();
@@ -165,9 +162,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
                 Ok(create_token(TokenKind::Greater, cursor))
             }
         }
-        '0'..='9' => {
-            Ok(parse_numeric_literal(cursor))
-        }
+        '0'..='9' => Ok(parse_numeric_literal(cursor)),
         '"' => {
             cursor.bump();
             let mut string = String::new();
@@ -238,13 +233,13 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
                     return Ok(Token {
                         kind: keyword,
                         length: cursor.position_within_token(),
-                    })
+                    });
                 }
 
                 return Ok(Token {
                     kind: TokenKind::Identifier(string),
                     length: cursor.position_within_token(),
-                })
+                });
             }
 
             Err(format!("Unrecognized character: {0}", cursor.first()))
@@ -302,9 +297,15 @@ fn escapable_is_char(c: char) -> Option<char> {
 fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
     match string {
         // Access modifiers
-        "public" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Public))),
-        "internal" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
-        "super" => Some(TokenKind::Keyword(Keyword::AccessModifier(AccessModifier::Internal))),
+        "public" => Some(TokenKind::Keyword(Keyword::AccessModifier(
+            AccessModifier::Public,
+        ))),
+        "internal" => Some(TokenKind::Keyword(Keyword::AccessModifier(
+            AccessModifier::Internal,
+        ))),
+        "super" => Some(TokenKind::Keyword(Keyword::AccessModifier(
+            AccessModifier::Internal,
+        ))),
 
         // Variable declarations
         "let" => Some(TokenKind::Keyword(Keyword::Let)),
@@ -344,7 +345,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "drop" => Some(TokenKind::Keyword(Keyword::Drop)),
         #[cfg(feature = "interpreter")]
         "print" => Some(TokenKind::Keyword(Keyword::Print)),
-        
+
         _ => None,
     }
 }

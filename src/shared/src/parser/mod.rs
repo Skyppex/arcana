@@ -1,7 +1,7 @@
 pub(crate) mod ast;
 pub mod cursor;
-mod statements;
 mod expressions;
+mod statements;
 
 use std::vec;
 

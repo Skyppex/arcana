@@ -2,8 +2,8 @@ mod common;
 
 use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
-use shared::type_checker::ast::{Literal, TypedExpression};
 use interpreter::{value, Value};
+use shared::type_checker::ast::{Literal, TypedExpression};
 
 use crate::common::create_env;
 
@@ -16,7 +16,8 @@ fn literal_is_literal() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_expression();
 
@@ -32,14 +33,15 @@ fn literal_has_correct_type() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(0)
         .unwrap_expression();
 
     match expression {
         TypedExpression::Literal(literal) => {
             assert!(matches!(literal, Literal::Int(_)));
-        },
+        }
         _ => panic!("Expected a literal expression, but found {:?}", expression),
     }
 }
@@ -48,7 +50,7 @@ fn literal_has_correct_type() {
 fn literal_returns_correct_value() {
     // Arrange
     let input = "1";
-    
+
     // Act
     let value = evaluate_expression(input, create_env(), false);
 

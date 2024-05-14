@@ -1,6 +1,9 @@
 use std::{fmt::Display, hash::Hash, ops::Deref};
 
-use crate::{lexer::token::{self, TokenKind}, parser::{cursor::Cursor, Literal}};
+use crate::{
+    lexer::token::{self, TokenKind},
+    parser::{cursor::Cursor, Literal},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeAnnotation {
@@ -14,9 +17,15 @@ impl Into<TypeIdentifier> for TypeAnnotation {
     fn into(self) -> TypeIdentifier {
         match self {
             TypeAnnotation::Type(name) => TypeIdentifier::Type(name),
-            TypeAnnotation::ConcreteType(name, generics) => TypeIdentifier::ConcreteType(name, generics),
-            TypeAnnotation::Array(type_annotation) => TypeIdentifier::ConcreteType("Array".to_string(), vec![*type_annotation]),
-            TypeAnnotation::Literal(literal) => TypeIdentifier::ConcreteType(literal.deref().to_string(), vec![]),
+            TypeAnnotation::ConcreteType(name, generics) => {
+                TypeIdentifier::ConcreteType(name, generics)
+            }
+            TypeAnnotation::Array(type_annotation) => {
+                TypeIdentifier::ConcreteType("Array".to_string(), vec![*type_annotation])
+            }
+            TypeAnnotation::Literal(literal) => {
+                TypeIdentifier::ConcreteType(literal.deref().to_string(), vec![])
+            }
         }
     }
 }
@@ -25,9 +34,16 @@ impl From<TypeIdentifier> for TypeAnnotation {
     fn from(type_identifier: TypeIdentifier) -> Self {
         match type_identifier {
             TypeIdentifier::Type(name) => TypeAnnotation::Type(name),
-            TypeIdentifier::GenericType(name, generics) => TypeAnnotation::ConcreteType(name, generics.into_iter().map(|g| g.type_annotation()).collect()),
-            TypeIdentifier::ConcreteType(name, generics) => TypeAnnotation::ConcreteType(name, generics),
-            TypeIdentifier::MemberType(_, _) => panic!("Cannot convert member type to type annotation"),
+            TypeIdentifier::GenericType(name, generics) => TypeAnnotation::ConcreteType(
+                name,
+                generics.into_iter().map(|g| g.type_annotation()).collect(),
+            ),
+            TypeIdentifier::ConcreteType(name, generics) => {
+                TypeAnnotation::ConcreteType(name, generics)
+            }
+            TypeIdentifier::MemberType(_, _) => {
+                panic!("Cannot convert member type to type annotation")
+            }
         }
     }
 }
@@ -55,22 +71,24 @@ impl TypeAnnotation {
 impl Display for TypeAnnotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypeAnnotation::Type(type_name) =>
-                write!(f, "{}", type_name),
+            TypeAnnotation::Type(type_name) => write!(f, "{}", type_name),
             TypeAnnotation::ConcreteType(type_name, generics) => {
                 if generics.is_empty() {
                     return write!(f, "{}", type_name);
                 }
-                
-                write!(f, "{}<{}>",
+
+                write!(
+                    f,
+                    "{}<{}>",
                     type_name,
-                    generics.iter()
+                    generics
+                        .iter()
                         .map(|g| g.to_string())
                         .collect::<Vec<String>>()
-                        .join(", "))
-            },
-            TypeAnnotation::Array(type_identifier) =>
-                write!(f, "[{}]", type_identifier),
+                        .join(", ")
+                )
+            }
+            TypeAnnotation::Array(type_identifier) => write!(f, "[{}]", type_identifier),
             TypeAnnotation::Literal(literal) => write!(f, "{:?}", literal),
         }
     }
@@ -97,7 +115,9 @@ impl TypeIdentifier {
     pub fn eq_names(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Type(name_left), Self::Type(name_right)) => name_left == name_right,
-            (Self::GenericType(name_left, _), Self::GenericType(name_right, _)) => name_left == name_right,
+            (Self::GenericType(name_left, _), Self::GenericType(name_right, _)) => {
+                name_left == name_right
+            }
             _ => false,
         }
     }
@@ -112,26 +132,32 @@ impl Hash for TypeIdentifier {
 impl Display for TypeIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypeIdentifier::Type(type_name) =>
-                write!(f, "{}", type_name),
+            TypeIdentifier::Type(type_name) => write!(f, "{}", type_name),
             TypeIdentifier::GenericType(type_name, generics) => {
-                write!(f, "{}<{}>",
+                write!(
+                    f,
+                    "{}<{}>",
                     type_name,
-                    generics.iter()
+                    generics
+                        .iter()
                         .map(|g| g.to_string())
                         .collect::<Vec<String>>()
-                        .join(", "))
-            },
+                        .join(", ")
+                )
+            }
             TypeIdentifier::ConcreteType(type_name, generics) => {
-                write!(f, "{}<{}>",
+                write!(
+                    f,
+                    "{}<{}>",
                     type_name,
-                    generics.iter()
+                    generics
+                        .iter()
                         .map(|g| g.to_string())
                         .collect::<Vec<String>>()
-                        .join(", "))
-            },
-            TypeIdentifier::MemberType(parent, member) =>
-                write!(f, "{}->{}", parent, member),
+                        .join(", ")
+                )
+            }
+            TypeIdentifier::MemberType(parent, member) => write!(f, "{}->{}", parent, member),
         }
     }
 }
@@ -168,23 +194,29 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
         TokenKind::OpenBracket => {
             let _ = cloned_cursor.bump();
             can_be_type_annotation(&cloned_cursor)
-        },
+        }
         _ => false,
     }
 }
 
-pub(super) fn parse_type_annotation_from_str(type_str: &str, use_double_colon: bool) -> Result<TypeAnnotation, String> {
+pub(super) fn parse_type_annotation_from_str(
+    type_str: &str,
+    use_double_colon: bool,
+) -> Result<TypeAnnotation, String> {
     let tokens = crate::lexer::tokenize(type_str)?;
     let mut cursor = Cursor::new(tokens);
     parse_type_annotation(&mut cursor, use_double_colon)
 }
 
-pub(super) fn parse_type_annotation(cursor: &mut Cursor, use_double_colon: bool) -> Result<TypeAnnotation, String> {
+pub(super) fn parse_type_annotation(
+    cursor: &mut Cursor,
+    use_double_colon: bool,
+) -> Result<TypeAnnotation, String> {
     match cursor.first().kind {
         TokenKind::Literal(token::Literal::Unit) => {
             cursor.bump()?; // Consume the unit
             Ok(TypeAnnotation::Type("unit".to_string()))
-        },
+        }
         TokenKind::Identifier(type_name) => {
             cursor.bump()?; // Consume the type identifier
 
@@ -198,16 +230,16 @@ pub(super) fn parse_type_annotation(cursor: &mut Cursor, use_double_colon: bool)
 
             if cursor.first().kind == TokenKind::Less {
                 cursor.bump()?; // Consume the <
-                let generics =
-                    parse_comma_separated_type_annotations(cursor,
-                        |kind| kind != TokenKind::Greater)?;
+                let generics = parse_comma_separated_type_annotations(cursor, |kind| {
+                    kind != TokenKind::Greater
+                })?;
 
                 cursor.bump()?; // Consume the >
                 return Ok(TypeAnnotation::ConcreteType(type_name, generics));
             }
 
             Ok(TypeAnnotation::Type(type_name))
-        },
+        }
         TokenKind::OpenBracket => {
             cursor.bump()?; // Consume the [
 
@@ -219,12 +251,18 @@ pub(super) fn parse_type_annotation(cursor: &mut Cursor, use_double_colon: bool)
 
             cursor.bump()?; // Consume the ]
             Ok(TypeAnnotation::Array(Box::new(type_annotation)))
-        },
-        _ => Err(format!("Expected type identifier but found {:?}", cursor.first().kind)),
+        }
+        _ => Err(format!(
+            "Expected type identifier but found {:?}",
+            cursor.first().kind
+        )),
     }
 }
 
-fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(cursor: &mut Cursor, check: F) -> Result<Vec<TypeAnnotation>, String> {
+fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(
+    cursor: &mut Cursor,
+    check: F,
+) -> Result<Vec<TypeAnnotation>, String> {
     let mut types = Vec::new();
 
     while check(cursor.first().kind) {
@@ -239,31 +277,36 @@ fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(cursor: &mut
     Ok(types)
 }
 
-pub(super) fn parse_type_identifier(cursor: &mut Cursor, use_double_colon: bool) -> Result<TypeIdentifier, String> {
+pub(super) fn parse_type_identifier(
+    cursor: &mut Cursor,
+    use_double_colon: bool,
+) -> Result<TypeIdentifier, String> {
     match cursor.first().kind {
         TokenKind::Identifier(type_name) => {
             cursor.bump()?; // Consume the type identifier
-            
+
             if use_double_colon {
                 if cursor.first().kind != TokenKind::DoubleColon {
                     return Err(format!("Expected :: but found {:?}", cursor.first().kind));
                 }
-                
+
                 cursor.bump()?; // Consume the ::
             }
 
             if cursor.first().kind == TokenKind::Less {
                 cursor.bump()?; // Consume the <
-                let generics =
-                    parse_generics_in_type_name(cursor)?;
+                let generics = parse_generics_in_type_name(cursor)?;
 
                 cursor.bump()?; // Consume the >
                 return Ok(TypeIdentifier::GenericType(type_name, generics));
             }
 
             Ok(TypeIdentifier::Type(type_name))
-        },
-        _ => Err(format!("Expected type identifier but found {:?}", cursor.first().kind)),
+        }
+        _ => Err(format!(
+            "Expected type identifier but found {:?}",
+            cursor.first().kind
+        )),
     }
 }
 
@@ -272,7 +315,10 @@ fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericType>, 
 
     while cursor.first().kind != TokenKind::Greater {
         let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-            return Err(format!("Expected type identifier but found {:?}", cursor.first().kind));
+            return Err(format!(
+                "Expected type identifier but found {:?}",
+                cursor.first().kind
+            ));
         };
 
         types.push(GenericType { type_name });

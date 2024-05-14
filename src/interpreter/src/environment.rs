@@ -2,7 +2,10 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use shared::type_checker::ast::Member;
 
-use super::{scope::{Scope, ScopeState, ScopeType}, value::{Variable, Value}};
+use super::{
+    scope::{Scope, ScopeState, ScopeType},
+    value::{Value, Variable},
+};
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
 
@@ -37,28 +40,40 @@ impl Environment {
         Self::new_scopes(parent, [scope])
     }
 
-    pub fn new_scopes<T: Into<ScopeState>, U: IntoIterator<Item = T>>
-    (parent: Rcrc<Environment>, scopes: U) -> Self {
+    pub fn new_scopes<T: Into<ScopeState>, U: IntoIterator<Item = T>>(
+        parent: Rcrc<Environment>,
+        scopes: U,
+    ) -> Self {
         Self {
             parent: Some(parent),
             variables: HashMap::new(),
             functions: HashMap::new(),
-            scopes: scopes.into_iter()
+            scopes: scopes
+                .into_iter()
                 .map(|scope| scope.into())
                 .collect::<Vec<ScopeState>>(),
         }
     }
 
     pub fn has_scope(&self, scope_type: &ScopeType) -> bool {
-        self.scopes.iter().any(|s| s.scope_type == *scope_type) ||
-            self.parent.as_ref().map(|p| p.borrow().has_scope(scope_type)).unwrap_or(false)
+        self.scopes.iter().any(|s| s.scope_type == *scope_type)
+            || self
+                .parent
+                .as_ref()
+                .map(|p| p.borrow().has_scope(scope_type))
+                .unwrap_or(false)
     }
 
     pub fn get_scope(&self, scope_type: &ScopeType) -> Option<Scope> {
-        self.scopes.iter().find(|s| s.scope_type == *scope_type && s.active)
+        self.scopes
+            .iter()
+            .find(|s| s.scope_type == *scope_type && s.active)
             .map(|f: &ScopeState| f.scope.clone())
-            .or_else(|| self.parent.as_ref().and_then(|p|
-                p.borrow().get_scope(scope_type)))
+            .or_else(|| {
+                self.parent
+                    .as_ref()
+                    .and_then(|p| p.borrow().get_scope(scope_type))
+            })
     }
 
     pub fn activate_scope(&mut self, scope: Scope) -> Result<(), String> {
@@ -72,7 +87,7 @@ impl Environment {
                 if scope_state.active {
                     panic!("Scope '{:?}' already active", scope_type);
                 }
-                
+
                 scope_state.scope = scope;
                 scope_state.active = true
             },
@@ -81,16 +96,22 @@ impl Environment {
                 .borrow_mut()
                 .activate_scope(scope)?,
         }
-        
+
         Ok(())
     }
 
     pub fn add_variable(&mut self, identifier: String, value: Value, mutable: bool) {
-        self.variables.insert(identifier.clone(), Rc::new(RefCell::new(Variable::new(identifier, value, mutable))));
+        self.variables.insert(
+            identifier.clone(),
+            Rc::new(RefCell::new(Variable::new(identifier, value, mutable))),
+        );
     }
 
     pub fn add_function(&mut self, identifier: String, value: Value, mutable: bool) {
-        self.functions.insert(identifier.clone(), Rc::new(RefCell::new(Variable::new(identifier, value, mutable))));
+        self.functions.insert(
+            identifier.clone(),
+            Rc::new(RefCell::new(Variable::new(identifier, value, mutable))),
+        );
     }
 
     pub fn get_variable(&self, identifier: &str) -> Option<Rcrc<Variable>> {
@@ -107,14 +128,15 @@ impl Environment {
 
     pub fn set_variable(&mut self, member: Member, value: Value) -> Result<Value, String> {
         match member {
-            Member::Identifier {
-                symbol,
-                type_: _
-            } => {
-                let variable = self.resolve(&symbol)
-                    .ok_or(format!("Variable '{}' not found", symbol))?.clone();
+            Member::Identifier { symbol, type_: _ } => {
+                let variable = self
+                    .resolve(&symbol)
+                    .ok_or(format!("Variable '{}' not found", symbol))?
+                    .clone();
 
-                if !matches!(variable.borrow().value, Value::Uninitialized) && !variable.borrow().mutable {
+                if !matches!(variable.borrow().value, Value::Uninitialized)
+                    && !variable.borrow().mutable
+                {
                     return Err(format!("Cannot assign to immutable variable '{}'", symbol));
                 }
 
@@ -125,10 +147,8 @@ impl Environment {
                 object: _,
                 member,
                 symbol: _,
-                type_: _
-            } => {
-                self.set_variable(*member.clone(), value.clone())
-            }
+                type_: _,
+            } => self.set_variable(*member.clone(), value.clone()),
         }
     }
 
@@ -145,7 +165,7 @@ impl Environment {
             None
         }
     }
-    
+
     pub fn resolve_function(&self, name: &str) -> Option<Rcrc<Variable>> {
         if let Some(functions) = self.functions.get(name) {
             Some(functions.clone())

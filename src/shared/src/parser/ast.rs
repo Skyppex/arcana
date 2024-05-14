@@ -1,17 +1,19 @@
-use std::{collections::HashMap, fmt::Display};
 use std::hash::Hash;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Impl{
+pub struct Impl {
     pub type_annotation: TypeAnnotation,
     pub functions: Vec<Statement>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
-    Program { statements: Vec<Statement> },
+    Program {
+        statements: Vec<Statement>,
+    },
     StructDeclaration(StructDeclaration),
     EnumDeclaration(EnumDeclaration),
     UnionDeclaration(UnionDeclaration),
@@ -135,15 +137,29 @@ impl ToString for Literal {
             Literal::String(v) => v.to_string(),
             Literal::Char(v) => v.to_string(),
             Literal::Bool(v) => v.to_string(),
-            Literal::Array(array) => format!("[{}]", array.iter().map(|e| {
-                if let Expression::Literal(literal) = e {
-                    literal.to_string()
-                } else {
-                    panic!("Array element is not a literal")
-                }
-            }).collect::<Vec<String>>().join(", ")),
-            Literal::Struct { type_annotation, field_initializers } => todo!(),
-            Literal::Enum { type_annotation, member, field_initializers } => todo!(),
+            Literal::Array(array) => format!(
+                "[{}]",
+                array
+                    .iter()
+                    .map(|e| {
+                        if let Expression::Literal(literal) = e {
+                            literal.to_string()
+                        } else {
+                            panic!("Array element is not a literal")
+                        }
+                    })
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Literal::Struct {
+                type_annotation,
+                field_initializers,
+            } => todo!(),
+            Literal::Enum {
+                type_annotation,
+                member,
+                field_initializers,
+            } => todo!(),
         }
     }
 }

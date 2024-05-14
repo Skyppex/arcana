@@ -1,18 +1,27 @@
 use std::{cell::RefCell, rc::Rc};
 
 use interpreter::{Environment, Value};
-use shared::{lexer, parser, type_checker::{self, ast::{TypedExpression, TypedStatement}}};
-
+use shared::{
+    lexer, parser,
+    type_checker::{
+        self,
+        ast::{TypedExpression, TypedStatement},
+    },
+};
 
 pub fn create_typed_ast(input: &str) -> TypedStatement {
     let tokens = lexer::tokenize(input).unwrap();
     let ast = parser::create_ast(tokens).unwrap();
     let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new()));
-    let typed_ast = type_checker::create_typed_ast(ast, type_environment).unwrap();
-    typed_ast
+    
+    type_checker::create_typed_ast(ast, type_environment).unwrap()
 }
 
-pub fn evaluate_expression(input: &str, environment: Rcrc<Environment>, unwrap_semi: bool) -> Value {
+pub fn evaluate_expression(
+    input: &str,
+    environment: Rcrc<Environment>,
+    unwrap_semi: bool,
+) -> Value {
     let tokens = lexer::tokenize(input).unwrap();
     let ast = parser::create_ast(tokens).unwrap();
     let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new()));
@@ -37,7 +46,7 @@ impl StatementExt for TypedStatement {
             _ => panic!("Expected a program"),
         }
     }
-    
+
     fn unwrap_semi(self) -> TypedStatement {
         match self {
             TypedStatement::Semi(expression) => *expression,

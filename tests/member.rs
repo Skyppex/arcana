@@ -2,8 +2,14 @@ mod common;
 
 use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
-use shared::{type_checker::{ast::{Member, TypedExpression}, StructField, Type}, types::TypeIdentifier};
 use interpreter::{value, Value};
+use shared::{
+    type_checker::{
+        ast::{Member, Typed, TypedExpression},
+        StructField, Type,
+    },
+    types::TypeIdentifier,
+};
 
 use crate::common::create_env;
 
@@ -19,11 +25,15 @@ fn identifier_is_identifier() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(1)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Member(Member::Identifier { .. })));
+    assert!(matches!(
+        expression,
+        TypedExpression::Member(Member::Identifier { .. })
+    ));
 }
 
 #[test]
@@ -39,11 +49,15 @@ fn member_access_is_member_access() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(2)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Member(Member::MemberAccess { .. })));
+    assert!(matches!(
+        expression,
+        TypedExpression::Member(Member::MemberAccess { .. })
+    ));
 }
 
 #[test]
@@ -58,16 +72,12 @@ fn identifier_has_correct_type() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(1)
         .unwrap_expression();
 
-    match expression {
-        TypedExpression::Member(Member::Identifier { type_, .. }) => {
-            assert_eq!(type_, Type::Int);
-        },
-        _ => panic!("Expected a member expression, but found {:?}", expression),
-    }
+    assert_eq!(expression.get_type(), Type::Int);
 }
 
 #[test]
@@ -83,20 +93,19 @@ fn member_access_has_correct_type() {
     let typed_ast = create_typed_ast(input);
 
     // Assert
-    let expression = typed_ast.unwrap_program()
+    let expression = typed_ast
+        .unwrap_program()
         .nth_statement(2)
         .unwrap_expression();
 
-    match expression {
-        TypedExpression::Member(Member::MemberAccess { type_, .. }) => {
-            assert_eq!(type_, Type::StructField(StructField {
-                struct_name: TypeIdentifier::Type("A".to_owned()),
-                field_name: "a".to_owned(),
-                field_type: Box::new(Type::Int)
-            }));
-        },
-        _ => panic!("Expected a member expression, but found {:?}", expression),
-    }
+    assert_eq!(
+        expression.get_type(),
+        Type::StructField(StructField {
+            struct_name: TypeIdentifier::Type("A".to_owned()),
+            field_name: "a".to_owned(),
+            field_type: Box::new(Type::Int)
+        })
+    );
 }
 
 #[test]

@@ -29,7 +29,6 @@ impl Into<Scope> for ScopeType {
             ScopeType::Return => Scope::Return(None),
         }
     }
-
 }
 
 impl Into<ScopeState> for Scope {

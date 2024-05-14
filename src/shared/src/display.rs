@@ -1,8 +1,18 @@
-use crate::{parser::{
-    AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression, FieldInitializer, FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, VariableDeclaration, While
-}, type_checker::{self, ast::{
-    Block, TypedExpression, TypedStatement
-}, Type}, types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier}};
+use crate::{
+    parser::{
+        AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, EnumDeclaration,
+        EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression, FieldInitializer,
+        FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement,
+        StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration,
+        VariableDeclaration, While,
+    },
+    type_checker::{
+        self,
+        ast::{Block, TypedExpression, TypedStatement},
+        Type,
+    },
+    types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
+};
 
 pub struct Indent {
     levels: Vec<bool>,
@@ -10,9 +20,7 @@ pub struct Indent {
 
 impl Indent {
     pub fn new() -> Indent {
-        Indent {
-            levels: vec![],
-        }
+        Indent { levels: vec![] }
     }
 
     fn increase(&mut self) {
@@ -74,91 +82,162 @@ impl IndentDisplay for Statement {
                         result.push_str("\n\n");
                     }
                 }
-                
+
                 result
-            },
+            }
             Statement::StructDeclaration(StructDeclaration {
                 access_modifier,
                 type_identifier,
                 where_clause,
-                fields 
+                fields,
             }) => {
                 let mut result = String::new();
                 result.push_str("<struct declaration>\n");
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
-                result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
-                
+                result.push_str(
+                    format!(
+                        "{}type_name: {}\n",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}access_modifier: {}",
+                        indent.dash(),
+                        access_modifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
                 if let Some(where_clause) = where_clause {
-                    result.push_str(format!("{}where_clause: {}", indent.dash(), indent_display_vec(where_clause, "generic constraints", "constraint", indent)).as_str());
+                    result.push_str(
+                        format!(
+                            "{}where_clause: {}",
+                            indent.dash(),
+                            indent_display_vec(
+                                where_clause,
+                                "generic constraints",
+                                "constraint",
+                                indent
+                            )
+                        )
+                        .as_str(),
+                    );
                 } else {
                     result.push_str(format!("{}where_clause: None", indent.dash()).as_str());
                 }
 
                 for (i, field) in fields.iter().enumerate() {
                     if i < fields.len() - 1 {
-                        result.push_str(format!("\n{}{}", indent.dash(), field.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{}", indent.dash(), field.indent_display(indent)).as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), field.indent_display(indent))
+                                .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             Statement::EnumDeclaration(EnumDeclaration {
                 access_modifier,
                 type_identifier,
-                members
+                members,
             }) => {
                 let mut result = String::new();
                 result.push_str("<enum declaration>\n");
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
-                result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type_name: {}\n",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}access_modifier: {}",
+                        indent.dash(),
+                        access_modifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
 
                 for (i, member) in members.iter().enumerate() {
                     if i < members.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), member.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), member.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), member.indent_display(indent)).as_str());
-                    }                    
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), member.indent_display(indent))
+                                .as_str(),
+                        );
+                    }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             Statement::UnionDeclaration(UnionDeclaration {
                 access_modifier,
                 type_identifier,
-                literals
+                literals,
             }) => {
                 let mut result = String::new();
                 result.push_str("<union declaration>\n");
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
-                result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type_name: {}\n",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}access_modifier: {}\n",
+                        indent.dash(),
+                        access_modifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 result.push_str(format!("{}literals:", indent.dash()).as_str());
                 indent.increase();
 
                 for (i, literal) in literals.iter().enumerate() {
                     if i < literals.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), literal.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), literal.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), literal.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), literal.indent_display(indent))
+                                .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 indent.decrease();
                 result
-            },
+            }
             // Statement::FlagsDeclaration(FlagsDeclaration {
             //     access_modifier,
             //     type_name,
@@ -168,7 +247,7 @@ impl IndentDisplay for Statement {
             //     result.push_str(format!("<flags declaration> {}\n", type_name).as_str());
             //     indent.increase();
             //     result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
-                
+
             //     for (i, member) in members.iter().enumerate() {
             //         let is_end = i == members.len() - 1;
             //         indent.current(is_end);
@@ -182,73 +261,128 @@ impl IndentDisplay for Statement {
                 let mut result = String::new();
                 result.push_str("<trait declaration>\n");
                 indent.increase();
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), trait_declaration.type_identifier.indent_display(indent)).as_str());
-                
+                result.push_str(
+                    format!(
+                        "{}type_name: {}\n",
+                        indent.dash(),
+                        trait_declaration.type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
                 for (i, function_declaration) in trait_declaration.functions.iter().enumerate() {
                     if i < trait_declaration.functions.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), function_declaration.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{},",
+                                indent.dash(),
+                                function_declaration.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), function_declaration.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                function_declaration.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             Statement::Impl(impl_) => {
                 let mut result = String::new();
                 result.push_str("<impl>\n");
                 indent.increase();
-                result.push_str(format!("{}type_annotation: {}", indent.dash(), impl_.type_annotation.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type_annotation: {}",
+                        indent.dash(),
+                        impl_.type_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
 
                 for (i, function) in impl_.functions.iter().enumerate() {
                     if i < impl_.functions.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), function.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), function.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), function.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), function.indent_display(indent))
+                                .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             Statement::FunctionDeclaration(function_declaration) => {
                 function_declaration.indent_display(indent)
-            },
+            }
             Statement::Semi(statement) => {
                 let mut result = String::new();
                 result.push_str("<semi>\n");
                 indent.increase();
                 indent.end_current();
-                result.push_str(format!("{}statement: {}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}statement: {}",
+                        indent.dash_end(),
+                        statement.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             Statement::Break(e) => {
                 let mut result = String::new();
                 result.push_str("<break>\n");
                 indent.increase();
                 indent.end_current();
-                result.push_str(format!("{}expression: {}", indent.dash_end(), e.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             Statement::Continue => {
                 let mut result = String::new();
                 result.push_str("<continue>");
                 result
-            },
+            }
             Statement::Return(e) => {
                 let mut result = String::new();
                 result.push_str("<return>\n");
                 indent.increase();
                 indent.end_current();
-                result.push_str(format!("{}expression: {}", indent.dash_end(), e.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             Statement::Expression(e) => e.indent_display(indent),
             Statement::Print(e) => e.indent_display(indent),
         }
@@ -268,24 +402,49 @@ impl IndentDisplay for FunctionDeclaration {
         indent.increase();
 
         result.push_str(format!("{}identifier: {}\n", indent.dash(), identifier).as_str());
-        result.push_str(format!("{}access_modifier: {}", indent.dash(), access_modifier.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}access_modifier: {}",
+                indent.dash(),
+                access_modifier.indent_display(indent)
+            )
+            .as_str(),
+        );
 
         for parameter in parameters {
-            result.push_str(format!("\n{}{}", indent.dash(), parameter.indent_display(indent)).as_str());
+            result.push_str(
+                format!("\n{}{}", indent.dash(), parameter.indent_display(indent)).as_str(),
+            );
         }
 
-        result.push_str(format!("\n{}return_type: {}\n", indent.dash(), return_type.indent_display(indent)).as_str());
-        
+        result.push_str(
+            format!(
+                "\n{}return_type: {}\n",
+                indent.dash(),
+                return_type.indent_display(indent)
+            )
+            .as_str(),
+        );
+
         indent.end_current();
         result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
         indent.increase();
 
         for (i, statement) in body.iter().enumerate() {
             if i < body.len() - 1 {
-                result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                result.push_str(
+                    format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str(),
+                );
             } else {
                 indent.end_current();
-                result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash_end(),
+                        statement.indent_display(indent)
+                    )
+                    .as_str(),
+                );
             }
         }
 
@@ -298,165 +457,307 @@ impl IndentDisplay for FunctionDeclaration {
 impl IndentDisplay for Expression {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            Expression::None => {
-                String::new()
-            },
+            Expression::None => String::new(),
             Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
                 type_annotation,
                 identifier,
-                initializer
+                initializer,
             }) => {
                 let mut result = String::new();
                 result.push_str(format!("<variable declaration> {}\n", identifier).as_str());
                 indent.increase();
                 result.push_str(format!("{}mutable: {}\n", indent.dash(), mutable).as_str());
-                result.push_str(format!("{}type_annotation: {}\n", indent.dash(), type_annotation.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type_annotation: {}\n",
+                        indent.dash(),
+                        type_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
-                result.push_str(format!("{}initializer: {}", indent.dash_end(), initializer.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}initializer: {}",
+                        indent.dash_end(),
+                        initializer.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             Expression::If(If {
                 r#if,
                 else_ifs,
-                r#else
+                r#else,
             }) => {
                 let mut result = String::new();
                 result.push_str("<if>\n");
                 indent.increase();
-                result.push_str(format!("{}condition:{}", indent.dash(), r#if.condition.indent_display(indent)).as_str());
-                result.push_str(format!("\n{}body: {}", indent.dash(), r#if.block.indent_display(indent)).as_str());
-                
+                result.push_str(
+                    format!(
+                        "{}condition:{}",
+                        indent.dash(),
+                        r#if.condition.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "\n{}body: {}",
+                        indent.dash(),
+                        r#if.block.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
                 if let Some(else_ifs) = else_ifs {
                     for (i, else_if) in else_ifs.iter().enumerate() {
                         let is_end = i == else_ifs.len() - 1;
                         indent.end_current();
-                        result.push_str(format!("\n{}{}\n", indent.dash(), else_if.indent_display(indent)).as_str());
-                        result.push_str(format!("\n{}condition: {}\n", indent.dash(), else_if.condition.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{}\n", indent.dash(), else_if.indent_display(indent))
+                                .as_str(),
+                        );
+                        result.push_str(
+                            format!(
+                                "\n{}condition: {}\n",
+                                indent.dash(),
+                                else_if.condition.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 } else {
                     result.push_str(format!("\n{}else_ifs: None\n", indent.dash()).as_str());
                 }
 
                 indent.end_current();
-                result.push_str(format!("{}else block: {}", indent.dash_end(), r#else.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}else block: {}",
+                        indent.dash_end(),
+                        r#else.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             Expression::Assignment(Assignment {
                 member,
-                initializer
+                initializer,
             }) => {
                 let mut result = String::new();
                 result.push_str("<assignment>\n");
                 indent.increase();
-                result.push_str(format!("{}member: {}\n", indent.dash(), member.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}member: {}\n",
+                        indent.dash(),
+                        member.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
-                result.push_str(format!("{}initializer: {}", indent.dash_end(), initializer.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}initializer: {}",
+                        indent.dash_end(),
+                        initializer.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             Expression::Member(m) => m.indent_display(indent),
             Expression::Literal(l) => l.indent_display(indent),
-            Expression::Call(Call {
-                caller,
-                arguments
-            }) => {
+            Expression::Call(Call { caller, arguments }) => {
                 let mut result = String::new();
                 result.push_str("<call>\n");
                 indent.increase();
-                result.push_str(format!("{}caller: {}", indent.dash(), caller.indent_display(indent)).as_str());
-                
+                result.push_str(
+                    format!("{}caller: {}", indent.dash(), caller.indent_display(indent)).as_str(),
+                );
+
                 for (i, argument) in arguments.iter().enumerate() {
                     if i < arguments.len() - 1 {
-                        result.push_str(format!("\n{}argument: {},", indent.dash(), argument.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}argument: {},",
+                                indent.dash(),
+                                argument.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}argument: {}", indent.dash_end(), argument.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}argument: {}",
+                                indent.dash_end(),
+                                argument.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
-            Expression::Index(Index {
-                caller,
-                index
-            }) => {
+            }
+            Expression::Index(Index { caller, index }) => {
                 let mut result = String::new();
                 result.push_str("<index>\n");
                 indent.increase_leaf();
-                result.push_str(format!("{}caller: {}\n", indent.dash(), caller.indent_display(indent)).as_str());
-                result.push_str(format!("{}index: {}", indent.dash_end(), index.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}caller: {}\n",
+                        indent.dash(),
+                        caller.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}index: {}",
+                        indent.dash_end(),
+                        index.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
             }
             Expression::Unary(Unary {
                 operator,
-                expression
+                expression,
             }) => {
                 let mut result = String::new();
                 result.push_str("<unary>\n");
                 indent.increase();
-                result.push_str(format!("{}operator: {}\n", indent.dash(), operator.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}operator: {}\n",
+                        indent.dash(),
+                        operator.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
-                result.push_str(format!("{}expression: {}", indent.dash_end(), expression.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             Expression::Binary(Binary {
                 left,
                 operator,
-                right
+                right,
             }) => {
                 let mut result = String::new();
                 result.push_str("<binary>\n");
                 indent.increase();
-                result.push_str(format!("{}left: {}\n", indent.dash(), left.indent_display(indent)).as_str());
-                result.push_str(format!("{}operator: {}\n", indent.dash(), operator.indent_display(indent)).as_str());
+                result.push_str(
+                    format!("{}left: {}\n", indent.dash(), left.indent_display(indent)).as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}operator: {}\n",
+                        indent.dash(),
+                        operator.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
-                result.push_str(format!("{}right: {}", indent.dash_end(), right.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}right: {}",
+                        indent.dash_end(),
+                        right.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             Expression::Ternary(Ternary {
                 condition,
                 true_expression,
-                false_expression
+                false_expression,
             }) => {
                 let mut result = String::new();
                 result.push_str("<ternary>\n");
                 indent.increase();
-                result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
-                result.push_str(format!("{}true_expression: {}\n", indent.dash(), true_expression.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}condition: {}\n",
+                        indent.dash(),
+                        condition.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}true_expression: {}\n",
+                        indent.dash(),
+                        true_expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
-                result.push_str(format!("{}false_expression: {}", indent.dash_end(), false_expression.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}false_expression: {}",
+                        indent.dash_end(),
+                        false_expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             Expression::Block(statements) => {
                 let mut result = String::new();
                 result.push_str("<block>");
                 indent.increase();
-                
+
                 for (i, statement) in statements.iter().enumerate() {
                     if i < statements.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                statement.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             Expression::Drop(identifier) => {
                 let mut result = String::new();
                 result.push_str(format!("<drop> {}", identifier).as_str());
                 result
-            },
+            }
             Expression::Loop(statements) => {
                 let mut result = String::new();
                 result.push_str("<loop>\n");
@@ -465,38 +766,65 @@ impl IndentDisplay for Expression {
                 result.push_str(format!("{}<block>", indent.dash_end()).as_str());
                 indent.increase();
                 indent.end_current();
-                
+
                 for (i, statement) in statements.iter().enumerate() {
                     if i < statements.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                statement.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 indent.decrease();
                 result
-            },
+            }
             Expression::While(While {
                 condition,
                 statements,
-                else_statements
+                else_statements,
             }) => {
                 let mut result = String::new();
                 result.push_str("<while>\n");
                 indent.increase();
-                result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}condition: {}\n",
+                        indent.dash(),
+                        condition.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 result.push_str(format!("{}block: <block>", indent.dash()).as_str());
                 indent.increase();
-                
+
                 for (i, statement) in statements.iter().enumerate() {
                     if i < statements.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                statement.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
@@ -506,13 +834,23 @@ impl IndentDisplay for Expression {
                 if let Some(else_statements) = else_statements {
                     result.push_str(format!("\n{}else: <block>", indent.dash_end()).as_str());
                     indent.increase();
-                    
+
                     for (i, statement) in else_statements.iter().enumerate() {
                         if i < else_statements.len() - 1 {
-                            result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                            result.push_str(
+                                format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                    .as_str(),
+                            );
                         } else {
                             indent.end_current();
-                            result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                            result.push_str(
+                                format!(
+                                    "\n{}{}",
+                                    indent.dash_end(),
+                                    statement.indent_display(indent)
+                                )
+                                .as_str(),
+                            );
                         }
                     }
 
@@ -523,7 +861,7 @@ impl IndentDisplay for Expression {
 
                 indent.decrease();
                 result
-            },
+            }
         }
     }
 }
@@ -531,28 +869,40 @@ impl IndentDisplay for Expression {
 impl IndentDisplay for Member {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            Member::Identifier {
-                symbol
-            } => {
+            Member::Identifier { symbol } => {
                 let mut result = String::new();
                 result.push_str(format!("<identifier> {}", symbol).as_str());
                 result
-            },
+            }
             Member::MemberAccess {
                 object,
                 member,
-                symbol
+                symbol,
             } => {
                 let mut result = String::new();
                 result.push_str("<member access>\n");
                 indent.increase();
-                result.push_str(format!("{}object: {}\n", indent.dash(), object.indent_display(indent)).as_str());
-                result.push_str(format!("{}member: {}\n", indent.dash(), member.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}object: {}\n",
+                        indent.dash(),
+                        object.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}member: {}\n",
+                        indent.dash(),
+                        member.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
                 result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
                 indent.decrease();
                 result
-            },
+            }
         }
     }
 }
@@ -574,53 +924,90 @@ impl IndentDisplay for Literal {
 
                 for (i, expression) in expressions.iter().enumerate() {
                     if i < expressions.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), expression.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), expression.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), expression.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                expression.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             Literal::Struct {
                 type_annotation: type_identifier,
-                field_initializers
+                field_initializers,
             } => {
                 let mut result = String::new();
                 result.push_str("<struct literal>\n");
                 indent.increase();
-                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
-                
+                result.push_str(
+                    format!(
+                        "{}type_name: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
                 for (i, field) in field_initializers.iter().enumerate() {
                     if i < field_initializers.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), field.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), field.indent_display(indent))
+                                .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             Literal::Enum {
                 type_annotation: type_identifier,
                 member,
-                field_initializers
+                field_initializers,
             } => {
                 let mut result = String::new();
                 result.push_str("<enum literal>\n");
                 indent.increase_leaf();
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type_name: {}\n",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 result.push_str(format!("{}member: {}\n", indent.dash_end(), member).as_str());
                 indent.increase_leaf();
-                result.push_str(format!("{}{}", indent.dash_end(), field_initializers.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}{}",
+                        indent.dash_end(),
+                        field_initializers.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 indent.decrease();
                 result
-            },
+            }
         }
     }
 }
@@ -632,12 +1019,26 @@ impl IndentDisplay for StructField {
         indent.increase();
 
         if let Some(access_modifier) = &self.access_modifier {
-            result.push_str(format!("{}access_modifier: {}\n", indent.dash(), access_modifier.indent_display(indent)).as_str());
+            result.push_str(
+                format!(
+                    "{}access_modifier: {}\n",
+                    indent.dash(),
+                    access_modifier.indent_display(indent)
+                )
+                .as_str(),
+            );
         } else {
             result.push_str(format!("{}access_modifier: None\n", indent.dash()).as_str());
         }
 
-        result.push_str(format!("{}type_annotation: {}\n", indent.dash(), self.type_annotation.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}type_annotation: {}\n",
+                indent.dash(),
+                self.type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
         indent.end_current();
         result.push_str(format!("{}mutable: {}", indent.dash_end(), self.mutable).as_str());
         indent.decrease();
@@ -650,13 +1051,17 @@ impl IndentDisplay for EnumMember {
         let mut result = String::new();
         result.push_str(format!("<enum member> {}", self.identifier).as_str());
         indent.increase();
-        
+
         for (i, field) in self.fields.iter().enumerate() {
             if i < self.fields.len() - 1 {
-                result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
+                result.push_str(
+                    format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str(),
+                );
             } else {
                 indent.end_current();
-                result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
+                result.push_str(
+                    format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str(),
+                );
             }
         }
 
@@ -671,7 +1076,14 @@ impl IndentDisplay for EnumMemberField {
         result.push_str("<enum member field>\n");
         indent.increase_leaf();
         result.push_str(format!("{}identifier: {}\n", indent.dash(), &self.identifier).as_str());
-        result.push_str(format!("{}type_annotation: {}", indent.dash_end(), self.type_annotation.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}type_annotation: {}",
+                indent.dash_end(),
+                self.type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
         indent.decrease();
         result
     }
@@ -704,15 +1116,23 @@ impl IndentDisplay for FieldInitializer {
         let mut result = String::new();
         result.push_str("<field initializer>\n");
         indent.increase();
-        
+
         if let Some(identifier) = &self.identifier {
-            result.push_str(format!("{}field initializer: {}\n", indent.dash(), identifier).as_str());
+            result
+                .push_str(format!("{}field initializer: {}\n", indent.dash(), identifier).as_str());
         } else {
             result.push_str(format!("{}field initializer: None\n", indent.dash()).as_str());
         }
 
         indent.end_current();
-        result.push_str(format!("{}initializer: {}", indent.dash_end(), self.initializer.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}initializer: {}",
+                indent.dash_end(),
+                self.initializer.indent_display(indent)
+            )
+            .as_str(),
+        );
         indent.decrease();
         result
     }
@@ -726,36 +1146,68 @@ impl IndentDisplay for EnumMemberFieldInitializers {
                 let mut result = String::new();
                 result.push_str("<named field initializers>");
                 indent.increase();
-                
+
                 for (i, (identifier, initializer)) in field_initializers.iter().enumerate() {
                     if i < field_initializers.len() - 1 {
-                        result.push_str(format!("\n{}{}: {},", indent.dash(), identifier, initializer.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}: {},",
+                                indent.dash(),
+                                identifier,
+                                initializer.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}: {}", indent.dash_end(), identifier, initializer.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}: {}",
+                                indent.dash_end(),
+                                identifier,
+                                initializer.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             EnumMemberFieldInitializers::Unnamed(field_initializers) => {
                 let mut result = String::new();
                 result.push_str("<unnamed field initializers>");
                 indent.increase();
-                
+
                 for (i, initializer) in field_initializers.iter().enumerate() {
                     if i < field_initializers.len() - 1 {
-                        result.push_str(format!("\n{}f{}: {},", indent.dash(), i, initializer.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}f{}: {},",
+                                indent.dash(),
+                                i,
+                                initializer.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}f{}: {}", indent.dash_end(), i, initializer.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}f{}: {}",
+                                indent.dash_end(),
+                                i,
+                                initializer.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
         }
     }
 }
@@ -802,7 +1254,14 @@ impl IndentDisplay for Parameter {
         result.push_str("<parameter>\n");
         indent.increase_leaf();
         result.push_str(format!("{}parameter: {}\n", indent.dash(), self.identifier).as_str());
-        result.push_str(format!("{}type_annotation: {}", indent.dash_end(), self.type_annotation.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}type_annotation: {}",
+                indent.dash_end(),
+                self.type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
         indent.decrease();
         result
     }
@@ -813,9 +1272,23 @@ impl IndentDisplay for ConditionBlock {
         let mut result = String::new();
         result.push_str("<condition block>\n");
         indent.increase();
-        result.push_str(format!("{}condition: {}\n", indent.dash(), self.condition.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}condition: {}\n",
+                indent.dash(),
+                self.condition.indent_display(indent)
+            )
+            .as_str(),
+        );
         indent.end_current();
-        result.push_str(format!("{}body: {}", indent.dash_end(), self.block.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}body: {}",
+                indent.dash_end(),
+                self.block.indent_display(indent)
+            )
+            .as_str(),
+        );
         indent.decrease();
         result
     }
@@ -825,11 +1298,9 @@ impl IndentDisplay for TypedStatement {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
             TypedStatement::None => String::new(),
-            TypedStatement::Program {
-                statements
-            } => {
+            TypedStatement::Program { statements } => {
                 let mut result = String::new();
-                
+
                 for (i, statement) in statements.iter().enumerate() {
                     result.push_str(&statement.indent_display(indent));
                     if i < statements.len() - 1 {
@@ -838,21 +1309,40 @@ impl IndentDisplay for TypedStatement {
                 }
 
                 result
-            },
+            }
             TypedStatement::StructDeclaration {
                 type_identifier,
                 where_clause,
                 fields,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<struct declaration> {}\n", type_).as_str());
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type_name: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
 
                 if let Some(where_clause) = where_clause {
-                    result.push_str(format!("{}where_clause: {}", indent.dash(), indent_display_vec(where_clause, "generic constraints", "constraint", indent)).as_str());
+                    result.push_str(
+                        format!(
+                            "{}where_clause: {}",
+                            indent.dash(),
+                            indent_display_vec(
+                                where_clause,
+                                "generic constraints",
+                                "constraint",
+                                indent
+                            )
+                        )
+                        .as_str(),
+                    );
                 } else {
                     result.push_str(format!("{}where_clause: None", indent.dash()).as_str());
                 }
@@ -860,145 +1350,216 @@ impl IndentDisplay for TypedStatement {
                 for (i, field) in fields.iter().enumerate() {
                     let is_end = i == fields.len() - 1;
                     indent.end_current();
-                    result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
+                    result.push_str(
+                        format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str(),
+                    );
                 }
-                
+
                 indent.decrease();
                 result
-            },
+            }
             TypedStatement::EnumDeclaration {
                 type_identifier,
                 members,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<enum declaration> {}\n", type_).as_str());
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
-                
+                result.push_str(
+                    format!(
+                        "{}type_name: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
                 for (i, member) in members.iter().enumerate() {
                     if i < members.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), member.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), member.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), member.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), member.indent_display(indent))
+                                .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             TypedStatement::UnionDeclaration {
                 type_identifier,
                 literals,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<union declaration> {}\n", type_).as_str());
                 indent.increase();
 
-                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
-                
+                result.push_str(
+                    format!(
+                        "{}type_name: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
                 for (i, literal) in literals.iter().enumerate() {
                     if i < literals.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), literal.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), literal.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), literal.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), literal.indent_display(indent))
+                                .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             TypedStatement::FunctionDeclaration {
                 identifier,
                 parameters,
                 return_type,
                 body,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<function declaration> {}\n", type_).as_str());
                 indent.increase();
-                
+
                 result.push_str(format!("{}identifier: {}", indent.dash(), identifier).as_str());
 
                 for parameter in parameters {
-                    result.push_str(format!("{}{}\n", indent.dash(), parameter.indent_display(indent)).as_str());
+                    result.push_str(
+                        format!("{}{}\n", indent.dash(), parameter.indent_display(indent)).as_str(),
+                    );
                 }
 
-                result.push_str(format!("{}return_type: {}\n", indent.dash(), return_type).as_str());
-                
+                result
+                    .push_str(format!("{}return_type: {}\n", indent.dash(), return_type).as_str());
+
                 indent.end_current();
                 result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
                 indent.increase();
 
                 for (i, statement) in body.iter().enumerate() {
                     if i < body.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                statement.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 indent.decrease();
                 result
-            },
+            }
             TypedStatement::Impl {
                 type_annotation,
-                functions
+                functions,
             } => {
                 let mut result = String::new();
                 result.push_str("<impl>\n");
                 indent.increase();
-                result.push_str(format!("{}type_annotation: {}", indent.dash(), type_annotation.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type_annotation: {}",
+                        indent.dash(),
+                        type_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
 
                 for (i, function) in functions.iter().enumerate() {
                     let is_end = i == functions.len() - 1;
                     indent.end_current();
-                    result.push_str(format!("\n{}{}", indent.dash_end(), function.indent_display(indent)).as_str());
+                    result.push_str(
+                        format!("\n{}{}", indent.dash_end(), function.indent_display(indent))
+                            .as_str(),
+                    );
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             TypedStatement::Semi(e) => {
                 let mut result = String::new();
                 result.push_str(format!("<semi>: {}\n", Type::Void).as_str());
                 indent.increase();
                 indent.end_current();
-                result.push_str(format!("{}statement: {}", indent.dash_end(), e.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}statement: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            
-            },
+            }
             TypedStatement::Break(e) => {
                 let mut result = String::new();
                 result.push_str(format!("<break>: {}\n", Type::Void).as_str());
                 indent.increase();
                 indent.end_current();
-                result.push_str(format!("{}expression: {}", indent.dash_end(), e.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             TypedStatement::Continue => {
                 let mut result = String::new();
                 result.push_str(format!("<continue>: {}\n", Type::Void).as_str());
                 result
-            },
+            }
             TypedStatement::Return(e) => {
                 let mut result = String::new();
                 result.push_str(format!("<return>: {}\n", Type::Void).as_str());
                 indent.increase();
                 indent.end_current();
-                result.push_str(format!("{}expression: {}", indent.dash_end(), e.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             TypedStatement::Expression(e) => e.indent_display(indent),
             TypedStatement::Print(e) => e.indent_display(indent),
         }
@@ -1008,222 +1569,375 @@ impl IndentDisplay for TypedStatement {
 impl IndentDisplay for TypedExpression {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            TypedExpression::None => {
-                String::new()
-            },
+            TypedExpression::None => String::new(),
             TypedExpression::VariableDeclaration {
                 mutable,
                 identifier,
                 initializer,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<variable declaration> {}: {}\n", identifier, type_).as_str());
+                result.push_str(
+                    format!("<variable declaration> {}: {}\n", identifier, type_).as_str(),
+                );
                 indent.increase();
                 result.push_str(format!("{}mutable: {}\n", indent.dash(), mutable).as_str());
                 indent.end_current();
-                
+
                 if let Some(initializer) = initializer {
-                    result.push_str(format!("{}initializer: {}", indent.dash_end(), initializer.indent_display(indent)).as_str());
+                    result.push_str(
+                        format!(
+                            "{}initializer: {}",
+                            indent.dash_end(),
+                            initializer.indent_display(indent)
+                        )
+                        .as_str(),
+                    );
                 } else {
                     result.push_str(format!("{}initializer: None", indent.dash_end()).as_str());
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             TypedExpression::If {
                 r#if,
                 else_ifs,
                 r#else,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<if>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}condition:{}", indent.dash(), r#if.condition.indent_display(indent)).as_str());
-                
+                result.push_str(
+                    format!(
+                        "{}condition:{}",
+                        indent.dash(),
+                        r#if.condition.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
                 for else_if in else_ifs {
-                    result.push_str(format!("\n{}{}\n", indent.dash(), else_if.indent_display(indent)).as_str());
-                    result.push_str(format!("\n{}condition: {}", indent.dash(), else_if.condition.indent_display(indent)).as_str());
+                    result.push_str(
+                        format!("\n{}{}\n", indent.dash(), else_if.indent_display(indent)).as_str(),
+                    );
+                    result.push_str(
+                        format!(
+                            "\n{}condition: {}",
+                            indent.dash(),
+                            else_if.condition.indent_display(indent)
+                        )
+                        .as_str(),
+                    );
                 }
 
                 indent.end_current();
-                
+
                 if let Some(r#else) = r#else {
-                    result.push_str(format!("\n{}else block: {}", indent.dash_end(), r#else.indent_display(indent)).as_str());
+                    result.push_str(
+                        format!(
+                            "\n{}else block: {}",
+                            indent.dash_end(),
+                            r#else.indent_display(indent)
+                        )
+                        .as_str(),
+                    );
                 } else {
                     result.push_str(format!("\n{}else block: None", indent.dash_end()).as_str());
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             TypedExpression::Assignment {
                 member,
                 initializer,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<assignment>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}member: {}\n", indent.dash(), member.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}member: {}\n",
+                        indent.dash(),
+                        member.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
-                result.push_str(format!("{}initializer: {}", indent.dash_end(), initializer.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}initializer: {}",
+                        indent.dash_end(),
+                        initializer.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             TypedExpression::Member(m) => m.indent_display(indent),
             TypedExpression::Literal(l) => l.indent_display(indent),
             TypedExpression::Call {
                 caller,
                 arguments,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<call>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}caller: {}", indent.dash(), caller.indent_display(indent)).as_str());
-                
+                result.push_str(
+                    format!("{}caller: {}", indent.dash(), caller.indent_display(indent)).as_str(),
+                );
+
                 for (i, argument) in arguments.iter().enumerate() {
                     if i < arguments.len() - 1 {
-                        result.push_str(format!("\n{}argument: {},", indent.dash(), argument.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}argument: {},",
+                                indent.dash(),
+                                argument.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}argument: {}", indent.dash_end(), argument.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}argument: {}",
+                                indent.dash_end(),
+                                argument.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             TypedExpression::Index {
                 caller,
                 argument,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<index>: {}\n", type_).as_str());
                 indent.increase_leaf();
-                result.push_str(format!("{}caller: {}\n", indent.dash(), caller.indent_display(indent)).as_str());
-                result.push_str(format!("{}index: {}", indent.dash_end(), argument.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}caller: {}\n",
+                        indent.dash(),
+                        caller.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}index: {}",
+                        indent.dash_end(),
+                        argument.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
             }
             TypedExpression::Unary {
                 operator,
                 expression,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<unary>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}operator: {}\n", indent.dash(), operator.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}operator: {}\n",
+                        indent.dash(),
+                        operator.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
-                result.push_str(format!("{}expression: {}", indent.dash_end(), expression.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             TypedExpression::Binary {
                 left,
                 operator,
                 right,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<binary>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}left: {}\n", indent.dash(), left.indent_display(indent)).as_str());
-                result.push_str(format!("{}operator: {}\n", indent.dash(), operator.indent_display(indent)).as_str());
+                result.push_str(
+                    format!("{}left: {}\n", indent.dash(), left.indent_display(indent)).as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}operator: {}\n",
+                        indent.dash(),
+                        operator.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
-                result.push_str(format!("{}right: {}", indent.dash_end(), right.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}right: {}",
+                        indent.dash_end(),
+                        right.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
+            }
             TypedExpression::Ternary {
                 condition,
                 true_expression,
                 false_expression,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<ternary>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
-                result.push_str(format!("{}true_expression: {}\n", indent.dash(), true_expression.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}condition: {}\n",
+                        indent.dash(),
+                        condition.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}true_expression: {}\n",
+                        indent.dash(),
+                        true_expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
-                result.push_str(format!("{}false_expression: {}", indent.dash_end(), false_expression.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}false_expression: {}",
+                        indent.dash_end(),
+                        false_expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
-            },
-            TypedExpression::Block(Block {
-                statements,
-                type_
-            }) => {
+            }
+            TypedExpression::Block(Block { statements, type_ }) => {
                 let mut result = String::new();
                 result.push_str(format!("<block>: {}", type_).as_str());
                 indent.increase();
-                
+
                 for (i, statement) in statements.iter().enumerate() {
                     if i < statements.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                statement.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
-            TypedExpression::Drop {
-                identifier,
-                type_
-            } => {
+            }
+            TypedExpression::Drop { identifier, type_ } => {
                 let mut result = String::new();
                 result.push_str(format!("<drop> {}: {}", identifier, type_).as_str());
                 result
-            },
-            TypedExpression::Loop(Block {
-                statements,
-                type_
-            }) => {
+            }
+            TypedExpression::Loop(Block { statements, type_ }) => {
                 let mut result = String::new();
                 result.push_str(format!("<loop>: {}", type_).as_str());
                 indent.increase();
                 indent.end_current();
-                
+
                 for (i, statement) in statements.iter().enumerate() {
                     if i < statements.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                statement.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             TypedExpression::While {
                 condition,
                 block,
                 else_block,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<while>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}condition: {}\n", indent.dash(), condition.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}condition: {}\n",
+                        indent.dash(),
+                        condition.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 result.push_str(format!("{}block: <block>", indent.dash()).as_str());
                 indent.increase();
-                
+
                 for (i, statement) in block.iter().enumerate() {
                     if i < block.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                statement.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
@@ -1233,13 +1947,23 @@ impl IndentDisplay for TypedExpression {
                 if let Some(else_block) = else_block {
                     result.push_str(format!("\n{}else: <block>", indent.dash_end()).as_str());
                     indent.increase();
-                    
+
                     for (i, statement) in else_block.iter().enumerate() {
                         if i < else_block.len() - 1 {
-                            result.push_str(format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str());
+                            result.push_str(
+                                format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                    .as_str(),
+                            );
                         } else {
                             indent.end_current();
-                            result.push_str(format!("\n{}{}", indent.dash_end(), statement.indent_display(indent)).as_str());
+                            result.push_str(
+                                format!(
+                                    "\n{}{}",
+                                    indent.dash_end(),
+                                    statement.indent_display(indent)
+                                )
+                                .as_str(),
+                            );
                         }
                     }
 
@@ -1250,7 +1974,7 @@ impl IndentDisplay for TypedExpression {
 
                 indent.decrease();
                 result
-            },
+            }
         }
     }
 }
@@ -1258,30 +1982,41 @@ impl IndentDisplay for TypedExpression {
 impl IndentDisplay for type_checker::ast::Member {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::Member::Identifier {
-                symbol,
-                type_
-            } => {
+            type_checker::ast::Member::Identifier { symbol, type_ } => {
                 let mut result = String::new();
                 result.push_str(format!("<identifier> {}: {}", symbol, type_).as_str());
                 result
-            },
+            }
             type_checker::ast::Member::MemberAccess {
                 object,
                 member,
                 symbol,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<member access>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}object: {}\n", indent.dash(), object.indent_display(indent)).as_str());
-                result.push_str(format!("{}member: {}\n", indent.dash(), member.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}object: {}\n",
+                        indent.dash(),
+                        object.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}member: {}\n",
+                        indent.dash(),
+                        member.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
                 result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
                 indent.decrease();
                 result
-            },
+            }
         }
     }
 }
@@ -1296,65 +2031,99 @@ impl IndentDisplay for type_checker::ast::Literal {
             type_checker::ast::Literal::String(s) => s.to_string(),
             type_checker::ast::Literal::Char(c) => c.to_string(),
             type_checker::ast::Literal::Bool(b) => b.to_string(),
-            type_checker::ast::Literal::Array {
-                values,
-                type_
-            } => {
+            type_checker::ast::Literal::Array { values, type_ } => {
                 let mut result = String::new();
                 result.push_str(format!("<array>: {}", type_).as_str());
                 indent.increase();
 
                 for (i, expression) in values.iter().enumerate() {
                     if i < values.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), expression.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), expression.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), expression.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                expression.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             type_checker::ast::Literal::Struct {
                 type_annotation: type_identifier,
                 field_initializers,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<struct literal>: {}\n", type_).as_str());
                 indent.increase();
-                result.push_str(format!("{}type_name: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type_name: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
 
                 for (i, field) in field_initializers.iter().enumerate() {
                     if i < field_initializers.len() - 1 {
-                        result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), field.indent_display(indent))
+                                .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), field.indent_display(indent))
+                                .as_str(),
+                        );
                     }
                 }
-                
+
                 indent.decrease();
                 result
-            },
+            }
             type_checker::ast::Literal::Enum {
                 type_annotation: type_identifier,
                 member,
                 field_initializers,
-                type_
+                type_,
             } => {
                 let mut result = String::new();
                 result.push_str(format!("<enum literal>: {}\n", type_).as_str());
                 indent.increase_leaf();
-                result.push_str(format!("{}type_name: {}\n", indent.dash(), type_identifier.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type_name: {}\n",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 result.push_str(format!("{}member: {}\n", indent.dash_end(), member).as_str());
                 indent.increase_leaf();
-                result.push_str(format!("{}{}", indent.dash_end(), field_initializers.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}{}",
+                        indent.dash_end(),
+                        field_initializers.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 indent.decrease();
                 result
-            },
+            }
         }
     }
 }
@@ -1375,7 +2144,14 @@ impl IndentDisplay for type_checker::ast::Parameter {
         let mut result = String::new();
         result.push_str("<parameter>\n");
         result.push_str(format!("{}parameter: {}\n", indent.dash(), self.identifier).as_str());
-        result.push_str(format!("{}type_annotation: {}", indent.dash_end(), self.type_annotation.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}type_annotation: {}",
+                indent.dash_end(),
+                self.type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
         result
     }
 }
@@ -1383,15 +2159,20 @@ impl IndentDisplay for type_checker::ast::Parameter {
 impl IndentDisplay for type_checker::ast::EnumMember {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str(format!("<enum member> {}: {}", self.discriminant_name, self.type_).as_str());
+        result
+            .push_str(format!("<enum member> {}: {}", self.discriminant_name, self.type_).as_str());
         indent.increase();
-        
+
         for (i, field) in self.fields.iter().enumerate() {
             if i < self.fields.len() - 1 {
-                result.push_str(format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str());
+                result.push_str(
+                    format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str(),
+                );
             } else {
                 indent.end_current();
-                result.push_str(format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str());
+                result.push_str(
+                    format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str(),
+                );
             }
         }
 
@@ -1417,9 +2198,23 @@ impl IndentDisplay for type_checker::ast::ConditionBlock {
         let mut result = String::new();
         result.push_str("<condition block>\n");
         indent.increase();
-        result.push_str(format!("{}condition: {}\n", indent.dash(), self.condition.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}condition: {}\n",
+                indent.dash(),
+                self.condition.indent_display(indent)
+            )
+            .as_str(),
+        );
         indent.end_current();
-        result.push_str(format!("{}body: {}", indent.dash_end(), self.block.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}body: {}",
+                indent.dash_end(),
+                self.block.indent_display(indent)
+            )
+            .as_str(),
+        );
         indent.decrease();
         result
     }
@@ -1466,15 +2261,23 @@ impl IndentDisplay for type_checker::ast::FieldInitializer {
         let mut result = String::new();
         result.push_str("<field initializer>\n");
         indent.increase();
-        
+
         if let Some(identifier) = &self.identifier {
-            result.push_str(format!("{}field initializer: {}\n", indent.dash(), identifier).as_str());
+            result
+                .push_str(format!("{}field initializer: {}\n", indent.dash(), identifier).as_str());
         } else {
             result.push_str(format!("{}field initializer: None\n", indent.dash()).as_str());
         }
 
         indent.end_current();
-        result.push_str(format!("{}initializer: {}", indent.dash_end(), self.initializer.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}initializer: {}",
+                indent.dash_end(),
+                self.initializer.indent_display(indent)
+            )
+            .as_str(),
+        );
         indent.decrease();
         result
     }
@@ -1488,36 +2291,68 @@ impl IndentDisplay for type_checker::ast::EnumMemberFieldInitializers {
                 let mut result = String::new();
                 result.push_str("<named field initializer>");
                 indent.increase();
-                
+
                 for (i, (identifier, initializer)) in field_initializers.iter().enumerate() {
                     if i < field_initializers.len() - 1 {
-                        result.push_str(format!("\n{}{}: {},", indent.dash(), identifier, initializer.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}: {},",
+                                indent.dash(),
+                                identifier,
+                                initializer.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}{}: {}", indent.dash_end(), identifier, initializer.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}{}: {}",
+                                indent.dash_end(),
+                                identifier,
+                                initializer.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
             type_checker::ast::EnumMemberFieldInitializers::Unnamed(field_initializers) => {
                 let mut result = String::new();
                 result.push_str("<unnamed field initializer>");
                 indent.increase();
-                
+
                 for (i, initializer) in field_initializers.iter().enumerate() {
                     if i < field_initializers.len() - 1 {
-                        result.push_str(format!("\n{}f{}: {},", indent.dash(), i, initializer.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}f{}: {},",
+                                indent.dash(),
+                                i,
+                                initializer.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}f{}: {}", indent.dash_end(), i, initializer.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}f{}: {}",
+                                indent.dash_end(),
+                                i,
+                                initializer.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 result
-            },
+            }
         }
     }
 }
@@ -1533,7 +2368,7 @@ impl IndentDisplay for TypeIdentifier {
                 result.push_str(format!("{}type: {}", indent.dash_end(), type_name).as_str());
                 indent.decrease();
                 result
-            },
+            }
             TypeIdentifier::GenericType(type_name, generics) => {
                 indent.increase();
                 result.push_str(format!("{}type: {}", indent.dash(), type_name).as_str());
@@ -1543,17 +2378,31 @@ impl IndentDisplay for TypeIdentifier {
 
                 for (i, generic) in generics.iter().enumerate() {
                     if i < generics.len() - 1 {
-                        result.push_str(format!("\n{}generic: {},", indent.dash(), generic.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}generic: {},",
+                                indent.dash(),
+                                generic.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}generic: {}", indent.dash_end(), generic.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}generic: {}",
+                                indent.dash_end(),
+                                generic.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 indent.decrease();
                 result
-            },
+            }
             TypeIdentifier::ConcreteType(type_name, concrete_types) => {
                 indent.increase();
                 result.push_str(format!("{}type: {}", indent.dash(), type_name).as_str());
@@ -1563,25 +2412,46 @@ impl IndentDisplay for TypeIdentifier {
 
                 for (i, concrete_type) in concrete_types.iter().enumerate() {
                     if i < concrete_types.len() - 1 {
-                        result.push_str(format!("\n{}concrete_type: {},", indent.dash(), concrete_type.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}concrete_type: {},",
+                                indent.dash(),
+                                concrete_type.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}concrete_type: {}", indent.dash_end(), concrete_type.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}concrete_type: {}",
+                                indent.dash_end(),
+                                concrete_type.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
 
                 indent.decrease();
                 indent.decrease();
                 result
-            },
+            }
             TypeIdentifier::MemberType(type_identifier, name) => {
                 indent.increase();
-                result.push_str(format!("{}type: {}", indent.dash(), type_identifier.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "{}type: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
                 result.push_str(format!("\n{}member: {}", indent.dash_end(), name).as_str());
                 indent.decrease();
                 result
-            },
+            }
         }
     }
 }
@@ -1602,16 +2472,37 @@ impl IndentDisplay for GenericConstraint {
         let mut result = String::new();
         result.push_str("<generic constraint>\n");
         indent.increase_leaf();
-        result.push_str(format!("{}type: {}\n", indent.dash_end(), self.generic.indent_display(indent)).as_str());
+        result.push_str(
+            format!(
+                "{}type: {}\n",
+                indent.dash_end(),
+                self.generic.indent_display(indent)
+            )
+            .as_str(),
+        );
         result.push_str(format!("{}constraints:", indent.dash_end()).as_str());
         indent.increase();
 
         for (i, constraint) in self.constraints.iter().enumerate() {
             if i < self.constraints.len() - 1 {
-                result.push_str(format!("\n{}constraint: {},", indent.dash(), constraint.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "\n{}constraint: {},",
+                        indent.dash(),
+                        constraint.indent_display(indent)
+                    )
+                    .as_str(),
+                );
             } else {
                 indent.end_current();
-                result.push_str(format!("\n{}constraint: {}", indent.dash_end(), constraint.indent_display(indent)).as_str());
+                result.push_str(
+                    format!(
+                        "\n{}constraint: {}",
+                        indent.dash_end(),
+                        constraint.indent_display(indent)
+                    )
+                    .as_str(),
+                );
             }
         }
 
@@ -1619,7 +2510,6 @@ impl IndentDisplay for GenericConstraint {
         indent.decrease();
         result
     }
-
 }
 
 impl IndentDisplay for TypeAnnotation {
@@ -1631,25 +2521,53 @@ impl IndentDisplay for TypeAnnotation {
         match self {
             TypeAnnotation::Type(type_name) => {
                 result.push_str(format!("{}type: {}", indent.dash_end(), type_name).as_str());
-            },
+            }
             TypeAnnotation::ConcreteType(type_name, generics) => {
                 result.push_str(format!("{}generic_type: {}", indent.dash(), type_name).as_str());
-                
+
                 for (i, generic) in generics.iter().enumerate() {
                     if i < generics.len() - 1 {
-                        result.push_str(format!("\n{}generic: {},", indent.dash(), generic.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}generic: {},",
+                                indent.dash(),
+                                generic.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     } else {
                         indent.end_current();
-                        result.push_str(format!("\n{}generic: {}", indent.dash_end(), generic.indent_display(indent)).as_str());
+                        result.push_str(
+                            format!(
+                                "\n{}generic: {}",
+                                indent.dash_end(),
+                                generic.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
                     }
                 }
-            },
+            }
             TypeAnnotation::Array(type_annotation) => {
-                result.push_str(format!("{}slice_type: {}", indent.dash_end(), type_annotation.indent_display(indent)).as_str());
-            },
+                result.push_str(
+                    format!(
+                        "{}slice_type: {}",
+                        indent.dash_end(),
+                        type_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+            }
             TypeAnnotation::Literal(literal) => {
-                result.push_str(format!("{}literal: {}", indent.dash_end(), literal.indent_display(indent)).as_str());
-            },
+                result.push_str(
+                    format!(
+                        "{}literal: {}",
+                        indent.dash_end(),
+                        literal.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+            }
         }
 
         indent.decrease();
@@ -1678,18 +2596,39 @@ impl IndentDisplay for String {
     }
 }
 
-fn indent_display_vec<T: IndentDisplay>(vec: &Vec<T>, parent_type_name: &str, item_field_name: &str, indent: &mut Indent) -> String {
+fn indent_display_vec<T: IndentDisplay>(
+    vec: &Vec<T>,
+    parent_type_name: &str,
+    item_field_name: &str,
+    indent: &mut Indent,
+) -> String {
     let mut result = String::new();
-    
+
     result.push_str(format!("<{}>", parent_type_name).as_str());
     indent.increase();
 
     for (i, item) in vec.iter().enumerate() {
         if i < vec.len() - 1 {
-            result.push_str(format!("\n{}{}: {},", indent.dash(), item_field_name, item.indent_display(indent)).as_str());
+            result.push_str(
+                format!(
+                    "\n{}{}: {},",
+                    indent.dash(),
+                    item_field_name,
+                    item.indent_display(indent)
+                )
+                .as_str(),
+            );
         } else {
             indent.end_current();
-            result.push_str(format!("\n{}{}: {}", indent.dash_end(), item_field_name, item.indent_display(indent)).as_str());
+            result.push_str(
+                format!(
+                    "\n{}{}: {}",
+                    indent.dash_end(),
+                    item_field_name,
+                    item.indent_display(indent)
+                )
+                .as_str(),
+            );
         }
     }
 

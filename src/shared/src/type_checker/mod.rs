@@ -1,19 +1,22 @@
-pub mod type_checker;
-pub mod type_environment;
 pub mod ast;
 pub mod full_name;
+pub mod type_checker;
+pub mod type_environment;
 
-mod statements;
 mod expressions;
 mod scope;
+mod statements;
 
+pub use full_name::*;
 pub use type_checker::*;
 pub use type_environment::*;
-pub use full_name::*;
 
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
-use crate::{parser, types::{GenericType, TypeAnnotation, TypeIdentifier}};
+use crate::{
+    parser,
+    types::{GenericType, TypeAnnotation, TypeIdentifier},
+};
 
 use self::statements::check_type_annotation;
 
@@ -50,7 +53,10 @@ pub struct StructField {
 
 impl FullName for StructField {
     fn full_name(&self) -> String {
-        format!("{}.{}: {}", self.struct_name, self.field_name, self.field_type)
+        format!(
+            "{}.{}: {}",
+            self.struct_name, self.field_name, self.field_type
+        )
     }
 }
 
@@ -95,7 +101,10 @@ pub struct EnumMemberField {
 
 impl FullName for EnumMemberField {
     fn full_name(&self) -> String {
-        format!("{}::{}.{}", self.enum_name, self.discriminant_name, self.field_name)
+        format!(
+            "{}::{}.{}",
+            self.enum_name, self.discriminant_name, self.field_name
+        )
     }
 }
 
@@ -114,9 +123,15 @@ impl Union {
 
 impl FullName for Union {
     fn full_name(&self) -> String {
-        format!("{} {{ {} }}",
+        format!(
+            "{} {{ {} }}",
             self.type_identifier.to_string(),
-            self.literals.iter().map(|l| l.to_string()).collect::<Vec<String>>().join(" | "))
+            self.literals
+                .iter()
+                .map(|l| l.to_string())
+                .collect::<Vec<String>>()
+                .join(" | ")
+        )
     }
 }
 
@@ -175,48 +190,63 @@ pub enum Type {
     Literal {
         name: String, // String representation of the literal
         type_: Box<Type>,
-    }
+    },
 }
 
 impl Type {
     pub fn option() -> Type {
         let option_name = "Option".to_string();
-        
+
         let option_ident = TypeIdentifier::GenericType(
             option_name,
-            vec![GenericType { type_name: "T".to_string() }]);
+            vec![GenericType {
+                type_name: "T".to_string(),
+            }],
+        );
 
-        let some_member_ident = TypeIdentifier::MemberType(
-            Box::new(option_ident.clone()),
-            "Some".to_string());
+        let some_member_ident =
+            TypeIdentifier::MemberType(Box::new(option_ident.clone()), "Some".to_string());
 
-        let some_member_field_ident = TypeIdentifier::MemberType(
-            Box::new(some_member_ident.clone()),
-            "f0".to_string());
+        let some_member_field_ident =
+            TypeIdentifier::MemberType(Box::new(some_member_ident.clone()), "f0".to_string());
 
-        let none_member_ident = TypeIdentifier::MemberType(
-            Box::new(option_ident.clone()),
-            "None".to_string());
+        let none_member_ident =
+            TypeIdentifier::MemberType(Box::new(option_ident.clone()), "None".to_string());
 
         Type::Enum(Enum {
             type_identifier: option_ident,
             members: vec![
-                ("Some".to_string(), Type::EnumMember(EnumMember {
-                    enum_name: some_member_ident,
-                    discriminant_name: "Some".to_string(),
-                    fields: vec![("f0".to_string(), Type::EnumMemberField(EnumMemberField {
-                        enum_name: some_member_field_ident,
+                (
+                    "Some".to_string(),
+                    Type::EnumMember(EnumMember {
+                        enum_name: some_member_ident,
                         discriminant_name: "Some".to_string(),
-                        field_name: "f0".to_string(),
-                        field_type: Box::new(Type::Generic(GenericType { type_name: "T".to_string() })),
-                    }))].into_iter().collect(),
-                })),
-                ("None".to_string(), Type::EnumMember(EnumMember {
-                    enum_name: none_member_ident,
-                    discriminant_name: "None".to_string(),
-                    fields: HashMap::new(),
-                })),
-            ].into_iter().collect(),
+                        fields: vec![(
+                            "f0".to_string(),
+                            Type::EnumMemberField(EnumMemberField {
+                                enum_name: some_member_field_ident,
+                                discriminant_name: "Some".to_string(),
+                                field_name: "f0".to_string(),
+                                field_type: Box::new(Type::Generic(GenericType {
+                                    type_name: "T".to_string(),
+                                })),
+                            }),
+                        )]
+                        .into_iter()
+                        .collect(),
+                    }),
+                ),
+                (
+                    "None".to_string(),
+                    Type::EnumMember(EnumMember {
+                        enum_name: none_member_ident,
+                        discriminant_name: "None".to_string(),
+                        fields: HashMap::new(),
+                    }),
+                ),
+            ]
+            .into_iter()
+            .collect(),
         })
     }
 
@@ -224,23 +254,36 @@ impl Type {
         Type::Enum(Enum {
             type_identifier: TypeIdentifier::ConcreteType(
                 "Option".to_string(),
-                vec![concrete.type_annotation()]),
+                vec![concrete.type_annotation()],
+            ),
             members: vec![
-                ("Some".to_string(), Type::EnumMember(EnumMember {
-                    enum_name: TypeIdentifier::ConcreteType(
-                        "Option".to_string(),
-                        vec![concrete.type_annotation()]),
-                    discriminant_name: "Some".to_string(),
-                    fields: vec![("f0".to_string(), concrete.clone())].into_iter().collect(),
-                })),
-                ("None".to_string(), Type::EnumMember(EnumMember {
-                    enum_name: TypeIdentifier::ConcreteType(
-                        "Option".to_string(),
-                        vec![concrete.type_annotation()]),
-                    discriminant_name: "None".to_string(),
-                    fields: HashMap::new(),
-                })),
-            ].into_iter().collect(),
+                (
+                    "Some".to_string(),
+                    Type::EnumMember(EnumMember {
+                        enum_name: TypeIdentifier::ConcreteType(
+                            "Option".to_string(),
+                            vec![concrete.type_annotation()],
+                        ),
+                        discriminant_name: "Some".to_string(),
+                        fields: vec![("f0".to_string(), concrete.clone())]
+                            .into_iter()
+                            .collect(),
+                    }),
+                ),
+                (
+                    "None".to_string(),
+                    Type::EnumMember(EnumMember {
+                        enum_name: TypeIdentifier::ConcreteType(
+                            "Option".to_string(),
+                            vec![concrete.type_annotation()],
+                        ),
+                        discriminant_name: "None".to_string(),
+                        fields: HashMap::new(),
+                    }),
+                ),
+            ]
+            .into_iter()
+            .collect(),
         })
     }
 
@@ -264,13 +307,34 @@ impl Type {
 
     pub fn from_literal(literal: &parser::Literal) -> Result<Type, String> {
         match literal {
-            parser::Literal::Unit => Ok(Type::Literal { name: Type::Unit.to_string(), type_: Box::new(Type::Unit) }),
-            parser::Literal::Int(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::Int) }),
-            parser::Literal::UInt(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::UInt) }),
-            parser::Literal::Float(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::Float) }),
-            parser::Literal::Char(v) => Ok(Type::Literal { name: format!("'{}'", v), type_: Box::new(Type::Char) }),
-            parser::Literal::String(v) => Ok(Type::Literal { name: format!("\"{}\"", v), type_: Box::new(Type::String) }),
-            parser::Literal::Bool(v) => Ok(Type::Literal { name: v.to_string(), type_: Box::new(Type::Bool) }),
+            parser::Literal::Unit => Ok(Type::Literal {
+                name: Type::Unit.to_string(),
+                type_: Box::new(Type::Unit),
+            }),
+            parser::Literal::Int(v) => Ok(Type::Literal {
+                name: v.to_string(),
+                type_: Box::new(Type::Int),
+            }),
+            parser::Literal::UInt(v) => Ok(Type::Literal {
+                name: v.to_string(),
+                type_: Box::new(Type::UInt),
+            }),
+            parser::Literal::Float(v) => Ok(Type::Literal {
+                name: v.to_string(),
+                type_: Box::new(Type::Float),
+            }),
+            parser::Literal::Char(v) => Ok(Type::Literal {
+                name: format!("'{}'", v),
+                type_: Box::new(Type::Char),
+            }),
+            parser::Literal::String(v) => Ok(Type::Literal {
+                name: format!("\"{}\"", v),
+                type_: Box::new(Type::String),
+            }),
+            parser::Literal::Bool(v) => Ok(Type::Literal {
+                name: v.to_string(),
+                type_: Box::new(Type::Bool),
+            }),
             _ => Err(format!("Cannot convert literal {:?} to type", literal)),
         }
     }
@@ -287,18 +351,21 @@ impl Type {
             Type::Char => TypeIdentifier::Type("char".to_string()),
             Type::Bool => TypeIdentifier::Type("bool".to_string()),
             Type::Struct(s) => s.type_identifier.clone(),
-            Type::StructField(sf) => TypeIdentifier::MemberType(
-                Box::new(sf.struct_name.clone()),
-                sf.field_name.clone()),
+            Type::StructField(sf) => {
+                TypeIdentifier::MemberType(Box::new(sf.struct_name.clone()), sf.field_name.clone())
+            }
             Type::Enum(u) => u.type_identifier.clone(),
             Type::EnumMember(um) => TypeIdentifier::MemberType(
                 Box::new(um.enum_name.clone()),
-                um.discriminant_name.clone()),
+                um.discriminant_name.clone(),
+            ),
             Type::EnumMemberField(umf) => TypeIdentifier::MemberType(
                 Box::new(TypeIdentifier::MemberType(
                     Box::new(umf.enum_name.clone()),
-                    umf.discriminant_name.clone())),
-                umf.field_name.clone()),
+                    umf.discriminant_name.clone(),
+                )),
+                umf.field_name.clone(),
+            ),
             Type::Union(u) => u.type_identifier.clone(),
             Type::Function(f) => f.identifier.clone(),
             _ => panic!("Cannot get type identifier for type {}", self.full_name()),
@@ -321,16 +388,25 @@ impl Type {
             Type::Enum(e) => e.type_annotation(),
             Type::Union(u) => u.type_annotation(),
             Type::Function(f) => f.type_annotation(),
-            Type::Literal { type_, .. } => TypeAnnotation::Literal(Box::new((*type_.clone()).into())),
+            Type::Literal { type_, .. } => {
+                TypeAnnotation::Literal(Box::new((*type_.clone()).into()))
+            }
             _ => panic!("Cannot get type annotation for type {}", self.full_name()),
         }
     }
 
-    pub fn clone_with_concrete_types(&self, concrete_types: Vec<TypeAnnotation>, type_environment: Rc<RefCell<TypeEnvironment>>) -> Result<Type, String> {
+    pub fn clone_with_concrete_types(
+        &self,
+        concrete_types: Vec<TypeAnnotation>,
+        type_environment: Rc<RefCell<TypeEnvironment>>,
+    ) -> Result<Type, String> {
         match self {
             Type::Struct(s) => {
                 let TypeIdentifier::GenericType(name, generics) = s.type_identifier.clone() else {
-                    return Err(format!("Cannot clone concrete types for struct {}", self.full_name()));
+                    return Err(format!(
+                        "Cannot clone concrete types for struct {}",
+                        self.full_name()
+                    ));
                 };
 
                 let mut type_map = HashMap::new();
@@ -345,19 +421,27 @@ impl Type {
                     let Type::StructField(StructField {
                         struct_name: _,
                         field_name,
-                        field_type }) = type_ else {
-                        return Err(format!("Struct fields are not of type StructField {}", type_.full_name()));
+                        field_type,
+                    }) = type_
+                    else {
+                        return Err(format!(
+                            "Struct fields are not of type StructField {}",
+                            type_.full_name()
+                        ));
                     };
 
-                    let Type::Generic( generic ) = *field_type.clone() else {
+                    let Type::Generic(generic) = *field_type.clone() else {
                         fields.insert(field_name.clone(), type_.clone());
                         continue;
                     };
-                    
-                    let concrete_type = type_map.get(&generic)
-                        .ok_or(format!("No concrete type found for generic type {}", generic.type_name))?;
 
-                    let concrete_type = check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+                    let concrete_type = type_map.get(&generic).ok_or(format!(
+                        "No concrete type found for generic type {}",
+                        generic.type_name
+                    ))?;
+
+                    let concrete_type =
+                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
 
                     fields.insert(field_name.clone(), concrete_type);
                 }
@@ -366,10 +450,13 @@ impl Type {
                     type_identifier: TypeIdentifier::ConcreteType(name, concrete_types),
                     fields,
                 }))
-            },
+            }
             Type::Enum(u) => {
                 let TypeIdentifier::GenericType(name, generics) = u.type_identifier.clone() else {
-                    return Err(format!("Cannot clone concrete types for enum {}", self.full_name()));
+                    return Err(format!(
+                        "Cannot clone concrete types for enum {}",
+                        self.full_name()
+                    ));
                 };
 
                 let mut type_map = HashMap::new();
@@ -378,13 +465,17 @@ impl Type {
                     type_map.insert(gt, ta);
                 }
 
-                let type_identifier = TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone());
+                let type_identifier =
+                    TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone());
 
                 let mut members = HashMap::new();
 
                 for (member_name, type_) in u.members.iter() {
                     let Type::EnumMember(u) = type_ else {
-                        return Err(format!("Enum members are not of type EnumMember {}", type_.full_name()));
+                        return Err(format!(
+                            "Enum members are not of type EnumMember {}",
+                            type_.full_name()
+                        ));
                     };
 
                     let mut fields = HashMap::new();
@@ -394,19 +485,30 @@ impl Type {
                             enum_name: _,
                             discriminant_name: _,
                             field_name,
-                            field_type }) = type_ else {
-                            return Err(format!("Enum member fields are not of type EnumMemberField {}", type_.full_name()));
+                            field_type,
+                        }) = type_
+                        else {
+                            return Err(format!(
+                                "Enum member fields are not of type EnumMemberField {}",
+                                type_.full_name()
+                            ));
                         };
-                        
-                        let Type::Generic( generic ) = *field_type.clone() else {
+
+                        let Type::Generic(generic) = *field_type.clone() else {
                             fields.insert(field_name.clone(), type_.clone());
                             continue;
                         };
-                        
-                        let concrete_type = type_map.get(&generic)
-                            .ok_or(format!("No concrete type found for generic type {}", generic.type_name))?;
-    
-                        let concrete_type = check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+
+                        let concrete_type = type_map.get(&generic).ok_or(format!(
+                            "No concrete type found for generic type {}",
+                            generic.type_name
+                        ))?;
+
+                        let concrete_type = check_type_annotation(
+                            &concrete_type,
+                            &vec![],
+                            type_environment.clone(),
+                        )?;
 
                         fields.insert(
                             field_name.clone(),
@@ -414,12 +516,16 @@ impl Type {
                                 enum_name: type_identifier.clone(),
                                 discriminant_name: u.discriminant_name.clone(),
                                 field_name: field_name.clone(),
-                                field_type: Box::new(concrete_type)
-                            }));
+                                field_type: Box::new(concrete_type),
+                            }),
+                        );
                     }
 
                     let member_type = Type::EnumMember(EnumMember {
-                        enum_name: TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone()),
+                        enum_name: TypeIdentifier::ConcreteType(
+                            name.clone(),
+                            concrete_types.clone(),
+                        ),
                         discriminant_name: member_name.clone(),
                         fields,
                     });
@@ -434,7 +540,10 @@ impl Type {
 
                 Ok(enum_)
             }
-            _ => Err(format!("Cannot clone concrete types for type {}", self.full_name())),
+            _ => Err(format!(
+                "Cannot clone concrete types for type {}",
+                self.full_name()
+            )),
         }
     }
 }
@@ -478,7 +587,6 @@ impl Into<parser::Literal> for Type {
             Type::Bool => parser::Literal::Bool(false),
             _ => panic!("Cannot convert type {} to literal", self.full_name()),
         }
-    
     }
 }
 

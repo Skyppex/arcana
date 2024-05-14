@@ -1,5 +1,7 @@
-use super::{cursor::Cursor, token::{Token, NumericLiteralType, IntLiteralBase, TokenKind, IntLiteral, Literal}};
-
+use super::{
+    cursor::Cursor,
+    token::{IntLiteral, IntLiteralBase, Literal, NumericLiteralType, Token, TokenKind},
+};
 
 pub fn parse_numeric_literal(cursor: &mut Cursor) -> Token {
     let base: IntLiteralBase = parse_base_prefix(cursor).unwrap_or(IntLiteralBase::None);
@@ -25,7 +27,9 @@ pub fn parse_numeric_literal(cursor: &mut Cursor) -> Token {
             value: value.parse::<u64>().unwrap(),
             base,
         })),
-        NumericLiteralType::Float => TokenKind::Literal(Literal::Float(value.parse::<f64>().expect("Failed to parse float literal"))),
+        NumericLiteralType::Float => TokenKind::Literal(Literal::Float(
+            value.parse::<f64>().expect("Failed to parse float literal"),
+        )),
     };
 
     Token {
@@ -37,10 +41,26 @@ pub fn parse_numeric_literal(cursor: &mut Cursor) -> Token {
 fn parse_base_prefix(cursor: &mut Cursor) -> Option<IntLiteralBase> {
     if cursor.first() == '0' {
         match cursor.second() {
-            'b' => {cursor.bump(); cursor.bump(); Some(IntLiteralBase::Binary)},
-            'o' => {cursor.bump(); cursor.bump(); Some(IntLiteralBase::Octal)},
-            'd' => {cursor.bump(); cursor.bump(); Some(IntLiteralBase::Decimal)},
-            'x' => {cursor.bump(); cursor.bump(); Some(IntLiteralBase::Hexadecimal)},
+            'b' => {
+                cursor.bump();
+                cursor.bump();
+                Some(IntLiteralBase::Binary)
+            }
+            'o' => {
+                cursor.bump();
+                cursor.bump();
+                Some(IntLiteralBase::Octal)
+            }
+            'd' => {
+                cursor.bump();
+                cursor.bump();
+                Some(IntLiteralBase::Decimal)
+            }
+            'x' => {
+                cursor.bump();
+                cursor.bump();
+                Some(IntLiteralBase::Hexadecimal)
+            }
             _ => None,
         }
     } else {
@@ -55,7 +75,7 @@ fn parse_numeric_literal_value(cursor: &mut Cursor, base: IntLiteralBase) -> Str
         value.push(cursor.first());
         cursor.bump();
     }
-    
+
     value
 }
 

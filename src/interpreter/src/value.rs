@@ -1,4 +1,4 @@
-use std::{fmt::Display, collections::HashMap};
+use std::{collections::HashMap, fmt::Display};
 
 use shared::{type_checker::ast::TypedStatement, types::TypeAnnotation};
 
@@ -12,10 +12,23 @@ pub enum Value {
     Char(char),
     String(String),
     Array(Vec<Value>),
-    Struct { struct_name: TypeAnnotation, fields: HashMap<String, Value> },
-    Enum { enum_member: EnumMember, fields: EnumFields },
-    Function { parameters: Vec<String>, body: Vec<TypedStatement> },
-    MemberFunction { type_name: TypeAnnotation, parameters: Vec<String>, body: Vec<TypedStatement> },
+    Struct {
+        struct_name: TypeAnnotation,
+        fields: HashMap<String, Value>,
+    },
+    Enum {
+        enum_member: EnumMember,
+        fields: EnumFields,
+    },
+    Function {
+        parameters: Vec<String>,
+        body: Vec<TypedStatement>,
+    },
+    MemberFunction {
+        type_name: TypeAnnotation,
+        parameters: Vec<String>,
+        body: Vec<TypedStatement>,
+    },
 }
 
 impl Value {
@@ -25,7 +38,7 @@ impl Value {
             v => Value::Enum {
                 enum_member: EnumMember {
                     enum_name: TypeAnnotation::ConcreteType("Option".to_owned(), vec![]),
-                    member_name: "Some".to_owned()
+                    member_name: "Some".to_owned(),
                 },
                 fields: EnumFields::Unnamed(vec![v]),
             },
@@ -36,7 +49,7 @@ impl Value {
         Value::Enum {
             enum_member: EnumMember {
                 enum_name: TypeAnnotation::ConcreteType("Option".to_owned(), vec![]),
-                member_name: "None".to_owned()
+                member_name: "None".to_owned(),
             },
             fields: EnumFields::Unnamed(vec![]),
         }
@@ -65,10 +78,10 @@ impl<'a> Display for Value {
                 }
 
                 write!(f, "]")
-            },
+            }
             Value::Struct {
                 struct_name,
-                fields
+                fields,
             } => {
                 write!(f, "{} {{ ", struct_name)?;
 
@@ -81,53 +94,67 @@ impl<'a> Display for Value {
                 }
 
                 write!(f, " }}")
-            
-            },
+            }
             Value::Enum {
                 enum_member,
-                fields
-            } => {
-                match fields {
-                    EnumFields::None => write!(f, ""),
-                    EnumFields::Named(fields) => {
-                        write!(f, "{}::{}(", enum_member.enum_name, enum_member.member_name)?;
-                        
-                        for (index, (identifier, value)) in fields.iter().enumerate() {
-                            write!(f, "{}: {}", identifier, value)?;
-                            
-                            if index < fields.len() - 1 {
-                                write!(f, ", ")?;
-                            }
-                        }
-                        
-                        write!(f, ")")
-                    },
-                    EnumFields::Unnamed(fields) => {
-                        write!(f, "{}::{}(", enum_member.enum_name, enum_member.member_name)?;
+                fields,
+            } => match fields {
+                EnumFields::None => write!(f, ""),
+                EnumFields::Named(fields) => {
+                    write!(f, "{}::{}(", enum_member.enum_name, enum_member.member_name)?;
 
-                        for (index, value) in fields.iter().enumerate() {
-                            write!(f, "{}", value)?;
-                            
-                            if index < fields.len() - 1 {
-                                write!(f, ", ")?;
-                            }
+                    for (index, (identifier, value)) in fields.iter().enumerate() {
+                        write!(f, "{}: {}", identifier, value)?;
+
+                        if index < fields.len() - 1 {
+                            write!(f, ", ")?;
                         }
-                        
-                        write!(f, ")")
-                    },
+                    }
+
+                    write!(f, ")")
+                }
+                EnumFields::Unnamed(fields) => {
+                    write!(f, "{}::{}(", enum_member.enum_name, enum_member.member_name)?;
+
+                    for (index, value) in fields.iter().enumerate() {
+                        write!(f, "{}", value)?;
+
+                        if index < fields.len() - 1 {
+                            write!(f, ", ")?;
+                        }
+                    }
+
+                    write!(f, ")")
                 }
             },
             Value::Function {
                 parameters,
-                body: _
+                body: _,
             } => {
-                write!(f, "({})", parameters.iter().map(|p| p.to_string()).collect::<Vec<String>>().join(", "))
-            },
+                write!(
+                    f,
+                    "({})",
+                    parameters
+                        .iter()
+                        .map(|p| p.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
             Value::MemberFunction {
                 type_name,
                 parameters,
-                body: _
-            } => write!(f, "{}.({})", type_name, parameters.iter().map(|p| p.to_string()).collect::<Vec<String>>().join(", ")),
+                body: _,
+            } => write!(
+                f,
+                "{}.({})",
+                type_name,
+                parameters
+                    .iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }
