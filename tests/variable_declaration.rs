@@ -1,6 +1,6 @@
 mod common;
 
-use common::{create_rcrc, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
+use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
 use shared::type_checker::{ast::{Literal, TypedExpression}, Type};
 use interpreter::{Environment, Value};
@@ -144,10 +144,10 @@ fn variable_declaration_has_value() {
 fn variable_declaration_adds_variable_to_environment() {
     // Arrange
     let input = "let x: bool;";
-    let environment = create_rcrc(Environment::new());
+    let environment = create_env();
 
     // Act
-    let value = evaluate_expression(input, environment.clone());
+    let value = evaluate_expression(input, environment.clone(), true);
 
     // Assert
     assert!(environment.borrow().get_variable("x").is_some());
@@ -158,10 +158,10 @@ fn variable_declaration_adds_variable_to_environment() {
 fn variable_declaration_adds_variable_to_environment_with_value() {
     // Arrange
     let input = "let x: bool = true;";
-    let environment = create_rcrc(Environment::new());
+    let environment = create_env();
 
     // Act
-    let value = evaluate_expression(input, environment.clone());
+    let value = evaluate_expression(input, environment.clone(), true);
 
     // Assert
     assert!(environment.borrow().get_variable("x").is_some());

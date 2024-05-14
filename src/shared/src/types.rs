@@ -58,6 +58,10 @@ impl Display for TypeAnnotation {
             TypeAnnotation::Type(type_name) =>
                 write!(f, "{}", type_name),
             TypeAnnotation::ConcreteType(type_name, generics) => {
+                if generics.is_empty() {
+                    return write!(f, "{}", type_name);
+                }
+                
                 write!(f, "{}<{}>",
                     type_name,
                     generics.iter()

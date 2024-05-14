@@ -183,7 +183,7 @@ fn evaluate_if<'a>(
             if v {
                 let value = evaluate_expression(*r#if.block, if_environment)?;
                 if r#else.is_none() {
-                    return Ok(Value::Void);
+                    return Ok(Value::option_some(value));
                 } else {
                     return Ok(value);
                 }
@@ -195,11 +195,11 @@ fn evaluate_if<'a>(
                     match condition {
                         Value::Bool(v) => {
                             if v {
-                                let value =  evaluate_expression(*else_if.block, else_if_environment);
+                                let value =  evaluate_expression(*else_if.block, else_if_environment)?;
                                 if r#else.is_none() {
-                                    return Ok(Value::Void);
+                                    return Ok(Value::option_some(value));
                                 } else {
-                                    return value;
+                                    return Ok(value);
                                 }
                             }
                         }
@@ -209,7 +209,7 @@ fn evaluate_if<'a>(
 
                 match r#else {
                     Some(r#else) => evaluate_expression(*r#else, if_environment),
-                    None => Ok(Value::Void)
+                    None => Ok(Value::option_none())
                 }
             }
         }

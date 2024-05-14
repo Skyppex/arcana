@@ -18,6 +18,31 @@ pub enum Value {
     MemberFunction { type_name: TypeAnnotation, parameters: Vec<String>, body: Vec<TypedStatement> },
 }
 
+impl Value {
+    pub fn option_some(value: Value) -> Value {
+        match value {
+            Value::Void => Value::Void,
+            v => Value::Enum {
+                enum_member: EnumMember {
+                    enum_name: TypeAnnotation::ConcreteType("Option".to_owned(), vec![]),
+                    member_name: "Some".to_owned()
+                },
+                fields: EnumFields::Unnamed(vec![v]),
+            },
+        }
+    }
+
+    pub fn option_none() -> Value {
+        Value::Enum {
+            enum_member: EnumMember {
+                enum_name: TypeAnnotation::ConcreteType("Option".to_owned(), vec![]),
+                member_name: "None".to_owned()
+            },
+            fields: EnumFields::Unnamed(vec![]),
+        }
+    }
+}
+
 impl<'a> Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
