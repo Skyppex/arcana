@@ -48,10 +48,8 @@ fn if_has_correct_type() {
 fn if_returns_if_block() {
     // Arrange
     let input = "if true { 1 } else { 2 }";
-    let environment = create_env();
-
     // Act
-    let value = evaluate_expression(input, environment, false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::Number(value::Number::Int(1)));
@@ -61,10 +59,8 @@ fn if_returns_if_block() {
 fn if_returns_else_block() {
     // Arrange
     let input = "if false { 1 } else { 2 }";
-    let environment = create_env();
-
     // Act
-    let value = evaluate_expression(input, environment, false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::Number(value::Number::Int(2)));
@@ -74,10 +70,8 @@ fn if_returns_else_block() {
 fn if_returns_else_if_block() {
     // Arrange
     let input = "if false { 1 } else if true { 2 } else { 3 }";
-    let environment = create_env();
-
     // Act
-    let value = evaluate_expression(input, environment, false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::Number(value::Number::Int(2)));
@@ -87,10 +81,8 @@ fn if_returns_else_if_block() {
 fn if_returns_option_some() {
     // Arrange
     let input = "if true { 1 }";
-    let environment = create_env();
-
     // Act
-    let value = evaluate_expression(input, environment, false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::option_some(Value::Number(value::Number::Int(1))));
@@ -100,10 +92,8 @@ fn if_returns_option_some() {
 fn if_returns_option_some_2() {
     // Arrange
     let input = "if false { 1 } else if true { 2 }";
-    let environment = create_env();
-
     // Act
-    let value = evaluate_expression(input, environment, false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::option_some(Value::Number(value::Number::Int(2))));
@@ -113,10 +103,8 @@ fn if_returns_option_some_2() {
 fn if_returns_option_none() {
     // Arrange
     let input = "if false { 1 }";
-    let environment = create_env();
-
     // Act
-    let value = evaluate_expression(input, environment, false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::option_none());
@@ -126,10 +114,8 @@ fn if_returns_option_none() {
 fn if_returns_option_none_2() {
     // Arrange
     let input = "if false { 1 } else if false { 2 }";
-    let environment = create_env();
-
     // Act
-    let value = evaluate_expression(input, environment, false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::option_none());

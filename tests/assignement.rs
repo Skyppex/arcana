@@ -58,10 +58,8 @@ fn assignment_returns_assigned_value() {
         x = 1
     "#;
 
-    let environment = create_env();
-
     // Act
-    let value = evaluate_expression(input, environment, true);
+    let value = evaluate_expression(input, create_env(), true);
 
     // Assert
     assert_eq!(value, Value::Number(value::Number::Int(1)));
