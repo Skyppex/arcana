@@ -151,13 +151,13 @@ fn variable_declaration_adds_variable_to_environment() {
 
     // Assert
     assert!(environment.borrow().get_variable("x").is_some());
-    assert_eq!(value, Value::Uninitialized);
+    assert_eq!(value, Value::Void);
 }
 
 #[test]
 fn variable_declaration_adds_variable_to_environment_with_value() {
     // Arrange
-    let input = "let x: bool = true;";
+    let input = "let x: bool = true";
     let environment = create_env();
 
     // Act

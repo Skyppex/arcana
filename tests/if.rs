@@ -2,8 +2,8 @@ mod common;
 
 use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
-use shared::{type_checker::{ast::TypedExpression, Type}, types::TypeAnnotation};
-use interpreter::{value::{self, EnumFields, EnumMember}, Value};
+use shared::type_checker::{ast::TypedExpression, Type};
+use interpreter::{value, Value};
 
 use crate::common::create_env;
 

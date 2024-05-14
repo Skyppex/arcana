@@ -17,14 +17,7 @@ pub fn evaluate_expression(input: &str, environment: Rcrc<Environment>, unwrap_s
     let ast = parser::create_ast(tokens).unwrap();
     let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new()));
     let typed_ast = type_checker::create_typed_ast(ast, type_environment).unwrap();
-
-    let mut expression = typed_ast.unwrap_program().nth_statement(0);
-
-    if unwrap_semi {
-        expression = expression.unwrap_semi();
-    }
-
-    interpreter::evaluate(expression, environment).unwrap()
+    interpreter::evaluate(typed_ast, environment).unwrap()
 }
 
 pub trait StatementExt {
