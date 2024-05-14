@@ -15,7 +15,7 @@ use clap::{ArgGroup, Parser};
         .requires("src")
         .args(&["label"])
 ))]
-pub(crate) struct MageArgs {
+pub struct MageArgs {
     /// Path to a folder containing a spell.toml file or path to the spell.toml file itself
     /// If this option is not specified, mage will run interactively in your terminal
     /// If the 'main' file isn't specified in the spell.toml file, it will look for main.ar or lib.ar in the same directory

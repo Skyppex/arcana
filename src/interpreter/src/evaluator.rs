@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use shared::{type_checker::{ast::{Block, *}, Type}, types::TypeIdentifier};
 
-use crate::interpreter::scope::Scope;
+use crate::scope::Scope;
 
 use super::{environment::{Environment, Rcrc}, evaluate_binop, scope::ScopeType, value::{Value, Number, EnumMember, EnumFields}};
 

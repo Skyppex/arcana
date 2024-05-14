@@ -1,9 +1,8 @@
 use std::{cell::RefCell, fs, io::{stdin, stdout, Write}, path::Path, rc::Rc};
 
 use shared::type_checker::TypeEnvironment;
-
-use crate::{interpreter::environment::Environment, read_input};
-
+use interpreter::Environment;
+use crate::read_input;
 
 pub(crate) fn interactive() -> Result<(), String> {
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));

@@ -1,23 +1,26 @@
-mod interpreter;
-mod mage_args;
 mod interactive;
+mod mage_args;
+
+use clap::Parser;
 
 use std::{cell::RefCell, rc::Rc};
 
-use clap::Parser;
-use interpreter::environment::Environment;
-use mage_args::MageArgs;
+use interpreter::Environment;
+use crate::mage_args::MageArgs;
 
-use interactive::interactive;
-use shared::{display::{Indent, IndentDisplay}, parser::create_ast, type_checker::{create_typed_ast, TypeEnvironment}};
+use shared::{
+    display::{Indent, IndentDisplay},
+    parser::create_ast,
+    type_checker::{create_typed_ast, TypeEnvironment},
+};
 
 fn main() {
-    let args = MageArgs::parse();
-    
+    let args = crate::mage_args::MageArgs::parse();
+
     let result = if let Some(ref source) = args.source {
         run_source(source, &args)
     } else {
-        interactive()
+        crate::interactive::interactive()
     };
 
     if let Err(error) = result {
@@ -25,9 +28,9 @@ fn main() {
     }
 }
 
-fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
+pub fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
     let source = std::fs::read_to_string(source)
-            .map_err(|error| format!("Failed to read file: {}", error))?;
+        .map_err(|error| format!("Failed to read file: {}", error))?;
 
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
     let environment = Rc::new(RefCell::new(Environment::new()));
@@ -61,11 +64,11 @@ fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
     result
 }
 
-
 pub fn read_input(
     input: String,
     type_environment: Rc<RefCell<TypeEnvironment>>,
-    environment: Rc<RefCell<Environment>>) -> Result<(), String> {
+    environment: Rc<RefCell<Environment>>,
+) -> Result<(), String> {
     const PRINT_TOKENS: bool = false;
     const PRINT_PARSER_AST: bool = true;
     const PRINT_TYPE_CHECKER_AST: bool = true;
@@ -87,9 +90,7 @@ pub fn read_input(
         eprintln!("{}\n", typed_program.indent_display(&mut indent));
     }
 
-    let result = interpreter::evaluate(
-        typed_program,
-        environment)?;
+    let result = interpreter::evaluate(typed_program, environment)?;
 
     if PRINT_TOKENS | PRINT_PARSER_AST || PRINT_TYPE_CHECKER_AST {
         eprintln!("{}", input);
