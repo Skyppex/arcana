@@ -537,8 +537,8 @@ pub fn check_type<'a>(
                 parser::BinaryOperator::BitwiseXor => BinaryOperator::BitwiseXor,
                 parser::BinaryOperator::BitwiseLeftShift => BinaryOperator::BitwiseLeftShift,
                 parser::BinaryOperator::BitwiseRightShift => BinaryOperator::BitwiseRightShift,
-                parser::BinaryOperator::BooleanLogicalAnd => BinaryOperator::BooleanLogicalAnd,
-                parser::BinaryOperator::BooleanLogicalOr => BinaryOperator::BooleanLogicalOr,
+                parser::BinaryOperator::LogicalAnd => BinaryOperator::LogicalAnd,
+                parser::BinaryOperator::LogicalOr => BinaryOperator::LogicalOr,
                 parser::BinaryOperator::Equal => BinaryOperator::Equal,
                 parser::BinaryOperator::NotEqual => BinaryOperator::NotEqual,
                 parser::BinaryOperator::LessThan => BinaryOperator::LessThan,
@@ -883,8 +883,8 @@ fn get_binop_type(left_type: &Type, operator: &BinaryOperator, right_type: &Type
         (Type::Int, BinaryOperator::GreaterThanOrEqual, Type::Int) => Type::Bool,
         (Type::UInt, BinaryOperator::GreaterThanOrEqual, Type::UInt) => Type::Bool,
         (Type::Float, BinaryOperator::GreaterThanOrEqual, Type::Float) => Type::Bool,
-        (Type::Bool, BinaryOperator::BooleanLogicalAnd, Type::Bool) => Type::Bool,
-        (Type::Bool, BinaryOperator::BooleanLogicalOr, Type::Bool) => Type::Bool,
+        (Type::Bool, BinaryOperator::LogicalAnd, Type::Bool) => Type::Bool,
+        (Type::Bool, BinaryOperator::LogicalOr, Type::Bool) => Type::Bool,
         (Type::Literal { name: _, type_ }, operator, right_type) => {
             get_binop_type(type_, operator, right_type)
         }

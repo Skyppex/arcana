@@ -393,8 +393,8 @@ fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
-                TokenKind::DoubleAmpersand => BinaryOperator::BooleanLogicalAnd,
-                TokenKind::DoublePipe => BinaryOperator::BooleanLogicalOr,
+                TokenKind::DoubleAmpersand => BinaryOperator::LogicalAnd,
+                TokenKind::DoublePipe => BinaryOperator::LogicalOr,
                 _ => unreachable!("Expected && or || but found {:?}", operator),
             },
         });
@@ -446,21 +446,20 @@ fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
         (cursor.first().kind, cursor.second().kind),
         (TokenKind::Greater, TokenKind::Greater) | (TokenKind::Less, TokenKind::Less)
     ) {
-        let operator = cursor.bump()?.kind; // Consume the >>, <<, ^, &, or |
+        let operator = cursor.bump()?.kind; // Consume the (first >), (first <), ^, &, or |
+
+        if matches!(operator, TokenKind::Greater | TokenKind::Less) {
+            cursor.bump()?; // Consume the second > or <
+        }
+
         let right = parse_additive(cursor)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
             right: Box::new(right),
             operator: match operator {
-                TokenKind::Greater => {
-                    cursor.bump()?; // Consume the >
-                    BinaryOperator::BitwiseRightShift
-                }
-                TokenKind::Less => {
-                    cursor.bump()?; // Consume the <
-                    BinaryOperator::BitwiseLeftShift
-                }
+                TokenKind::Greater => BinaryOperator::BitwiseRightShift,
+                TokenKind::Less => BinaryOperator::BitwiseLeftShift,
                 TokenKind::Caret => BinaryOperator::BitwiseXor,
                 TokenKind::Ampersand => BinaryOperator::BitwiseAnd,
                 TokenKind::Pipe => BinaryOperator::BitwiseOr,
