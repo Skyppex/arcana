@@ -2,17 +2,20 @@ mod common;
 
 use common::{create_typed_ast, StatementExt, VecStatementExt};
 
+use interpreter::{value::Number, Value};
 use shared::type_checker::{
     ast::{Typed, TypedExpression},
     Type,
 };
 
+use crate::common::{create_env, evaluate_expression};
+
 #[test]
-fn call_is_call() {
+fn index_is_index() {
     // Arrange
     let input = r#"
-        func a() {}
-        a()
+        let x: [int] = [1];
+        x[0u]
     "#;
 
     // Act
@@ -24,15 +27,15 @@ fn call_is_call() {
         .nth_statement(1)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Call { .. }));
+    assert!(matches!(expression, TypedExpression::Index { .. }));
 }
 
 #[test]
-fn call_has_void_return_type() {
+fn index_has_correct_type() {
     // Arrange
     let input = r#"
-        func a() {}
-        a()
+        let x: [int] = [1];
+        x[0u]
     "#;
 
     // Act
@@ -44,25 +47,20 @@ fn call_has_void_return_type() {
         .nth_statement(1)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Void);
+    assert_eq!(expression.get_type(), Type::Int);
 }
 
 #[test]
-fn call_has_return_type() {
+fn index_returns_correct_value() {
     // Arrange
     let input = r#"
-        func a(): bool { true }
-        a()
+        let x: [int] = [1];
+        x[0u]
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
-    let expression = typed_ast
-        .unwrap_program()
-        .nth_statement(1)
-        .unwrap_expression();
-
-    assert_eq!(expression.get_type(), Type::Bool);
+    assert_eq!(value, Value::Number(Number::Int(1)));
 }

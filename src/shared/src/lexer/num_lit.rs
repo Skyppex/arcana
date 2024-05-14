@@ -81,13 +81,7 @@ fn parse_numeric_literal_value(cursor: &mut Cursor, base: IntLiteralBase) -> Str
 
 fn parse_suffix(cursor: &mut Cursor) -> Option<NumericLiteralType> {
     if is_numeric_literal_suffix_start(cursor.first()) {
-        let mut suffix = String::from(cursor.bump().unwrap());
-
-        while cursor.first().is_digit(10) {
-            suffix.push(cursor.first());
-            cursor.bump();
-        }
-
+        let suffix = String::from(cursor.bump().unwrap());
         into_numeric_literal_suffix(&suffix)
     } else {
         None
@@ -109,9 +103,9 @@ fn is_numeric_literal_suffix_start(c: char) -> bool {
 
 fn into_numeric_literal_suffix(suffix: &str) -> Option<NumericLiteralType> {
     match suffix {
-        "int" => Some(NumericLiteralType::Int),
-        "uint" => Some(NumericLiteralType::UInt),
-        "float" => Some(NumericLiteralType::Float),
+        "i" => Some(NumericLiteralType::Int),
+        "u" => Some(NumericLiteralType::UInt),
+        "f" => Some(NumericLiteralType::Float),
         _ => None,
     }
 }
