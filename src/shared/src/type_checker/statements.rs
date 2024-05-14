@@ -516,7 +516,7 @@ pub fn check_type<'a>(
             let body_type = return_scope.map(|s| s.fold())
                 .unwrap_or_else(|| Ok(body_typed_statement.iter()
                     .last()
-                    .map(|ts| ts.get_type())
+                    .map(|ts| ts.get_deep_type())
                     .unwrap_or(Type::Void)))?;
 
             if return_type != body_type {
