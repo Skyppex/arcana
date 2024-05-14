@@ -507,7 +507,7 @@ pub fn check_type<'a>(
         }
         Expression::Unary(unary) => {
             let expression = check_type(&unary.expression, discovered_types, type_environment)?;
-            let type_ = expression.get_type();
+            let type_ = expression.get_deep_type();
 
             Ok(TypedExpression::Unary {
                 operator: match unary.operator {
