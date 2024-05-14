@@ -6,10 +6,11 @@ You might have some complex functionality already, but your users also want to j
 Here's how you might provide a function like that:
 
 The consumers code:
+
 ```rs
-#[derive(Newable)] // Auto implements a `new` function which takes in `a: i64` and `b: string` and assigns them to the fields.
+#[derive(Newable)] // Auto implements a `new` function which takes in `a: int` and `b: string` and assigns them to the fields.
 struct MyStruct {
-    a: i64,
+    a: int,
     b: string
 }
 ```
@@ -37,7 +38,7 @@ if you want to add your own parameters you'd have to add them at the beginning.
 
 ```rs
 impl<T> Create<T> for T {
-    pub func create<[..P]>(x: i64, y: i64, do: bool, args: [..P]): T
+    pub func create<[..P]>(x: int, y: int, do: bool, args: [..P]): T
     where T is Newable<[..P]> {
         // Do some stuff here which uses the extra arguments and interacts with the rest of your factory code in some way.
         // if do {

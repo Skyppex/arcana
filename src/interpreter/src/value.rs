@@ -109,35 +109,17 @@ impl<'a> Display for Value {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
-    I8(i8),
-    I16(i16),
-    I32(i32),
-    I64(i64),
-    I128(i128),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    U64(u64),
-    U128(u128),
-    F32(f32),
-    F64(f64),
+    Int(i64),
+    UInt(u64),
+    Float(f64),
 }
 
 impl Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Number::I8(number) => write!(f, "{}", number),
-            Number::I16(number) => write!(f, "{}", number),
-            Number::I32(number) => write!(f, "{}", number),
-            Number::I64(number) => write!(f, "{}", number),
-            Number::I128(number) => write!(f, "{}", number),
-            Number::U8(number) => write!(f, "{}", number),
-            Number::U16(number) => write!(f, "{}", number),
-            Number::U32(number) => write!(f, "{}", number),
-            Number::U64(number) => write!(f, "{}", number),
-            Number::U128(number) => write!(f, "{}", number),
-            Number::F32(number) => write!(f, "{}", number),
-            Number::F64(number) => write!(f, "{}", number),
+            Number::Int(number) => write!(f, "{}", number),
+            Number::UInt(number) => write!(f, "{}", number),
+            Number::Float(number) => write!(f, "{}", number),
         }
     }
 }

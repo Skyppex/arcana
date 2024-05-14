@@ -280,18 +280,9 @@ fn evaluate_member_access<'a>(object: Box<TypedExpression>, environment: Rcrc<En
 fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Result<Value, String> {
     match literal {
         Literal::Unit => Ok(Value::Unit),
-        Literal::I8(v) => Ok(Value::Number(Number::I8(v))),
-        Literal::I16(v) => Ok(Value::Number(Number::I16(v))),
-        Literal::I32(v) => Ok(Value::Number(Number::I32(v))),
-        Literal::I64(v) => Ok(Value::Number(Number::I64(v))),
-        Literal::I128(v) => Ok(Value::Number(Number::I128(v))),
-        Literal::U8(v) => Ok(Value::Number(Number::U8(v))),
-        Literal::U16(v) => Ok(Value::Number(Number::U16(v))),
-        Literal::U32(v) => Ok(Value::Number(Number::U32(v))),
-        Literal::U64(v) => Ok(Value::Number(Number::U64(v))),
-        Literal::U128(v) => Ok(Value::Number(Number::U128(v))),
-        Literal::F32(v) => Ok(Value::Number(Number::F32(v))),
-        Literal::F64(v) => Ok(Value::Number(Number::F64(v))),
+        Literal::Int(v) => Ok(Value::Number(Number::Int(v))),
+        Literal::UInt(v) => Ok(Value::Number(Number::UInt(v))),
+        Literal::Float(v) => Ok(Value::Number(Number::Float(v))),
         Literal::String(v) => Ok(Value::String(v)),
         Literal::Char(v) => Ok(Value::Char(v)),
         Literal::Bool(v) => Ok(Value::Bool(v)),
@@ -437,7 +428,7 @@ fn evaluate_index(
  
     let evaluated_argument = evaluate_expression(*argument, environment.clone())?;
 
-    let Value::Number(Number::U64(index)) = evaluated_argument else {
+    let Value::Number(Number::UInt(index)) = evaluated_argument else {
         unreachable!("Type is known after type checking, this should never happen")
     };
 
@@ -472,13 +463,8 @@ fn evaluate_unary<'a>(
             match value {
                 Value::Number(number) => {
                     match number {
-                        Number::I8(v) => Ok(Value::Number(Number::I8(-v))),
-                        Number::I16(v) => Ok(Value::Number(Number::I16(-v))),
-                        Number::I32(v) => Ok(Value::Number(Number::I32(-v))),
-                        Number::I64(v) => Ok(Value::Number(Number::I64(-v))),
-                        Number::I128(v) => Ok(Value::Number(Number::I128(-v))),
-                        Number::F32(v) => Ok(Value::Number(Number::F32(-v))),
-                        Number::F64(v) => Ok(Value::Number(Number::F64(-v))),
+                        Number::Int(v) => Ok(Value::Number(Number::Int(-v))),
+                        Number::Float(v) => Ok(Value::Number(Number::Float(-v))),
                         other => Err(format!("Cannot apply unary operator '-' to unsigned integers '{}'", other))
                     }
                 }
@@ -489,16 +475,8 @@ fn evaluate_unary<'a>(
             match value {
                 Value::Number(number) => {
                     match number {
-                        Number::I8(v) => Ok(Value::Number(Number::I8(!v))),
-                        Number::I16(v) => Ok(Value::Number(Number::I16(!v))),
-                        Number::I32(v) => Ok(Value::Number(Number::I32(!v))),
-                        Number::I64(v) => Ok(Value::Number(Number::I64(!v))),
-                        Number::I128(v) => Ok(Value::Number(Number::I128(!v))),
-                        Number::U8(v) => Ok(Value::Number(Number::U8(!v))),
-                        Number::U16(v) => Ok(Value::Number(Number::U16(!v))),
-                        Number::U32(v) => Ok(Value::Number(Number::U32(!v))),
-                        Number::U64(v) => Ok(Value::Number(Number::U64(!v))),
-                        Number::U128(v) => Ok(Value::Number(Number::U128(!v))),
+                        Number::Int(v) => Ok(Value::Number(Number::Int(!v))),
+                        Number::UInt(v) => Ok(Value::Number(Number::UInt(!v))),
                         other => Err(format!("Cannot apply unary operator '~' to floating point numbers '{}'", other))
                     }
                 }

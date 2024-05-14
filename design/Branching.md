@@ -48,6 +48,7 @@ if condition with variable declaration {
     body
 }
 ```
+
 This should also work with `else if`.
 
 ## Match statement
@@ -64,10 +65,12 @@ match expression {
     _ => body, // Default case. Must be last, but can be omitted if all cases are handled.
 }
 ```
+
 `match` can return a value:
 If the match is assigned to a variable or is directly returned any return statement
 in the arm bodies returns for the match statement, not the current function you're in.
-```
+
+```rs
 var value = match expression {
     pattern => body,
     pattern => body,
@@ -78,10 +81,10 @@ var value = match expression {
 
 ### Match works with enums
 
-```
+```rs
 enum Foo {
-    Bar(i32);
-    Baz(i32, f32);
+    Bar(int);
+    Baz(int, float);
     BarBaz;
 }
 
@@ -99,8 +102,8 @@ For flags, the exhaustive match only cares about declared flags, not the underly
 This will be possible due to the inability to flip bits which are not declared in the type.
 You need to handle all possible combinations of flags.
 
-```
-flags Foo(i32) {
+```rs
+flags Foo(int) {
     First;
     Second;
     Third;
@@ -113,6 +116,6 @@ match foo {
     Foo.Second | Foo.Third => body, // Exact match where Second and Third are flipped
     Foo.Second or Foo.Third // Exactly Second or exactly Third
     ?Foo.First or ?Foo.Third // As long as First flag or Third flag is flipped
-    ?~Foo.First // As long as First isnt flipped (this works because ~ turns 0b0000_0001 into 0b1111_1110) and so it checks any flags which are flipped
+    ?~Foo.First // As long as First isn't flipped (this works because ~ turns 0b0000_0001 into 0b1111_1110) and so it checks any flags which are flipped
 }
 ```

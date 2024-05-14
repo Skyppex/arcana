@@ -71,8 +71,8 @@ Access modifiers can be used on more than just modules. Here is a comprehensive 
 - Modules
 - Types (struct, enum, flags, type)
 - Struct fields
-    - type statements which extend structs will inherit access from the structs fields
-    - type statements which add new fields to a struct allow you to define the access inline
+  - type statements which extend structs will inherit access from the structs fields
+  - type statements which add new fields to a struct allow you to define the access inline
 - Traits
 - Functions
 - Notably, not Impl blocks (you use it on the functions instead)

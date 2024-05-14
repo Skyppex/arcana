@@ -27,7 +27,7 @@ The `Self` keyword is a special keyword which refers to the type which implement
 
 ```
 struct Foo {
-    i32 bar;
+    int bar;
 }
 
 impl Add for Foo {
@@ -37,7 +37,7 @@ impl Add for Foo {
 }
 ```
 
-This works because the `i32` type already implements the `Add` trait, so we can use it to implement the trait for our own type.
+This works because the `int` type already implements the `Add` trait, so we can use it to implement the trait for our own type.
 
 ## Default Implementations
 
@@ -81,15 +81,15 @@ When implementing the `Newable` trait you have to specify the parameters as gene
 
 ```rs
 struct MyStruct {
-    a: i64,
+    a: int,
     b: string,
 }
 
 // Would be nice to avoid defining the parameters twice using type inference somehow
-impl Newable<[..a: i64, b: string]> for MyStruct {
+impl Newable<[..a: int, b: string]> for MyStruct {
     type Return = MyStruct;
 
-    func new(a: i64, b: string): Self::Return {
+    func new(a: int, b: string): Self::Return {
         MyStruct { a, b }
     }
 }

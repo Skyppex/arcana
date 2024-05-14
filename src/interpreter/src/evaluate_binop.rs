@@ -29,18 +29,9 @@ fn evaluate_add<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left + right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left + right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left + right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left + right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left + right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left + right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left + right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left + right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left + right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left + right))),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Number(Number::F32(left + right))),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Number(Number::F64(left + right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left + right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left + right))),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Number(Number::Float(left + right))),
                 (left, right) => Err(format!("Cannot add {:?} and {:?}", left, right)),
             }
         },
@@ -53,18 +44,9 @@ fn evaluate_subtract<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left - right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left - right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left - right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left - right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left - right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left - right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left - right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left - right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left - right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left - right))),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Number(Number::F32(left - right))),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Number(Number::F64(left - right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left - right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left - right))),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Number(Number::Float(left - right))),
                 (left, right) => Err(format!("Cannot subtract {:?} and {:?}", left, right)),
             }
         },
@@ -76,18 +58,9 @@ fn evaluate_multiply<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left * right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left * right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left * right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left * right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left * right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left * right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left * right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left * right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left * right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left * right))),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Number(Number::F32(left * right))),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Number(Number::F64(left * right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left * right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left * right))),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Number(Number::Float(left * right))),
                 (left, right) => Err(format!("Cannot multiply {:?} and {:?}", left, right)),
             }
         },
@@ -99,18 +72,9 @@ fn evaluate_divide<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left / right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left / right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left / right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left / right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left / right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left / right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left / right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left / right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left / right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left / right))),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Number(Number::F32(left / right))),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Number(Number::F64(left / right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left / right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left / right))),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Number(Number::Float(left / right))),
                 (left, right) => Err(format!("Cannot divide {:?} and {:?}", left, right)),
             }
         },
@@ -122,18 +86,9 @@ fn evaluate_modulo<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left % right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left % right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left % right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left % right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left % right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left % right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left % right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left % right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left % right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left % right))),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Number(Number::F32(left % right))),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Number(Number::F64(left % right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left % right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left % right))),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Number(Number::Float(left % right))),
                 (left, right) => Err(format!("Cannot modulo {:?} and {:?}", left, right)),
             }
         },
@@ -145,16 +100,8 @@ fn evaluate_bitwise_and<'a>(left: Value, right: Value) -> Result<Value, String> 
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left & right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left & right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left & right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left & right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left & right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left & right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left & right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left & right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left & right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left & right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left & right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left & right))),
                 (left, right) => Err(format!("Cannot bitwise and {:?} and {:?}", left, right)),
             }
         },
@@ -166,16 +113,8 @@ fn evaluate_bitwise_or<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left | right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left | right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left | right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left | right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left | right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left | right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left | right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left | right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left | right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left | right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left | right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left | right))),
                 (left, right) => Err(format!("Cannot bitwise or {:?} and {:?}", left, right)),
             }
         },
@@ -187,16 +126,8 @@ fn evaluate_bitwise_xor<'a>(left: Value, right: Value) -> Result<Value, String> 
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left ^ right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left ^ right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left ^ right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left ^ right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left ^ right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left ^ right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left ^ right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left ^ right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left ^ right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left ^ right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left ^ right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left ^ right))),
                 (left, right) => Err(format!("Cannot bitwise xor {:?} and {:?}", left, right)),
             }
         },
@@ -208,16 +139,8 @@ fn evaluate_bitwise_left_shift<'a>(left: Value, right: Value) -> Result<Value, S
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left << right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left << right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left << right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left << right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left << right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left << right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left << right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left << right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left << right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left << right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left << right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left << right))),
                 (left, right) => Err(format!("Cannot bitwise left shift {:?} and {:?}", left, right)),
             }
         },
@@ -229,16 +152,8 @@ fn evaluate_bitwise_right_shift<'a>(left: Value, right: Value) -> Result<Value, 
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Number(Number::I8(left >> right))),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Number(Number::I16(left >> right))),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Number(Number::I32(left >> right))),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Number(Number::I64(left >> right))),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Number(Number::I128(left >> right))),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Number(Number::U8(left >> right))),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Number(Number::U16(left >> right))),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Number(Number::U32(left >> right))),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Number(Number::U64(left >> right))),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Number(Number::U128(left >> right))),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left >> right))),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Number(Number::UInt(left >> right))),
                 (left, right) => Err(format!("Cannot bitwise right shift {:?} and {:?}", left, right)),
             }
         },
@@ -264,18 +179,9 @@ fn evaluate_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Bool(left == right)),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Bool(left == right)),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Bool(left == right)),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Bool(left == right)),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Bool(left == right)),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Bool(left == right)),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Bool(left == right)),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Bool(left == right)),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Bool(left == right)),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Bool(left == right)),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Bool(left == right)),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Bool(left == right)),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left == right)),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left == right)),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left == right)),
                 (left, right) => Err(format!("Cannot equal {:?} and {:?}", left, right)),
             }
         },
@@ -290,18 +196,9 @@ fn evaluate_not_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Bool(left != right)),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Bool(left != right)),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Bool(left != right)),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Bool(left != right)),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Bool(left != right)),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Bool(left != right)),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Bool(left != right)),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Bool(left != right)),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Bool(left != right)),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Bool(left != right)),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Bool(left != right)),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Bool(left != right)),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left != right)),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left != right)),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left != right)),
                 (left, right) => Err(format!("Cannot not equal {:?} and {:?}", left, right)),
             }
         },
@@ -316,18 +213,9 @@ fn evaluate_less_than<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Bool(left < right)),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Bool(left < right)),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Bool(left < right)),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Bool(left < right)),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Bool(left < right)),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Bool(left < right)),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Bool(left < right)),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Bool(left < right)),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Bool(left < right)),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Bool(left < right)),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Bool(left < right)),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Bool(left < right)),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left < right)),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left < right)),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left < right)),
                 (left, right) => Err(format!("Cannot less than {:?} and {:?}", left, right)),
             }
         },
@@ -339,18 +227,9 @@ fn evaluate_less_than_or_equal<'a>(left: Value, right: Value) -> Result<Value, S
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Bool(left <= right)),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Bool(left <= right)),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Bool(left <= right)),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Bool(left <= right)),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Bool(left <= right)),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Bool(left <= right)),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Bool(left <= right)),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Bool(left <= right)),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Bool(left <= right)),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Bool(left <= right)),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Bool(left <= right)),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Bool(left <= right)),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left <= right)),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left <= right)),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left <= right)),
                 (left, right) => Err(format!("Cannot less than or equal {:?} and {:?}", left, right)),
             }
         },
@@ -362,18 +241,9 @@ fn evaluate_greater_than<'a>(left: Value, right: Value) -> Result<Value, String>
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Bool(left > right)),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Bool(left > right)),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Bool(left > right)),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Bool(left > right)),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Bool(left > right)),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Bool(left > right)),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Bool(left > right)),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Bool(left > right)),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Bool(left > right)),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Bool(left > right)),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Bool(left > right)),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Bool(left > right)),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left > right)),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left > right)),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left > right)),
                 (left, right) => Err(format!("Cannot greater than {:?} and {:?}", left, right)),
             }
         },
@@ -385,18 +255,9 @@ fn evaluate_greater_than_or_equal<'a>(left: Value, right: Value) -> Result<Value
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => {
             match (left, right) {
-                (Number::I8(left), Number::I8(right)) => Ok(Value::Bool(left >= right)),
-                (Number::I16(left), Number::I16(right)) => Ok(Value::Bool(left >= right)),
-                (Number::I32(left), Number::I32(right)) => Ok(Value::Bool(left >= right)),
-                (Number::I64(left), Number::I64(right)) => Ok(Value::Bool(left >= right)),
-                (Number::I128(left), Number::I128(right)) => Ok(Value::Bool(left >= right)),
-                (Number::U8(left), Number::U8(right)) => Ok(Value::Bool(left >= right)),
-                (Number::U16(left), Number::U16(right)) => Ok(Value::Bool(left >= right)),
-                (Number::U32(left), Number::U32(right)) => Ok(Value::Bool(left >= right)),
-                (Number::U64(left), Number::U64(right)) => Ok(Value::Bool(left >= right)),
-                (Number::U128(left), Number::U128(right)) => Ok(Value::Bool(left >= right)),
-                (Number::F32(left), Number::F32(right)) => Ok(Value::Bool(left >= right)),
-                (Number::F64(left), Number::F64(right)) => Ok(Value::Bool(left >= right)),
+                (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left >= right)),
+                (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left >= right)),
+                (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left >= right)),
                 (left, right) => Err(format!("Cannot greater than or equal {:?} and {:?}", left, right)),
             }
         },

@@ -1,1 +1,1 @@
-let x: bool;
+if true { 1 } else { 2 }

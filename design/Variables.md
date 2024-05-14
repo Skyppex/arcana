@@ -1,33 +1,19 @@
 # Syntax Examples
 
-`let x: i64;` Variable declaration -> Statement \
-`let mut x: i64;` Mutable variable declaration -> Statement \
+`let x: int;` Variable declaration -> Statement \
+`let mut x: int;` Mutable variable declaration -> Statement \
 `let x = 0;` Variable declaration with initialization -> Expression \
-`let mut x: i64 = 0;` Mutable variable declaration with initialization -> Expression
+`let mut x: int = 0;` Mutable variable declaration with initialization -> Expression
 
 `x = 0;` Variable assignment -> Expression
 
-# Literals
-`0i8` i8 literal -> Expression \
-`0u8` u8 literal -> Expression \
-`0i16` i16 literal -> Expression \
-`0u16` u16 literal -> Expression \
-`0` i32 literal -> Expression \
-`0u` u32 literal -> Expression \
-`0i32` i32 literal -> Expression \
-`0u32` u32 literal -> Expression \
-`0i64` i64 literal -> Expression \
-`0u64` u64 literal -> Expression \
-`0i128` i128 literal -> Expression \
-`0u128` u128 literal -> Expression \
-`0isize` isize literal -> Expression \
-`0usize` usize literal -> Expression \
-`0.0f8` f8 literal -> Expression \
-`0.0f16` f16 literal -> Expression \ 
-`0.0` f32 literal -> Expression \
-`0.0f32` f32 literal -> Expression \
-`0.0f64` f64 literal -> Expression \
-`0.0f128` f128 literal -> Expression \
+## Literals
+
+`0` int literal -> Expression \
+`0i` int literal -> Expression \
+`0u` uint literal -> Expression \
+`0.0` float literal -> Expression \
+`0.0f` float literal -> Expression \
 `true` Boolean literal -> Expression \
 `false` Boolean literal -> Expression \
 `'c'` Character literal -> Expression \
@@ -36,14 +22,16 @@
 `r#"Hello "World""#` Raw string literal -> Expression \
 
 Raw interpolated string literal -> Expression
-```
+
+```rs
 r"Hello
 ---"World"
 -"
 ```
 
 Raw multiline string literal with different delimiters -> Expression
-```
+
+```rs
 r#"Hello
 ---"World"
 --"#
@@ -52,7 +40,8 @@ r#"Hello
 ### Struct literals
 
 Given the following struct:
-```
+
+```rs
 struct Foo {
     bar: i32;
     baz: f32;
@@ -60,9 +49,11 @@ struct Foo {
 ```
 
 The struct literal syntax is as follows:
-```
+
+```rs
 Foo { bar: 5, baz: 10 }
 ```
+
 This is assignable to a value of type Foo
 
 ## Defining literal values
