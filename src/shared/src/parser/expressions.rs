@@ -591,7 +591,8 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut else_ifs = vec![];
     let mut r#else = None;
 
-    while cursor.first().kind == TokenKind::Keyword(Keyword::Else) {
+    let mut else_reached = false;
+    while cursor.first().kind == TokenKind::Keyword(Keyword::Else) && !else_reached {
         cursor.bump()?; // Consume the else
 
         if cursor.first().kind == TokenKind::Keyword(Keyword::If) {
@@ -607,6 +608,7 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
         } else {
             let block = parse_block(cursor)?;
             r#else = Some(Box::new(block));
+            else_reached = true;
         }
     }
 
