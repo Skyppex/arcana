@@ -1,30 +1,30 @@
 # arcane
 
-This is my WIP programming language.
+Arcana is my WIP programming language.
 
 ## Todo
 - [x] Lexer
 - [x] Parser
 - [x] AST
-- [ ] Type checker
+- [x] Type checker
 
 ## Current design goals
-- Compiled
+- Interpreted
 - Statically typed
 - Procedural
 - High-level syntax
-- Low-level control
 - Everything is an expression
-- Everything is a type
+- Paramater types
+- Enum variant types
 - Type arithmetic
 - No null
-- Borrow checker
+- Rich pattern matching
 
 ## Syntax
-- Structs and Enums
-- Named bit flags as a wrapper for integer types
-- Functions
-- Implementations
+- Structs, rust-like enums, and literal unions
+- Named bit flags
+- Top-level Functions
+- Rust-like impl blocks
 - Traits
 - Generics
 - Closures
