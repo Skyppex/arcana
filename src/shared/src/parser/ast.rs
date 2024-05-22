@@ -165,12 +165,6 @@ impl ToString for Literal {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ConditionBlock {
-    pub condition: Box<Expression>,
-    pub block: Box<Expression>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub struct While {
     pub condition: Box<Expression>,
     pub statements: Vec<Statement>,
@@ -266,9 +260,9 @@ pub struct VariableDeclaration {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct If {
-    pub r#if: ConditionBlock,
-    pub else_ifs: Option<Vec<ConditionBlock>>,
-    pub r#else: Option<Box<Expression>>,
+    pub condition: Box<Expression>,
+    pub true_expression: Box<Expression>,
+    pub false_expression: Option<Box<Expression>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

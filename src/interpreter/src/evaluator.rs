@@ -101,11 +101,17 @@ fn evaluate_expression<'a>(
             type_,
         } => evaluate_variable_declaration(mutable, identifier, initializer, type_, environment),
         TypedExpression::If {
-            r#if,
-            else_ifs,
-            r#else,
+            condition,
+            true_expression,
+            false_expression,
             type_,
-        } => evaluate_if(r#if, else_ifs, r#else, type_, environment),
+        } => evaluate_if(
+            condition,
+            true_expression,
+            false_expression,
+            type_,
+            environment,
+        ),
         TypedExpression::Assignment {
             member,
             initializer,
@@ -198,54 +204,29 @@ fn evaluate_variable_declaration<'a>(
 }
 
 fn evaluate_if<'a>(
-    r#if: ConditionBlock,
-    else_ifs: Vec<ConditionBlock>,
-    r#else: Option<Box<TypedExpression>>,
+    condition: Box<TypedExpression>,
+    true_expression: Box<TypedExpression>,
+    false_expression: Option<Box<TypedExpression>>,
     _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let if_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
-    let condition = evaluate_expression(*r#if.condition, if_environment.clone())?;
+    let condition = evaluate_expression(*condition, if_environment.clone())?;
 
     match condition {
         Value::Bool(v) => {
             if v {
-                let value = evaluate_expression(*r#if.block, if_environment)?;
-                if r#else.is_none() {
+                let value = evaluate_expression(*true_expression, if_environment)?;
+                if false_expression.is_none() {
                     return Ok(Value::option_some(value));
                 } else {
                     return Ok(value);
                 }
             } else {
-                for else_if in else_ifs {
-                    let else_if_environment =
-                        Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
-                    let condition =
-                        evaluate_expression(*else_if.condition, else_if_environment.clone())?;
-
-                    match condition {
-                        Value::Bool(v) => {
-                            if v {
-                                let value =
-                                    evaluate_expression(*else_if.block, else_if_environment)?;
-                                if r#else.is_none() {
-                                    return Ok(Value::option_some(value));
-                                } else {
-                                    return Ok(value);
-                                }
-                            }
-                        }
-                        _ => {
-                            return Err(format!(
-                                "Else if condition must be boolean '{}'",
-                                condition
-                            ))
-                        }
+                match false_expression {
+                    Some(false_expression) => {
+                        evaluate_expression(*false_expression, if_environment)
                     }
-                }
-
-                match r#else {
-                    Some(r#else) => evaluate_expression(*r#else, if_environment),
                     None => Ok(Value::option_none()),
                 }
             }

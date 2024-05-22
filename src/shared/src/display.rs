@@ -1,10 +1,9 @@
 use crate::{
     parser::{
-        AccessModifier, Assignment, Binary, BinaryOperator, Call, ConditionBlock, EnumDeclaration,
-        EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression, FieldInitializer,
-        FlagsMember, FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement,
-        StructDeclaration, StructField, Ternary, Unary, UnaryOperator, UnionDeclaration,
-        VariableDeclaration, While,
+        AccessModifier, Assignment, Binary, BinaryOperator, Call, EnumDeclaration, EnumMember,
+        EnumMemberField, EnumMemberFieldInitializers, Expression, FieldInitializer, FlagsMember,
+        FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration,
+        StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, VariableDeclaration, While,
     },
     type_checker::{
         self,
@@ -489,9 +488,9 @@ impl IndentDisplay for Expression {
                 result
             }
             Expression::If(If {
-                r#if,
-                else_ifs,
-                r#else,
+                condition,
+                true_expression,
+                false_expression,
             }) => {
                 let mut result = String::new();
                 result.push_str("<if>\n");
@@ -500,46 +499,25 @@ impl IndentDisplay for Expression {
                     format!(
                         "{}condition:{}",
                         indent.dash(),
-                        r#if.condition.indent_display(indent)
+                        condition.indent_display(indent)
                     )
                     .as_str(),
                 );
                 result.push_str(
                     format!(
-                        "\n{}body: {}",
+                        "\n{}true expression: {}",
                         indent.dash(),
-                        r#if.block.indent_display(indent)
+                        true_expression.indent_display(indent)
                     )
                     .as_str(),
                 );
-
-                if let Some(else_ifs) = else_ifs {
-                    for (i, else_if) in else_ifs.iter().enumerate() {
-                        let is_end = i == else_ifs.len() - 1;
-                        indent.end_current();
-                        result.push_str(
-                            format!("\n{}{}\n", indent.dash(), else_if.indent_display(indent))
-                                .as_str(),
-                        );
-                        result.push_str(
-                            format!(
-                                "\n{}condition: {}\n",
-                                indent.dash(),
-                                else_if.condition.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    }
-                } else {
-                    result.push_str(format!("\n{}else_ifs: None\n", indent.dash()).as_str());
-                }
 
                 indent.end_current();
                 result.push_str(
                     format!(
-                        "{}else block: {}",
+                        "{}false expression: {}",
                         indent.dash_end(),
-                        r#else.indent_display(indent)
+                        false_expression.indent_display(indent)
                     )
                     .as_str(),
                 );
@@ -1267,33 +1245,6 @@ impl IndentDisplay for Parameter {
     }
 }
 
-impl IndentDisplay for ConditionBlock {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        let mut result = String::new();
-        result.push_str("<condition block>\n");
-        indent.increase();
-        result.push_str(
-            format!(
-                "{}condition: {}\n",
-                indent.dash(),
-                self.condition.indent_display(indent)
-            )
-            .as_str(),
-        );
-        indent.end_current();
-        result.push_str(
-            format!(
-                "{}body: {}",
-                indent.dash_end(),
-                self.block.indent_display(indent)
-            )
-            .as_str(),
-        );
-        indent.decrease();
-        result
-    }
-}
-
 impl IndentDisplay for TypedStatement {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
@@ -1601,9 +1552,9 @@ impl IndentDisplay for TypedExpression {
                 result
             }
             TypedExpression::If {
-                r#if,
-                else_ifs,
-                r#else,
+                condition,
+                true_expression,
+                false_expression,
                 type_,
             } => {
                 let mut result = String::new();
@@ -1613,38 +1564,35 @@ impl IndentDisplay for TypedExpression {
                     format!(
                         "{}condition:{}",
                         indent.dash(),
-                        r#if.condition.indent_display(indent)
+                        condition.indent_display(indent)
                     )
                     .as_str(),
                 );
 
-                for else_if in else_ifs {
-                    result.push_str(
-                        format!("\n{}{}\n", indent.dash(), else_if.indent_display(indent)).as_str(),
-                    );
-                    result.push_str(
-                        format!(
-                            "\n{}condition: {}",
-                            indent.dash(),
-                            else_if.condition.indent_display(indent)
-                        )
-                        .as_str(),
-                    );
-                }
+                result.push_str(
+                    format!(
+                        "\n{}true expression: {}",
+                        indent.dash(),
+                        true_expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
 
                 indent.end_current();
 
-                if let Some(r#else) = r#else {
+                if let Some(false_expression) = false_expression {
                     result.push_str(
                         format!(
-                            "\n{}else block: {}",
+                            "\n{}false expression: {}",
                             indent.dash_end(),
-                            r#else.indent_display(indent)
+                            false_expression.indent_display(indent)
                         )
                         .as_str(),
                     );
                 } else {
-                    result.push_str(format!("\n{}else block: None", indent.dash_end()).as_str());
+                    result.push_str(
+                        format!("\n{}false expression: None", indent.dash_end()).as_str(),
+                    );
                 }
 
                 indent.decrease();
@@ -2188,33 +2136,6 @@ impl IndentDisplay for type_checker::ast::EnumMemberField {
         indent.increase_leaf();
         result.push_str(format!("{}identifier: {}\n", indent.dash(), self.identifier).as_str());
         result.push_str(format!("{}type: {}", indent.dash_end(), self.type_).as_str());
-        indent.decrease();
-        result
-    }
-}
-
-impl IndentDisplay for type_checker::ast::ConditionBlock {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        let mut result = String::new();
-        result.push_str("<condition block>\n");
-        indent.increase();
-        result.push_str(
-            format!(
-                "{}condition: {}\n",
-                indent.dash(),
-                self.condition.indent_display(indent)
-            )
-            .as_str(),
-        );
-        indent.end_current();
-        result.push_str(
-            format!(
-                "{}body: {}",
-                indent.dash_end(),
-                self.block.indent_display(indent)
-            )
-            .as_str(),
-        );
         indent.decrease();
         result
     }

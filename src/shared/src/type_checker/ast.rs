@@ -259,9 +259,9 @@ pub enum TypedExpression {
         type_: Type,
     },
     If {
-        r#if: ConditionBlock,
-        else_ifs: Vec<ConditionBlock>,
-        r#else: Option<Box<TypedExpression>>,
+        condition: Box<TypedExpression>,
+        true_expression: Box<TypedExpression>,
+        false_expression: Option<Box<TypedExpression>>,
         type_: Type,
     },
     Assignment {
@@ -377,17 +377,14 @@ impl Display for TypedExpression {
                 }
             }
             TypedExpression::If {
-                r#if,
-                else_ifs,
-                r#else,
+                condition,
+                true_expression,
+                false_expression,
                 ..
             } => {
-                write!(f, "if {} {{ {} }}", r#if.condition, r#if.block)?;
-                for else_if in else_ifs {
-                    write!(f, " else if {} {{ {} }}", else_if.condition, else_if.block)?;
-                }
-                if let Some(r#else) = r#else {
-                    write!(f, " else {{ {} }}", r#else)?;
+                write!(f, "if {} {{ {} }}", condition, true_expression)?;
+                if let Some(false_expression) = false_expression {
+                    write!(f, " else {{ {} }}", false_expression)?;
                 }
                 Ok(())
             }
@@ -669,18 +666,6 @@ impl Display for Literal {
                 field_initializers, ..
             } => write!(f, "{}", field_initializers.to_string()),
         }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ConditionBlock {
-    pub condition: Box<TypedExpression>,
-    pub block: Box<TypedExpression>,
-}
-
-impl Display for ConditionBlock {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {{ {} }}", self.condition, self.block)
     }
 }
 

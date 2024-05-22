@@ -24,7 +24,13 @@ fn add_is_add() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Binary { operator: BinaryOperator::Add, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Binary {
+            operator: BinaryOperator::Add,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -41,7 +47,13 @@ fn subtract_is_subtract() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Binary { operator: BinaryOperator::Subtract, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Binary {
+            operator: BinaryOperator::Subtract,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -58,7 +70,13 @@ fn multiply_is_multiply() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Binary { operator: BinaryOperator::Multiply, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Binary {
+            operator: BinaryOperator::Multiply,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -75,7 +93,13 @@ fn divide_is_divide() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Binary { operator: BinaryOperator::Divide, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Binary {
+            operator: BinaryOperator::Divide,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -92,7 +116,13 @@ fn modulo_is_modulo() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Binary { operator: BinaryOperator::Modulo, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Binary {
+            operator: BinaryOperator::Modulo,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -109,7 +139,13 @@ fn bitwise_and_is_bitwise_and() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Binary { operator: BinaryOperator::BitwiseAnd, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Binary {
+            operator: BinaryOperator::BitwiseAnd,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -126,7 +162,13 @@ fn bitwise_or_is_bitwise_or() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Binary { operator: BinaryOperator::BitwiseOr, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Binary {
+            operator: BinaryOperator::BitwiseOr,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -143,7 +185,13 @@ fn bitwise_xor_is_bitwise_xor() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Binary { operator: BinaryOperator::BitwiseXor, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Binary {
+            operator: BinaryOperator::BitwiseXor,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -162,7 +210,10 @@ fn bitwise_left_shift_is_bitwise_left_shift() {
 
     assert!(matches!(
         expression,
-        TypedExpression::Binary { operator: BinaryOperator::BitwiseLeftShift, .. }
+        TypedExpression::Binary {
+            operator: BinaryOperator::BitwiseLeftShift,
+            ..
+        }
     ));
 }
 
@@ -182,7 +233,10 @@ fn bitwise_right_shift_is_bitwise_right_shift() {
 
     assert!(matches!(
         expression,
-        TypedExpression::Binary { operator: BinaryOperator::BitwiseRightShift, .. }
+        TypedExpression::Binary {
+            operator: BinaryOperator::BitwiseRightShift,
+            ..
+        }
     ));
 }
 

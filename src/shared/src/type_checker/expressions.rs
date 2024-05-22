@@ -3,13 +3,15 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{
     parser::{self, Assignment, Expression, If, VariableDeclaration, While},
     type_checker::ast::Literal,
+    types::TypeIdentifier,
 };
 
 use super::{
     ast::{
-        BinaryOperator, Block, ConditionBlock, EnumMemberFieldInitializers, FieldInitializer,
-        Member, Typed, TypedExpression, TypedStatement, UnaryOperator,
+        BinaryOperator, Block, EnumMemberFieldInitializers, FieldInitializer, Member, Typed,
+        TypedExpression, TypedStatement, UnaryOperator,
     },
+    full_name,
     scope::ScopeType,
     statements, DiscoveredType, Enum, EnumMember, EnumMemberField, FullName, Rcrc, Struct,
     StructField, Type, TypeEnvironment, Union,
@@ -62,19 +64,16 @@ pub fn check_type<'a>(
             })
         }
         Expression::If(If {
-            r#if,
-            else_ifs,
-            r#else,
+            condition,
+            true_expression,
+            false_expression,
         }) => {
             let if_else_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
 
-            let if_condition = check_type(
-                &r#if.condition,
-                discovered_types,
-                if_else_environment.clone(),
-            )?;
+            let if_condition =
+                check_type(&condition, discovered_types, if_else_environment.clone())?;
 
             if !type_equals(&if_condition.get_type(), &Type::Bool) {
                 return Err(format!(
@@ -83,73 +82,52 @@ pub fn check_type<'a>(
                 ));
             };
 
-            let if_block = check_type(&r#if.block, discovered_types, if_else_environment.clone())?;
+            let if_block = check_type(
+                &true_expression,
+                discovered_types,
+                if_else_environment.clone(),
+            )?;
             let if_block_type = if_block.get_type();
 
-            let mut else_if_condition_blocks = vec![];
-
-            if let Some(else_ifs) = else_ifs {
-                for else_if in else_ifs {
-                    let else_if_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
-                        type_environment.clone(),
-                    )));
-
-                    let else_if_condition = check_type(
-                        &else_if.condition,
-                        discovered_types,
-                        else_if_environment.clone(),
-                    )?;
-                    if let Type::Bool = else_if_condition.get_type() {
-                        return Err(format!("Else if condition must be of type bool"));
-                    }
-
-                    let else_if_block =
-                        check_type(&else_if.block, discovered_types, else_if_environment)?;
-                    let else_if_block_type = else_if_block.get_type();
-
-                    if !type_equals(&if_block_type, &else_if_block_type) {
-                        return Err(format!(
-                            "If block type {:?} does not match else if block type {:?}",
-                            if_block_type, else_if_block_type
-                        ));
-                    }
-
-                    else_if_condition_blocks.push(ConditionBlock {
-                        condition: Box::new(else_if_condition),
-                        block: Box::new(else_if_block),
-                    });
-                }
-            }
-
-            let else_block = if let Some(r#else) = r#else {
-                Some(check_type(r#else, discovered_types, if_else_environment)?)
+            let else_block = if let Some(false_expression) = false_expression {
+                Some(check_type(
+                    false_expression,
+                    discovered_types,
+                    if_else_environment,
+                )?)
             } else {
                 None
             };
 
             let else_type = else_block.clone().map(|e| e.get_type());
+            println!("1: {:?}", else_type);
+            let is_opt = !is_option(&else_type);
+            println!("2: {:?}", is_opt);
 
-            let type_ = if let Some(else_type) = else_type {
-                if !type_equals(&if_block_type, &else_type) {
-                    return Err(format!(
-                        "If block type {:?} does not match else block type {:?}",
-                        if_block_type, else_type
-                    ));
+            let type_ = if !is_option(&else_type) {
+                if let Some(else_type) = else_type {
+                    if !type_equals(&if_block_type, &else_type) {
+                        return Err(format!(
+                            "If block type {:?} does not match else block type {:?}",
+                            if_block_type, else_type
+                        ));
+                    }
+
+                    if_block_type.clone()
+                } else {
+                    Type::option_of(if_block_type.clone())
                 }
-
-                if_block_type.clone()
             } else {
                 Type::option_of(if_block_type.clone())
             };
 
+            println!("20: {:?}", type_);
+
             Ok(TypedExpression::If {
-                r#if: ConditionBlock {
-                    condition: Box::new(if_condition.clone()),
-                    block: Box::new(if_block.clone()),
-                },
-                else_ifs: else_if_condition_blocks,
-                r#else: else_block.map(|e| Box::new(e.clone())),
-                type_: type_,
+                condition: Box::new(if_condition.clone()),
+                true_expression: Box::new(if_block.clone()),
+                false_expression: else_block.map(|e| Box::new(e.clone())),
+                type_,
             })
         }
         Expression::Assignment(Assignment {
@@ -290,7 +268,7 @@ pub fn check_type<'a>(
 
                     Literal::Struct {
                         type_annotation: type_annotation.clone(),
-                        field_initializers: field_initializers,
+                        field_initializers,
                         type_,
                     }
                 }
@@ -742,6 +720,48 @@ pub fn check_type<'a>(
             })
         }
     }
+}
+
+fn is_option(type_: &Option<Type>) -> bool {
+    let Some(type_) = type_ else {
+        return false;
+    };
+
+    println!("2: {:?}", type_);
+
+    let Type::Enum(Enum {
+        type_identifier,
+        members,
+    }) = type_
+    else {
+        return false;
+    };
+
+    println!("3: {:?}", type_identifier);
+    println!("4: {:?}", members);
+
+    let TypeIdentifier::ConcreteType(name, ..) = type_identifier else {
+        return false;
+    };
+
+    println!("5: {:?}", name);
+
+    if name != "Option" {
+        return false;
+    }
+
+    return members.get("Some").map_or(false, |member| {
+        println!("6: {:?}", member);
+
+        let Type::EnumMember(EnumMember { fields, .. }) = member else {
+            return false;
+        };
+
+        return fields.get("f0").map_or(false, |field| {
+            println!("7: {:?}", field);
+            return true;
+        });
+    });
 }
 
 fn type_equals(left: &Type, right: &Type) -> bool {

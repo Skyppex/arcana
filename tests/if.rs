@@ -172,17 +172,3 @@ fn ifs_are_equals() {
     assert_eq!(value2, Value::Number(value::Number::Int(2)));
     assert_eq!(value, value2);
 }
-
-#[test]
-fn ifs_ast_are_equals() {
-    // Arrange
-    let input = "if false { 1 } else if true { 2 } else { 3 }";
-    let input2 = "if false { 1 } else { if true { 2 } else { 3 } }";
-
-    // Act
-    let typed_ast = create_typed_ast(input);
-    let typed_ast2 = create_typed_ast(input2);
-
-    // Assert
-    assert_eq!(typed_ast, typed_ast2);
-}

@@ -7,8 +7,8 @@ use crate::{
 
 use super::{
     cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call,
-    ConditionBlock, EnumMemberFieldInitializers, Expression, FieldInitializer, If, Index, Literal,
-    Member, Statement, Ternary, Unary, UnaryOperator, VariableDeclaration, While,
+    EnumMemberFieldInitializers, Expression, FieldInitializer, If, Index, Literal, Member,
+    Statement, Ternary, Unary, UnaryOperator, VariableDeclaration, While,
 };
 use crate::types::{can_be_type_annotation, parse_type_annotation};
 
@@ -586,43 +586,25 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.bump()?; // Consume the if
 
     let if_condition = parse_expression(cursor)?;
-    let if_block = parse_block(cursor)?;
+    let if_block = parse_expression(cursor)?;
 
-    let mut else_ifs = vec![];
     let mut r#else = None;
 
-    let mut else_reached = false;
-    while cursor.first().kind == TokenKind::Keyword(Keyword::Else) && !else_reached {
+    if cursor.first().kind == TokenKind::Keyword(Keyword::Else) {
         cursor.bump()?; // Consume the else
 
         if cursor.first().kind == TokenKind::Keyword(Keyword::If) {
-            cursor.bump()?; // Consume the if
-
-            let condition = parse_expression(cursor)?;
-            let block = parse_block(cursor)?;
-
-            else_ifs.push(ConditionBlock {
-                condition: Box::new(condition),
-                block: Box::new(block),
-            });
+            r#else = Some(Box::new(parse_if(cursor)?));
         } else {
             let block = parse_block(cursor)?;
             r#else = Some(Box::new(block));
-            else_reached = true;
         }
     }
 
     return Ok(Expression::If(If {
-        r#if: ConditionBlock {
-            condition: Box::new(if_condition),
-            block: Box::new(if_block),
-        },
-        else_ifs: if else_ifs.len() > 0 {
-            Some(else_ifs)
-        } else {
-            None
-        },
-        r#else,
+        condition: Box::new(if_condition),
+        true_expression: Box::new(if_block),
+        false_expression: r#else,
     }));
 }
 

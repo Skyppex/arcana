@@ -1,9 +1,5 @@
-struct A {
-    a: int
-}
-
-impl A {
-    func new(a: int): A {
-        return A { a: a };
-    }
+if 2 < 3 {
+    1
+} else if false {
+    5
 }
