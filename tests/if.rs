@@ -41,22 +41,31 @@ fn if_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(
-        expression.get_type(),
-        Type::Literal {
-            name: "1".to_owned(),
-            type_: Box::new(Type::Int)
-        }
-    );
+    assert_eq!(expression.get_type(), Type::Int);
 }
 
+#[test]
+fn if_has_correct_type_2() {
+    // Arrange
+    let input = "if true 1 else 2";
+
+    // Act
+    let typed_ast = create_typed_ast(input);
+
+    // Assert
+    let expression = typed_ast
+        .unwrap_program()
+        .nth_statement(0)
+        .unwrap_expression();
+
+    assert_eq!(expression.get_type(), Type::Int);
+}
 #[test]
 fn if_returns_if_block() {
     // Arrange
     let input = "if true { 1 } else { 2 }";
     // Act
     let value = evaluate_expression(input, create_env(), false);
-
     // Assert
     assert_eq!(value, Value::Number(value::Number::Int(1)));
 }

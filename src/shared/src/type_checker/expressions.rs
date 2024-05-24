@@ -87,7 +87,7 @@ pub fn check_type<'a>(
                 discovered_types,
                 if_else_environment.clone(),
             )?;
-            let if_block_type = if_block.get_type();
+            let if_block_type = if_block.get_deep_type();
 
             let else_block = if let Some(false_expression) = false_expression {
                 Some(check_type(
@@ -99,7 +99,7 @@ pub fn check_type<'a>(
                 None
             };
 
-            let else_type = else_block.clone().map(|e| e.get_type());
+            let else_type = else_block.clone().map(|e| e.get_deep_type());
             println!("1: {:?}", else_type);
             let is_opt = !is_option(&else_type);
             println!("2: {:?}", is_opt);
@@ -555,7 +555,7 @@ pub fn check_type<'a>(
                 ternary_environment,
             )?;
 
-            let Type::Bool = condition.get_type() else {
+            if !type_equals(&condition.get_type(), &Type::Bool) {
                 return Err(format!("Ternary condition must be of type bool"));
             };
 
@@ -589,7 +589,7 @@ pub fn check_type<'a>(
             for statement in statements_.clone() {
                 match statement {
                     TypedStatement::Expression(e) => {
-                        type_ = e.get_type();
+                        type_ = e.get_deep_type();
                     }
                     _ => continue,
                 }
