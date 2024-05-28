@@ -2,8 +2,10 @@ mod common;
 
 use common::{create_typed_ast, StatementExt, VecStatementExt};
 use interpreter::{value, Value};
-use shared::type_checker::ast::{Typed, TypedExpression};
-use shared::type_checker::Type;
+use shared::type_checker::{
+    ast::{Typed, TypedExpression},
+    Type,
+};
 
 use crate::common::{create_env, evaluate_expression};
 
