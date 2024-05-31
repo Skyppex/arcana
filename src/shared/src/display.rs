@@ -515,7 +515,7 @@ impl IndentDisplay for Expression {
                 indent.end_current();
                 result.push_str(
                     format!(
-                        "{}false expression: {}",
+                        "\n{}false expression: {}",
                         indent.dash_end(),
                         false_expression.indent_display(indent)
                     )
