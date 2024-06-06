@@ -233,7 +233,18 @@ impl TypeEnvironment {
                         .borrow()
                         .get_type_from_annotation(type_annotation, type_environment)
                 } else {
-                    Err(format!("Type {} not found", type_name))
+                    let mut split = type_name.split("::");
+                    let type_name = split.next().unwrap();
+                    let member_name = split.next().unwrap();
+
+                    if let Some(t) = self.types.get(&TypeIdentifier::MemberType(
+                        Box::new(TypeIdentifier::Type(type_name.to_owned())),
+                        member_name.to_owned(),
+                    )) {
+                        Ok(t.clone())
+                    } else {
+                        Err(format!("Type {} not found", type_name))
+                    }
                 }
             }
             TypeAnnotation::ConcreteType(type_name, concrete_types) => {

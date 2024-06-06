@@ -48,8 +48,8 @@ pub(crate) fn interactive() -> Result<(), String> {
         }
 
         if input.trim() == "types" {
-            for (.., type_) in type_environment.borrow().get_types() {
-                println!("{}", type_);
+            for (type_identifier, type_) in type_environment.borrow().get_types() {
+                println!("{} - {}", type_, type_identifier);
             }
             continue;
         }

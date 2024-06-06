@@ -228,6 +228,28 @@ pub(super) fn parse_type_annotation(
                 }
             }
 
+            if let TokenKind::Identifier(variant_name) = cursor.first().kind {
+                cursor.bump()?; // Consume the variant name
+
+                if cursor.first().kind == TokenKind::Less {
+                    cursor.bump()?; // Consume the <
+                    let generics = parse_comma_separated_type_annotations(cursor, |kind| {
+                        kind != TokenKind::Greater
+                    })?;
+
+                    cursor.bump()?; // Consume the >
+                    return Ok(TypeAnnotation::ConcreteType(
+                        format!("{}::{}", type_name, variant_name),
+                        generics,
+                    ));
+                }
+
+                return Ok(TypeAnnotation::Type(format!(
+                    "{}::{}",
+                    type_name, variant_name
+                )));
+            }
+
             if cursor.first().kind == TokenKind::Less {
                 cursor.bump()?; // Consume the <
                 let generics = parse_comma_separated_type_annotations(cursor, |kind| {

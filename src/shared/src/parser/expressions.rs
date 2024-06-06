@@ -199,12 +199,6 @@ fn parse_enum_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
 ) -> Result<Expression, String> {
-    let TokenKind::DoubleColon = cursor.first().kind else {
-        return Err(format!("Expected :: but found {:?}", cursor.first().kind));
-    };
-
-    cursor.bump()?; // Consume the ::
-
     let TokenKind::Identifier(member) = cursor.first().kind else {
         return Err(format!(
             "Expected identifier but found {:?}",
@@ -550,7 +544,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         ));
     }
 
-    let type_annotation = parse_type_annotation(cursor, false)?;
+    let type_annotation = parse_type_annotation(cursor, true)?;
 
     match cursor.first().kind {
         TokenKind::Equal => {
