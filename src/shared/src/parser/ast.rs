@@ -17,8 +17,6 @@ pub enum Statement {
     StructDeclaration(StructDeclaration),
     EnumDeclaration(EnumDeclaration),
     UnionDeclaration(UnionDeclaration),
-    TraitDeclaration(TraitDeclaration),
-    Impl(Impl),
     FunctionDeclaration(FunctionDeclaration),
     Semi(Box<Statement>),
     Break(Option<Expression>),
