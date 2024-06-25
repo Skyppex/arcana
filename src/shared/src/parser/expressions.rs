@@ -7,8 +7,8 @@ use crate::{
 
 use super::{
     cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call,
-    EnumMemberFieldInitializers, Expression, FieldInitializer, If, Index, Literal, Member,
-    Statement, Ternary, Unary, UnaryOperator, VariableDeclaration, While,
+    EnumMemberFieldInitializers, Expression, FieldInitializer, If, Literal, Member, Statement,
+    Ternary, Unary, UnaryOperator, VariableDeclaration, While,
 };
 use crate::types::{can_be_type_annotation, parse_type_annotation};
 
@@ -127,7 +127,7 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_assignment(cursor);
     };
 
-    let type_annotation = parse_type_annotation(cursor, true)?;
+    let type_annotation = parse_type_annotation(cursor)?;
 
     if cursor.first().kind == TokenKind::OpenBrace {
         parse_struct_literal(cursor, type_annotation)
@@ -550,7 +550,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         ));
     }
 
-    let type_annotation = parse_type_annotation(cursor, false)?;
+    let type_annotation = parse_type_annotation(cursor)?;
 
     match cursor.first().kind {
         TokenKind::Equal => {
@@ -638,10 +638,6 @@ fn parse_call_member(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_call_expression(member, cursor);
     }
 
-    if cursor.first().kind == TokenKind::OpenBracket {
-        return parse_index_expression(member, cursor);
-    }
-
     return Ok(member);
 }
 
@@ -683,23 +679,6 @@ fn parse_args_list(cursor: &mut Cursor) -> Result<Vec<Expression>, String> {
     }
 
     Ok(args)
-}
-
-fn parse_index_expression(caller: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
-    cursor.bump()?; // Consume the [
-    let argument = parse_expression(cursor)?;
-    cursor.bump()?; // Consume the ]
-
-    let mut index = Expression::Index(Index {
-        caller: Box::new(caller.clone()),
-        index: Box::new(argument),
-    });
-
-    if let TokenKind::OpenBracket = cursor.first().kind {
-        index = parse_index_expression(index, cursor)?;
-    }
-
-    return Ok(index);
 }
 
 fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {

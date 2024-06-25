@@ -199,19 +199,13 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
     }
 }
 
-pub(super) fn parse_type_annotation_from_str(
-    type_str: &str,
-    use_double_colon: bool,
-) -> Result<TypeAnnotation, String> {
+pub(super) fn parse_type_annotation_from_str(type_str: &str) -> Result<TypeAnnotation, String> {
     let tokens = crate::lexer::tokenize(type_str)?;
     let mut cursor = Cursor::new(tokens);
-    parse_type_annotation(&mut cursor, use_double_colon)
+    parse_type_annotation(&mut cursor)
 }
 
-pub(super) fn parse_type_annotation(
-    cursor: &mut Cursor,
-    use_double_colon: bool,
-) -> Result<TypeAnnotation, String> {
+pub(super) fn parse_type_annotation(cursor: &mut Cursor) -> Result<TypeAnnotation, String> {
     match cursor.first().kind {
         TokenKind::Literal(token::Literal::Unit) => {
             cursor.bump()?; // Consume the unit
@@ -220,21 +214,37 @@ pub(super) fn parse_type_annotation(
         TokenKind::Identifier(type_name) => {
             cursor.bump()?; // Consume the type identifier
 
-            if use_double_colon {
-                if cursor.first().kind == TokenKind::DoubleColon {
-                    cursor.bump()?; // Consume the ::
-                } else if cursor.first().kind == TokenKind::Less {
-                    return Err(format!("Expected :: but found {:?}", cursor.first().kind));
-                }
-            }
+            let mut generics = None;
 
             if cursor.first().kind == TokenKind::Less {
                 cursor.bump()?; // Consume the <
-                let generics = parse_comma_separated_type_annotations(cursor, |kind| {
+                generics = Some(parse_comma_separated_type_annotations(cursor, |kind| {
                     kind != TokenKind::Greater
-                })?;
+                })?);
 
                 cursor.bump()?; // Consume the >
+            }
+
+            if cursor.first().kind == TokenKind::DoubleColon {
+                cursor.bump()?; // Consume the ::
+
+                let TokenKind::Identifier(variant_name) = cursor.bump()?.kind else {
+                    return Err(format!(
+                        "Expected variant name but found {:?}",
+                        cursor.first().kind
+                    ));
+                };
+
+                let type_name = format!("{}::{}", type_name, variant_name);
+
+                if let Some(generics) = generics {
+                    return Ok(TypeAnnotation::ConcreteType(type_name, generics));
+                }
+
+                return Ok(TypeAnnotation::Type(type_name));
+            }
+
+            if let Some(generics) = generics {
                 return Ok(TypeAnnotation::ConcreteType(type_name, generics));
             }
 
@@ -243,7 +253,7 @@ pub(super) fn parse_type_annotation(
         TokenKind::OpenBracket => {
             cursor.bump()?; // Consume the [
 
-            let type_annotation = parse_type_annotation(cursor, false)?;
+            let type_annotation = parse_type_annotation(cursor)?;
 
             if cursor.first().kind != TokenKind::CloseBracket {
                 return Err(format!("Expected ] but found {:?}", cursor.first().kind));
@@ -266,7 +276,7 @@ fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(
     let mut types = Vec::new();
 
     while check(cursor.first().kind) {
-        let type_annotation = parse_type_annotation(cursor, false)?;
+        let type_annotation = parse_type_annotation(cursor)?;
         types.push(type_annotation);
 
         if cursor.first().kind == TokenKind::Comma {

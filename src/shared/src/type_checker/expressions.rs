@@ -13,8 +13,8 @@ use super::{
     },
     full_name,
     scope::ScopeType,
-    statements, DiscoveredType, Enum, EnumMember, EnumMemberField, FullName, Rcrc, Struct,
-    StructField, Type, TypeEnvironment, Union,
+    statements, DiscoveredType, Enum, EnumMember, FullName, Rcrc, Struct, Type, TypeEnvironment,
+    Union,
 };
 
 pub fn check_type<'a>(
@@ -249,16 +249,10 @@ pub fn check_type<'a>(
                     let field_initializers = field_initializers?;
 
                     for (field, initializer) in fields.iter().zip(field_initializers.iter()) {
-                        let Type::StructField(StructField { field_type, .. }) = field.1 else {
-                            return Err(format!(
-                                "Field type {} is not a struct field",
-                                field.1.full_name()
-                            ));
-                        };
-
+                        let field_type = field.1;
                         let initializer_type = initializer.initializer.get_type();
 
-                        if !type_equals(field_type.as_ref(), &initializer_type) {
+                        if !type_equals(field_type, &initializer_type) {
                             return Err(format!(
                                 "Field type {} does not match initializer type {}",
                                 field_type, initializer_type
@@ -341,18 +335,9 @@ pub fn check_type<'a>(
                             for ((_, field_type), (_, initializer)) in
                                 fields.iter().zip(field_initializers.iter())
                             {
-                                let Type::EnumMemberField(EnumMemberField { field_type, .. }) =
-                                    field_type
-                                else {
-                                    return Err(format!(
-                                        "Field type {} is not a enum member field",
-                                        field_type.full_name()
-                                    ));
-                                };
-
                                 let initializer_type = initializer.get_type();
 
-                                if !type_equals(field_type.as_ref(), &initializer_type) {
+                                if !type_equals(field_type, &initializer_type) {
                                     return Err(format!(
                                         "Field type {} does not match initializer type {}",
                                         field_type, initializer_type
@@ -367,18 +352,10 @@ pub fn check_type<'a>(
 
                             for (field, initializer) in fields.iter().zip(field_initializers.iter())
                             {
-                                let Type::EnumMemberField(EnumMemberField { field_type, .. }) =
-                                    field.1
-                                else {
-                                    return Err(format!(
-                                        "Field type {} is not a enum member field",
-                                        field.1.full_name()
-                                    ));
-                                };
-
+                                let field_type = field.1;
                                 let initializer_type = initializer.get_type();
 
-                                if !type_equals(field_type.as_ref(), &initializer_type) {
+                                if !type_equals(field_type, &initializer_type) {
                                     return Err(format!(
                                         "Field type {} does not match initializer type {}",
                                         field_type, initializer_type
@@ -459,29 +436,6 @@ pub fn check_type<'a>(
                     symbol: _,
                 } => todo!("Member access call"),
             }
-        }
-        Expression::Index(index) => {
-            let caller = check_type(&index.caller, discovered_types, type_environment.clone())?;
-            let caller_type = caller.clone().get_deep_type();
-
-            let Type::Array(type_) = caller_type else {
-                return Err(format!(
-                    "Index caller type {:?} is not an array",
-                    caller_type
-                ));
-            };
-
-            let index = check_type(&index.index, discovered_types, type_environment)?;
-
-            if !type_equals(&index.get_type(), &Type::UInt) {
-                return Err(format!("Index type {:?} is not a uint", index.get_type()));
-            }
-
-            Ok(TypedExpression::Index {
-                caller: Box::new(caller),
-                argument: Box::new(index),
-                type_: *type_.clone(),
-            })
         }
         Expression::Unary(unary) => {
             let expression = check_type(&unary.expression, discovered_types, type_environment)?;
@@ -766,10 +720,7 @@ fn is_option(type_: &Option<Type>) -> bool {
 
 fn type_equals(left: &Type, right: &Type) -> bool {
     match (left, right) {
-        (Type::Union(Union { literals, .. }), Type::Literal { .. }) => {
-            let x = literals.contains(right);
-            x
-        }
+        (Type::Union(Union { literals, .. }), Type::Literal { .. }) => literals.contains(right),
         (Type::Literal { .. }, Type::Union(_)) => type_equals(right, left),
         (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
             type_equals(type_, type_2)
@@ -816,10 +767,7 @@ fn check_type_member_access_recurse(
                     return Err(format!("Unexpected type: {}", field_type.full_name()));
                 }
 
-                let identifier_type = match field_type {
-                    Type::StructField(struct_field) => *struct_field.field_type.clone(),
-                    _ => field_type.clone(),
-                };
+                let identifier_type = field_type.clone();
 
                 Ok(TypedExpression::Member(Member::MemberAccess {
                     object: Box::new(object_type_expression),
@@ -837,13 +785,6 @@ fn check_type_member_access_recurse(
                 symbol: _,
             } => check_type_member_access(&object, discovered_types, type_environment, &member),
         },
-        Type::StructField(struct_field) => check_type_member_access_recurse(
-            *struct_field.field_type,
-            member,
-            type_environment,
-            object_type_expression,
-            discovered_types,
-        ),
         _ => Err("Member access is only supported on structs".to_string()),
     }
 }

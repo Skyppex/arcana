@@ -11,8 +11,8 @@ use crate::{
 use super::{
     cursor::Cursor,
     expressions::{self, parse_block_statements, parse_expression},
-    EnumDeclaration, EnumMember, EnumMemberField, Expression, FunctionDeclaration, Impl, Literal,
-    Parameter, Statement, StructDeclaration, StructField, TraitDeclaration, UnionDeclaration,
+    EnumDeclaration, EnumMember, EnumMemberField, Expression, FunctionDeclaration, Literal,
+    Parameter, Statement, StructDeclaration, StructField, UnionDeclaration,
 };
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
@@ -99,7 +99,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
             ));
         }
 
-        return_type = Some(parse_type_annotation(cursor, false)?);
+        return_type = Some(parse_type_annotation(cursor)?);
     }
 
     let body = parse_block_statements(cursor)?;
@@ -240,7 +240,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
-            return parse_trait_declaration_statement(cursor);
+            return parse_next(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -248,7 +248,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
-        return parse_trait_declaration_statement(cursor);
+        return parse_next(cursor);
     }
 
     cursor.bump()?; // Consume the union keyword
@@ -296,159 +296,6 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         access_modifier,
         type_identifier: TypeIdentifier::Type(type_name),
         literals: literals?,
-    }))
-}
-
-fn parse_trait_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
-    let mut access_modifier = None;
-
-    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
-        if cursor.second().kind != TokenKind::Keyword(Keyword::Trait) {
-            return parse_impl(cursor);
-        }
-
-        cursor.bump()?; // Consume the access modifier
-        access_modifier = Some(am);
-    }
-
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Trait) {
-        return parse_impl(cursor);
-    }
-
-    let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-        return Err(format!(
-            "Expected identifier but found {:?}",
-            cursor.prev().kind
-        ));
-    };
-
-    let TokenKind::OpenBrace = cursor.bump()?.kind else {
-        return Err(format!("Expected {{ but found {:?}", cursor.prev().kind));
-    };
-
-    let mut associated_types = vec![];
-
-    while cursor.first().kind == TokenKind::Keyword(Keyword::Type) {
-        cursor.bump()?; // Consume the type keyword
-
-        let associated_type = parse_type_identifier(cursor, false)?;
-
-        let TokenKind::Semicolon = cursor.bump()?.kind else {
-            return Err(format!("Expected ; but found {:?}", cursor.prev().kind));
-        };
-
-        associated_types.push(associated_type);
-    }
-
-    let mut functions = vec![];
-
-    while cursor.first().kind != TokenKind::CloseBrace {
-        let function_declaration_statement = parse_function_declaration_statement(cursor)?;
-
-        let Statement::FunctionDeclaration(function_declaration) =
-            function_declaration_statement.clone()
-        else {
-            return Err(format!(
-                "Expected function declaration but found {:?}",
-                function_declaration_statement
-            ));
-        };
-
-        functions.push(function_declaration);
-    }
-
-    cursor.bump()?; // Consume the }
-
-    Ok(Statement::TraitDeclaration(TraitDeclaration {
-        access_modifier,
-        type_identifier: TypeIdentifier::Type(type_name),
-        associated_types,
-        functions: functions,
-    }))
-}
-
-// fn parse_flags_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
-//     let mut access_modifier = None;
-
-//     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
-//         if cursor.second().kind != TokenKind::Keyword(Keyword::Flags) {
-//             return parse_print(cursor);
-//         }
-
-//         cursor.bump()?; // Consume the access modifier
-//         access_modifier = Some(am);
-//     }
-
-//     if cursor.first().kind != TokenKind::Keyword(Keyword::Flags) {
-//         return parse_print(cursor);
-//     }
-
-//     cursor.bump()?; // Consume the flags keyword
-
-//     let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-//         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-//     };
-
-//     let TokenKind::OpenBrace = cursor.bump()?.kind else {
-//         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
-//     };
-
-//     let mut members = vec![];
-//     let mut has_comma = true;
-
-//     while cursor.first().kind != TokenKind::CloseBrace {
-//         if !has_comma {
-//             return Err(format!("Expected , but found {:?}", cursor.first().kind));
-//         }
-
-//         has_comma = true;
-//         members.push(parse_flags_member(cursor)?);
-
-//         if cursor.first().kind == TokenKind::Comma {
-//             cursor.bump()?; // Consume the ,
-//         } else {
-//             has_comma = false;
-//         }
-//     }
-
-//     cursor.bump()?; // Consume the }
-
-//     Ok(Statement::FlagsDeclaration(FlagsDeclaration {
-//         access_modifier,
-//         type_name,
-//         members,
-//     }))
-// }
-
-fn parse_impl(cursor: &mut Cursor) -> Result<Statement, String> {
-    let TokenKind::Keyword(Keyword::Impl) = cursor.first().kind else {
-        return parse_next(cursor);
-    };
-
-    cursor.bump()?; // Consume the impl
-
-    if !can_be_type_annotation(cursor) {
-        return Err(format!(
-            "Expected type annotation but found {:?}",
-            cursor.first().kind
-        ));
-    }
-
-    let type_annotation = parse_type_annotation(cursor, false)?;
-    let methods = parse_block_statements(cursor)?;
-
-    for method in methods.iter() {
-        if !matches!(method, Statement::FunctionDeclaration(_)) {
-            return Err(format!(
-                "Expected function declaration but found {:?}",
-                method
-            ));
-        }
-    }
-
-    Ok(Statement::Impl(Impl {
-        type_annotation,
-        functions: methods,
     }))
 }
 
@@ -537,7 +384,7 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
         ));
     }
 
-    let type_anntation = parse_type_annotation(cursor, false)?;
+    let type_anntation = parse_type_annotation(cursor)?;
 
     Ok(Parameter {
         identifier,
@@ -579,7 +426,7 @@ fn parse_struct_field(cursor: &mut Cursor) -> Result<StructField, String> {
         ));
     }
 
-    let type_annotation = parse_type_annotation(cursor, false)?;
+    let type_annotation = parse_type_annotation(cursor)?;
 
     Ok(StructField {
         access_modifier,
@@ -653,7 +500,7 @@ fn parse_enum_field(cursor: &mut Cursor, field_position: usize) -> Result<EnumMe
                 ));
             }
 
-            let type_annotation = parse_type_annotation(cursor, false)?;
+            let type_annotation = parse_type_annotation(cursor)?;
 
             Ok(EnumMemberField {
                 identifier: first_ident,
@@ -663,7 +510,7 @@ fn parse_enum_field(cursor: &mut Cursor, field_position: usize) -> Result<EnumMe
         _ => {
             return Ok(EnumMemberField {
                 identifier: format!("f{}", field_position.to_string()),
-                type_annotation: parse_type_annotation_from_str(&first_ident, false)?,
+                type_annotation: parse_type_annotation_from_str(&first_ident)?,
             });
         }
     }

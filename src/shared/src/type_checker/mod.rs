@@ -180,10 +180,8 @@ pub enum Type {
     Bool,
     Array(Box<Type>),
     Struct(Struct),
-    StructField(StructField),
     Enum(Enum),
     EnumMember(EnumMember),
-    EnumMemberField(EnumMemberField),
     Union(Union),
     Trait(Trait),
     Function(Function),
@@ -207,9 +205,6 @@ impl Type {
         let some_member_ident =
             TypeIdentifier::MemberType(Box::new(option_ident.clone()), "Some".to_string());
 
-        let some_member_field_ident =
-            TypeIdentifier::MemberType(Box::new(some_member_ident.clone()), "f0".to_string());
-
         let none_member_ident =
             TypeIdentifier::MemberType(Box::new(option_ident.clone()), "None".to_string());
 
@@ -223,13 +218,8 @@ impl Type {
                         discriminant_name: "Some".to_string(),
                         fields: vec![(
                             "f0".to_string(),
-                            Type::EnumMemberField(EnumMemberField {
-                                enum_name: some_member_field_ident,
-                                discriminant_name: "Some".to_string(),
-                                field_name: "f0".to_string(),
-                                field_type: Box::new(Type::Generic(GenericType {
-                                    type_name: "T".to_string(),
-                                })),
+                            Type::Generic(GenericType {
+                                type_name: "T".to_string(),
                             }),
                         )]
                         .into_iter()
@@ -351,20 +341,10 @@ impl Type {
             Type::Char => TypeIdentifier::Type("char".to_string()),
             Type::Bool => TypeIdentifier::Type("bool".to_string()),
             Type::Struct(s) => s.type_identifier.clone(),
-            Type::StructField(sf) => {
-                TypeIdentifier::MemberType(Box::new(sf.struct_name.clone()), sf.field_name.clone())
-            }
             Type::Enum(u) => u.type_identifier.clone(),
             Type::EnumMember(um) => TypeIdentifier::MemberType(
                 Box::new(um.enum_name.clone()),
                 um.discriminant_name.clone(),
-            ),
-            Type::EnumMemberField(umf) => TypeIdentifier::MemberType(
-                Box::new(TypeIdentifier::MemberType(
-                    Box::new(umf.enum_name.clone()),
-                    umf.discriminant_name.clone(),
-                )),
-                umf.field_name.clone(),
             ),
             Type::Union(u) => u.type_identifier.clone(),
             Type::Function(f) => f.identifier.clone(),
@@ -417,21 +397,9 @@ impl Type {
 
                 let mut fields = HashMap::new();
 
-                for (_, type_) in s.fields.iter() {
-                    let Type::StructField(StructField {
-                        struct_name: _,
-                        field_name,
-                        field_type,
-                    }) = type_
-                    else {
-                        return Err(format!(
-                            "Struct fields are not of type StructField {}",
-                            type_.full_name()
-                        ));
-                    };
-
-                    let Type::Generic(generic) = *field_type.clone() else {
-                        fields.insert(field_name.clone(), type_.clone());
+                for (field_name, field_type) in s.fields.iter() {
+                    let Type::Generic(generic) = field_type.clone() else {
+                        fields.insert(field_name.clone(), field_type.clone());
                         continue;
                     };
 
@@ -480,22 +448,9 @@ impl Type {
 
                     let mut fields = HashMap::new();
 
-                    for (_, type_) in u.fields.iter() {
-                        let Type::EnumMemberField(EnumMemberField {
-                            enum_name: _,
-                            discriminant_name: _,
-                            field_name,
-                            field_type,
-                        }) = type_
-                        else {
-                            return Err(format!(
-                                "Enum member fields are not of type EnumMemberField {}",
-                                type_.full_name()
-                            ));
-                        };
-
-                        let Type::Generic(generic) = *field_type.clone() else {
-                            fields.insert(field_name.clone(), type_.clone());
+                    for (field_name, field_type) in u.fields.iter() {
+                        let Type::Generic(generic) = field_type else {
+                            fields.insert(field_name.clone(), field_type.clone());
                             continue;
                         };
 
@@ -510,15 +465,7 @@ impl Type {
                             type_environment.clone(),
                         )?;
 
-                        fields.insert(
-                            field_name.clone(),
-                            Type::EnumMemberField(EnumMemberField {
-                                enum_name: type_identifier.clone(),
-                                discriminant_name: u.discriminant_name.clone(),
-                                field_name: field_name.clone(),
-                                field_type: Box::new(concrete_type),
-                            }),
-                        );
+                        fields.insert(field_name.clone(), concrete_type);
                     }
 
                     let member_type = Type::EnumMember(EnumMember {
@@ -562,10 +509,8 @@ impl FullName for Type {
             Type::Bool => "bool".to_string(),
             Type::Array(t) => format!("[{}]", t.full_name()),
             Type::Struct(s) => s.full_name(),
-            Type::StructField(sf) => sf.full_name(),
             Type::Enum(u) => u.full_name(),
             Type::EnumMember(um) => um.full_name(),
-            Type::EnumMemberField(umf) => umf.full_name(),
             Type::Union(u) => u.full_name(),
             Type::Function(f) => f.full_name(),
             Type::Literal { name, type_ } => format!("#{}: {}", type_.full_name(), name),

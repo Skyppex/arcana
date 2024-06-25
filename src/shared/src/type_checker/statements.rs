@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    parser::{self, Impl, Statement, UnionDeclaration},
-    types::{GenericType, TypeAnnotation, TypeIdentifier},
+    parser::{self, Statement, UnionDeclaration},
+    types::{TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
@@ -66,37 +66,6 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .map(|literal| TypeAnnotation::Literal(Box::new(literal.clone())))
                 .collect(),
         )]),
-        Statement::TraitDeclaration(parser::TraitDeclaration {
-            access_modifier: _,
-            type_identifier,
-            associated_types,
-            functions,
-        }) => {
-            let mut discovered_types = vec![];
-
-            let trait_type = DiscoveredType::Trait(
-                type_identifier.clone(),
-                associated_types.iter().cloned().collect(),
-                functions.iter().map(|f| f.identifier.clone()).collect(),
-            );
-
-            discovered_types.push(trait_type);
-            Ok(discovered_types)
-        }
-        // Statement::FlagsDeclaration(parser::FlagsDeclaration {
-        //     access_modifier: _,
-        //     type_name,
-        //     members
-        // }) => Ok(vec![]),
-        Statement::Impl(Impl {
-            functions: methods, ..
-        }) => {
-            let mut discovered_types = vec![];
-            for method in methods {
-                discovered_types.append(&mut discover_user_defined_types(method)?);
-            }
-            Ok(discovered_types)
-        }
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             identifier,
@@ -197,11 +166,7 @@ pub fn check_type<'a>(
                 .clone()?
                 .iter()
                 .map(|f: &ast::StructField| {
-                    let struct_field = Type::StructField(StructField {
-                        struct_name: type_identifier.clone(),
-                        field_name: f.identifier.clone(),
-                        field_type: Box::new(f.type_.clone()),
-                    });
+                    let struct_field = f.type_.clone();
 
                     match type_environment.borrow_mut().add_type(struct_field.clone()) {
                         Ok(_) => Ok((f.identifier.clone(), struct_field)),
@@ -270,12 +235,7 @@ pub fn check_type<'a>(
                         .map(|f| {
                             let field_name = f.identifier.clone();
 
-                            let enum_member_field = Type::EnumMemberField(EnumMemberField {
-                                enum_name: type_identifier.clone(),
-                                discriminant_name: member.identifier.clone(),
-                                field_name: field_name.clone(),
-                                field_type: Box::new(f.type_.clone()),
-                            });
+                            let enum_member_field = f.type_.clone();
 
                             match type_environment
                                 .borrow_mut()
@@ -385,133 +345,6 @@ pub fn check_type<'a>(
                     .map(|l| TypeAnnotation::Literal(Box::new(l.clone())))
                     .collect(),
                 type_,
-            })
-        }
-        Statement::TraitDeclaration(parser::TraitDeclaration {
-            access_modifier: _,
-            type_identifier,
-            associated_types,
-            functions: _,
-        }) => {
-            let trait_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
-                type_environment.clone(),
-            )));
-
-            for associated_type in associated_types {
-                trait_type_environment
-                    .borrow_mut()
-                    .add_type(Type::Generic(GenericType {
-                        type_name: associated_type.name().to_string(),
-                    }))?;
-            }
-
-            let associated_types = associated_types
-                .iter()
-                .map(|ti| {
-                    let check_type_identifier =
-                        check_type_identifier(ti, discovered_types, type_environment.clone());
-                    (ti.name().to_string(), check_type_identifier)
-                })
-                .collect::<HashMap<String, Result<Type, String>>>();
-
-            let values: Result<Vec<Type>, String> =
-                associated_types.clone().into_values().map(|r| r).collect();
-
-            let values = values?;
-
-            let associated_types = associated_types
-                .into_iter()
-                .zip(values)
-                .map(|((k, _), v)| (k, v.clone()))
-                .collect::<HashMap<String, Type>>();
-
-            let type_ = Type::Trait(Trait {
-                type_identifier: type_identifier.clone(),
-                associated_types,
-                functions: Vec::new(),
-            });
-
-            type_environment.borrow_mut().add_type(type_.clone())?;
-
-            Ok(TypedStatement::None)
-        }
-        // Statement::FlagsDeclaration(parser::FlagsDeclaration {
-        //     access_modifier: _,
-        //     type_name,
-        //     members
-        // }) => {
-        //     todo!("Flags declaration")
-        //     // let ms: Result<Vec<ast::FlagsMember>, String> = members.iter()
-        //     //     .map(|member| {
-        //     //         Ok(ast::FlagsMember {
-        //     //             identifier: member.identifier.clone(),
-        //     //             value: ast::FlagsValue::Default
-        //     //         })
-        //     //     })
-        //     //     .collect();
-
-        //     // let flags = Type::Flags(Enum {
-        //     //     name: type_name.clone(),
-        //     //     members: ms.clone()?
-        //     //         .iter()
-        //     //         .map(|m| (m.identifier.clone(), Type::FlagsMember(EnumMember {
-        //     //             enum_name: type_name.clone(),
-        //     //             discriminant_name: m.identifier.clone(),
-        //     //             fields: HashMap::new()
-        //     //         })))
-        //     //         .collect()
-        //     // });
-
-        //     // type_environment.add_type(flags.clone())?;
-
-        //     // Ok(TypedStatement::FlagsDeclaration {
-        //     //     type_name: type_name.clone(),
-        //     //     members: ms?,
-        //     //     type_: flags
-        //     // })
-        // },
-        Statement::Impl(parser::Impl {
-            type_annotation,
-            functions,
-        }) => {
-            let mut typed_functions = vec![];
-
-            for function in functions {
-                let typed_function =
-                    check_type(function, discovered_types, type_environment.clone())?;
-
-                let TypedStatement::FunctionDeclaration {
-                    identifier,
-                    parameters,
-                    return_type,
-                    body: _,
-                    type_: _,
-                } = typed_function.clone()
-                else {
-                    return Err("Impl method must be a function".to_string());
-                };
-
-                typed_functions.push(typed_function);
-
-                let function_type = Type::Function(Function {
-                    identifier: identifier.clone(),
-                    parameters: parameters
-                        .iter()
-                        .map(|p| (p.identifier.clone(), p.type_.clone()))
-                        .collect(),
-                    return_type: Box::new(return_type.clone()),
-                });
-
-                type_environment.borrow_mut().add_impl_function(
-                    type_annotation.clone(),
-                    identifier.clone(),
-                    function_type.clone(),
-                )?;
-            }
-
-            Ok(TypedStatement::Impl {
-                type_annotation: type_annotation.clone(),
-                functions: typed_functions,
             })
         }
         Statement::FunctionDeclaration(parser::FunctionDeclaration {

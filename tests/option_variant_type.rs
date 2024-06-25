@@ -2,10 +2,11 @@ mod common;
 
 use std::collections::HashMap;
 
-use common::{create_typed_ast, StatementExt, VecStatementExt};
+use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
+use interpreter::{environment, evaluate, value::EnumFields, Value};
 use shared::{
-    type_checker::{ast::Typed, EnumMember, EnumMemberField, Type},
+    type_checker::{ast::Typed, EnumMember, Type},
     types::TypeIdentifier,
 };
 
@@ -13,12 +14,12 @@ use shared::{
 fn enum_variant_can_be_used_as_a_type() {
     // Arrange
     let input = r#"
-        enum Option {
-            Some(x: int),
-            None
+        enum O {
+            S(x: int),
+            N
         }
 
-        let x: Option::Some; 
+        let x: O::S; 
         "#;
 
     // Act
@@ -34,17 +35,42 @@ fn enum_variant_can_be_used_as_a_type() {
     assert_eq!(
         expression.get_type(),
         Type::EnumMember(EnumMember {
-            enum_name: TypeIdentifier::Type("Option".to_owned()),
-            discriminant_name: "Some".to_owned(),
-            fields: HashMap::from([(
-                "x".to_owned(),
-                Type::EnumMemberField(EnumMemberField {
-                    enum_name: TypeIdentifier::Type("Option".to_owned()),
-                    discriminant_name: "Some".to_owned(),
-                    field_name: "x".to_owned(),
-                    field_type: Box::new(Type::Int)
-                })
-            )])
+            enum_name: TypeIdentifier::Type("O".to_owned()),
+            discriminant_name: "S".to_owned(),
+            fields: HashMap::from([("x".to_owned(), Type::Int)])
         })
     )
+}
+
+#[test]
+fn enum_variant_can_be_assigned_to_variable_with_variant_type() {
+    // Arrange
+    let input = r#"
+        enum O {
+            S(x: int),
+            N
+        }
+
+        let x: O::S = O::S(x: 1);
+        "#;
+
+    let environment = create_env();
+
+    // Act
+    let value = evaluate_expression(input, environment, true);
+
+    // Assert
+    assert_eq!(
+        value,
+        Value::Enum {
+            enum_member: interpreter::value::EnumMember {
+                enum_name: shared::types::TypeAnnotation::Type("O".to_string()),
+                member_name: "S".to_string(),
+            },
+            fields: EnumFields::Named(HashMap::from([(
+                "x".to_string(),
+                Value::Number(interpreter::value::Number::Int(1))
+            )]))
+        }
+    );
 }

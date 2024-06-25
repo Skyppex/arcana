@@ -2,7 +2,7 @@ use crate::{
     parser::{
         AccessModifier, Assignment, Binary, BinaryOperator, Call, EnumDeclaration, EnumMember,
         EnumMemberField, EnumMemberFieldInitializers, Expression, FieldInitializer, FlagsMember,
-        FunctionDeclaration, If, Index, Literal, Member, Parameter, Statement, StructDeclaration,
+        FunctionDeclaration, If, Literal, Member, Parameter, Statement, StructDeclaration,
         StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, VariableDeclaration, While,
     },
     type_checker::{
@@ -256,76 +256,6 @@ impl IndentDisplay for Statement {
             //     indent.decrease();
             //     result
             // },
-            Statement::TraitDeclaration(trait_declaration) => {
-                let mut result = String::new();
-                result.push_str("<trait declaration>\n");
-                indent.increase();
-                result.push_str(
-                    format!(
-                        "{}type_name: {}\n",
-                        indent.dash(),
-                        trait_declaration.type_identifier.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-
-                for (i, function_declaration) in trait_declaration.functions.iter().enumerate() {
-                    if i < trait_declaration.functions.len() - 1 {
-                        result.push_str(
-                            format!(
-                                "\n{}{},",
-                                indent.dash(),
-                                function_declaration.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!(
-                                "\n{}{}",
-                                indent.dash_end(),
-                                function_declaration.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    }
-                }
-
-                indent.decrease();
-                result
-            }
-            Statement::Impl(impl_) => {
-                let mut result = String::new();
-                result.push_str("<impl>\n");
-                indent.increase();
-                result.push_str(
-                    format!(
-                        "{}type_annotation: {}",
-                        indent.dash(),
-                        impl_.type_annotation.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-
-                for (i, function) in impl_.functions.iter().enumerate() {
-                    if i < impl_.functions.len() - 1 {
-                        result.push_str(
-                            format!("\n{}{},", indent.dash(), function.indent_display(indent))
-                                .as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!("\n{}{}", indent.dash_end(), function.indent_display(indent))
-                                .as_str(),
-                        );
-                    }
-                }
-
-                indent.decrease();
-                result
-            }
             Statement::FunctionDeclaration(function_declaration) => {
                 function_declaration.indent_display(indent)
             }
@@ -584,29 +514,6 @@ impl IndentDisplay for Expression {
                     }
                 }
 
-                indent.decrease();
-                result
-            }
-            Expression::Index(Index { caller, index }) => {
-                let mut result = String::new();
-                result.push_str("<index>\n");
-                indent.increase_leaf();
-                result.push_str(
-                    format!(
-                        "{}caller: {}\n",
-                        indent.dash(),
-                        caller.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                result.push_str(
-                    format!(
-                        "{}index: {}",
-                        indent.dash_end(),
-                        index.indent_display(indent)
-                    )
-                    .as_str(),
-                );
                 indent.decrease();
                 result
             }

@@ -226,7 +226,22 @@ impl TypeEnvironment {
     ) -> Result<Type, String> {
         match type_annotation {
             TypeAnnotation::Type(type_name) => {
+                println!("type_name: {:?}", type_name);
+                println!("types.keys: {:?}", self.types.keys());
                 if let Some(t) = self.types.get(&TypeIdentifier::Type(type_name.clone())) {
+                    Ok(t.clone())
+                } else if type_name.contains("::") {
+                    let parts: Vec<&str> = type_name.split("::").collect();
+                    let type_name = parts[0];
+                    let variant_name = parts[1];
+
+                    let Some(t) = self.types.get(&TypeIdentifier::MemberType(
+                        Box::new(TypeIdentifier::Type(type_name.to_string())),
+                        variant_name.to_string(),
+                    )) else {
+                        return Err(format!("Type {} not found", type_name));
+                    };
+
                     Ok(t.clone())
                 } else if let Some(parent) = &self.parent {
                     parent

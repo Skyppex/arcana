@@ -13,7 +13,7 @@ pub fn create_typed_ast(input: &str) -> TypedStatement {
     let tokens = lexer::tokenize(input).unwrap();
     let ast = parser::create_ast(tokens).unwrap();
     let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new()));
-    
+
     type_checker::create_typed_ast(ast, type_environment).unwrap()
 }
 
@@ -26,7 +26,12 @@ pub fn evaluate_expression(
     let ast = parser::create_ast(tokens).unwrap();
     let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new()));
     let typed_ast = type_checker::create_typed_ast(ast, type_environment).unwrap();
-    interpreter::evaluate(typed_ast, environment).unwrap()
+
+    if unwrap_semi {
+        interpreter::evaluate(typed_ast.unwrap_semi(), environment).unwrap()
+    } else {
+        interpreter::evaluate(typed_ast, environment).unwrap()
+    }
 }
 
 pub trait StatementExt {

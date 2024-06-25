@@ -4,12 +4,6 @@ use std::{collections::HashMap, fmt::Display};
 use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Impl {
-    pub type_annotation: TypeAnnotation,
-    pub functions: Vec<Statement>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Program {
         statements: Vec<Statement>,
@@ -40,7 +34,6 @@ pub enum Expression {
     Member(Member),
     Literal(Literal),
     Call(Call),
-    Index(Index),
     Unary(Unary),
     Binary(Binary),
     Ternary(Ternary),
@@ -71,21 +64,6 @@ pub struct UnionDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
     pub literals: Vec<Literal>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TraitDeclaration {
-    pub access_modifier: Option<AccessModifier>,
-    pub type_identifier: TypeIdentifier,
-    pub associated_types: Vec<TypeIdentifier>,
-    pub functions: Vec<FunctionDeclaration>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct FlagsDeclaration {
-    pub access_modifier: Option<AccessModifier>,
-    pub type_identifier: TypeIdentifier,
-    pub members: Vec<FlagsMember>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -273,12 +251,6 @@ pub struct Assignment {
 pub struct Call {
     pub caller: Box<Expression>,
     pub arguments: Vec<Expression>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Index {
-    pub caller: Box<Expression>,
-    pub index: Box<Expression>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
