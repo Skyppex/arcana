@@ -1,6 +1,8 @@
 use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
+use crate::display::{Indent, IndentDisplay};
+use crate::pretty_print::PrettyPrint;
 use crate::{
     parser,
     types::{GenericConstraint, TypeAnnotation, TypeIdentifier},
@@ -100,6 +102,13 @@ impl Typed for TypedStatement {
             TypedStatement::Expression(e) => e.get_deep_type(),
             TypedStatement::Print(e) => e.get_deep_type(),
         }
+    }
+}
+
+impl PrettyPrint for TypedStatement {
+    fn prettify(&self) -> String {
+        let mut indent = Indent::new();
+        self.indent_display(&mut indent)
     }
 }
 
@@ -351,6 +360,13 @@ impl Typed for TypedExpression {
             TypedExpression::Loop(Block { type_, .. }) => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
         }
+    }
+}
+
+impl PrettyPrint for TypedExpression {
+    fn prettify(&self) -> String {
+        let mut indent = Indent::new();
+        self.indent_display(&mut indent)
     }
 }
 

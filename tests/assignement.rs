@@ -70,7 +70,7 @@ fn assignment_returns_assigned_value() {
     "#;
 
     // Act
-    let value = evaluate_expression(input, create_env(), true);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::Number(value::Number::Int(1)));

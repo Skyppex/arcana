@@ -3,12 +3,9 @@ mod common;
 use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
 use interpreter::{value, Value};
-use shared::{
-    type_checker::{
-        ast::{Member, Typed, TypedExpression},
-        StructField, Type,
-    },
-    types::TypeIdentifier,
+use shared::type_checker::{
+    ast::{Member, Typed, TypedExpression},
+    Type,
 };
 
 use crate::common::create_env;
@@ -98,14 +95,7 @@ fn member_access_has_correct_type() {
         .nth_statement(2)
         .unwrap_expression();
 
-    assert_eq!(
-        expression.get_type(),
-        Type::StructField(StructField {
-            struct_name: TypeIdentifier::Type("A".to_owned()),
-            field_name: "a".to_owned(),
-            field_type: Box::new(Type::Int)
-        })
-    );
+    assert_eq!(expression.get_type(), Type::Int);
 }
 
 #[test]

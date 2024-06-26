@@ -2,12 +2,22 @@ use std::fmt::Display;
 
 use num_traits::int::PrimInt;
 
-use crate::parser::AccessModifier;
+use crate::{parser::AccessModifier, pretty_print::PrettyPrint};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
     pub length: u32,
+}
+
+impl<T: IntoIterator<Item = Token> + Clone> PrettyPrint for T {
+    fn prettify(&self) -> String {
+        self.clone()
+            .into_iter()
+            .map(|token| format!("{:?} -> {}", token.kind, token.length))
+            .collect::<Vec<String>>()
+            .join("\n")
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

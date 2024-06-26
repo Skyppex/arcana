@@ -9,8 +9,8 @@ use crate::mage_args::MageArgs;
 use interpreter::Environment;
 
 use shared::{
-    display::{Indent, IndentDisplay},
     parser::create_ast,
+    pretty_print::PrettyPrint,
     type_checker::{create_typed_ast, TypeEnvironment},
 };
 
@@ -69,25 +69,23 @@ pub fn read_input(
     type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>,
 ) -> Result<(), String> {
-    const PRINT_TOKENS: bool = false;
+    const PRINT_TOKENS: bool = true;
     const PRINT_PARSER_AST: bool = true;
     const PRINT_TYPE_CHECKER_AST: bool = true;
 
     let tokens = shared::lexer::tokenize(&input)?;
     if PRINT_TOKENS {
-        eprintln!("{:?}\n", tokens);
+        eprintln!("{}\n", tokens.prettify());
     }
 
     let program = create_ast(tokens)?;
     if PRINT_PARSER_AST {
-        let mut indent = Indent::new();
-        eprintln!("{}\n", program.indent_display(&mut indent));
+        eprintln!("{}\n", program.prettify());
     }
 
     let typed_program = create_typed_ast(program, type_environment)?;
     if PRINT_TYPE_CHECKER_AST {
-        let mut indent = Indent::new();
-        eprintln!("{}\n", typed_program.indent_display(&mut indent));
+        eprintln!("{}\n", typed_program.prettify());
     }
 
     let result = interpreter::evaluate(typed_program, environment)?;

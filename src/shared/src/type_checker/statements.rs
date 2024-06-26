@@ -11,7 +11,7 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    Enum, EnumMember, EnumMemberField, Function, Rcrc, Struct, StructField, Trait, Type, Union,
+    Enum, EnumMember, Function, Rcrc, Struct, Trait, Type, Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {

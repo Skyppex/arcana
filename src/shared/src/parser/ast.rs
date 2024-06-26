@@ -1,6 +1,8 @@
 use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
+use crate::display::{Indent, IndentDisplay};
+use crate::pretty_print::PrettyPrint;
 use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,6 +22,13 @@ pub enum Statement {
 
     #[cfg(feature = "interpreter")]
     Print(Expression),
+}
+
+impl PrettyPrint for Statement {
+    fn prettify(&self) -> String {
+        let mut indent = Indent::new();
+        self.indent_display(&mut indent)
+    }
 }
 
 type Block = Vec<Statement>;
@@ -42,6 +51,13 @@ pub enum Expression {
     While(While),
     #[cfg(feature = "interpreter")]
     Drop(String),
+}
+
+impl PrettyPrint for Expression {
+    fn prettify(&self) -> String {
+        let mut indent = Indent::new();
+        self.indent_display(&mut indent)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
