@@ -508,7 +508,6 @@ fn check_type_identifier(
             DiscoveredType::Struct(name, ..) => name == type_identifier,
             DiscoveredType::Enum(name, ..) => name == type_identifier,
             DiscoveredType::Union(name, ..) => name == type_identifier,
-            DiscoveredType::Trait(name, ..) => name == type_identifier,
             DiscoveredType::Function(name, ..) => name == type_identifier,
         }) {
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
@@ -594,34 +593,6 @@ fn check_type_identifier(
                 literals: literal_types,
             }))
         }
-        Some(DiscoveredType::Trait(type_identifier, associated_types, functions)) => {
-            let associated_types = associated_types
-                .iter()
-                .map(|ti| {
-                    (
-                        ti.name().to_string(),
-                        check_type_identifier(ti, discovered_types, type_environment.clone()),
-                    )
-                })
-                .collect::<HashMap<String, Result<Type, String>>>();
-
-            let values: Result<Vec<Type>, String> =
-                associated_types.clone().into_values().map(|r| r).collect();
-
-            let values = values?;
-
-            let associated_types = associated_types
-                .into_iter()
-                .zip(values)
-                .map(|((k, _), v)| (k, v.clone()))
-                .collect::<HashMap<String, Type>>();
-
-            Ok(Type::Trait(Trait {
-                type_identifier: type_identifier.clone(),
-                associated_types,
-                functions: functions.clone(),
-            }))
-        }
         Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {
             Ok(Type::Function(Function {
                 identifier: type_identifier.clone(),
@@ -675,9 +646,6 @@ pub fn check_type_annotation(
                 type_identifier.name() == type_annotation.name()
             }
             DiscoveredType::Union(type_identifier, ..) => {
-                type_identifier.name() == type_annotation.name()
-            }
-            DiscoveredType::Trait(type_identifier, ..) => {
                 type_identifier.name() == type_annotation.name()
             }
             DiscoveredType::Function(type_identifier, ..) => {
@@ -767,11 +735,6 @@ pub fn check_type_annotation(
                 literals: literal_types,
             }))
         }
-        Some(DiscoveredType::Trait(type_identifier, ..)) => Ok(Type::Trait(Trait {
-            type_identifier: type_identifier.clone(),
-            associated_types: HashMap::new(),
-            functions: Vec::new(),
-        })),
         Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {
             Ok(Type::Function(Function {
                 identifier: type_identifier.clone(),
