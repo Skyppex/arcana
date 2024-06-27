@@ -11,7 +11,7 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    Enum, EnumMember, Function, Rcrc, Struct, Trait, Type, Union,
+    Enum, EnumMember, Function, Rcrc, Struct, Type, Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -165,14 +165,7 @@ pub fn check_type<'a>(
             let field_types: Result<HashMap<String, Type>, String> = fields
                 .clone()?
                 .iter()
-                .map(|f: &ast::StructField| {
-                    let struct_field = f.type_.clone();
-
-                    match type_environment.borrow_mut().add_type(struct_field.clone()) {
-                        Ok(_) => Ok((f.identifier.clone(), struct_field)),
-                        Err(e) => Err(e),
-                    }
-                })
+                .map(|f: &ast::StructField| Ok((f.identifier.clone(), f.type_.clone())))
                 .collect();
 
             let type_ = Type::Struct(Struct {
@@ -232,19 +225,7 @@ pub fn check_type<'a>(
                     let field_types: Result<HashMap<String, Type>, String> = fields
                         .clone()?
                         .iter()
-                        .map(|f| {
-                            let field_name = f.identifier.clone();
-
-                            let enum_member_field = f.type_.clone();
-
-                            match type_environment
-                                .borrow_mut()
-                                .add_type(enum_member_field.clone())
-                            {
-                                Ok(_) => Ok((field_name, enum_member_field)),
-                                Err(e) => Err(e),
-                            }
-                        })
+                        .map(|f| Ok((f.identifier.clone(), f.type_.clone())))
                         .collect();
 
                     let enum_member = Type::EnumMember(EnumMember {

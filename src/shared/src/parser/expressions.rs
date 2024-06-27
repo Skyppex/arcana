@@ -199,21 +199,6 @@ fn parse_enum_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
 ) -> Result<Expression, String> {
-    let TokenKind::DoubleColon = cursor.first().kind else {
-        return Err(format!("Expected :: but found {:?}", cursor.first().kind));
-    };
-
-    cursor.bump()?; // Consume the ::
-
-    let TokenKind::Identifier(member) = cursor.first().kind else {
-        return Err(format!(
-            "Expected identifier but found {:?}",
-            cursor.first().kind
-        ));
-    };
-
-    cursor.bump()?; // Consume the identifier
-
     let field_initializers = {
         if cursor.first().kind == TokenKind::OpenParen {
             cursor.bump()?; // Consume the (
@@ -225,8 +210,13 @@ fn parse_enum_literal(
 
     cursor.bump()?; // Consume the )
     Ok(Expression::Literal(Literal::Enum {
-        type_annotation,
-        member,
+        type_annotation: type_annotation.clone(),
+        member: type_annotation
+            .to_string()
+            .split("::")
+            .last()
+            .unwrap()
+            .to_string(),
         field_initializers,
     }))
 }
