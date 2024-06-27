@@ -217,11 +217,7 @@ fn parse_enum_literal(
     let field_initializers = {
         if cursor.first().kind == TokenKind::OpenParen {
             cursor.bump()?; // Consume the (
-            if matches!(cursor.second().kind, TokenKind::Colon) {
-                parse_named_enum_member_field_initializers(cursor)?
-            } else {
-                parse_unnamed_enum_member_field_initializers(cursor)?
-            }
+            parse_named_enum_member_field_initializers(cursor)?
         } else {
             EnumMemberFieldInitializers::None
         }
@@ -233,24 +229,6 @@ fn parse_enum_literal(
         member,
         field_initializers,
     }))
-}
-
-fn parse_unnamed_enum_member_field_initializers(
-    cursor: &mut Cursor,
-) -> Result<EnumMemberFieldInitializers, String> {
-    let mut field_initializers = vec![];
-
-    while cursor.first().kind != TokenKind::CloseParen {
-        let initializer = parse_expression(cursor)?;
-
-        if cursor.first().kind == TokenKind::Comma {
-            cursor.bump()?; // Consume the ,
-        }
-
-        field_initializers.push(initializer);
-    }
-
-    Ok(EnumMemberFieldInitializers::Unnamed(field_initializers))
 }
 
 fn parse_named_enum_member_field_initializers(

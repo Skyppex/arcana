@@ -292,19 +292,6 @@ pub fn check_type<'a>(
 
                                 EnumMemberFieldInitializers::Named(fis)
                             }
-                            parser::EnumMemberFieldInitializers::Unnamed(field_initializers) => {
-                                let mut fis: Vec<TypedExpression> = vec![];
-
-                                for initializer in field_initializers {
-                                    fis.push(check_type(
-                                        &initializer,
-                                        discovered_types,
-                                        type_environment.clone(),
-                                    )?);
-                                }
-
-                                EnumMemberFieldInitializers::Unnamed(fis)
-                            }
                         };
 
                         Ok(field_initializers)

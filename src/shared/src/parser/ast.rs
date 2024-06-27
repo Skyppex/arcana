@@ -214,7 +214,6 @@ pub struct EnumMemberField {
 pub enum EnumMemberFieldInitializers {
     None,
     Named(HashMap<String, Expression>),
-    Unnamed(Vec<Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -50,7 +50,7 @@ impl From<TypeIdentifier> for TypeAnnotation {
 
 pub enum LiteralType {
     Unit,
-    Int(),
+    Int,
     Float,
     String,
     Char,
