@@ -86,9 +86,15 @@ pub struct UnionDeclaration {
 pub struct FunctionDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub identifier: TypeIdentifier,
-    pub parameters: Vec<Parameter>,
-    pub return_type: Option<TypeAnnotation>,
+    pub param: Option<Parameter>,
+    pub return_type_annotation: Option<TypeAnnotation>,
     pub body: Block,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Parameter {
+    pub name: String,
+    pub type_annotation: TypeAnnotation,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -144,13 +150,13 @@ impl ToString for Literal {
                     .join(", ")
             ),
             Literal::Struct {
-                type_annotation,
-                field_initializers,
+                type_annotation: _,
+                field_initializers: _,
             } => todo!(),
             Literal::Enum {
-                type_annotation,
-                member,
-                field_initializers,
+                type_annotation: _,
+                member: _,
+                field_initializers: _,
             } => todo!(),
         }
     }
@@ -219,14 +225,8 @@ pub enum EnumMemberFieldInitializers {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AccessModifier {
     Public,
-    Internal,
+    Module,
     Super,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Parameter {
-    pub identifier: String,
-    pub type_annotation: TypeAnnotation,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -265,7 +265,7 @@ pub struct Assignment {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Call {
     pub caller: Box<Expression>,
-    pub arguments: Vec<Expression>,
+    pub argument: Option<Box<Expression>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

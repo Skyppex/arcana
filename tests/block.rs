@@ -1,14 +1,11 @@
 mod common;
 
-use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
+use common::{create_typed_ast, StatementExt, VecStatementExt};
 
-use interpreter::{value, Value};
 use shared::type_checker::{
     ast::{Typed, TypedExpression},
     Type,
 };
-
-use crate::common::create_env;
 
 #[test]
 fn block_is_block() {

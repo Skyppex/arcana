@@ -151,7 +151,7 @@ impl FullName for Trait {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub identifier: TypeIdentifier,
-    pub parameters: HashMap<String, Type>,
+    pub param: Option<Parameter>,
     pub return_type: Box<Type>,
 }
 
@@ -165,6 +165,12 @@ impl FullName for Function {
     fn full_name(&self) -> String {
         self.identifier.to_string()
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Parameter {
+    pub name: String,
+    pub type_: Box<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

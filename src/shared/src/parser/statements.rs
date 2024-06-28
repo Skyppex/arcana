@@ -61,7 +61,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     let mut access_modifier = None;
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
-        if cursor.second().kind != TokenKind::Keyword(Keyword::Func) {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Fun) {
             return parse_return(cursor);
         }
 
@@ -69,7 +69,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         access_modifier = Some(am);
     }
 
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Func) {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Fun) {
         return parse_return(cursor);
     }
 
@@ -82,6 +82,8 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     };
 
     let parameters = parse_parameters(cursor)?;
+
+    let param = parameters.first().map(|p| p.clone());
 
     let TokenKind::CloseParen = cursor.bump()?.kind else {
         return Err(format!("Expected ) but found {:?}", cursor.first().kind));
@@ -99,7 +101,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
             ));
         }
 
-        return_type = Some(parse_type_annotation(cursor)?);
+        return_type = Some(parse_type_annotation(cursor, true)?);
     }
 
     let body = parse_block_statements(cursor)?;
@@ -107,8 +109,8 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     Ok(Statement::FunctionDeclaration(FunctionDeclaration {
         access_modifier,
         identifier: type_identifier,
-        parameters,
-        return_type,
+        param,
+        return_type_annotation: return_type,
         body,
     }))
 }
@@ -384,10 +386,10 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
         ));
     }
 
-    let type_anntation = parse_type_annotation(cursor)?;
+    let type_anntation = parse_type_annotation(cursor, false)?;
 
     Ok(Parameter {
-        identifier,
+        name: identifier,
         type_annotation: type_anntation,
     })
 }
@@ -426,7 +428,7 @@ fn parse_struct_field(cursor: &mut Cursor) -> Result<StructField, String> {
         ));
     }
 
-    let type_annotation = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor, false)?;
 
     Ok(StructField {
         access_modifier,
@@ -500,7 +502,7 @@ fn parse_enum_field(cursor: &mut Cursor, field_position: usize) -> Result<EnumMe
                 ));
             }
 
-            let type_annotation = parse_type_annotation(cursor)?;
+            let type_annotation = parse_type_annotation(cursor, false)?;
 
             Ok(EnumMemberField {
                 identifier: first_ident,
@@ -510,7 +512,7 @@ fn parse_enum_field(cursor: &mut Cursor, field_position: usize) -> Result<EnumMe
         _ => {
             return Ok(EnumMemberField {
                 identifier: format!("f{}", field_position.to_string()),
-                type_annotation: parse_type_annotation_from_str(&first_ident)?,
+                type_annotation: parse_type_annotation_from_str(&first_ident, false)?,
             });
         }
     }

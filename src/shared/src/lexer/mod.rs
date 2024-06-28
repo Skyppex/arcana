@@ -297,14 +297,14 @@ fn escapable_is_char(c: char) -> Option<char> {
 fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
     match string {
         // Access modifiers
-        "public" => Some(TokenKind::Keyword(Keyword::AccessModifier(
+        "pub" => Some(TokenKind::Keyword(Keyword::AccessModifier(
             AccessModifier::Public,
         ))),
-        "internal" => Some(TokenKind::Keyword(Keyword::AccessModifier(
-            AccessModifier::Internal,
+        "mod" => Some(TokenKind::Keyword(Keyword::AccessModifier(
+            AccessModifier::Module,
         ))),
         "super" => Some(TokenKind::Keyword(Keyword::AccessModifier(
-            AccessModifier::Internal,
+            AccessModifier::Super,
         ))),
 
         // Variable declarations
@@ -312,13 +312,13 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
 
         // Types
         "mut" => Some(TokenKind::Keyword(Keyword::Mut)),
-        "func" => Some(TokenKind::Keyword(Keyword::Func)),
+        "fun" => Some(TokenKind::Keyword(Keyword::Fun)),
         "struct" => Some(TokenKind::Keyword(Keyword::Struct)),
         "enum" => Some(TokenKind::Keyword(Keyword::Enum)),
         "union" => Some(TokenKind::Keyword(Keyword::Union)),
         // "flags" => Some(TokenKind::Keyword(Keyword::Flags)),
-        "impl" => Some(TokenKind::Keyword(Keyword::Impl)),
-        "trait" => Some(TokenKind::Keyword(Keyword::Trait)),
+        // "impl" => Some(TokenKind::Keyword(Keyword::Impl)),
+        // "trait" => Some(TokenKind::Keyword(Keyword::Trait)),
 
         // Generics
         "where" => Some(TokenKind::Keyword(Keyword::Where)),
@@ -337,6 +337,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "continue" => Some(TokenKind::Keyword(Keyword::Continue)),
 
         // Literals
+        "void" => Some(TokenKind::Literal(Literal::Void)),
         "unit" => Some(TokenKind::Literal(Literal::Unit)),
         "true" => Some(TokenKind::Literal(Literal::Bool(true))),
         "false" => Some(TokenKind::Literal(Literal::Bool(false))),

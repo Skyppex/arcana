@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    parser::Statement,
+    parser::{Parameter, Statement},
     types::{TypeAnnotation, TypeIdentifier},
 };
 
@@ -15,11 +15,11 @@ pub enum DiscoveredType {
         HashMap<String, HashMap<String, TypeAnnotation>>,
     ),
     Union(TypeIdentifier, Vec<TypeAnnotation>),
-    Function(
-        TypeIdentifier,
-        HashMap<String, TypeAnnotation>,
-        TypeAnnotation,
-    ),
+    Function {
+        type_identifier: TypeIdentifier,
+        param: Option<Parameter>,
+        return_type_annotation: TypeAnnotation,
+    },
 }
 
 pub fn create_typed_ast<'a>(

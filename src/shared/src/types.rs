@@ -189,6 +189,7 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
     let mut cloned_cursor = cursor.clone();
 
     match cloned_cursor.first().kind {
+        TokenKind::Literal(token::Literal::Void) => true,
         TokenKind::Literal(token::Literal::Unit) => true,
         TokenKind::Identifier(_) => true,
         TokenKind::OpenBracket => {
@@ -199,14 +200,28 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
     }
 }
 
-pub(super) fn parse_type_annotation_from_str(type_str: &str) -> Result<TypeAnnotation, String> {
+pub(super) fn parse_type_annotation_from_str(
+    type_str: &str,
+    allow_void: bool,
+) -> Result<TypeAnnotation, String> {
     let tokens = crate::lexer::tokenize(type_str)?;
     let mut cursor = Cursor::new(tokens);
-    parse_type_annotation(&mut cursor)
+    parse_type_annotation(&mut cursor, allow_void)
 }
 
-pub(super) fn parse_type_annotation(cursor: &mut Cursor) -> Result<TypeAnnotation, String> {
+pub(super) fn parse_type_annotation(
+    cursor: &mut Cursor,
+    allow_void: bool,
+) -> Result<TypeAnnotation, String> {
     match cursor.first().kind {
+        TokenKind::Literal(token::Literal::Void) => {
+            if !allow_void {
+                return Err("Void type is not allowed here".to_string());
+            }
+
+            cursor.bump()?; // Consume the void
+            Ok(TypeAnnotation::Type("void".to_string()))
+        }
         TokenKind::Literal(token::Literal::Unit) => {
             cursor.bump()?; // Consume the unit
             Ok(TypeAnnotation::Type("unit".to_string()))
@@ -218,9 +233,11 @@ pub(super) fn parse_type_annotation(cursor: &mut Cursor) -> Result<TypeAnnotatio
 
             if cursor.first().kind == TokenKind::Less {
                 cursor.bump()?; // Consume the <
-                generics = Some(parse_comma_separated_type_annotations(cursor, |kind| {
-                    kind != TokenKind::Greater
-                })?);
+                generics = Some(parse_comma_separated_type_annotations(
+                    cursor,
+                    |kind| kind != TokenKind::Greater,
+                    allow_void,
+                )?);
 
                 cursor.bump()?; // Consume the >
             }
@@ -253,7 +270,7 @@ pub(super) fn parse_type_annotation(cursor: &mut Cursor) -> Result<TypeAnnotatio
         TokenKind::OpenBracket => {
             cursor.bump()?; // Consume the [
 
-            let type_annotation = parse_type_annotation(cursor)?;
+            let type_annotation = parse_type_annotation(cursor, allow_void)?;
 
             if cursor.first().kind != TokenKind::CloseBracket {
                 return Err(format!("Expected ] but found {:?}", cursor.first().kind));
@@ -272,11 +289,12 @@ pub(super) fn parse_type_annotation(cursor: &mut Cursor) -> Result<TypeAnnotatio
 fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(
     cursor: &mut Cursor,
     check: F,
+    allow_void: bool,
 ) -> Result<Vec<TypeAnnotation>, String> {
     let mut types = Vec::new();
 
     while check(cursor.first().kind) {
-        let type_annotation = parse_type_annotation(cursor)?;
+        let type_annotation = parse_type_annotation(cursor, allow_void)?;
         types.push(type_annotation);
 
         if cursor.first().kind == TokenKind::Comma {

@@ -21,12 +21,7 @@ pub enum Value {
         fields: EnumFields,
     },
     Function {
-        parameters: Vec<String>,
-        body: Vec<TypedStatement>,
-    },
-    MemberFunction {
-        type_name: TypeAnnotation,
-        parameters: Vec<String>,
+        param_name: Option<String>,
         body: Vec<TypedStatement>,
     },
 }
@@ -128,33 +123,12 @@ impl<'a> Display for Value {
                 }
             },
             Value::Function {
-                parameters,
+                param_name,
                 body: _,
-            } => {
-                write!(
-                    f,
-                    "({})",
-                    parameters
-                        .iter()
-                        .map(|p| p.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )
-            }
-            Value::MemberFunction {
-                type_name,
-                parameters,
-                body: _,
-            } => write!(
-                f,
-                "{}.({})",
-                type_name,
-                parameters
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            } => match param_name {
+                Some(param_name) => write!(f, "({})", param_name),
+                None => write!(f, "()"),
+            },
         }
     }
 }

@@ -26,36 +26,14 @@ pub fn evaluate<'a>(
         TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
         TypedStatement::EnumDeclaration { .. } => Ok(Value::Void),
         TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
-        TypedStatement::Impl {
-            type_annotation,
-            functions,
-        } => {
-            for function in functions {
-                let TypedStatement::FunctionDeclaration {
-                    identifier,
-                    parameters,
-                    return_type,
-                    body,
-                    type_,
-                } = function
-                else {
-                    return Err("Impl function must be a function".to_string())?;
-                };
-
-                let function_value =
-                    evaluate_function_declaration(&environment, identifier, parameters, body)?;
-            }
-
-            Ok(Value::Void)
-        }
         TypedStatement::Program { statements } => evaluate_program(statements, environment),
         TypedStatement::FunctionDeclaration {
             identifier,
-            parameters,
+            param,
             return_type: _,
             body,
             type_: _,
-        } => evaluate_function_declaration(&environment, identifier, parameters, body),
+        } => evaluate_function_declaration(&environment, identifier, param, body),
         TypedStatement::Semi(s) => {
             evaluate(*s, environment)?;
             Ok(Value::Void)
@@ -75,11 +53,11 @@ pub fn evaluate<'a>(
 fn evaluate_function_declaration(
     environment: &Rc<RefCell<Environment>>,
     identifier: TypeIdentifier,
-    parameters: Vec<Parameter>,
+    param: Option<TypedParameter>,
     body: Vec<TypedStatement>,
 ) -> Result<Value, String> {
     let function = Value::Function {
-        parameters: parameters.into_iter().map(|p| p.identifier).collect(),
+        param_name: param.map(|p| p.name),
         body,
     };
     environment
@@ -121,9 +99,9 @@ fn evaluate_expression<'a>(
         TypedExpression::Literal(l) => evaluate_literal(l, environment),
         TypedExpression::Call {
             caller,
-            arguments,
+            argument,
             type_,
-        } => evaluate_call(caller, arguments, type_, environment),
+        } => evaluate_call(caller, argument, type_, environment),
         TypedExpression::Index {
             caller,
             argument,
@@ -303,6 +281,7 @@ fn evaluate_member_access<'a>(
 
 fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Result<Value, String> {
     match literal {
+        Literal::Void => panic!("Void literals should never be evaluated"),
         Literal::Unit => Ok(Value::Unit),
         Literal::Int(v) => Ok(Value::Number(Number::Int(v))),
         Literal::UInt(v) => Ok(Value::Number(Number::UInt(v))),
@@ -382,32 +361,32 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
 
 fn evaluate_call(
     caller: Box<TypedExpression>,
-    arguments: Vec<TypedExpression>,
+    argument: Option<Box<TypedExpression>>,
     _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let caller_value = evaluate_expression(*caller, environment.clone())?;
 
-    let mut evaluated_arguments = Vec::new();
-
-    for argument in arguments {
-        let evaluated_arg = evaluate_expression(argument, environment.clone())?;
-        evaluated_arguments.push(evaluated_arg);
-    }
+    let evaluated_arg = argument
+        .map(|arg| evaluate_expression(*arg, environment.clone()))
+        .transpose()?;
 
     match caller_value {
-        Value::Function { parameters, body } => {
+        Value::Function { param_name, body } => {
             let function_environment = Rc::new(RefCell::new(Environment::new_scope(
                 environment,
                 ScopeType::Return,
             )));
 
-            for (index, parameter) in parameters.iter().enumerate() {
-                function_environment.borrow_mut().add_variable(
-                    parameter.clone(),
-                    evaluated_arguments[index].clone(),
-                    false,
-                );
+            match evaluated_arg {
+                Some(evaluated_arg) => {
+                    function_environment.borrow_mut().add_variable(
+                        param_name.clone().unwrap(),
+                        evaluated_arg.clone(),
+                        false,
+                    );
+                }
+                None => (),
             }
 
             let mut value = Value::Void;

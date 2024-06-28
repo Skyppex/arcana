@@ -35,21 +35,6 @@ impl Cursor {
         iter.pop().unwrap_or(END_OF_FILE_TOKEN)
     }
 
-    pub(crate) fn third(&self) -> Token {
-        let mut iter = self.tokens.clone();
-        iter.pop();
-        iter.pop();
-        iter.pop().unwrap_or(END_OF_FILE_TOKEN)
-    }
-
-    pub(crate) fn fourth(&self) -> Token {
-        let mut iter = self.tokens.clone();
-        iter.pop();
-        iter.pop();
-        iter.pop();
-        iter.pop().unwrap_or(END_OF_FILE_TOKEN)
-    }
-
     pub(crate) fn is_end_of_file(&self) -> bool {
         self.tokens.is_empty() || self.first().kind == crate::lexer::token::TokenKind::EndOfFile
     }

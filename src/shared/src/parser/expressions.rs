@@ -127,7 +127,7 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_assignment(cursor);
     };
 
-    let type_annotation = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor, false)?;
 
     if cursor.first().kind == TokenKind::OpenBrace {
         parse_struct_literal(cursor, type_annotation)
@@ -518,7 +518,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         ));
     }
 
-    let type_annotation = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor, false)?;
 
     match cursor.first().kind {
         TokenKind::Equal => {
@@ -613,9 +613,11 @@ fn parse_call_expression(caller: Expression, cursor: &mut Cursor) -> Result<Expr
     let arguments = parse_args(cursor)?;
     cursor.bump()?; // Consume the )
 
+    let argument = arguments.first();
+
     let mut call = Expression::Call(Call {
         caller: Box::new(caller.clone()),
-        arguments,
+        argument: argument.map(|a| Box::new(a.clone())),
     });
 
     if let TokenKind::OpenParen = cursor.first().kind {
@@ -759,6 +761,7 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 
 fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> {
     match literal {
+        token::Literal::Void => Err("Void literals are not allowed".to_string()),
         token::Literal::Unit => Ok(Expression::Literal(Literal::Unit)),
         token::Literal::Int(literal) => Ok(Expression::Literal(Literal::Int(literal.value))),
         token::Literal::UInt(literal) => Ok(Expression::Literal(Literal::UInt(literal.value))),

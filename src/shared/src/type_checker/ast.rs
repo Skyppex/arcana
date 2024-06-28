@@ -39,14 +39,10 @@ pub enum TypedStatement {
     },
     FunctionDeclaration {
         identifier: TypeIdentifier,
-        parameters: Vec<Parameter>,
+        param: Option<TypedParameter>,
         return_type: Type,
         body: Vec<TypedStatement>,
         type_: Type,
-    },
-    Impl {
-        type_annotation: TypeAnnotation,
-        functions: Vec<TypedStatement>,
     },
     Semi(Box<TypedStatement>),
     Break(Option<TypedExpression>),
@@ -76,7 +72,6 @@ impl Typed for TypedStatement {
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
-            TypedStatement::Impl { .. } => Type::Void,
             TypedStatement::Semi { .. } => Type::Void,
             TypedStatement::Break(_) => Type::Void,
             TypedStatement::Continue => Type::Void,
@@ -94,7 +89,6 @@ impl Typed for TypedStatement {
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
-            TypedStatement::Impl { .. } => Type::Void,
             TypedStatement::Semi(e) => e.get_deep_type(),
             TypedStatement::Break(e) => e.as_ref().map_or(Type::Void, |e| e.get_deep_type()),
             TypedStatement::Continue => Type::Void,
@@ -169,7 +163,7 @@ impl Display for TypedStatement {
             ),
             TypedStatement::FunctionDeclaration {
                 identifier,
-                parameters,
+                param,
                 return_type,
                 body,
                 ..
@@ -177,26 +171,13 @@ impl Display for TypedStatement {
                 f,
                 "fn {}({}) -> {} {{{}}}",
                 identifier,
-                parameters
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                if let Some(param) = param {
+                    param.to_string()
+                } else {
+                    "".to_string()
+                },
                 return_type,
                 body.iter()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
-            TypedStatement::Impl {
-                type_annotation,
-                functions,
-            } => write!(
-                f,
-                "impl {} {{{}}}",
-                type_annotation,
-                functions
-                    .iter()
                     .map(|s| s.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -224,6 +205,29 @@ impl Display for TypedStatement {
             TypedStatement::Expression(e) => write!(f, "{}", e),
             TypedStatement::Print(e) => write!(f, "print {}", e),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedParameter {
+    pub name: String,
+    pub type_annotation: TypeAnnotation,
+    pub type_: Box<Type>,
+}
+
+impl Typed for TypedParameter {
+    fn get_type(&self) -> Type {
+        *self.type_.clone()
+    }
+
+    fn get_deep_type(&self) -> Type {
+        *self.type_.clone()
+    }
+}
+
+impl Display for TypedParameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.name, self.type_annotation)
     }
 }
 
@@ -282,7 +286,7 @@ pub enum TypedExpression {
     Literal(Literal),
     Call {
         caller: Box<TypedExpression>,
-        arguments: Vec<TypedExpression>,
+        argument: Option<Box<TypedExpression>>,
         type_: Type,
     },
     Index {
@@ -412,16 +416,12 @@ impl Display for TypedExpression {
             TypedExpression::Member(member) => write!(f, "{}", member),
             TypedExpression::Literal(literal) => write!(f, "{}", literal),
             TypedExpression::Call {
-                caller, arguments, ..
+                caller, argument, ..
             } => write!(
                 f,
                 "{}({})",
                 caller,
-                arguments
-                    .iter()
-                    .map(|a| a.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
+                argument.clone().map_or("".to_string(), |a| a.to_string())
             ),
             TypedExpression::Index {
                 caller, argument, ..
@@ -513,7 +513,7 @@ impl Into<AccessModifier> for parser::AccessModifier {
     fn into(self) -> AccessModifier {
         match self {
             parser::AccessModifier::Public => AccessModifier::Public,
-            parser::AccessModifier::Internal => AccessModifier::Internal,
+            parser::AccessModifier::Module => AccessModifier::Internal,
             parser::AccessModifier::Super => AccessModifier::Super,
         }
     }
@@ -558,6 +558,7 @@ impl Display for EnumMemberField {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
+    Void,
     Unit,
     Int(i64),
     UInt(u64),
@@ -592,10 +593,8 @@ impl Hash for Literal {
 impl Typed for Literal {
     fn get_type(&self) -> Type {
         match self {
-            Literal::Unit => Type::Literal {
-                name: "unit".to_string(),
-                type_: Box::new(Type::Unit),
-            },
+            Literal::Void => Type::Void,
+            Literal::Unit => Type::Unit,
             Literal::Int(v) => Type::Literal {
                 name: v.to_string(),
                 type_: Box::new(Type::Int),
@@ -628,6 +627,7 @@ impl Typed for Literal {
 
     fn get_deep_type(&self) -> Type {
         match self {
+            Literal::Void => Type::Void,
             Literal::Unit => Type::Unit,
             Literal::Int(_) => Type::Int,
             Literal::UInt(_) => Type::UInt,
@@ -645,6 +645,7 @@ impl Typed for Literal {
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Literal::Void => write!(f, "void"),
             Literal::Unit => write!(f, "unit"),
             Literal::Int(v) => write!(f, "{}", v),
             Literal::UInt(v) => write!(f, "{}", v),
@@ -735,19 +736,6 @@ impl Display for EnumMemberFieldInitializers {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Parameter {
-    pub identifier: String,
-    pub type_annotation: TypeAnnotation,
-    pub type_: Type,
-}
-
-impl Display for Parameter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.identifier, self.type_annotation)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum Member {
     Identifier {
         symbol: String,
@@ -790,12 +778,7 @@ impl Display for Member {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Member::Identifier { symbol, .. } => write!(f, "{}", symbol),
-            Member::MemberAccess {
-                object,
-                member,
-                symbol,
-                ..
-            } => write!(f, "{}.{}", object, member),
+            Member::MemberAccess { object, member, .. } => write!(f, "{}.{}", object, member),
         }
     }
 }

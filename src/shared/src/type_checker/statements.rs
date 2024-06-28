@@ -6,12 +6,12 @@ use crate::{
 };
 
 use super::{
-    ast::{self, Typed, TypedStatement},
+    ast::{self, Typed, TypedParameter, TypedStatement},
     expressions,
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    Enum, EnumMember, Function, Rcrc, Struct, Type, Union,
+    Enum, EnumMember, Function, Parameter, Rcrc, Struct, Type, Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -69,24 +69,16 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             identifier,
-            parameters,
-            return_type,
+            param,
+            return_type_annotation,
             body: _,
-        }) => Ok(vec![DiscoveredType::Function(
-            identifier.clone(),
-            parameters
-                .iter()
-                .map(|parameter| {
-                    (
-                        parameter.identifier.clone(),
-                        parameter.type_annotation.clone(),
-                    )
-                })
-                .collect(),
-            return_type
+        }) => Ok(vec![DiscoveredType::Function {
+            type_identifier: identifier.clone(),
+            param: param.clone(),
+            return_type_annotation: return_type_annotation
                 .clone()
                 .unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
-        )]),
+        }]),
         Statement::Semi(_) => Ok(vec![]),
         Statement::Break(_) => Ok(vec![]),
         Statement::Continue => Ok(vec![]),
@@ -331,12 +323,12 @@ pub fn check_type<'a>(
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             identifier,
-            parameters,
-            return_type,
+            param,
+            return_type_annotation,
             body,
         }) => {
             let return_type = check_type_annotation(
-                &return_type
+                &return_type_annotation
                     .clone()
                     .unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
                 &discovered_types,
@@ -348,29 +340,43 @@ pub fn check_type<'a>(
                 ScopeType::Return,
             )));
 
-            let parameters: Result<Vec<ast::Parameter>, String> = parameters
-                .iter()
-                .map(|parameter| {
-                    match check_type_annotation(
-                        &parameter.type_annotation,
-                        &discovered_types,
-                        block_environment.clone(),
-                    ) {
-                        Ok(t) => {
-                            block_environment
-                                .borrow_mut()
-                                .add_variable(parameter.identifier.clone(), t.clone());
+            if let Some(param) = param {
+                match check_type_annotation(
+                    &param.type_annotation,
+                    &discovered_types,
+                    block_environment.clone(),
+                ) {
+                    Ok(t) => {
+                        block_environment
+                            .borrow_mut()
+                            .add_variable(param.name.clone(), t.clone());
 
-                            Ok(ast::Parameter {
-                                identifier: parameter.identifier.clone(),
-                                type_annotation: parameter.type_annotation.clone(),
-                                type_: t,
-                            })
-                        }
-                        Err(e) => Err(e),
+                        Ok(())
                     }
-                })
-                .collect();
+                    Err(e) => Err(e),
+                }?;
+            }
+
+            let param: Option<Parameter> = match param {
+                Some(p) => {
+                    let param_name = p.name.clone();
+                    let param_type_annotation = p.type_annotation.clone();
+
+                    if param_name.is_empty() {
+                        return Err("Parameter must have a name".to_string());
+                    }
+
+                    Some(Parameter {
+                        name: param_name,
+                        type_: Box::new(check_type_annotation(
+                            &param_type_annotation,
+                            &discovered_types,
+                            block_environment.clone(),
+                        )?),
+                    })
+                }
+                None => None,
+            };
 
             let body_typed_statement: Result<Vec<TypedStatement>, String> = body
                 .iter()
@@ -398,11 +404,7 @@ pub fn check_type<'a>(
 
             let type_ = Type::Function(Function {
                 identifier: identifier.clone(),
-                parameters: parameters
-                    .clone()?
-                    .iter()
-                    .map(|p| (p.identifier.clone(), p.type_.clone()))
-                    .collect(),
+                param: param.clone(),
                 return_type: Box::new(return_type.clone()),
             });
 
@@ -410,7 +412,11 @@ pub fn check_type<'a>(
 
             Ok(TypedStatement::FunctionDeclaration {
                 identifier: identifier.clone(),
-                parameters: parameters?,
+                param: param.map(|p| TypedParameter {
+                    name: p.name,
+                    type_annotation: p.type_.type_annotation(),
+                    type_: p.type_,
+                }),
                 return_type,
                 body: body_typed_statement,
                 type_,
@@ -489,7 +495,10 @@ fn check_type_identifier(
             DiscoveredType::Struct(name, ..) => name == type_identifier,
             DiscoveredType::Enum(name, ..) => name == type_identifier,
             DiscoveredType::Union(name, ..) => name == type_identifier,
-            DiscoveredType::Function(name, ..) => name == type_identifier,
+            DiscoveredType::Function {
+                type_identifier: name,
+                ..
+            } => name == type_identifier,
         }) {
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
@@ -574,31 +583,32 @@ fn check_type_identifier(
                 literals: literal_types,
             }))
         }
-        Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {
-            Ok(Type::Function(Function {
+        Some(DiscoveredType::Function {
+            type_identifier,
+            param,
+            return_type_annotation,
+        }) => {
+            let param = match param {
+                Some(param) => Some(Parameter {
+                    name: param.name.clone(),
+                    type_: Box::new(check_type_annotation(
+                        &param.type_annotation,
+                        discovered_types,
+                        type_environment.clone(),
+                    )?),
+                }),
+                None => None,
+            };
+
+            return Ok(Type::Function(Function {
                 identifier: type_identifier.clone(),
-                parameters: {
-                    let mut map = HashMap::new();
-
-                    for (identifier, type_annotation) in parameters {
-                        map.insert(
-                            identifier.clone(),
-                            check_type_annotation(
-                                type_annotation,
-                                discovered_types,
-                                type_environment.clone(),
-                            )?,
-                        );
-                    }
-
-                    map
-                },
+                param,
                 return_type: Box::new(check_type_annotation(
-                    return_type,
+                    return_type_annotation,
                     discovered_types,
                     type_environment,
                 )?),
-            }))
+            }));
         }
         None => Type::from_string(&type_identifier.to_string())
             .ok_or(format!("Unknown type {}", type_identifier)),
@@ -629,9 +639,9 @@ pub fn check_type_annotation(
             DiscoveredType::Union(type_identifier, ..) => {
                 type_identifier.name() == type_annotation.name()
             }
-            DiscoveredType::Function(type_identifier, ..) => {
-                type_identifier.name() == type_annotation.name()
-            }
+            DiscoveredType::Function {
+                type_identifier, ..
+            } => type_identifier.name() == type_annotation.name(),
         }) {
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
@@ -716,27 +726,28 @@ pub fn check_type_annotation(
                 literals: literal_types,
             }))
         }
-        Some(DiscoveredType::Function(type_identifier, parameters, return_type)) => {
+        Some(DiscoveredType::Function {
+            type_identifier,
+            param,
+            return_type_annotation,
+        }) => {
+            let param = match param {
+                Some(param) => Some(Parameter {
+                    name: param.name.clone(),
+                    type_: Box::new(check_type_annotation(
+                        &param.type_annotation,
+                        discovered_types,
+                        type_environment.clone(),
+                    )?),
+                }),
+                None => None,
+            };
+
             Ok(Type::Function(Function {
                 identifier: type_identifier.clone(),
-                parameters: {
-                    let mut map = HashMap::new();
-
-                    for (identifier, type_annotation) in parameters {
-                        map.insert(
-                            identifier.clone(),
-                            check_type_annotation(
-                                type_annotation,
-                                discovered_types,
-                                type_environment.clone(),
-                            )?,
-                        );
-                    }
-
-                    map
-                },
+                param,
                 return_type: Box::new(check_type_annotation(
-                    return_type,
+                    return_type_annotation,
                     discovered_types,
                     type_environment,
                 )?),

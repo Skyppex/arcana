@@ -11,7 +11,6 @@ use super::{
         BinaryOperator, Block, EnumMemberFieldInitializers, FieldInitializer, Member, Typed,
         TypedExpression, TypedStatement, UnaryOperator,
     },
-    full_name,
     scope::ScopeType,
     statements, DiscoveredType, Enum, EnumMember, FullName, Rcrc, Struct, Type, TypeEnvironment,
     Union,
@@ -384,36 +383,36 @@ pub fn check_type<'a>(
                         ))?
                     };
 
-                    if function.clone().parameters.len() != call.arguments.len() {
-                        Err(format!(
-                            "Expected {} arguments, found {}",
-                            function.clone().parameters.len(),
-                            call.arguments.len()
-                        ))?
-                    }
+                    let arg_typed_expression = call
+                        .argument
+                        .clone()
+                        .map(|arg| check_type(&arg, discovered_types, type_environment.clone()))
+                        .transpose()?;
 
-                    let mut args = vec![];
-                    for (i, (.., type_)) in function.clone().parameters.iter().enumerate() {
-                        let arg = &call.arguments[i];
+                    let function_param_type = function.param.map(|p| p.type_.clone());
 
-                        let arg_typed_expression =
-                            check_type(arg, discovered_types, type_environment.clone())?;
+                    let arg = match (arg_typed_expression.clone(), function_param_type.clone()) {
+                        (Some(arg), Some(param)) => {
+                            if !type_equals(&arg.get_type(), &param) {
+                                return Err(format!(
+                                    "Argument type {} does not match parameter type {}",
+                                    arg.get_type(),
+                                    param
+                                ));
+                            }
 
-                        if !type_equals(&arg_typed_expression.get_deep_type(), type_) {
-                            Err(format!(
-                                "Argument {} type {} does not match parameter type {}",
-                                i,
-                                arg_typed_expression.get_type(),
-                                type_
-                            ))?
+                            Some(Box::new(arg))
                         }
-
-                        args.push(arg_typed_expression);
-                    }
+                        (None, None) => None,
+                        _ => Err(format!(
+                            "Expected argument type {:?}, found {:?}",
+                            function_param_type, arg_typed_expression
+                        ))?,
+                    };
 
                     Ok(TypedExpression::Call {
                         caller: Box::new(caller),
-                        arguments: args,
+                        argument: arg,
                         type_: *function.return_type,
                     })
                 }

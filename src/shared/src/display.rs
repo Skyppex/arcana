@@ -7,7 +7,7 @@ use crate::{
     },
     type_checker::{
         self,
-        ast::{Block, TypedExpression, TypedStatement},
+        ast::{Block, TypedExpression, TypedParameter, TypedStatement},
         Type,
     },
     types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
@@ -322,8 +322,8 @@ impl IndentDisplay for FunctionDeclaration {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let identifier = &self.identifier;
         let access_modifier = &self.access_modifier;
-        let parameters = &self.parameters;
-        let return_type = &self.return_type;
+        let param = &self.param;
+        let return_type_annotation = &self.return_type_annotation;
         let body = &self.body;
 
         let mut result = String::new();
@@ -333,24 +333,22 @@ impl IndentDisplay for FunctionDeclaration {
         result.push_str(format!("{}identifier: {}\n", indent.dash(), identifier).as_str());
         result.push_str(
             format!(
-                "{}access_modifier: {}",
+                "{}access_modifier: {}\n",
                 indent.dash(),
                 access_modifier.indent_display(indent)
             )
             .as_str(),
         );
 
-        for parameter in parameters {
-            result.push_str(
-                format!("\n{}{}", indent.dash(), parameter.indent_display(indent)).as_str(),
-            );
-        }
+        result.push_str(
+            format!("{}param: {}\n", indent.dash(), param.indent_display(indent)).as_str(),
+        );
 
         result.push_str(
             format!(
-                "\n{}return_type: {}\n",
+                "{}return_type: {}\n",
                 indent.dash(),
-                return_type.indent_display(indent)
+                return_type_annotation.indent_display(indent)
             )
             .as_str(),
         );
@@ -483,7 +481,7 @@ impl IndentDisplay for Expression {
             }
             Expression::Member(m) => m.indent_display(indent),
             Expression::Literal(l) => l.indent_display(indent),
-            Expression::Call(Call { caller, arguments }) => {
+            Expression::Call(Call { caller, argument }) => {
                 let mut result = String::new();
                 result.push_str("<call>\n");
                 indent.increase();
@@ -491,28 +489,15 @@ impl IndentDisplay for Expression {
                     format!("{}caller: {}", indent.dash(), caller.indent_display(indent)).as_str(),
                 );
 
-                for (i, argument) in arguments.iter().enumerate() {
-                    if i < arguments.len() - 1 {
-                        result.push_str(
-                            format!(
-                                "\n{}argument: {},",
-                                indent.dash(),
-                                argument.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!(
-                                "\n{}argument: {}",
-                                indent.dash_end(),
-                                argument.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    }
-                }
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "\n{}argument: {}",
+                        indent.dash_end(),
+                        argument.indent_display(indent)
+                    )
+                    .as_str(),
+                );
 
                 indent.decrease();
                 result
@@ -990,7 +975,7 @@ impl IndentDisplay for AccessModifier {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
             AccessModifier::Public => "public".to_string(),
-            AccessModifier::Internal => "internal".to_string(),
+            AccessModifier::Module => "internal".to_string(),
             AccessModifier::Super => "super".to_string(),
         }
     }
@@ -1064,6 +1049,32 @@ impl IndentDisplay for EnumMemberFieldInitializers {
     }
 }
 
+impl IndentDisplay for Parameter {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<parameter>\n");
+        indent.increase_leaf();
+        result.push_str(
+            format!(
+                "{}name: {}\n",
+                indent.dash(),
+                self.name.indent_display(indent)
+            )
+            .as_str(),
+        );
+        result.push_str(
+            format!(
+                "{}type_annotation: {}",
+                indent.dash_end(),
+                self.type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.decrease();
+        result
+    }
+}
+
 impl IndentDisplay for UnaryOperator {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
@@ -1097,25 +1108,6 @@ impl IndentDisplay for BinaryOperator {
             BinaryOperator::GreaterThan => ">".to_string(),
             BinaryOperator::GreaterThanOrEqual => ">=".to_string(),
         }
-    }
-}
-
-impl IndentDisplay for Parameter {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        let mut result = String::new();
-        result.push_str("<parameter>\n");
-        indent.increase_leaf();
-        result.push_str(format!("{}parameter: {}\n", indent.dash(), self.identifier).as_str());
-        result.push_str(
-            format!(
-                "{}type_annotation: {}",
-                indent.dash_end(),
-                self.type_annotation.indent_display(indent)
-            )
-            .as_str(),
-        );
-        indent.decrease();
-        result
     }
 }
 
@@ -1172,8 +1164,7 @@ impl IndentDisplay for TypedStatement {
                     result.push_str(format!("{}where_clause: None", indent.dash()).as_str());
                 }
 
-                for (i, field) in fields.iter().enumerate() {
-                    let is_end = i == fields.len() - 1;
+                for field in fields.iter() {
                     indent.end_current();
                     result.push_str(
                         format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str(),
@@ -1257,7 +1248,7 @@ impl IndentDisplay for TypedStatement {
             }
             TypedStatement::FunctionDeclaration {
                 identifier,
-                parameters,
+                param,
                 return_type,
                 body,
                 type_,
@@ -1266,13 +1257,11 @@ impl IndentDisplay for TypedStatement {
                 result.push_str(format!("<function declaration> {}\n", type_).as_str());
                 indent.increase();
 
-                result.push_str(format!("{}identifier: {}", indent.dash(), identifier).as_str());
+                result.push_str(format!("{}identifier: {}\n", indent.dash(), identifier).as_str());
 
-                for parameter in parameters {
-                    result.push_str(
-                        format!("{}{}\n", indent.dash(), parameter.indent_display(indent)).as_str(),
-                    );
-                }
+                result.push_str(
+                    format!("{}{}\n", indent.dash(), param.indent_display(indent)).as_str(),
+                );
 
                 result
                     .push_str(format!("{}return_type: {}\n", indent.dash(), return_type).as_str());
@@ -1301,34 +1290,6 @@ impl IndentDisplay for TypedStatement {
                 }
 
                 indent.decrease();
-                indent.decrease();
-                result
-            }
-            TypedStatement::Impl {
-                type_annotation,
-                functions,
-            } => {
-                let mut result = String::new();
-                result.push_str("<impl>\n");
-                indent.increase();
-                result.push_str(
-                    format!(
-                        "{}type_annotation: {}",
-                        indent.dash(),
-                        type_annotation.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-
-                for (i, function) in functions.iter().enumerate() {
-                    let is_end = i == functions.len() - 1;
-                    indent.end_current();
-                    result.push_str(
-                        format!("\n{}{}", indent.dash_end(), function.indent_display(indent))
-                            .as_str(),
-                    );
-                }
-
                 indent.decrease();
                 result
             }
@@ -1504,7 +1465,7 @@ impl IndentDisplay for TypedExpression {
             TypedExpression::Literal(l) => l.indent_display(indent),
             TypedExpression::Call {
                 caller,
-                arguments,
+                argument,
                 type_,
             } => {
                 let mut result = String::new();
@@ -1514,28 +1475,15 @@ impl IndentDisplay for TypedExpression {
                     format!("{}caller: {}", indent.dash(), caller.indent_display(indent)).as_str(),
                 );
 
-                for (i, argument) in arguments.iter().enumerate() {
-                    if i < arguments.len() - 1 {
-                        result.push_str(
-                            format!(
-                                "\n{}argument: {},",
-                                indent.dash(),
-                                argument.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!(
-                                "\n{}argument: {}",
-                                indent.dash_end(),
-                                argument.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    }
-                }
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "\n{}argument: {}",
+                        indent.dash_end(),
+                        argument.indent_display(indent)
+                    )
+                    .as_str(),
+                );
 
                 indent.decrease();
                 result
@@ -1801,6 +1749,32 @@ impl IndentDisplay for TypedExpression {
     }
 }
 
+impl IndentDisplay for TypedParameter {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<parameter>\n");
+        indent.increase_leaf();
+        result.push_str(
+            format!(
+                "{}name: {}\n",
+                indent.dash(),
+                self.name.indent_display(indent)
+            )
+            .as_str(),
+        );
+        result.push_str(
+            format!(
+                "{}type_annotation: {}",
+                indent.dash_end(),
+                self.type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.decrease();
+        result
+    }
+}
+
 impl IndentDisplay for type_checker::ast::Member {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
@@ -1846,6 +1820,7 @@ impl IndentDisplay for type_checker::ast::Member {
 impl IndentDisplay for type_checker::ast::Literal {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
+            type_checker::ast::Literal::Void => "void".to_string(),
             type_checker::ast::Literal::Unit => "unit".to_string(),
             type_checker::ast::Literal::Int(v) => v.to_string(),
             type_checker::ast::Literal::UInt(v) => v.to_string(),
@@ -1957,23 +1932,6 @@ impl IndentDisplay for type_checker::ast::StructField {
         indent.increase_leaf();
         result.push_str(format!("{}mutable: {}", indent.dash_end(), self.mutable).as_str());
         indent.decrease();
-        result
-    }
-}
-
-impl IndentDisplay for type_checker::ast::Parameter {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        let mut result = String::new();
-        result.push_str("<parameter>\n");
-        result.push_str(format!("{}parameter: {}\n", indent.dash(), self.identifier).as_str());
-        result.push_str(
-            format!(
-                "{}type_annotation: {}",
-                indent.dash_end(),
-                self.type_annotation.indent_display(indent)
-            )
-            .as_str(),
-        );
         result
     }
 }

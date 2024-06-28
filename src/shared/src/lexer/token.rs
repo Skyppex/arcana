@@ -86,6 +86,7 @@ pub enum TokenKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
+    Void,
     Unit,
     Int(IntLiteral<i64>),
     UInt(IntLiteral<u64>),
@@ -98,6 +99,7 @@ pub enum Literal {
 impl ToString for Literal {
     fn to_string(&self) -> String {
         match self {
+            Literal::Void => "void".to_string(),
             Literal::Unit => "unit".to_string(),
             Literal::Int(v) => v.to_string(),
             Literal::UInt(v) => v.to_string(),
@@ -159,13 +161,13 @@ pub enum Keyword {
 
     // Types
     Mut,
-    Func,
+    Fun,
     Struct,
     Enum,
     Union,
     // Flags,
-    Impl,
-    Trait,
+    // Impl,
+    // Trait,
     Type,
 
     // Generics
