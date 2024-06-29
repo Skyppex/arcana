@@ -1,7 +1,7 @@
-use std::{fmt::Display, hash::Hash, ops::Deref};
+use std::{fmt::Display, hash::Hash};
 
 use crate::{
-    lexer::token::{self, TokenKind},
+    lexer::token::{self, Keyword, TokenKind},
     parser::{cursor::Cursor, Literal},
 };
 
@@ -11,23 +11,7 @@ pub enum TypeAnnotation {
     ConcreteType(String, Vec<TypeAnnotation>),
     Array(Box<TypeAnnotation>),
     Literal(Box<Literal>),
-}
-
-impl Into<TypeIdentifier> for TypeAnnotation {
-    fn into(self) -> TypeIdentifier {
-        match self {
-            TypeAnnotation::Type(name) => TypeIdentifier::Type(name),
-            TypeAnnotation::ConcreteType(name, generics) => {
-                TypeIdentifier::ConcreteType(name, generics)
-            }
-            TypeAnnotation::Array(type_annotation) => {
-                TypeIdentifier::ConcreteType("Array".to_string(), vec![*type_annotation])
-            }
-            TypeAnnotation::Literal(literal) => {
-                TypeIdentifier::ConcreteType(literal.deref().to_string(), vec![])
-            }
-        }
-    }
+    Function(Vec<TypeAnnotation>, Box<TypeAnnotation>),
 }
 
 impl From<TypeIdentifier> for TypeAnnotation {
@@ -64,6 +48,17 @@ impl TypeAnnotation {
             TypeAnnotation::ConcreteType(name, _) => name.clone(),
             TypeAnnotation::Array(type_identifier) => type_identifier.name(),
             TypeAnnotation::Literal(literal) => literal.to_string(),
+            TypeAnnotation::Function(type_annotations, return_type_annotation) => {
+                format!(
+                    "fun({}): {}",
+                    type_annotations
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    return_type_annotation.to_string()
+                )
+            }
         }
     }
 }
@@ -90,6 +85,18 @@ impl Display for TypeAnnotation {
             }
             TypeAnnotation::Array(type_identifier) => write!(f, "[{}]", type_identifier),
             TypeAnnotation::Literal(literal) => write!(f, "{:?}", literal),
+            TypeAnnotation::Function(type_annotations, return_type_annotation) => {
+                write!(
+                    f,
+                    "fun({}): {}",
+                    type_annotations
+                        .iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    return_type_annotation.to_string()
+                )
+            }
         }
     }
 }
@@ -196,6 +203,7 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
             let _ = cloned_cursor.bump();
             can_be_type_annotation(&cloned_cursor)
         }
+        TokenKind::Keyword(Keyword::Fun) => true,
         _ => false,
     }
 }
@@ -278,6 +286,33 @@ pub(super) fn parse_type_annotation(
 
             cursor.bump()?; // Consume the ]
             Ok(TypeAnnotation::Array(Box::new(type_annotation)))
+        }
+        TokenKind::Keyword(Keyword::Fun) => {
+            cursor.bump()?; // Consume the fun
+
+            if cursor.first().kind != TokenKind::OpenParen {
+                return Err(format!("Expected ( but found {:?}", cursor.first().kind));
+            }
+
+            cursor.bump()?; // Consume the (
+
+            let parameters = parse_comma_separated_type_annotations(
+                cursor,
+                |kind| kind != TokenKind::CloseParen,
+                allow_void,
+            )?;
+
+            cursor.bump()?; // Consume the )
+
+            if cursor.first().kind != TokenKind::Colon {
+                return Err(format!("Expected : but found {:?}", cursor.first().kind));
+            }
+
+            cursor.bump()?; // Consume the :
+
+            let return_type = Box::new(parse_type_annotation(cursor, true)?);
+
+            Ok(TypeAnnotation::Function(parameters, return_type))
         }
         _ => Err(format!(
             "Expected type identifier but found {:?}",

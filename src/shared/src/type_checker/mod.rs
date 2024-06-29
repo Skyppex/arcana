@@ -150,20 +150,29 @@ impl FullName for Trait {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
-    pub identifier: TypeIdentifier,
+    pub identifier: Option<TypeIdentifier>,
     pub param: Option<Parameter>,
     pub return_type: Box<Type>,
 }
 
 impl Function {
-    pub fn type_annotation(&self) -> TypeAnnotation {
-        TypeAnnotation::from(self.identifier.clone())
+    pub fn type_annotation(&self) -> Option<TypeAnnotation> {
+        self.identifier
+            .clone()
+            .map(|id| TypeAnnotation::from(id.clone()))
     }
 }
 
 impl FullName for Function {
     fn full_name(&self) -> String {
-        self.identifier.to_string()
+        format!(
+            "fun({}): {}",
+            self.param
+                .clone()
+                .map(|p| p.type_.full_name())
+                .unwrap_or_else(|| "".to_string()),
+            self.return_type
+        )
     }
 }
 
@@ -353,7 +362,10 @@ impl Type {
                 um.discriminant_name.clone(),
             ),
             Type::Union(u) => u.type_identifier.clone(),
-            Type::Function(f) => f.identifier.clone(),
+            Type::Function(f) => f
+                .identifier
+                .clone()
+                .unwrap_or_else(|| panic!("Closure has no identifier")),
             _ => panic!("Cannot get type identifier for type {}", self.full_name()),
         }
     }
@@ -373,7 +385,9 @@ impl Type {
             Type::Struct(s) => s.type_annotation(),
             Type::Enum(e) => e.type_annotation(),
             Type::Union(u) => u.type_annotation(),
-            Type::Function(f) => f.type_annotation(),
+            Type::Function(f) => f
+                .type_annotation()
+                .unwrap_or_else(|| panic!("Closure has no type annotation")),
             Type::Literal { type_, .. } => {
                 TypeAnnotation::Literal(Box::new((*type_.clone()).into()))
             }
@@ -544,5 +558,26 @@ impl Into<parser::Literal> for Type {
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.to_string().fmt(f)
+    }
+}
+
+pub fn type_equals(left: &Type, right: &Type) -> bool {
+    match (left, right) {
+        (Type::Union(Union { literals, .. }), Type::Literal { .. }) => literals.contains(right),
+        (Type::Literal { .. }, Type::Union(_)) => type_equals(right, left),
+        (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
+            type_equals(type_, type_2)
+        }
+        (Type::Literal { type_, .. }, other) => type_equals(type_, other),
+        (other, Type::Literal { type_, .. }) => type_equals(other, type_),
+        (Type::Function(fl), Type::Function(fr)) => {
+            type_equals(fl.return_type.as_ref(), fr.return_type.as_ref())
+                && fl
+                    .param
+                    .as_ref()
+                    .zip(fr.param.as_ref())
+                    .map_or(true, |(p, p2)| type_equals(&p.type_, &p2.type_))
+        }
+        _ => left == right,
     }
 }

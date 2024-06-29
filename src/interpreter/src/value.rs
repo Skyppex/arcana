@@ -2,6 +2,8 @@ use std::{collections::HashMap, fmt::Display};
 
 use shared::{type_checker::ast::TypedStatement, types::TypeAnnotation};
 
+use crate::{environment::Rcrc, Environment};
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Uninitialized,
@@ -23,6 +25,7 @@ pub enum Value {
     Function {
         param_name: Option<String>,
         body: Vec<TypedStatement>,
+        environment: Rcrc<Environment>,
     },
 }
 
@@ -125,6 +128,7 @@ impl<'a> Display for Value {
             Value::Function {
                 param_name,
                 body: _,
+                environment: _,
             } => match param_name {
                 Some(param_name) => write!(f, "({})", param_name),
                 None => write!(f, "()"),

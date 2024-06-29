@@ -8,7 +8,7 @@ use std::{
 
 use crate::read_input;
 use interpreter::Environment;
-use shared::type_checker::TypeEnvironment;
+use shared::type_checker::{Type, TypeEnvironment};
 
 pub(crate) fn interactive() -> Result<(), String> {
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
@@ -48,8 +48,12 @@ pub(crate) fn interactive() -> Result<(), String> {
         }
 
         if input.trim() == "types" {
-            for (.., type_) in type_environment.borrow().get_types() {
-                println!("{}", type_);
+            for (ident, type_) in type_environment.borrow().get_types() {
+                if let Type::Function(..) = type_ {
+                    println!("{} -> {}", ident.to_string(), type_);
+                } else {
+                    println!("{}", type_);
+                }
             }
             continue;
         }
@@ -68,8 +72,22 @@ pub(crate) fn interactive() -> Result<(), String> {
             continue;
         }
 
-        if let Err(message) = read_input(input, type_environment, environment.clone()) {
+        if input.trim() == "env" {
+            for (_, value) in environment.borrow().get_variables() {
+                println!("{}", value.borrow());
+            }
+
+            for (_, value) in environment.borrow().get_functions() {
+                println!("{}", value.borrow());
+            }
+
+            continue;
+        }
+
+        if let Err(message) = read_input(input.clone(), type_environment, environment.clone()) {
             println!("Error: {}", message);
+            println!();
+            println!("{}", input);
         }
 
         println!()

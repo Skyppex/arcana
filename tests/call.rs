@@ -11,7 +11,7 @@ use shared::type_checker::{
 fn call_is_call() {
     // Arrange
     let input = r#"
-        func a() {}
+        fun a() {}
         a()
     "#;
 
@@ -31,7 +31,7 @@ fn call_is_call() {
 fn call_has_void_return_type() {
     // Arrange
     let input = r#"
-        func a() {}
+        fun a() {}
         a()
     "#;
 
@@ -51,7 +51,7 @@ fn call_has_void_return_type() {
 fn call_has_return_type() {
     // Arrange
     let input = r#"
-        func a(): bool { true }
+        fun a(): bool { true }
         a()
     "#;
 

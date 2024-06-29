@@ -6,9 +6,9 @@ use crate::{
 };
 
 use super::{
-    cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call,
-    EnumMemberFieldInitializers, Expression, FieldInitializer, If, Literal, Member, Statement,
-    Ternary, Unary, UnaryOperator, VariableDeclaration, While,
+    cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, Closure,
+    EnumMemberFieldInitializers, Expression, FieldInitializer, If, Literal, Member, Parameter,
+    Statement, Ternary, Unary, UnaryOperator, VariableDeclaration, While,
 };
 use crate::types::{can_be_type_annotation, parse_type_annotation};
 
@@ -287,7 +287,7 @@ fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> 
             | TokenKind::PipeEqual
             | TokenKind::CaretEqual
     ) {
-        let operator = cursor.bump()?.kind; // Consume the +=, -=, *=, /=, %=, &=, |=, ^=, >>=, or <<=
+        let operator = cursor.bump()?.kind; // Consume the +=, -=, *=, /=, %=, &=, |=, ^=
         let initializer = parse_expression(cursor)?;
 
         let Expression::Member(ref member) = expression else {
@@ -321,7 +321,7 @@ fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> 
 }
 
 fn parse_ternary(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_boolean_logical(cursor)?;
+    let mut expression = parse_closure(cursor)?;
 
     while let TokenKind::QuestionMark = cursor.first().kind {
         cursor.bump()?; // Consume the ?
@@ -347,14 +347,72 @@ fn parse_ternary(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
+fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Pipe {
+        return parse_boolean_logical(cursor);
+    }
+
+    cursor.bump()?; // Consume the |
+
+    let mut parameters = vec![];
+
+    while cursor.first().kind != TokenKind::Pipe {
+        let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
+            return Err(format!(
+                "Expected identifier but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        let TokenKind::Colon = cursor.bump()?.kind else {
+            return Err(format!("Expected : but found {:?}", cursor.first().kind));
+        };
+
+        let type_annotation = parse_type_annotation(cursor, false)?;
+
+        parameters.push(Parameter {
+            name: identifier,
+            type_annotation,
+        });
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        }
+    }
+
+    cursor.bump()?; // Consume the |
+
+    let return_type_annotation = if cursor.first().kind == TokenKind::Colon {
+        cursor.bump()?; // Consume the :
+        Some(parse_type_annotation(cursor, true)?)
+    } else {
+        None
+    };
+
+    let param = parameters.first().cloned();
+
+    let body = parse_expression(cursor)?;
+
+    Ok(Expression::Closure(Closure {
+        param,
+        return_type_annotation,
+        body: Box::new(body),
+    }))
+}
+
 fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_comparison(cursor)?;
 
     while matches!(
-        cursor.first().kind,
-        TokenKind::DoubleAmpersand | TokenKind::DoublePipe
+        (cursor.first().kind, cursor.second().kind),
+        (TokenKind::DoubleAmpersand, _) | (TokenKind::Pipe, TokenKind::Pipe)
     ) {
-        let operator = cursor.bump()?.kind; // Consume the && or ||
+        let operator = cursor.bump()?.kind; // Consume the && or |
+
+        if matches!(operator, TokenKind::Pipe) {
+            cursor.bump()?; // Consume the second |
+        }
+
         let right = parse_comparison(cursor)?;
 
         expression = Expression::Binary(Binary {
@@ -362,7 +420,7 @@ fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
             right: Box::new(right),
             operator: match operator {
                 TokenKind::DoubleAmpersand => BinaryOperator::LogicalAnd,
-                TokenKind::DoublePipe => BinaryOperator::LogicalOr,
+                TokenKind::Pipe => BinaryOperator::LogicalOr,
                 _ => unreachable!("Expected && or || but found {:?}", operator),
             },
         });
@@ -384,7 +442,7 @@ fn parse_comparison(cursor: &mut Cursor) -> Result<Expression, String> {
             | TokenKind::LessEqual
     ) {
         let operator = cursor.bump()?.kind; // Consume the ==, !=, >, <, >=, or <=
-        let right = parse_bitwise_logical(cursor)?;
+        let right = parse_additive(cursor)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
@@ -408,19 +466,22 @@ fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_additive(cursor)?;
 
     while matches!(
-        cursor.first().kind,
-        TokenKind::Caret | TokenKind::Ampersand | TokenKind::Pipe
+        (cursor.first().kind, cursor.second().kind),
+        (TokenKind::Caret, _)
+            | (TokenKind::Ampersand, _)
+            | (TokenKind::Greater, TokenKind::Greater)
+            | (TokenKind::Less, TokenKind::Less)
     ) || matches!(
         (cursor.first().kind, cursor.second().kind),
-        (TokenKind::Greater, TokenKind::Greater) | (TokenKind::Less, TokenKind::Less)
-    ) {
+        (TokenKind::Pipe, t) if t != TokenKind::Pipe)
+    {
         let operator = cursor.bump()?.kind; // Consume the (first >), (first <), ^, &, or |
 
         if matches!(operator, TokenKind::Greater | TokenKind::Less) {
             cursor.bump()?; // Consume the second > or <
         }
 
-        let right = parse_additive(cursor)?;
+        let right = parse_boolean_logical(cursor)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
@@ -655,7 +716,7 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut object = parse_literal(cursor)?;
 
     while let TokenKind::DoubleColon = cursor.first().kind {
-        cursor.bump()?; // Consume the .
+        cursor.bump()?; // Consume the ::
 
         let TokenKind::Identifier(identifier) = cursor.first().kind else {
             return Err(format!(

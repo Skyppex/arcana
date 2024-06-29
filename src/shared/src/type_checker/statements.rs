@@ -11,7 +11,7 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    Enum, EnumMember, Function, Parameter, Rcrc, Struct, Type, Union,
+    type_equals, Enum, EnumMember, Function, Parameter, Rcrc, Struct, Type, Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -289,9 +289,9 @@ pub fn check_type<'a>(
                     return Err(format!("Expected literal, found {}", t));
                 };
 
-                if acc.clone()? == Type::Void {
+                if type_equals(&acc.clone()?, &Type::Void) {
                     Ok(*type_.clone())
-                } else if acc.clone()? != *type_.clone() {
+                } else if !type_equals(&acc.clone()?, type_) {
                     Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
                         acc.as_ref().unwrap(),
@@ -395,7 +395,7 @@ pub fn check_type<'a>(
                     .unwrap_or(Type::Void))
             })?;
 
-            if return_type != body_type {
+            if !type_equals(&return_type, &body_type) {
                 return Err(format!(
                     "Function body's return type {} does not match function return type {}",
                     body_type, return_type
@@ -403,7 +403,7 @@ pub fn check_type<'a>(
             }
 
             let type_ = Type::Function(Function {
-                identifier: identifier.clone(),
+                identifier: Some(identifier.clone()),
                 param: param.clone(),
                 return_type: Box::new(return_type.clone()),
             });
@@ -564,9 +564,9 @@ fn check_type_identifier(
                 .collect::<Result<Vec<Type>, String>>()?;
 
             let literal_type = literal_types.iter().fold(Ok(Type::Void), |acc, t| {
-                if acc == Ok(Type::Void) {
+                if type_equals(&acc.clone()?, &Type::Void) {
                     Ok(t.clone())
-                } else if acc != Ok(t.clone()) {
+                } else if type_equals(&acc.clone()?, t) {
                     Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
                         acc.as_ref().unwrap(),
@@ -601,7 +601,7 @@ fn check_type_identifier(
             };
 
             return Ok(Type::Function(Function {
-                identifier: type_identifier.clone(),
+                identifier: Some(type_identifier.clone()),
                 param,
                 return_type: Box::new(check_type_annotation(
                     return_type_annotation,
@@ -707,9 +707,9 @@ pub fn check_type_annotation(
                 .collect::<Result<Vec<Type>, String>>()?;
 
             let literal_type = literal_types.iter().fold(Ok(Type::Void), |acc, t| {
-                if acc == Ok(Type::Void) {
+                if type_equals(&acc.clone()?, &Type::Void) {
                     Ok(t.clone())
-                } else if acc != Ok(t.clone()) {
+                } else if !type_equals(&acc.clone()?, t) {
                     Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
                         acc.as_ref().unwrap(),
@@ -744,7 +744,7 @@ pub fn check_type_annotation(
             };
 
             Ok(Type::Function(Function {
-                identifier: type_identifier.clone(),
+                identifier: Some(type_identifier.clone()),
                 param,
                 return_type: Box::new(check_type_annotation(
                     return_type_annotation,

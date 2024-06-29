@@ -118,12 +118,30 @@ impl Environment {
         self.resolve(identifier)
     }
 
-    pub fn get_variables(&self) -> &HashMap<String, Rcrc<Variable>> {
-        &self.variables
+    pub fn get_variables(&self) -> HashMap<String, Rcrc<Variable>> {
+        let current_funcs = self.variables.clone();
+        let parent_funcs = self
+            .parent
+            .clone()
+            .map(|p| p.borrow().get_variables())
+            .unwrap_or_default();
+
+        current_funcs.into_iter().chain(parent_funcs).collect()
     }
 
     pub fn get_function(&self, identifier: &str) -> Option<Rcrc<Variable>> {
         self.resolve_function(identifier)
+    }
+
+    pub fn get_functions(&self) -> HashMap<String, Rcrc<Variable>> {
+        let current_funcs = self.functions.clone();
+        let parent_funcs = self
+            .parent
+            .clone()
+            .map(|p| p.borrow().get_functions())
+            .unwrap_or_default();
+
+        current_funcs.into_iter().chain(parent_funcs).collect()
     }
 
     pub fn set_variable(&mut self, member: Member, value: Value) -> Result<Value, String> {
@@ -170,7 +188,7 @@ impl Environment {
         if let Some(functions) = self.functions.get(name) {
             Some(functions.clone())
         } else if let Some(parent) = &self.parent {
-            parent.borrow().resolve(name)
+            parent.borrow().resolve_function(name)
         } else {
             None
         }

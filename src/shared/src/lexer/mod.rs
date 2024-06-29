@@ -111,10 +111,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             }
         }
         '|' => {
-            if cursor.second() == '|' {
-                cursor.bump();
-                Ok(create_token(TokenKind::DoublePipe, cursor))
-            } else if cursor.second() == '=' {
+            if cursor.second() == '=' {
                 cursor.bump();
                 Ok(create_token(TokenKind::PipeEqual, cursor))
             } else {

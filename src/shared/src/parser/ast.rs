@@ -42,6 +42,7 @@ pub enum Expression {
     Assignment(Assignment),
     Member(Member),
     Literal(Literal),
+    Closure(Closure),
     Call(Call),
     Unary(Unary),
     Binary(Binary),
@@ -260,6 +261,13 @@ pub struct If {
 pub struct Assignment {
     pub member: Box<Member>,
     pub initializer: Box<Expression>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Closure {
+    pub param: Option<Parameter>,
+    pub return_type_annotation: Option<TypeAnnotation>,
+    pub body: Box<Expression>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

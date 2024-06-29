@@ -45,7 +45,6 @@ pub enum TokenKind {
     DoubleAmpersand,
     Pipe,
     PipeEqual,
-    DoublePipe,
     Caret,
     CaretEqual,
     Tilde,

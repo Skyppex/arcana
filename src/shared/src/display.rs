@@ -481,6 +481,38 @@ impl IndentDisplay for Expression {
             }
             Expression::Member(m) => m.indent_display(indent),
             Expression::Literal(l) => l.indent_display(indent),
+            Expression::Closure(c) => {
+                let mut result = String::new();
+                result.push_str("<closure>\n");
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}param: {}\n",
+                        indent.dash(),
+                        c.param.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}return_type: {}\n",
+                        indent.dash(),
+                        c.return_type_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "\n{}body: {}",
+                        indent.dash_end(),
+                        c.body.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                indent.decrease();
+                result
+            }
             Expression::Call(Call { caller, argument }) => {
                 let mut result = String::new();
                 result.push_str("<call>\n");
@@ -1463,6 +1495,33 @@ impl IndentDisplay for TypedExpression {
             }
             TypedExpression::Member(m) => m.indent_display(indent),
             TypedExpression::Literal(l) => l.indent_display(indent),
+            TypedExpression::Closure {
+                param,
+                return_type,
+                body,
+                type_,
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<closure>: {}\n", type_).as_str());
+                indent.increase();
+                result.push_str(
+                    format!("{}param: {}\n", indent.dash(), param.indent_display(indent)).as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}return_type: {}\n",
+                        indent.dash(),
+                        return_type.type_annotation().indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                indent.end_current();
+                result.push_str(
+                    format!("{}body: {}", indent.dash_end(), body.indent_display(indent)).as_str(),
+                );
+                indent.decrease();
+                result
+            }
             TypedExpression::Call {
                 caller,
                 argument,
@@ -2276,13 +2335,13 @@ impl IndentDisplay for TypeAnnotation {
                 result.push_str(format!("{}type: {}", indent.dash_end(), type_name).as_str());
             }
             TypeAnnotation::ConcreteType(type_name, generics) => {
-                result.push_str(format!("{}generic_type: {}", indent.dash(), type_name).as_str());
+                result.push_str(format!("{}concrete_type: {}", indent.dash(), type_name).as_str());
 
                 for (i, generic) in generics.iter().enumerate() {
                     if i < generics.len() - 1 {
                         result.push_str(
                             format!(
-                                "\n{}generic: {},",
+                                "\n{}conretes: {},",
                                 indent.dash(),
                                 generic.indent_display(indent)
                             )
@@ -2292,7 +2351,7 @@ impl IndentDisplay for TypeAnnotation {
                         indent.end_current();
                         result.push_str(
                             format!(
-                                "\n{}generic: {}",
+                                "\n{}concretes: {}",
                                 indent.dash_end(),
                                 generic.indent_display(indent)
                             )
@@ -2317,6 +2376,28 @@ impl IndentDisplay for TypeAnnotation {
                         "{}literal: {}",
                         indent.dash_end(),
                         literal.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+            }
+            TypeAnnotation::Function(param, return_type) => {
+                result.push_str(
+                    format!(
+                        "{}param: {}",
+                        indent.dash(),
+                        param
+                            .into_iter()
+                            .map(|p| p.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "\n{}return_type: {}",
+                        indent.dash_end(),
+                        return_type.indent_display(indent)
                     )
                     .as_str(),
                 );

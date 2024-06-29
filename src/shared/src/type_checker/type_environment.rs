@@ -4,7 +4,7 @@ use crate::types::{GenericType, TypeAnnotation, TypeIdentifier};
 
 use super::{
     scope::{Scope, ScopeType},
-    FullName, Type,
+    FullName, Parameter, Type,
 };
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
@@ -143,8 +143,6 @@ impl TypeEnvironment {
     ) -> Result<Type, String> {
         match type_annotation {
             TypeAnnotation::Type(type_name) => {
-                println!("type_name: {:?}", type_name);
-                println!("types.keys: {:?}", self.types.keys());
                 if let Some(t) = self.types.get(&TypeIdentifier::Type(type_name.clone())) {
                     Ok(t.clone())
                 } else if type_name.contains("::") {
@@ -187,6 +185,30 @@ impl TypeEnvironment {
                 .get_type_from_annotation(type_annotation, type_environment)
                 .map(|t| Type::Array(Box::new(t))),
             TypeAnnotation::Literal(literal) => Ok(Type::from_literal(literal)?),
+            TypeAnnotation::Function(param_type_annotations, return_type_annotation) => {
+                let param_types = param_type_annotations
+                    .iter()
+                    .map(|a| {
+                        self.get_type_from_annotation(a, type_environment.clone())
+                            .map_err(|e| format!("Error getting type from annotation: {}", e))
+                    })
+                    .collect::<Result<Vec<Type>, String>>()?;
+
+                let return_type = self
+                    .get_type_from_annotation(return_type_annotation, type_environment)
+                    .map_err(|e| format!("Error getting type from annotation: {}", e))?;
+
+                let param_type = param_types.first().cloned();
+
+                Ok(Type::Function(super::Function {
+                    identifier: None,
+                    param: param_type.map(|pt| Parameter {
+                        name: pt.full_name(),
+                        type_: Box::new(pt),
+                    }),
+                    return_type: Box::new(return_type),
+                }))
+            }
         }
     }
 

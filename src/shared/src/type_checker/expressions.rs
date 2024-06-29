@@ -9,11 +9,11 @@ use crate::{
 use super::{
     ast::{
         BinaryOperator, Block, EnumMemberFieldInitializers, FieldInitializer, Member, Typed,
-        TypedExpression, TypedStatement, UnaryOperator,
+        TypedExpression, TypedParameter, TypedStatement, UnaryOperator,
     },
     scope::ScopeType,
-    statements, DiscoveredType, Enum, EnumMember, FullName, Rcrc, Struct, Type, TypeEnvironment,
-    Union,
+    statements, type_equals, DiscoveredType, Enum, EnumMember, FullName, Function, Rcrc, Struct,
+    Type, TypeEnvironment,
 };
 
 pub fn check_type<'a>(
@@ -99,9 +99,7 @@ pub fn check_type<'a>(
             };
 
             let else_type = else_block.clone().map(|e| e.get_deep_type());
-            println!("1: {:?}", else_type);
             let is_opt = !is_option(&else_type);
-            println!("2: {:?}", is_opt);
 
             let type_ = if !is_option(&else_type) {
                 if let Some(else_type) = else_type {
@@ -119,8 +117,6 @@ pub fn check_type<'a>(
             } else {
                 Type::option_of(if_block_type.clone())
             };
-
-            println!("20: {:?}", type_);
 
             Ok(TypedExpression::If {
                 condition: Box::new(if_condition.clone()),
@@ -243,8 +239,6 @@ pub fn check_type<'a>(
                         Err(format!("{} is not a struct", type_.full_name()))?
                     };
 
-                    println!("{:?}", fields);
-
                     let field_initializers = field_initializers?;
 
                     for (field, initializer) in fields.iter().zip(field_initializers.iter()) {
@@ -301,7 +295,7 @@ pub fn check_type<'a>(
                         .get_type_from_annotation(type_annotation, type_environment.clone())?;
 
                     let Type::Enum(Enum { members, .. }) = type_.clone() else {
-                        Err(format!("{} is not a struct", type_.full_name()))?
+                        Err(format!("{} is not an enum", type_.full_name()))?
                     };
 
                     let Some(Type::EnumMember(EnumMember { fields, .. })) = members.get(member)
@@ -362,66 +356,97 @@ pub fn check_type<'a>(
 
             Ok(TypedExpression::Literal(literal))
         }
-        Expression::Call(call) => {
-            let Expression::Member(member) = *call.caller.clone() else {
-                Err("Function must be a member".to_string())?
-            };
+        Expression::Closure(closure) => {
+            let closure_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
+                type_environment.clone(),
+            )));
 
-            let caller = check_type(&call.caller, discovered_types, type_environment.clone())?;
+            let param = closure.param.clone();
+            let return_type_annotation = closure.return_type_annotation.clone();
+            let body = closure.body.clone();
 
-            match member {
-                parser::Member::Identifier { symbol } => {
-                    let function_type = type_environment
-                        .borrow()
-                        .get_type_from_str(&symbol)
-                        .ok_or_else(|| format!("Unexpected type: {}", symbol))?;
+            let param = match param {
+                Some(param) => {
+                    let type_ = type_environment.borrow().get_type_from_annotation(
+                        &param.type_annotation,
+                        type_environment.clone(),
+                    )?;
 
-                    let Type::Function(function) = function_type.clone() else {
-                        Err(format!(
-                            "Expected function type, found {}",
-                            function_type.full_name()
-                        ))?
-                    };
+                    closure_environment
+                        .borrow_mut()
+                        .add_variable(param.name.clone(), type_.clone());
 
-                    let arg_typed_expression = call
-                        .argument
-                        .clone()
-                        .map(|arg| check_type(&arg, discovered_types, type_environment.clone()))
-                        .transpose()?;
-
-                    let function_param_type = function.param.map(|p| p.type_.clone());
-
-                    let arg = match (arg_typed_expression.clone(), function_param_type.clone()) {
-                        (Some(arg), Some(param)) => {
-                            if !type_equals(&arg.get_type(), &param) {
-                                return Err(format!(
-                                    "Argument type {} does not match parameter type {}",
-                                    arg.get_type(),
-                                    param
-                                ));
-                            }
-
-                            Some(Box::new(arg))
-                        }
-                        (None, None) => None,
-                        _ => Err(format!(
-                            "Expected argument type {:?}, found {:?}",
-                            function_param_type, arg_typed_expression
-                        ))?,
-                    };
-
-                    Ok(TypedExpression::Call {
-                        caller: Box::new(caller),
-                        argument: arg,
-                        type_: *function.return_type,
+                    Some(TypedParameter {
+                        name: param.name.clone(),
+                        type_annotation: param.type_annotation.clone(),
+                        type_: Box::new(type_),
                     })
                 }
-                parser::Member::MemberAccess {
-                    object: _,
-                    member: _,
-                    symbol: _,
-                } => todo!("Member access call"),
+                None => None,
+            };
+
+            let return_type = match return_type_annotation {
+                Some(return_type) => {
+                    let type_ = type_environment
+                        .borrow()
+                        .get_type_from_annotation(&return_type, type_environment.clone())?;
+
+                    type_
+                }
+                None => Type::Void,
+            };
+
+            let body = check_type(&body, discovered_types, closure_environment.clone())?;
+
+            let type_ = Type::Function(Function {
+                identifier: None,
+                param: param.clone().map(|p| super::Parameter {
+                    name: p.name,
+                    type_: p.type_,
+                }),
+                return_type: Box::new(return_type.clone()),
+            });
+
+            Ok(TypedExpression::Closure {
+                param,
+                return_type,
+                body: Box::new(body),
+                type_,
+            })
+        }
+        Expression::Call(call) => {
+            let caller = check_type(&call.caller, discovered_types, type_environment.clone())?;
+
+            if !matches!(caller.get_type(), Type::Function(_)) {
+                return Err(format!(
+                    "Expected function type, found {}",
+                    caller.get_type()
+                ));
             }
+
+            let type_ = match caller.get_type() {
+                Type::Function(Function { return_type, .. }) => *return_type,
+                _ => {
+                    return Err(format!(
+                        "Expected function type, found {}",
+                        caller.get_type()
+                    ))
+                }
+            };
+
+            let arg_typed_expression = call
+                .argument
+                .clone()
+                .map(|arg| check_type(&arg, discovered_types, type_environment.clone()))
+                .transpose()?;
+
+            let arg = arg_typed_expression.clone().map(|arg| Box::new(arg));
+
+            Ok(TypedExpression::Call {
+                caller: Box::new(caller),
+                argument: arg,
+                type_,
+            })
         }
         Expression::Unary(unary) => {
             let expression = check_type(&unary.expression, discovered_types, type_environment)?;
@@ -667,8 +692,6 @@ fn is_option(type_: &Option<Type>) -> bool {
         return false;
     };
 
-    println!("2: {:?}", type_);
-
     let Type::Enum(Enum {
         type_identifier,
         members,
@@ -677,44 +700,23 @@ fn is_option(type_: &Option<Type>) -> bool {
         return false;
     };
 
-    println!("3: {:?}", type_identifier);
-    println!("4: {:?}", members);
-
     let TypeIdentifier::ConcreteType(name, ..) = type_identifier else {
         return false;
     };
-
-    println!("5: {:?}", name);
 
     if name != "Option" {
         return false;
     }
 
     return members.get("Some").map_or(false, |member| {
-        println!("6: {:?}", member);
-
         let Type::EnumMember(EnumMember { fields, .. }) = member else {
             return false;
         };
 
         return fields.get("f0").map_or(false, |field| {
-            println!("7: {:?}", field);
             return true;
         });
     });
-}
-
-fn type_equals(left: &Type, right: &Type) -> bool {
-    match (left, right) {
-        (Type::Union(Union { literals, .. }), Type::Literal { .. }) => literals.contains(right),
-        (Type::Literal { .. }, Type::Union(_)) => type_equals(right, left),
-        (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
-            type_equals(type_, type_2)
-        }
-        (Type::Literal { type_, .. }, other) => type_equals(type_, other),
-        (other, Type::Literal { type_, .. }) => type_equals(other, type_),
-        _ => left == right,
-    }
 }
 
 fn check_type_member_access(

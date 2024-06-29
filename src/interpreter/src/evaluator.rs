@@ -33,7 +33,7 @@ pub fn evaluate<'a>(
             return_type: _,
             body,
             type_: _,
-        } => evaluate_function_declaration(&environment, identifier, param, body),
+        } => evaluate_function_declaration(environment, identifier, param, body),
         TypedStatement::Semi(s) => {
             evaluate(*s, environment)?;
             Ok(Value::Void)
@@ -51,7 +51,7 @@ pub fn evaluate<'a>(
 }
 
 fn evaluate_function_declaration(
-    environment: &Rc<RefCell<Environment>>,
+    environment: Rc<RefCell<Environment>>,
     identifier: TypeIdentifier,
     param: Option<TypedParameter>,
     body: Vec<TypedStatement>,
@@ -59,10 +59,13 @@ fn evaluate_function_declaration(
     let function = Value::Function {
         param_name: param.map(|p| p.name),
         body,
+        environment: environment.clone(),
     };
+
     environment
         .borrow_mut()
         .add_function(identifier.to_string(), function, false);
+
     Ok(Value::Void)
 }
 
@@ -97,6 +100,12 @@ fn evaluate_expression<'a>(
         } => evaluate_assignment(member, initializer, type_, environment),
         TypedExpression::Member(m) => evaluate_member(m, environment),
         TypedExpression::Literal(l) => evaluate_literal(l, environment),
+        TypedExpression::Closure {
+            param,
+            return_type: _,
+            body,
+            type_: _,
+        } => evaluate_closure(param, *body, environment),
         TypedExpression::Call {
             caller,
             argument,
@@ -359,6 +368,18 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
     }
 }
 
+fn evaluate_closure(
+    param: Option<TypedParameter>,
+    body: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    Ok(Value::Function {
+        param_name: param.map(|p| p.name),
+        body: vec![TypedStatement::Expression(body)],
+        environment,
+    })
+}
+
 fn evaluate_call(
     caller: Box<TypedExpression>,
     argument: Option<Box<TypedExpression>>,
@@ -372,7 +393,11 @@ fn evaluate_call(
         .transpose()?;
 
     match caller_value {
-        Value::Function { param_name, body } => {
+        Value::Function {
+            param_name,
+            body,
+            environment,
+        } => {
             let function_environment = Rc::new(RefCell::new(Environment::new_scope(
                 environment,
                 ScopeType::Return,

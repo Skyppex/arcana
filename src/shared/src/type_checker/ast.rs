@@ -264,7 +264,6 @@ impl Display for Block {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypedExpression {
     None, // For testing purposes
-
     VariableDeclaration {
         mutable: bool,
         identifier: String,
@@ -284,6 +283,12 @@ pub enum TypedExpression {
     },
     Member(Member),
     Literal(Literal),
+    Closure {
+        param: Option<TypedParameter>,
+        return_type: Type,
+        body: Box<TypedExpression>,
+        type_: Type,
+    },
     Call {
         caller: Box<TypedExpression>,
         argument: Option<Box<TypedExpression>>,
@@ -334,6 +339,7 @@ impl Typed for TypedExpression {
             TypedExpression::Assignment { type_, .. } => type_.clone(),
             TypedExpression::Member(member) => member.get_type(),
             TypedExpression::Literal(literal) => literal.get_type(),
+            TypedExpression::Closure { type_, .. } => type_.clone(),
             TypedExpression::Call { type_, .. } => type_.clone(),
             TypedExpression::Index { type_, .. } => type_.clone(),
             TypedExpression::Unary { type_, .. } => type_.clone(),
@@ -354,6 +360,7 @@ impl Typed for TypedExpression {
             TypedExpression::Assignment { type_, .. } => type_.clone(),
             TypedExpression::Member(member) => member.get_deep_type(),
             TypedExpression::Literal(literal) => literal.get_deep_type(),
+            TypedExpression::Closure { type_, .. } => type_.clone(),
             TypedExpression::Call { type_, .. } => type_.clone(),
             TypedExpression::Index { type_, .. } => type_.clone(),
             TypedExpression::Unary { type_, .. } => type_.clone(),
@@ -415,6 +422,25 @@ impl Display for TypedExpression {
             } => write!(f, "{} = {}", member, initializer),
             TypedExpression::Member(member) => write!(f, "{}", member),
             TypedExpression::Literal(literal) => write!(f, "{}", literal),
+            TypedExpression::Closure {
+                param,
+                return_type,
+                body,
+                type_,
+            } => {
+                write!(
+                    f,
+                    "fn {}({}) -> {} {{ {} }}",
+                    if let Some(param) = param {
+                        param.to_string()
+                    } else {
+                        "".to_string()
+                    },
+                    return_type,
+                    body,
+                    type_
+                )
+            }
             TypedExpression::Call {
                 caller, argument, ..
             } => write!(
