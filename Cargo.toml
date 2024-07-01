@@ -15,6 +15,6 @@ members = [
 ]
 
 [dependencies]
-clap = { version = "4.5.1", features = ["derive"] }
+clap = { version = "4.5.8", features = ["derive"] }
 shared = { path = "src/shared"}
 interpreter = { path = "src/interpreter"}

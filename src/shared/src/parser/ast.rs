@@ -94,7 +94,7 @@ pub struct FunctionDeclaration {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    pub name: String,
+    pub identifier: String,
     pub type_annotation: TypeAnnotation,
 }
 

@@ -115,6 +115,13 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     }))
 }
 
+// fn handle_multiple_parameters(
+//     params: Vec<Parameter>,
+//     body: Vec<Statement>,
+// ) -> Result<Expression, String> {
+//
+// }
+
 fn parse_return(cursor: &mut Cursor) -> Result<Statement, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Return) {
         return parse_struct_declaration_statement(cursor);
@@ -389,7 +396,7 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
     let type_anntation = parse_type_annotation(cursor, false)?;
 
     Ok(Parameter {
-        name: identifier,
+        identifier,
         type_annotation: type_anntation,
     })
 }

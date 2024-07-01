@@ -57,7 +57,7 @@ fn evaluate_function_declaration(
     body: Vec<TypedStatement>,
 ) -> Result<Value, String> {
     let function = Value::Function {
-        param_name: param.map(|p| p.name),
+        param_name: param.map(|p| p.identifier),
         body,
         environment: environment.clone(),
     };
@@ -346,15 +346,6 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
 
                     EnumFields::Named(fields)
                 }
-                EnumMemberFieldInitializers::Unnamed(field_initializers) => {
-                    let mut fields = Vec::new();
-
-                    for initializer in field_initializers {
-                        fields.push(evaluate_expression(initializer, environment.clone())?);
-                    }
-
-                    EnumFields::Unnamed(fields)
-                }
             };
 
             Ok(Value::Enum {
@@ -374,7 +365,7 @@ fn evaluate_closure(
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     Ok(Value::Function {
-        param_name: param.map(|p| p.name),
+        param_name: param.map(|p| p.identifier),
         body: vec![TypedStatement::Expression(body)],
         environment,
     })

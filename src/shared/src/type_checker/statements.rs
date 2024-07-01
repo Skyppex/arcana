@@ -349,7 +349,7 @@ pub fn check_type<'a>(
                     Ok(t) => {
                         block_environment
                             .borrow_mut()
-                            .add_variable(param.name.clone(), t.clone());
+                            .add_variable(param.identifier.clone(), t.clone());
 
                         Ok(())
                     }
@@ -359,7 +359,7 @@ pub fn check_type<'a>(
 
             let param: Option<Parameter> = match param {
                 Some(p) => {
-                    let param_name = p.name.clone();
+                    let param_name = p.identifier.clone();
                     let param_type_annotation = p.type_annotation.clone();
 
                     if param_name.is_empty() {
@@ -367,7 +367,7 @@ pub fn check_type<'a>(
                     }
 
                     Some(Parameter {
-                        name: param_name,
+                        identifier: param_name,
                         type_: Box::new(check_type_annotation(
                             &param_type_annotation,
                             &discovered_types,
@@ -413,7 +413,7 @@ pub fn check_type<'a>(
             Ok(TypedStatement::FunctionDeclaration {
                 identifier: identifier.clone(),
                 param: param.map(|p| TypedParameter {
-                    name: p.name,
+                    identifier: p.identifier,
                     type_annotation: p.type_.type_annotation(),
                     type_: p.type_,
                 }),
@@ -477,6 +477,7 @@ pub fn check_type<'a>(
     }
 }
 
+#[allow(dead_code)]
 fn check_type_identifier(
     type_identifier: &TypeIdentifier,
     discovered_types: &Vec<DiscoveredType>,
@@ -590,7 +591,7 @@ fn check_type_identifier(
         }) => {
             let param = match param {
                 Some(param) => Some(Parameter {
-                    name: param.name.clone(),
+                    identifier: param.identifier.clone(),
                     type_: Box::new(check_type_annotation(
                         &param.type_annotation,
                         discovered_types,
@@ -733,7 +734,7 @@ pub fn check_type_annotation(
         }) => {
             let param = match param {
                 Some(param) => Some(Parameter {
-                    name: param.name.clone(),
+                    identifier: param.identifier.clone(),
                     type_: Box::new(check_type_annotation(
                         &param.type_annotation,
                         discovered_types,

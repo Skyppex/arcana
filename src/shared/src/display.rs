@@ -1090,7 +1090,7 @@ impl IndentDisplay for Parameter {
             format!(
                 "{}name: {}\n",
                 indent.dash(),
-                self.name.indent_display(indent)
+                self.identifier.indent_display(indent)
             )
             .as_str(),
         );
@@ -1817,7 +1817,7 @@ impl IndentDisplay for TypedParameter {
             format!(
                 "{}name: {}\n",
                 indent.dash(),
-                self.name.indent_display(indent)
+                self.identifier.indent_display(indent)
             )
             .as_str(),
         );
@@ -2122,39 +2122,6 @@ impl IndentDisplay for type_checker::ast::EnumMemberFieldInitializers {
                                 "\n{}{}: {}",
                                 indent.dash_end(),
                                 identifier,
-                                initializer.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    }
-                }
-
-                indent.decrease();
-                result
-            }
-            type_checker::ast::EnumMemberFieldInitializers::Unnamed(field_initializers) => {
-                let mut result = String::new();
-                result.push_str("<unnamed field initializer>");
-                indent.increase();
-
-                for (i, initializer) in field_initializers.iter().enumerate() {
-                    if i < field_initializers.len() - 1 {
-                        result.push_str(
-                            format!(
-                                "\n{}f{}: {},",
-                                indent.dash(),
-                                i,
-                                initializer.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!(
-                                "\n{}f{}: {}",
-                                indent.dash_end(),
-                                i,
                                 initializer.indent_display(indent)
                             )
                             .as_str(),

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
-use interpreter::{environment, evaluate, value::EnumFields, Value};
+use interpreter::{value::EnumFields, Value};
 use shared::{
     type_checker::{ast::Typed, EnumMember, Type},
     types::TypeIdentifier,

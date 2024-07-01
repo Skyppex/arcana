@@ -371,7 +371,7 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
         let type_annotation = parse_type_annotation(cursor, false)?;
 
         parameters.push(Parameter {
-            name: identifier,
+            identifier,
             type_annotation,
         });
 

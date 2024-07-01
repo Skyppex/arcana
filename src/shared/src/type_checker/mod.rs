@@ -178,7 +178,7 @@ impl FullName for Function {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
-    pub name: String,
+    pub identifier: String,
     pub type_: Box<Type>,
 }
 

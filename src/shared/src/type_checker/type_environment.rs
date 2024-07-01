@@ -203,7 +203,7 @@ impl TypeEnvironment {
                 Ok(Type::Function(super::Function {
                     identifier: None,
                     param: param_type.map(|pt| Parameter {
-                        name: pt.full_name(),
+                        identifier: pt.full_name(),
                         type_: Box::new(pt),
                     }),
                     return_type: Box::new(return_type),

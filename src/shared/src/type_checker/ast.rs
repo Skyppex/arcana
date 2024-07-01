@@ -210,7 +210,7 @@ impl Display for TypedStatement {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedParameter {
-    pub name: String,
+    pub identifier: String,
     pub type_annotation: TypeAnnotation,
     pub type_: Box<Type>,
 }
@@ -227,7 +227,7 @@ impl Typed for TypedParameter {
 
 impl Display for TypedParameter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.name, self.type_annotation)
+        write!(f, "{}: {}", self.identifier, self.type_annotation)
     }
 }
 
@@ -732,7 +732,6 @@ impl Display for FieldInitializer {
 pub enum EnumMemberFieldInitializers {
     None,
     Named(HashMap<String, TypedExpression>),
-    Unnamed(Vec<TypedExpression>),
 }
 
 impl Display for EnumMemberFieldInitializers {
@@ -745,15 +744,6 @@ impl Display for EnumMemberFieldInitializers {
                 field_initializers
                     .iter()
                     .map(|(k, v)| format!("{}: {}", k, v))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
-            EnumMemberFieldInitializers::Unnamed(field_initializers) => write!(
-                f,
-                "({})",
-                field_initializers
-                    .iter()
-                    .map(|v| v.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),

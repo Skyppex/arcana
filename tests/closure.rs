@@ -2,12 +2,9 @@ mod common;
 
 use common::{create_typed_ast, StatementExt, VecStatementExt};
 use interpreter::{value::Number, Value};
-use shared::{
-    type_checker::{
-        ast::{Typed, TypedExpression},
-        Function, Parameter, Type,
-    },
-    types::TypeAnnotation,
+use shared::type_checker::{
+    ast::{Typed, TypedExpression},
+    Function, Parameter, Type,
 };
 
 #[test]
@@ -71,7 +68,7 @@ fn closure_has_correct_type_with_param_and_return() {
         Type::Function(Function {
             identifier: None,
             param: Some(Parameter {
-                name: "x".to_string(),
+                identifier: "x".to_string(),
                 type_: Box::new(Type::Int),
             }),
             return_type: Box::new(Type::Int)

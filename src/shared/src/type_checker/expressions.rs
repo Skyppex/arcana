@@ -99,7 +99,6 @@ pub fn check_type<'a>(
             };
 
             let else_type = else_block.clone().map(|e| e.get_deep_type());
-            let is_opt = !is_option(&else_type);
 
             let type_ = if !is_option(&else_type) {
                 if let Some(else_type) = else_type {
@@ -325,24 +324,6 @@ pub fn check_type<'a>(
                                 }
                             }
                         }
-                        EnumMemberFieldInitializers::Unnamed(ref field_initializers) => {
-                            if fields.len() != field_initializers.len() {
-                                return Err(format!("Enum member {} has {} fields, but {} initializers were provided", member, fields.len(), field_initializers.len()));
-                            }
-
-                            for (field, initializer) in fields.iter().zip(field_initializers.iter())
-                            {
-                                let field_type = field.1;
-                                let initializer_type = initializer.get_type();
-
-                                if !type_equals(field_type, &initializer_type) {
-                                    return Err(format!(
-                                        "Field type {} does not match initializer type {}",
-                                        field_type, initializer_type
-                                    ));
-                                }
-                            }
-                        }
                     }
 
                     Literal::Enum {
@@ -374,10 +355,10 @@ pub fn check_type<'a>(
 
                     closure_environment
                         .borrow_mut()
-                        .add_variable(param.name.clone(), type_.clone());
+                        .add_variable(param.identifier.clone(), type_.clone());
 
                     Some(TypedParameter {
-                        name: param.name.clone(),
+                        identifier: param.identifier.clone(),
                         type_annotation: param.type_annotation.clone(),
                         type_: Box::new(type_),
                     })
@@ -401,7 +382,7 @@ pub fn check_type<'a>(
             let type_ = Type::Function(Function {
                 identifier: None,
                 param: param.clone().map(|p| super::Parameter {
-                    name: p.name,
+                    identifier: p.identifier,
                     type_: p.type_,
                 }),
                 return_type: Box::new(return_type.clone()),
@@ -713,7 +694,7 @@ fn is_option(type_: &Option<Type>) -> bool {
             return false;
         };
 
-        return fields.get("f0").map_or(false, |field| {
+        return fields.get("f0").map_or(false, |_| {
             return true;
         });
     });
