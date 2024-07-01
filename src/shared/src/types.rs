@@ -11,7 +11,7 @@ pub enum TypeAnnotation {
     ConcreteType(String, Vec<TypeAnnotation>),
     Array(Box<TypeAnnotation>),
     Literal(Box<Literal>),
-    Function(Vec<TypeAnnotation>, Box<TypeAnnotation>),
+    Function(Box<TypeAnnotation>, Box<TypeAnnotation>),
 }
 
 impl From<TypeIdentifier> for TypeAnnotation {
@@ -48,14 +48,10 @@ impl TypeAnnotation {
             TypeAnnotation::ConcreteType(name, _) => name.clone(),
             TypeAnnotation::Array(type_identifier) => type_identifier.name(),
             TypeAnnotation::Literal(literal) => literal.to_string(),
-            TypeAnnotation::Function(type_annotations, return_type_annotation) => {
+            TypeAnnotation::Function(type_annotation, return_type_annotation) => {
                 format!(
                     "fun({}): {}",
-                    type_annotations
-                        .iter()
-                        .map(|t| t.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", "),
+                    type_annotation.to_string(),
                     return_type_annotation.to_string()
                 )
             }
@@ -85,15 +81,11 @@ impl Display for TypeAnnotation {
             }
             TypeAnnotation::Array(type_identifier) => write!(f, "[{}]", type_identifier),
             TypeAnnotation::Literal(literal) => write!(f, "{:?}", literal),
-            TypeAnnotation::Function(type_annotations, return_type_annotation) => {
+            TypeAnnotation::Function(type_annotation, return_type_annotation) => {
                 write!(
                     f,
                     "fun({}): {}",
-                    type_annotations
-                        .iter()
-                        .map(|t| t.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", "),
+                    type_annotation.to_string(),
                     return_type_annotation.to_string()
                 )
             }
@@ -296,7 +288,7 @@ pub(super) fn parse_type_annotation(
 
             cursor.bump()?; // Consume the (
 
-            let parameters = parse_comma_separated_type_annotations(
+            let params = parse_comma_separated_type_annotations(
                 cursor,
                 |kind| kind != TokenKind::CloseParen,
                 allow_void,
@@ -310,15 +302,22 @@ pub(super) fn parse_type_annotation(
 
             cursor.bump()?; // Consume the :
 
-            let return_type = Box::new(parse_type_annotation(cursor, true)?);
+            let return_type_annotation = Box::new(parse_type_annotation(cursor, true)?);
 
-            Ok(TypeAnnotation::Function(parameters, return_type))
+            handle_multiple_parameters(params, return_type_annotation)
         }
         _ => Err(format!(
             "Expected type identifier but found {:?}",
             cursor.first().kind
         )),
     }
+}
+
+fn handle_multiple_parameters(
+    params: Vec<TypeAnnotation>,
+    return_type_annotation: Box<TypeAnnotation>,
+) -> Result<TypeAnnotation, String> {
+    todo!("Handle multiple parameters in type annotations")
 }
 
 fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(

@@ -4,15 +4,16 @@ use crate::{
     lexer::token::{Keyword, TokenKind},
     types::{
         can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str,
-        parse_type_identifier, GenericConstraint, GenericType, TypeIdentifier,
+        parse_type_identifier, GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier,
     },
 };
 
 use super::{
     cursor::Cursor,
     expressions::{self, parse_block_statements, parse_expression},
-    EnumDeclaration, EnumMember, EnumMemberField, Expression, FunctionDeclaration, Literal,
-    Parameter, Statement, StructDeclaration, StructField, UnionDeclaration,
+    AccessModifier, Closure, EnumDeclaration, EnumMember, EnumMemberField, Expression,
+    FunctionDeclaration, Literal, Parameter, Statement, StructDeclaration, StructField,
+    UnionDeclaration,
 };
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
@@ -81,15 +82,13 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         return Err(format!("Expected ( but found {:?}", cursor.first().kind));
     };
 
-    let parameters = parse_parameters(cursor)?;
-
-    let param = parameters.first().map(|p| p.clone());
+    let params = parse_parameters(cursor)?;
 
     let TokenKind::CloseParen = cursor.bump()?.kind else {
         return Err(format!("Expected ) but found {:?}", cursor.first().kind));
     };
 
-    let mut return_type = None;
+    let mut return_type_annotation = None;
 
     if cursor.first().kind == TokenKind::Colon {
         cursor.bump()?; // Consume the :
@@ -101,26 +100,54 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
             ));
         }
 
-        return_type = Some(parse_type_annotation(cursor, true)?);
+        return_type_annotation = Some(parse_type_annotation(cursor, true)?);
     }
 
     let body = parse_block_statements(cursor)?;
+    let body = handle_multiple_parameters(
+        access_modifier,
+        type_identifier,
+        &params,
+        return_type_annotation.clone(),
+        body,
+    )?;
+
+    Ok(body)
+}
+
+fn handle_multiple_parameters(
+    access_modifier: Option<AccessModifier>,
+    type_identifier: TypeIdentifier,
+    params: &Vec<Parameter>,
+    return_type_annotation: Option<TypeAnnotation>,
+    body: Vec<Statement>,
+) -> Result<Statement, String> {
+    let second_param = params.get(1).map(|p| p.clone());
+
+    let None = second_param else {
+        return Ok(Statement::FunctionDeclaration(FunctionDeclaration {
+            access_modifier,
+            identifier: type_identifier,
+            param: params.first().cloned(),
+            return_type_annotation,
+            body,
+        }));
+    };
+
+    let new_body = Expression::Closure(Closure {
+        param: second_param,
+        return_type_annotation,
+        body: Box::new(Expression::Block(body)),
+    });
 
     Ok(Statement::FunctionDeclaration(FunctionDeclaration {
         access_modifier,
         identifier: type_identifier,
-        param,
-        return_type_annotation: return_type,
-        body,
+        param: params.first().cloned(),
+        return_type_annotation: return_type_annotation.map(|r| TypeAnnotation::Function((), ())),
+        body: vec![Statement::Expression(new_body)],
     }))
 }
-
-// fn handle_multiple_parameters(
-//     params: Vec<Parameter>,
-//     body: Vec<Statement>,
-// ) -> Result<Expression, String> {
-//
-// }
 
 fn parse_return(cursor: &mut Cursor) -> Result<Statement, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Return) {
