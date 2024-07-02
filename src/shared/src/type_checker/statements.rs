@@ -327,6 +327,8 @@ pub fn check_type<'a>(
             return_type_annotation,
             body,
         }) => {
+            println!("Function declaration");
+            println!("{:?}", return_type_annotation);
             let return_type = check_type_annotation(
                 &return_type_annotation
                     .clone()
@@ -334,6 +336,9 @@ pub fn check_type<'a>(
                 &discovered_types,
                 type_environment.clone(),
             )?;
+
+            print!("Return type: ");
+            println!("{:?}", return_type);
 
             let body_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
                 type_environment.clone(),
@@ -357,6 +362,8 @@ pub fn check_type<'a>(
                 }?;
             }
 
+            println!("Params1");
+            println!("{:?}", param);
             let param: Option<Parameter> = match param {
                 Some(p) => {
                     let param_name = p.identifier.clone();
@@ -377,6 +384,8 @@ pub fn check_type<'a>(
                 }
                 None => None,
             };
+            println!("Params2");
+            println!("{:?}", param);
 
             let body_typed_expression: TypedExpression =
                 expressions::check_type(body, discovered_types, body_environment.clone())?;
@@ -402,6 +411,9 @@ pub fn check_type<'a>(
 
             type_environment.borrow_mut().add_type(type_.clone())?;
 
+            println!("Return type");
+            println!("{:?}", return_type);
+            println!("{:?}", type_);
             Ok(TypedStatement::FunctionDeclaration {
                 identifier: identifier.clone(),
                 param: param.map(|p| TypedParameter {
@@ -613,10 +625,14 @@ pub fn check_type_annotation(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<Type, String> {
+    println!("123");
+    println!("{:?}", type_annotation);
     if let Ok(type_) = type_environment
         .borrow()
         .get_type_from_annotation(type_annotation, type_environment.clone())
     {
+        println!("2222");
+        println!("{:?}", type_);
         return Ok(type_);
     }
 
@@ -724,6 +740,10 @@ pub fn check_type_annotation(
             param,
             return_type_annotation,
         }) => {
+            println!("111");
+            println!("{:?}", type_identifier);
+            println!("{:?}", param);
+            println!("{:?}", return_type_annotation);
             let param = match param {
                 Some(param) => Some(Parameter {
                     identifier: param.identifier.clone(),

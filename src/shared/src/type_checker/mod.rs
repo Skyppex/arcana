@@ -164,7 +164,7 @@ impl Function {
                 Some(TypeAnnotation::Function(
                     self.param
                         .clone()
-                        .map(|p| Box::new(p.type_.type_annotation())),
+                        .map(|p| (p.identifier, Box::new(p.type_.type_annotation()))),
                     Box::new(self.return_type.type_annotation()),
                 ))
             })

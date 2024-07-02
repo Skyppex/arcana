@@ -103,6 +103,8 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         return_type_annotation = Some(parse_type_annotation(cursor, true)?);
     }
 
+    println!("Parser");
+    println!("{:?}", return_type_annotation);
     let body = parse_expression(cursor)?;
     let body = handle_multiple_parameters(
         access_modifier,
@@ -143,10 +145,14 @@ fn handle_multiple_parameters(
 
     let new_return_type_annotation = return_type_annotation.map(|r| {
         TypeAnnotation::Function(
-            second_param.map(|p| Box::new(p.type_annotation)),
+            second_param.map(|p| (p.identifier, Box::new(p.type_annotation))),
             Box::new(r),
         )
     });
+
+    println!("New");
+    println!("{:?}", new_body);
+    println!("{:?}", new_return_type_annotation);
 
     Ok(Statement::FunctionDeclaration(FunctionDeclaration {
         access_modifier,

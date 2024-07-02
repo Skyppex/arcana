@@ -186,22 +186,33 @@ impl TypeEnvironment {
                 .map(|t| Type::Array(Box::new(t))),
             TypeAnnotation::Literal(literal) => Ok(Type::from_literal(literal)?),
             TypeAnnotation::Function(param_type_annotation, return_type_annotation) => {
-                let param_type = param_type_annotation
-                    .as_ref()
-                    .map(|p| {
-                        self.get_type_from_annotation(p, type_environment.clone())
-                            .map_err(|e| format!("Error getting type from annotation: {}", e))
-                    })
-                    .transpose()?;
+                println!("abc");
+                println!("{:?}", param_type_annotation);
+                println!("{:?}", return_type_annotation);
+                let param_info = param_type_annotation.as_ref().map(|p| {
+                    (
+                        p.clone().0,
+                        self.get_type_from_annotation(&p.1, type_environment.clone())
+                            .map_err(|e| format!("Error getting type from annotation: {}", e)),
+                    )
+                });
+
+                let (param_ident, param_type) =
+                    (param_info.clone().map(|p| p.0), param_info.map(|p| p.1));
+                let param_type = param_type.transpose()?;
+
+                println!("{:?}", param_type);
 
                 let return_type = self
                     .get_type_from_annotation(return_type_annotation, type_environment)
                     .map_err(|e| format!("Error getting type from annotation: {}", e))?;
 
+                println!("{:?}", return_type);
+
                 Ok(Type::Function(super::Function {
                     identifier: None,
                     param: param_type.map(|pt| Parameter {
-                        identifier: pt.full_name(),
+                        identifier: param_ident.expect("Param exists so ident should exist"),
                         type_: Box::new(pt),
                     }),
                     return_type: Box::new(return_type),

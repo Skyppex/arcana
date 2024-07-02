@@ -415,7 +415,10 @@ fn unwrap_arguments(
     Ok(Expression::Closure(Closure {
         param: first_param,
         return_type_annotation: Some(TypeAnnotation::Function(
-            Some(Box::new(second_param.clone().type_annotation)),
+            Some((
+                second_param.clone().identifier,
+                Box::new(second_param.clone().type_annotation),
+            )),
             return_type_annotation
                 .clone()
                 .map(|r| Box::new(r))
