@@ -123,6 +123,7 @@ fn handle_multiple_parameters(
     body: Expression,
 ) -> Result<Statement, String> {
     let second_param = params.get(1).map(|p| p.clone());
+    println!("{:?}", second_param);
 
     if let None = second_param {
         return Ok(Statement::FunctionDeclaration(FunctionDeclaration {
