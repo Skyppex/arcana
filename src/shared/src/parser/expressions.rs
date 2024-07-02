@@ -670,16 +670,21 @@ fn parse_call_member(cursor: &mut Cursor) -> Result<Expression, String> {
     return Ok(member);
 }
 
-fn parse_call_expression(caller: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_call_expression(callee: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
     let arguments = parse_args(cursor)?;
     cursor.bump()?; // Consume the )
 
-    let argument = arguments.first();
-
     let mut call = Expression::Call(Call {
-        caller: Box::new(caller.clone()),
-        argument: argument.map(|a| Box::new(a.clone())),
+        callee: Box::new(callee.clone()),
+        argument: arguments.first().map(|a| Box::new(a.clone())),
     });
+
+    for arg in arguments.into_iter().skip(1) {
+        call = Expression::Call(Call {
+            callee: Box::new(call),
+            argument: Some(Box::new(arg)),
+        })
+    }
 
     if let TokenKind::OpenParen = cursor.first().kind {
         call = parse_call_expression(call, cursor)?;

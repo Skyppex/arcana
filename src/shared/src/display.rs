@@ -513,7 +513,10 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Call(Call { caller, argument }) => {
+            Expression::Call(Call {
+                callee: caller,
+                argument,
+            }) => {
                 let mut result = String::new();
                 result.push_str("<call>\n");
                 indent.increase();

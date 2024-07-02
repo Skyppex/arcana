@@ -11,7 +11,13 @@ pub enum TypeAnnotation {
     ConcreteType(String, Vec<TypeAnnotation>),
     Array(Box<TypeAnnotation>),
     Literal(Box<Literal>),
-    Function(Box<TypeAnnotation>, Box<TypeAnnotation>),
+    Function(Option<Box<TypeAnnotation>>, Box<TypeAnnotation>),
+}
+
+impl TypeAnnotation {
+    pub fn void() -> Self {
+        TypeAnnotation::Type("void".to_string())
+    }
 }
 
 impl From<TypeIdentifier> for TypeAnnotation {
@@ -51,7 +57,10 @@ impl TypeAnnotation {
             TypeAnnotation::Function(type_annotation, return_type_annotation) => {
                 format!(
                     "fun({}): {}",
-                    type_annotation.to_string(),
+                    type_annotation
+                        .clone()
+                        .map(|t| t.to_string())
+                        .unwrap_or("".to_string()),
                     return_type_annotation.to_string()
                 )
             }
@@ -85,7 +94,10 @@ impl Display for TypeAnnotation {
                 write!(
                     f,
                     "fun({}): {}",
-                    type_annotation.to_string(),
+                    type_annotation
+                        .clone()
+                        .map(|t| t.to_string())
+                        .unwrap_or("".to_string()),
                     return_type_annotation.to_string()
                 )
             }
@@ -304,7 +316,7 @@ pub(super) fn parse_type_annotation(
 
             let return_type_annotation = Box::new(parse_type_annotation(cursor, true)?);
 
-            handle_multiple_parameters(params, return_type_annotation)
+            unwrap_function_annotation(params, return_type_annotation)
         }
         _ => Err(format!(
             "Expected type identifier but found {:?}",
@@ -313,11 +325,28 @@ pub(super) fn parse_type_annotation(
     }
 }
 
-fn handle_multiple_parameters(
+fn unwrap_function_annotation(
     params: Vec<TypeAnnotation>,
     return_type_annotation: Box<TypeAnnotation>,
 ) -> Result<TypeAnnotation, String> {
-    todo!("Handle multiple parameters in type annotations")
+    if params.len() == 0 {
+        Ok(TypeAnnotation::Function(None, return_type_annotation))
+    } else if params.len() == 1 {
+        Ok(TypeAnnotation::Function(
+            Some(Box::new(params[0].clone())),
+            return_type_annotation,
+        ))
+    } else {
+        let second_param = params[1].clone();
+
+        Ok(TypeAnnotation::Function(
+            Some(Box::new(params.first().cloned().unwrap())),
+            Box::new(TypeAnnotation::Function(
+                Some(Box::new(second_param)),
+                return_type_annotation,
+            )),
+        ))
+    }
 }
 
 fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(

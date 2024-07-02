@@ -2,6 +2,7 @@ use std::vec;
 
 use crate::{
     lexer::token::{Keyword, TokenKind},
+    type_checker::Type,
     types::{
         can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str,
         parse_type_identifier, GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier,
@@ -124,7 +125,7 @@ fn handle_multiple_parameters(
 ) -> Result<Statement, String> {
     let second_param = params.get(1).map(|p| p.clone());
 
-    let None = second_param else {
+    if let None = second_param {
         return Ok(Statement::FunctionDeclaration(FunctionDeclaration {
             access_modifier,
             identifier: type_identifier,
@@ -135,16 +136,23 @@ fn handle_multiple_parameters(
     };
 
     let new_body = Expression::Closure(Closure {
-        param: second_param,
-        return_type_annotation,
+        param: second_param.clone(),
+        return_type_annotation: return_type_annotation.clone(),
         body: Box::new(Expression::Block(body)),
+    });
+
+    let new_return_type_annotation = return_type_annotation.map(|r| {
+        TypeAnnotation::Function(
+            second_param.map(|p| Box::new(p.type_annotation)),
+            Box::new(r),
+        )
     });
 
     Ok(Statement::FunctionDeclaration(FunctionDeclaration {
         access_modifier,
         identifier: type_identifier,
         param: params.first().cloned(),
-        return_type_annotation: return_type_annotation.map(|r| TypeAnnotation::Function((), ())),
+        return_type_annotation: new_return_type_annotation,
         body: vec![Statement::Expression(new_body)],
     }))
 }

@@ -396,7 +396,7 @@ pub fn check_type<'a>(
             })
         }
         Expression::Call(call) => {
-            let caller = check_type(&call.caller, discovered_types, type_environment.clone())?;
+            let caller = check_type(&call.callee, discovered_types, type_environment.clone())?;
 
             if !matches!(caller.get_type(), Type::Function(_)) {
                 return Err(format!(

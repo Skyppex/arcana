@@ -185,20 +185,18 @@ impl TypeEnvironment {
                 .get_type_from_annotation(type_annotation, type_environment)
                 .map(|t| Type::Array(Box::new(t))),
             TypeAnnotation::Literal(literal) => Ok(Type::from_literal(literal)?),
-            TypeAnnotation::Function(param_type_annotations, return_type_annotation) => {
-                let param_types = param_type_annotations
-                    .iter()
-                    .map(|a| {
-                        self.get_type_from_annotation(a, type_environment.clone())
+            TypeAnnotation::Function(param_type_annotation, return_type_annotation) => {
+                let param_type = param_type_annotation
+                    .as_ref()
+                    .map(|p| {
+                        self.get_type_from_annotation(p, type_environment.clone())
                             .map_err(|e| format!("Error getting type from annotation: {}", e))
                     })
-                    .collect::<Result<Vec<Type>, String>>()?;
+                    .transpose()?;
 
                 let return_type = self
                     .get_type_from_annotation(return_type_annotation, type_environment)
                     .map_err(|e| format!("Error getting type from annotation: {}", e))?;
-
-                let param_type = param_types.first().cloned();
 
                 Ok(Type::Function(super::Function {
                     identifier: None,

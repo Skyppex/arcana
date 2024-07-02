@@ -272,7 +272,7 @@ pub struct Closure {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Call {
-    pub caller: Box<Expression>,
+    pub callee: Box<Expression>,
     pub argument: Option<Box<Expression>>,
 }
 
