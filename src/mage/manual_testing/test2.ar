@@ -1,13 +1,11 @@
-fun mul(x: int): fun(int): int {
-    |y: int|: int {
-        let mut r: int = 0;
-        let mut i: int = 0;
+fun mul(x: int, y: int): int {
+    let mut r: int = 0;
+    let mut i: int = 0;
 
-        while i < y {
-            r = add(r)(x);
-            i = add(i)(1);
-        }
-
-        r
+    while i < y {
+        r = add(r, x);
+        i = add(i, 1);
     }
+
+    r
 }

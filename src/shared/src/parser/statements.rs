@@ -2,7 +2,6 @@ use std::vec;
 
 use crate::{
     lexer::token::{Keyword, TokenKind},
-    type_checker::Type,
     types::{
         can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str,
         parse_type_identifier, GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier,
@@ -11,7 +10,7 @@ use crate::{
 
 use super::{
     cursor::Cursor,
-    expressions::{self, parse_block_statements, parse_expression},
+    expressions::{self, parse_expression},
     AccessModifier, Closure, EnumDeclaration, EnumMember, EnumMemberField, Expression,
     FunctionDeclaration, Literal, Parameter, Statement, StructDeclaration, StructField,
     UnionDeclaration,
@@ -104,7 +103,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         return_type_annotation = Some(parse_type_annotation(cursor, true)?);
     }
 
-    let body = parse_block_statements(cursor)?;
+    let body = parse_expression(cursor)?;
     let body = handle_multiple_parameters(
         access_modifier,
         type_identifier,
@@ -121,7 +120,7 @@ fn handle_multiple_parameters(
     type_identifier: TypeIdentifier,
     params: &Vec<Parameter>,
     return_type_annotation: Option<TypeAnnotation>,
-    body: Vec<Statement>,
+    body: Expression,
 ) -> Result<Statement, String> {
     let second_param = params.get(1).map(|p| p.clone());
 
@@ -138,7 +137,7 @@ fn handle_multiple_parameters(
     let new_body = Expression::Closure(Closure {
         param: second_param.clone(),
         return_type_annotation: return_type_annotation.clone(),
-        body: Box::new(Expression::Block(body)),
+        body: Box::new(body),
     });
 
     let new_return_type_annotation = return_type_annotation.map(|r| {
@@ -153,7 +152,7 @@ fn handle_multiple_parameters(
         identifier: type_identifier,
         param: params.first().cloned(),
         return_type_annotation: new_return_type_annotation,
-        body: vec![Statement::Expression(new_body)],
+        body: new_body,
     }))
 }
 

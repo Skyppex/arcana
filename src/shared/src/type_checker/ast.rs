@@ -41,7 +41,7 @@ pub enum TypedStatement {
         identifier: TypeIdentifier,
         param: Option<TypedParameter>,
         return_type: Type,
-        body: Vec<TypedStatement>,
+        body: TypedExpression,
         type_: Type,
     },
     Semi(Box<TypedStatement>),
@@ -169,7 +169,7 @@ impl Display for TypedStatement {
                 ..
             } => write!(
                 f,
-                "fn {}({}) -> {} {{{}}}",
+                "fn {}({}): {} => {}",
                 identifier,
                 if let Some(param) = param {
                     param.to_string()
@@ -177,10 +177,7 @@ impl Display for TypedStatement {
                     "".to_string()
                 },
                 return_type,
-                body.iter()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
+                body.to_string()
             ),
             TypedStatement::Semi(s) => write!(f, "{};", s),
             TypedStatement::Break(e) => write!(

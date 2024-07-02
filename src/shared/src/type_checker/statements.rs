@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{
-    ast::{self, Typed, TypedParameter, TypedStatement},
+    ast::{self, Typed, TypedExpression, TypedParameter, TypedStatement},
     expressions,
     scope::ScopeType,
     type_checker::DiscoveredType,
@@ -335,7 +335,7 @@ pub fn check_type<'a>(
                 type_environment.clone(),
             )?;
 
-            let block_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
+            let body_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
                 type_environment.clone(),
                 ScopeType::Return,
             )));
@@ -344,10 +344,10 @@ pub fn check_type<'a>(
                 match check_type_annotation(
                     &param.type_annotation,
                     &discovered_types,
-                    block_environment.clone(),
+                    body_environment.clone(),
                 ) {
                     Ok(t) => {
-                        block_environment
+                        body_environment
                             .borrow_mut()
                             .add_variable(param.identifier.clone(), t.clone());
 
@@ -371,29 +371,21 @@ pub fn check_type<'a>(
                         type_: Box::new(check_type_annotation(
                             &param_type_annotation,
                             &discovered_types,
-                            block_environment.clone(),
+                            body_environment.clone(),
                         )?),
                     })
                 }
                 None => None,
             };
 
-            let body_typed_statement: Result<Vec<TypedStatement>, String> = body
-                .iter()
-                .map(|s| check_type(s, discovered_types, block_environment.clone()))
-                .collect();
+            let body_typed_expression: TypedExpression =
+                expressions::check_type(body, discovered_types, body_environment.clone())?;
 
-            let body_typed_statement = body_typed_statement?;
+            let return_scope = body_environment.borrow().get_scope(&ScopeType::Return);
 
-            let return_scope = block_environment.borrow().get_scope(&ScopeType::Return);
-
-            let body_type = return_scope.map(|s| s.fold()).unwrap_or_else(|| {
-                Ok(body_typed_statement
-                    .iter()
-                    .last()
-                    .map(|ts| ts.get_deep_type())
-                    .unwrap_or(Type::Void))
-            })?;
+            let body_type = return_scope
+                .map(|s| s.fold())
+                .unwrap_or_else(|| Ok(body_typed_expression.get_deep_type()))?;
 
             if !type_equals(&return_type, &body_type) {
                 return Err(format!(
@@ -418,7 +410,7 @@ pub fn check_type<'a>(
                     type_: p.type_,
                 }),
                 return_type,
-                body: body_typed_statement,
+                body: body_typed_expression,
                 type_,
             })
         }

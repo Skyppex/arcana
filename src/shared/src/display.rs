@@ -357,23 +357,7 @@ impl IndentDisplay for FunctionDeclaration {
         result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
         indent.increase();
 
-        for (i, statement) in body.iter().enumerate() {
-            if i < body.len() - 1 {
-                result.push_str(
-                    format!("\n{}{},", indent.dash(), statement.indent_display(indent)).as_str(),
-                );
-            } else {
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "\n{}{}",
-                        indent.dash_end(),
-                        statement.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-            }
-        }
+        result.push_str(format!("\n{}{}", indent.dash(), body.indent_display(indent)).as_str());
 
         indent.decrease();
         indent.decrease();
@@ -1305,24 +1289,9 @@ impl IndentDisplay for TypedStatement {
                 result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
                 indent.increase();
 
-                for (i, statement) in body.iter().enumerate() {
-                    if i < body.len() - 1 {
-                        result.push_str(
-                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
-                                .as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!(
-                                "\n{}{}",
-                                indent.dash_end(),
-                                statement.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    }
-                }
+                result.push_str(
+                    format!("\n{}{}", indent.dash(), body.indent_display(indent)).as_str(),
+                );
 
                 indent.decrease();
                 indent.decrease();

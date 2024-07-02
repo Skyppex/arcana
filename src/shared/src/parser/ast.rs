@@ -89,7 +89,7 @@ pub struct FunctionDeclaration {
     pub identifier: TypeIdentifier,
     pub param: Option<Parameter>,
     pub return_type_annotation: Option<TypeAnnotation>,
-    pub body: Block,
+    pub body: Expression,
 }
 
 #[derive(Debug, Clone, PartialEq)]

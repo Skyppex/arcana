@@ -54,7 +54,7 @@ fn evaluate_function_declaration(
     environment: Rc<RefCell<Environment>>,
     identifier: TypeIdentifier,
     param: Option<TypedParameter>,
-    body: Vec<TypedStatement>,
+    body: TypedExpression,
 ) -> Result<Value, String> {
     let function = Value::Function {
         param_name: param.map(|p| p.identifier),
@@ -366,7 +366,7 @@ fn evaluate_closure(
 ) -> Result<Value, String> {
     Ok(Value::Function {
         param_name: param.map(|p| p.identifier),
-        body: vec![TypedStatement::Expression(body)],
+        body,
         environment,
     })
 }
@@ -374,7 +374,7 @@ fn evaluate_closure(
 fn evaluate_call(
     caller: Box<TypedExpression>,
     argument: Option<Box<TypedExpression>>,
-    _type_: Type,
+    type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let caller_value = evaluate_expression(*caller, environment.clone())?;
@@ -390,7 +390,7 @@ fn evaluate_call(
             environment,
         } => {
             let function_environment = Rc::new(RefCell::new(Environment::new_scope(
-                environment,
+                environment.clone(),
                 ScopeType::Return,
             )));
 
@@ -405,38 +405,33 @@ fn evaluate_call(
                 None => (),
             }
 
-            let mut value = Value::Void;
-            for statement in body {
-                value = evaluate(statement, function_environment.clone())?;
+            let mut value = evaluate_expression(body, function_environment.clone())?;
 
-                if let Some(Scope::Return(v)) =
-                    function_environment.borrow().get_scope(&ScopeType::Return)
-                {
-                    match v {
-                        Some(v) => {
-                            if _type_ == Type::Void {
-                                return Err(format!("Cannot return a value from a void function",));
-                            }
-
-                            value = v.clone();
-                            break;
+            if let Some(Scope::Return(v)) =
+                function_environment.borrow().get_scope(&ScopeType::Return)
+            {
+                match v {
+                    Some(v) => {
+                        if type_ == Type::Void {
+                            return Err(format!("Cannot return a value from a void function",));
                         }
-                        None => {
-                            if _type_ != Type::Void {
-                                return Err(format!(
-                                    "Cannot return void from a non-void function. Expected type '{}', found type 'void'",
-                                    _type_
-                                ));
-                            }
 
-                            value = Value::Void;
-                            break;
+                        value = v.clone();
+                    }
+                    None => {
+                        if type_ != Type::Void {
+                            return Err(format!(
+                                "Cannot return void from a non-void function. Expected type '{}', found type 'void'",
+                                type_
+                            ));
                         }
+
+                        value = Value::Void;
                     }
                 }
             }
 
-            if _type_ == Type::Void {
+            if type_ == Type::Void {
                 return Ok(Value::Void);
             }
 

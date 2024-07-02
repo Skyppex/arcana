@@ -396,21 +396,21 @@ pub fn check_type<'a>(
             })
         }
         Expression::Call(call) => {
-            let caller = check_type(&call.callee, discovered_types, type_environment.clone())?;
+            let callee = check_type(&call.callee, discovered_types, type_environment.clone())?;
 
-            if !matches!(caller.get_type(), Type::Function(_)) {
+            if !matches!(callee.get_type(), Type::Function(_)) {
                 return Err(format!(
                     "Expected function type, found {}",
-                    caller.get_type()
+                    callee.get_type()
                 ));
             }
 
-            let type_ = match caller.get_type() {
+            let type_ = match callee.get_type() {
                 Type::Function(Function { return_type, .. }) => *return_type,
                 _ => {
                     return Err(format!(
                         "Expected function type, found {}",
-                        caller.get_type()
+                        callee.get_type()
                     ))
                 }
             };
@@ -421,10 +421,30 @@ pub fn check_type<'a>(
                 .map(|arg| check_type(&arg, discovered_types, type_environment.clone()))
                 .transpose()?;
 
+            if let Some(ate) = arg_typed_expression.clone() {
+                let Type::Function(Function {
+                    param: Some(param), ..
+                }) = callee.get_type()
+                else {
+                    return Err(format!(
+                        "Expected function type, found {}",
+                        callee.get_type()
+                    ));
+                };
+
+                if !type_equals(&ate.get_type(), &param.type_) {
+                    return Err(format!(
+                        "Argument type {} does not match parameter type {}",
+                        ate.get_type(),
+                        param.type_
+                    ));
+                }
+            }
+
             let arg = arg_typed_expression.clone().map(|arg| Box::new(arg));
 
             Ok(TypedExpression::Call {
-                caller: Box::new(caller),
+                caller: Box::new(callee),
                 argument: arg,
                 type_,
             })

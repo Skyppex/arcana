@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use shared::{type_checker::ast::TypedStatement, types::TypeAnnotation};
+use shared::{type_checker::ast::TypedExpression, types::TypeAnnotation};
 
 use crate::{environment::Rcrc, Environment};
 
@@ -24,7 +24,7 @@ pub enum Value {
     },
     Function {
         param_name: Option<String>,
-        body: Vec<TypedStatement>,
+        body: TypedExpression,
         environment: Rcrc<Environment>,
     },
 }
