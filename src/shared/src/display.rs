@@ -354,12 +354,9 @@ impl IndentDisplay for FunctionDeclaration {
         );
 
         indent.end_current();
-        result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
-        indent.increase();
-
-        result.push_str(format!("\n{}{}", indent.dash(), body.indent_display(indent)).as_str());
-
-        indent.decrease();
+        result.push_str(
+            format!("{}body: {}", indent.dash_end(), body.indent_display(indent)).as_str(),
+        );
         indent.decrease();
         result
     }
@@ -618,7 +615,7 @@ impl IndentDisplay for Expression {
             Expression::Block(statements) => {
                 let mut result = String::new();
                 result.push_str("<block>");
-                indent.increase();
+                indent.increase_leaf();
 
                 for (i, statement) in statements.iter().enumerate() {
                     if i < statements.len() - 1 {
@@ -654,7 +651,6 @@ impl IndentDisplay for Expression {
                 indent.end_current();
                 result.push_str(format!("{}<block>", indent.dash_end()).as_str());
                 indent.increase();
-                indent.end_current();
 
                 for (i, statement) in statements.iter().enumerate() {
                     if i < statements.len() - 1 {
@@ -1286,14 +1282,10 @@ impl IndentDisplay for TypedStatement {
                     .push_str(format!("{}return_type: {}\n", indent.dash(), return_type).as_str());
 
                 indent.end_current();
-                result.push_str(format!("{}body: <block>", indent.dash_end()).as_str());
-                indent.increase();
-
                 result.push_str(
-                    format!("\n{}{}", indent.dash(), body.indent_display(indent)).as_str(),
+                    format!("{}body: {}", indent.dash_end(), body.indent_display(indent)).as_str(),
                 );
 
-                indent.decrease();
                 indent.decrease();
                 result
             }
