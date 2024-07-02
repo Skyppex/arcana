@@ -504,7 +504,7 @@ impl IndentDisplay for Expression {
                 indent.end_current();
                 result.push_str(
                     format!(
-                        "\n{}body: {}",
+                        "{}body: {}",
                         indent.dash_end(),
                         c.body.indent_display(indent)
                     )

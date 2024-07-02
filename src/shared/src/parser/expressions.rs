@@ -354,7 +354,7 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the |
 
-    let mut parameters = vec![];
+    let mut params = vec![];
 
     while cursor.first().kind != TokenKind::Pipe {
         let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
@@ -370,7 +370,7 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
         let type_annotation = parse_type_annotation(cursor, false)?;
 
-        parameters.push(Parameter {
+        params.push(Parameter {
             identifier,
             type_annotation,
         });
@@ -389,14 +389,43 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
         None
     };
 
-    let param = parameters.first().cloned();
-
     let body = parse_expression(cursor)?;
 
+    unwrap_arguments(params, return_type_annotation, body)
+}
+
+fn unwrap_arguments(
+    params: Vec<Parameter>,
+    return_type_annotation: Option<TypeAnnotation>,
+    body: Expression,
+) -> Result<Expression, String> {
+    if params.len() <= 1 {
+        return Ok(Expression::Closure(Closure {
+            param: params.first().cloned(),
+            return_type_annotation,
+            body: Box::new(body),
+        }));
+    }
+
+    let first_param = params.first().cloned();
+    let second_param = params.get(1).cloned().unwrap();
+
+    println!("Multiple params: {:?}", params);
+
     Ok(Expression::Closure(Closure {
-        param,
-        return_type_annotation,
-        body: Box::new(body),
+        param: first_param,
+        return_type_annotation: Some(TypeAnnotation::Function(
+            Some(Box::new(second_param.clone().type_annotation)),
+            return_type_annotation
+                .clone()
+                .map(|r| Box::new(r))
+                .unwrap_or(Box::new(TypeAnnotation::void())),
+        )),
+        body: Box::new(Expression::Closure(Closure {
+            param: Some(second_param),
+            return_type_annotation,
+            body: Box::new(body),
+        })),
     }))
 }
 
