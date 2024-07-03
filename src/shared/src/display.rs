@@ -1835,7 +1835,36 @@ impl IndentDisplay for type_checker::ast::Member {
                 result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
                 indent.decrease();
                 result
-            }
+            } // type_checker::ast::Member::MemberFunctionAccess {
+              //     object,
+              //     member,
+              //     symbol,
+              //     type_,
+              // } => {
+              //     let mut result = String::new();
+              //     result.push_str(format!("<member function access>: {}\n", type_).as_str());
+              //     indent.increase();
+              //     result.push_str(
+              //         format!(
+              //             "{}object: {}\n",
+              //             indent.dash(),
+              //             object.indent_display(indent)
+              //         )
+              //         .as_str(),
+              //     );
+              //     result.push_str(
+              //         format!(
+              //             "{}member: {}\n",
+              //             indent.dash(),
+              //             member.indent_display(indent)
+              //         )
+              //         .as_str(),
+              //     );
+              //     indent.end_current();
+              //     result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
+              //     indent.decrease();
+              //     result
+              // }
         }
     }
 }

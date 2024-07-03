@@ -158,7 +158,7 @@ pub fn check_type<'a>(
                 let type_ = type_environment
                     .borrow()
                     .get_variable(symbol)
-                    .or(type_environment.borrow().get_type_from_str(symbol))
+                    .or_else(|| type_environment.borrow().get_type_from_str(symbol))
                     .ok_or_else(|| format!("Unexpected variable: {}", symbol))?
                     .clone();
 
@@ -741,40 +741,64 @@ fn check_type_member_access_recurse(
     object_type: Type,
     member: &Box<parser::Member>,
     type_environment: Rcrc<TypeEnvironment>,
-    object_type_expression: TypedExpression,
-    discovered_types: &Vec<DiscoveredType>,
+    object_typed_expression: TypedExpression,
+    _discovered_types: &Vec<DiscoveredType>,
 ) -> Result<TypedExpression, String> {
-    match object_type {
-        Type::Struct(struct_) => match *member.clone() {
-            parser::Member::Identifier { symbol } => {
-                let field_type = struct_.fields.get(&symbol).ok_or(format!(
-                    "Struct {} does not have a field called '{}'",
-                    struct_.type_identifier, symbol
-                ))?;
+    match *member.clone() {
+        parser::Member::Identifier { symbol } => {
+            let type_ = type_environment
+                .borrow()
+                .get_variable(&symbol)
+                .or_else(|| type_environment.borrow().get_type_from_str(&symbol))
+                .ok_or_else(|| {
+                    format!(
+                        "Unexpected member access: {} on type {}",
+                        symbol,
+                        object_type.full_name()
+                    )
+                })?;
 
-                if !type_environment.borrow().lookup_type(&field_type) {
-                    return Err(format!("Unexpected type: {}", field_type.full_name()));
-                }
+            let Type::Function(Function { param, .. }) = type_.clone() else {
+                return Err(format!("{} is not a function", symbol));
+            };
 
-                let identifier_type = field_type.clone();
+            let Some(param) = param else {
+                Err(format!(
+                    "Function {} must have at least one parameter",
+                    symbol
+                ))?
+            };
 
-                Ok(TypedExpression::Member(Member::MemberAccess {
-                    object: Box::new(object_type_expression),
-                    member: Box::new(Member::Identifier {
-                        symbol: symbol.clone(),
-                        type_: identifier_type.clone(),
-                    }),
-                    symbol: symbol.clone(),
-                    type_: field_type.clone(),
-                }))
+            if !type_equals(&object_type, &param.type_) {
+                Err(format!(
+                    "Function {} must be called on type {}",
+                    symbol, param.type_
+                ))?
             }
-            parser::Member::MemberAccess {
-                object,
-                member,
-                symbol: _,
-            } => check_type_member_access(&object, discovered_types, type_environment, &member),
-        },
-        _ => Err("Member access is only supported on structs".to_string()),
+
+            Ok(TypedExpression::Closure {
+                param: None,
+                return_type: type_.clone(),
+                body: Box::new(TypedExpression::Call {
+                    caller: Box::new(TypedExpression::Member(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: type_.clone(),
+                    })),
+                    argument: Some(Box::new(object_typed_expression)),
+                    type_: type_.clone(),
+                }),
+                type_: if let Type::Function(Function { return_type, .. }) = type_ {
+                    Type::Function(Function {
+                        identifier: None,
+                        param: None,
+                        return_type,
+                    })
+                } else {
+                    return Err(format!("{} is not a function", symbol));
+                },
+            })
+        }
+        parser::Member::MemberAccess { .. } => todo!("Member access"),
     }
 }
 

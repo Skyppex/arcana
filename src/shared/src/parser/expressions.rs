@@ -410,8 +410,6 @@ fn unwrap_arguments(
     let first_param = params.first().cloned();
     let second_param = params.get(1).cloned().unwrap();
 
-    println!("Multiple params: {:?}", params);
-
     Ok(Expression::Closure(Closure {
         param: first_param,
         return_type_annotation: Some(TypeAnnotation::Function(

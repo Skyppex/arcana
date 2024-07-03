@@ -161,12 +161,11 @@ impl Environment {
                 variable.borrow_mut().value = value.clone();
                 return Ok(value);
             }
-            Member::MemberAccess {
-                object: _,
-                member,
-                symbol: _,
-                type_: _,
-            } => self.set_variable(*member.clone(), value.clone()),
+            Member::MemberAccess { member, .. } => {
+                self.set_variable(*member.clone(), value.clone())
+            } // Member::MemberFunctionAccess { member, .. } => {
+              //     self.set_variable(*member.clone(), value.clone())
+              // }
         }
     }
 

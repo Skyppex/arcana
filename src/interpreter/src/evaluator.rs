@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use shared::{
     type_checker::{
@@ -56,11 +56,17 @@ fn evaluate_function_declaration(
     param: Option<TypedParameter>,
     body: TypedExpression,
 ) -> Result<Value, String> {
+    let function_environment = Rc::new(RefCell::new(environment.deref().clone().borrow().clone()));
+
     let function = Value::Function {
         param_name: param.map(|p| p.identifier),
         body,
-        environment: environment.clone(),
+        environment: function_environment.clone(),
     };
+
+    function_environment
+        .borrow_mut()
+        .add_function(identifier.to_string(), function.clone(), false);
 
     environment
         .borrow_mut()
@@ -245,12 +251,11 @@ fn evaluate_member<'a>(member: Member, environment: Rcrc<Environment>) -> Result
             .borrow()
             .value
             .clone()),
-        Member::MemberAccess {
-            object,
-            member,
-            symbol: _,
-            type_: _,
-        } => evaluate_member_access(object, environment, member),
+        Member::MemberAccess { object, member, .. } => {
+            evaluate_member_access(object, environment, member)
+        } // Member::MemberFunctionAccess { object, member, .. } => {
+          //     evaluate_member_function_access(object, environment, member)
+          // }
     }
 }
 
@@ -274,19 +279,73 @@ fn evaluate_member_access<'a>(
 
                 Ok(field_value.clone())
             }
-            Member::MemberAccess {
-                object,
-                member,
-                symbol: _,
-                type_: _,
-            } => evaluate_member_access(object, environment, member),
+            Member::MemberAccess { object, member, .. } => {
+                evaluate_member_access(object, environment, member)
+            } // Member::MemberFunctionAccess { object, member, .. } => {
+              //     evaluate_member_function_access(object, environment, member)
+              // }
         },
         _ => Err(format!(
-            "Member access is only supported on structs '{}'",
+            "Cannot access member of non-struct value '{}'",
             value
         )),
     }
 }
+
+// fn evaluate_member_function_access<'a>(
+//     object: Box<TypedExpression>,
+//     environment: Rcrc<Environment>,
+//     member: Box<Member>,
+// ) -> Result<Value, String> {
+//     let value = evaluate_expression(*object, environment.clone())?;
+//
+//     match value {
+//         Value::Struct {
+//             struct_name,
+//             fields,
+//         } => match *member.clone() {
+//             Member::Identifier { symbol, type_: _ } => {
+//                 let field_value = fields.get(&symbol).ok_or(format!(
+//                     "Field '{}' not found in struct '{}'",
+//                     symbol, struct_name
+//                 ))?;
+//
+//                 Ok(field_value.clone())
+//             }
+//             Member::MemberAccess { object, member, .. } => {
+//                 evaluate_member_access(object, environment, member)
+//             }
+//             Member::MemberFunctionAccess { object, member, .. } => {
+//                 evaluate_member_function_access(object, environment, member)
+//             }
+//         },
+//         _ => {
+//             let Member::Identifier { symbol, .. } = *member else {
+//                 return Err(format!("Expected identifier, found '{}'", member));
+//             };
+//
+//             let function_value = environment
+//                 .borrow()
+//                 .get_variable(&symbol)
+//                 .or_else(|| environment.borrow().get_function(&symbol))
+//                 .ok_or(format!("Variable '{}' not found in env", symbol))?;
+//
+//             let new_function_value = match function_value.borrow().value.clone() {
+//                 Value::Function {
+//                     param_name,
+//                     body,
+//                     environment,
+//                 } => Value::Function {
+//                     param_name,
+//                     body,
+//                     environment: Rc::new(RefCell::new(Environment::new_parent(environment))),
+//                 },
+//                 _ => return Err(format!("Expected function, found '{}'", function_value)),
+//             };
+//             Ok(function_value.clone().borrow().value.clone())
+//         }
+//     }
+// }
 
 fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Result<Value, String> {
     match literal {
@@ -372,18 +431,18 @@ fn evaluate_closure(
 }
 
 fn evaluate_call(
-    caller: Box<TypedExpression>,
+    callee: Box<TypedExpression>,
     argument: Option<Box<TypedExpression>>,
     type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
-    let caller_value = evaluate_expression(*caller, environment.clone())?;
+    let callee_value = evaluate_expression(*callee, environment.clone())?;
 
     let evaluated_arg = argument
         .map(|arg| evaluate_expression(*arg, environment.clone()))
         .transpose()?;
 
-    match caller_value {
+    match callee_value {
         Value::Function {
             param_name,
             body,
@@ -437,7 +496,7 @@ fn evaluate_call(
 
             Ok(value)
         }
-        _ => Err(format!("Cannot call non-function value '{}'", caller_value)),
+        _ => Err(format!("Cannot call non-function value '{}'", callee_value)),
     }
 }
 

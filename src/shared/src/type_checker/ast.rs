@@ -760,6 +760,12 @@ pub enum Member {
         symbol: String,
         type_: Type,
     },
+    // MemberFunctionAccess {
+    //     object: Box<TypedExpression>,
+    //     member: Box<Member>,
+    //     symbol: String,
+    //     type_: Type,
+    // },
 }
 
 impl Member {
@@ -767,6 +773,7 @@ impl Member {
         match self {
             Member::Identifier { symbol, .. } => symbol,
             Member::MemberAccess { symbol, .. } => symbol,
+            // Member::MemberFunctionAccess { symbol, .. } => symbol,
         }
     }
 }
@@ -776,6 +783,7 @@ impl Typed for Member {
         match self {
             Member::Identifier { type_, .. } => type_.clone(),
             Member::MemberAccess { type_, .. } => type_.clone(),
+            // Member::MemberFunctionAccess { type_, .. } => type_.clone(),
         }
     }
 
@@ -783,6 +791,7 @@ impl Typed for Member {
         match self {
             Member::Identifier { type_, .. } => type_.clone(),
             Member::MemberAccess { member, .. } => member.get_deep_type(),
+            // Member::MemberFunctionAccess { member, .. } => member.get_deep_type(),
         }
     }
 }
@@ -792,6 +801,9 @@ impl Display for Member {
         match self {
             Member::Identifier { symbol, .. } => write!(f, "{}", symbol),
             Member::MemberAccess { object, member, .. } => write!(f, "{}.{}", object, member),
+            // Member::MemberFunctionAccess { object, member, .. } => {
+            //     write!(f, "{}.{}", object, member)
+            // }
         }
     }
 }

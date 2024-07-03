@@ -186,9 +186,6 @@ impl TypeEnvironment {
                 .map(|t| Type::Array(Box::new(t))),
             TypeAnnotation::Literal(literal) => Ok(Type::from_literal(literal)?),
             TypeAnnotation::Function(param_type_annotation, return_type_annotation) => {
-                println!("abc");
-                println!("{:?}", param_type_annotation);
-                println!("{:?}", return_type_annotation);
                 let param_type = param_type_annotation
                     .as_ref()
                     .map(|p| {
@@ -197,13 +194,9 @@ impl TypeEnvironment {
                     })
                     .transpose()?;
 
-                println!("{:?}", param_type);
-
                 let return_type = self
                     .get_type_from_annotation(return_type_annotation, type_environment)
                     .map_err(|e| format!("Error getting type from annotation: {}", e))?;
-
-                println!("{:?}", return_type);
 
                 Ok(Type::Function(super::Function {
                     identifier: None,

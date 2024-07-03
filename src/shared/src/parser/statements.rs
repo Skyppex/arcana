@@ -103,8 +103,6 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         return_type_annotation = Some(parse_type_annotation(cursor, true)?);
     }
 
-    println!("Parser");
-    println!("{:?}", return_type_annotation);
     let body = parse_expression(cursor)?;
     let body = handle_multiple_parameters(
         access_modifier,
@@ -114,8 +112,6 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         body,
     )?;
 
-    println!("Body");
-    println!("{:?}", body);
     Ok(body)
 }
 
@@ -127,7 +123,6 @@ fn handle_multiple_parameters(
     body: Expression,
 ) -> Result<Statement, String> {
     let second_param = params.get(1).map(|p| p.clone());
-    println!("{:?}", second_param);
 
     if let None = second_param {
         return Ok(Statement::FunctionDeclaration(FunctionDeclaration {
@@ -151,10 +146,6 @@ fn handle_multiple_parameters(
             Box::new(r),
         )
     });
-
-    println!("New");
-    println!("{:?}", new_body);
-    println!("{:?}", new_return_type_annotation);
 
     Ok(Statement::FunctionDeclaration(FunctionDeclaration {
         access_modifier,
