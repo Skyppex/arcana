@@ -328,7 +328,10 @@ pub fn check_type<'a>(
             body,
         }) => {
             println!("Function declaration");
+            println!("{:?}", identifier);
+            println!("{:?}", param);
             println!("{:?}", return_type_annotation);
+            println!("{:?}", body);
             let return_type = check_type_annotation(
                 &return_type_annotation
                     .clone()

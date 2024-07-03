@@ -11,20 +11,12 @@ pub enum TypeAnnotation {
     ConcreteType(String, Vec<TypeAnnotation>),
     Array(Box<TypeAnnotation>),
     Literal(Box<Literal>),
-    Function(Option<(String, Box<TypeAnnotation>)>, Box<TypeAnnotation>),
+    Function(Option<Box<TypeAnnotation>>, Box<TypeAnnotation>),
 }
 
 impl TypeAnnotation {
     pub fn void() -> Self {
         TypeAnnotation::Type("void".to_string())
-    }
-
-    pub fn param_ident(&self) -> Option<String> {
-        if let TypeAnnotation::Function(Some((ident, _)), _) = self {
-            Some(ident.clone())
-        } else {
-            None
-        }
     }
 }
 
@@ -67,7 +59,7 @@ impl TypeAnnotation {
                     "fun({}): {}",
                     type_annotation
                         .clone()
-                        .map(|(n, t)| format!("{}: {}", n, t.to_string()))
+                        .map(|t| t.to_string())
                         .unwrap_or("".to_string()),
                     return_type_annotation.to_string()
                 )
@@ -104,7 +96,7 @@ impl Display for TypeAnnotation {
                     "fun({}): {}",
                     type_annotation
                         .clone()
-                        .map(|(n, t)| format!("{}: {}", n, t.to_string()))
+                        .map(|t| t.to_string())
                         .unwrap_or("".to_string()),
                     return_type_annotation.to_string()
                 )
@@ -343,10 +335,7 @@ fn unwrap_function_annotation(
         let param = params[0].clone();
 
         Ok(TypeAnnotation::Function(
-            Some((
-                param.param_ident().expect("All params must have a name"),
-                Box::new(param),
-            )),
+            Some(Box::new(param)),
             return_type_annotation,
         ))
     } else {
@@ -354,19 +343,9 @@ fn unwrap_function_annotation(
         let second_param = params[1].clone();
 
         Ok(TypeAnnotation::Function(
-            Some((
-                first_param
-                    .param_ident()
-                    .expect("All params must have a name"),
-                Box::new(first_param),
-            )),
+            Some(Box::new(first_param)),
             Box::new(TypeAnnotation::Function(
-                Some((
-                    second_param
-                        .param_ident()
-                        .expect("All params must have a name"),
-                    Box::new(second_param),
-                )),
+                Some(Box::new(second_param)),
                 return_type_annotation,
             )),
         ))

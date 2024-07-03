@@ -94,7 +94,7 @@ pub fn function_declaration_with_multiple_params_has_correct_type() {
             return_type: Box::new(Type::Function(Function {
                 identifier: None,
                 param: Some(Parameter {
-                    identifier: "y".to_string(),
+                    identifier: "int".to_string(),
                     type_: Box::new(Type::Int),
                 }),
                 return_type: Box::new(Type::Int),

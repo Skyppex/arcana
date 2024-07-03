@@ -114,6 +114,8 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         body,
     )?;
 
+    println!("Body");
+    println!("{:?}", body);
     Ok(body)
 }
 
@@ -145,7 +147,7 @@ fn handle_multiple_parameters(
 
     let new_return_type_annotation = return_type_annotation.map(|r| {
         TypeAnnotation::Function(
-            second_param.map(|p| (p.identifier, Box::new(p.type_annotation))),
+            second_param.map(|p| Box::new(p.type_annotation)),
             Box::new(r),
         )
     });

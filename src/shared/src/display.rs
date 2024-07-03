@@ -2318,7 +2318,7 @@ impl IndentDisplay for TypeAnnotation {
                         indent.dash(),
                         param
                             .into_iter()
-                            .map(|p| format!("{}: {}", p.0, p.1.to_string()))
+                            .map(|p| p.to_string())
                             .collect::<Vec<String>>()
                             .join(", ")
                     )
