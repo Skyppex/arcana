@@ -1,0 +1,7 @@
+fun things(value: int, operation: fun(): int): int { 
+    operation(value)
+}
+
+things(13) => {
+
+}

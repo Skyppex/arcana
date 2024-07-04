@@ -42,123 +42,116 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
         '[' => Ok(create_token(TokenKind::OpenBracket, cursor)),
         ']' => Ok(create_token(TokenKind::CloseBracket, cursor)),
         ',' => Ok(create_token(TokenKind::Comma, cursor)),
-        ':' => {
-            if cursor.second() == ':' {
+        ':' => match cursor.second() {
+            ':' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::DoubleColon, cursor))
-            } else {
-                Ok(create_token(TokenKind::Colon, cursor))
             }
-        }
+            _ => Ok(create_token(TokenKind::Colon, cursor)),
+        },
         ';' => Ok(create_token(TokenKind::Semicolon, cursor)),
         '.' => Ok(create_token(TokenKind::Dot, cursor)),
         '?' => Ok(create_token(TokenKind::QuestionMark, cursor)),
-        '+' => {
-            if cursor.second() == '=' {
+        '+' => match cursor.second() {
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::PlusEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Plus, cursor))
             }
-        }
-        '-' => {
-            if cursor.second() == '=' {
+            _ => Ok(create_token(TokenKind::Plus, cursor)),
+        },
+        '-' => match cursor.second() {
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::MinusEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Minus, cursor))
             }
-        }
-        '*' => {
-            if cursor.second() == '=' {
+            _ => Ok(create_token(TokenKind::Minus, cursor)),
+        },
+        '*' => match cursor.second() {
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::StarEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Star, cursor))
             }
-        }
-        '/' => {
-            if cursor.second() == '/' {
+            _ => Ok(create_token(TokenKind::Star, cursor)),
+        },
+        '/' => match cursor.second() {
+            '/' => {
                 cursor.eat_while(|c| !is_end_of_line_comment(c));
                 Ok(Token {
                     kind: TokenKind::LineComment,
                     length: cursor.position_within_token(),
                 })
-            } else if cursor.second() == '=' {
+            }
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::SlashEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Slash, cursor))
             }
-        }
-        '%' => {
-            if cursor.second() == '=' {
+            _ => Ok(create_token(TokenKind::Slash, cursor)),
+        },
+        '%' => match cursor.second() {
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::PercentEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Percent, cursor))
             }
-        }
-        '&' => {
-            if cursor.second() == '&' {
+            _ => Ok(create_token(TokenKind::Percent, cursor)),
+        },
+        '&' => match cursor.second() {
+            '&' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::DoubleAmpersand, cursor))
-            } else if cursor.second() == '=' {
+            }
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::AmpersandEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Ampersand, cursor))
             }
-        }
-        '|' => {
-            if cursor.second() == '=' {
+            _ => Ok(create_token(TokenKind::Ampersand, cursor)),
+        },
+        '|' => match cursor.second() {
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::PipeEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Pipe, cursor))
             }
-        }
-        '^' => {
-            if cursor.second() == '=' {
+            _ => Ok(create_token(TokenKind::Pipe, cursor)),
+        },
+        '^' => match cursor.second() {
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::CaretEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Caret, cursor))
             }
-        }
+            _ => Ok(create_token(TokenKind::Caret, cursor)),
+        },
         '~' => Ok(create_token(TokenKind::Tilde, cursor)),
-        '=' => {
-            if cursor.second() == '=' {
+        '=' => match cursor.second() {
+            '>' => {
+                cursor.bump();
+                Ok(create_token(TokenKind::FatArrow, cursor))
+            }
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::DoubleEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Equal, cursor))
             }
-        }
-        '!' => {
-            if cursor.second() == '=' {
+            _ => Ok(create_token(TokenKind::Equal, cursor)),
+        },
+        '!' => match cursor.second() {
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::BangEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Bang, cursor))
             }
-        }
-        '<' => {
-            if cursor.second() == '=' {
+            _ => Ok(create_token(TokenKind::Bang, cursor)),
+        },
+        '<' => match cursor.second() {
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::LessEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Less, cursor))
             }
-        }
-        '>' => {
-            if cursor.second() == '=' {
+            _ => Ok(create_token(TokenKind::Less, cursor)),
+        },
+        '>' => match cursor.second() {
+            '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::GreaterEqual, cursor))
-            } else {
-                Ok(create_token(TokenKind::Greater, cursor))
             }
-        }
+            _ => Ok(create_token(TokenKind::Greater, cursor)),
+        },
         '0'..='9' => Ok(parse_numeric_literal(cursor)),
         '"' => {
             cursor.bump();
@@ -278,14 +271,14 @@ fn always_escapable(c: char) -> Option<char> {
 }
 
 fn escapable_is_string(c: char) -> Option<char> {
-    always_escapable(c).or(match c {
+    always_escapable(c).or_else(|| match c {
         '"' => Some('"'),
         _ => None,
     })
 }
 
 fn escapable_is_char(c: char) -> Option<char> {
-    always_escapable(c).or(match c {
+    always_escapable(c).or_else(|| match c {
         '\'' => Some('\''),
         _ => None,
     })
@@ -300,7 +293,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "mod" => Some(TokenKind::Keyword(Keyword::AccessModifier(
             AccessModifier::Module,
         ))),
-        "super" => Some(TokenKind::Keyword(Keyword::AccessModifier(
+        "sup" => Some(TokenKind::Keyword(Keyword::AccessModifier(
             AccessModifier::Super,
         ))),
 

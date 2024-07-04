@@ -13,7 +13,7 @@ mod common;
 pub fn function_declaration_is_function_declaration() {
     // Arrange
 
-    let input = "fun foo() {}";
+    let input = "fun foo() => {}";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -30,7 +30,7 @@ pub fn function_declaration_is_function_declaration() {
 #[test]
 pub fn function_declaration_has_correct_type() {
     // Arrange
-    let input = "fun foo() {}";
+    let input = "fun foo() => {}";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -51,7 +51,7 @@ pub fn function_declaration_has_correct_type() {
 #[test]
 pub fn function_declaration_has_correct_type_with_param_and_return() {
     // Arrange
-    let input = "fun foo(x: int): int x";
+    let input = "fun foo(x: int): int => x";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -75,7 +75,7 @@ pub fn function_declaration_has_correct_type_with_param_and_return() {
 #[test]
 pub fn function_declaration_with_multiple_params_has_correct_type() {
     // Arrange
-    let input = "fun foo(x: int, y: int): int x";
+    let input = "fun foo(x: int, y: int): int => x";
 
     // Act
     let typed_ast = create_typed_ast(input);

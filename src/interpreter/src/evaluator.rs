@@ -133,18 +133,6 @@ fn evaluate_expression<'a>(
             right,
             type_,
         } => evaluate_binary(left, operator, right, type_, environment),
-        TypedExpression::Ternary {
-            condition,
-            true_expression,
-            false_expression,
-            type_,
-        } => evaluate_ternary(
-            condition,
-            true_expression,
-            false_expression,
-            type_,
-            environment,
-        ),
         TypedExpression::Block(Block { statements, type_ }) => {
             evaluate_block(statements, type_, environment)
         }
@@ -243,14 +231,17 @@ fn evaluate_assignment<'a>(
 
 fn evaluate_member<'a>(member: Member, environment: Rcrc<Environment>) -> Result<Value, String> {
     match member {
-        Member::Identifier { symbol, type_: _ } => Ok(environment
-            .borrow()
-            .get_variable(&symbol)
-            .or(environment.borrow().get_function(&symbol))
-            .ok_or(format!("Variable '{}' not found", symbol))?
-            .borrow()
-            .value
-            .clone()),
+        Member::Identifier { symbol, type_: _ } => {
+            println!("Getting variable: {}", symbol);
+            Ok(environment
+                .borrow()
+                .get_variable(&symbol)
+                .or(environment.borrow().get_function(&symbol))
+                .ok_or(format!("Variable '{}' not found", symbol))?
+                .borrow()
+                .value
+                .clone())
+        }
         Member::MemberAccess { object, member, .. } => {
             evaluate_member_access(object, environment, member)
         } // Member::MemberFunctionAccess { object, member, .. } => {
@@ -594,31 +585,6 @@ fn evaluate_binary<'a>(
     evaluate_binop::evaluate_binop(left, operator, right)
 }
 
-fn evaluate_ternary<'a>(
-    condition: Box<TypedExpression>,
-    true_expression: Box<TypedExpression>,
-    false_expression: Box<TypedExpression>,
-    _type_: Type,
-    environment: Rcrc<Environment>,
-) -> Result<Value, String> {
-    let ternary_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
-    let condition = evaluate_expression(*condition, ternary_environment.clone())?;
-
-    match condition {
-        Value::Bool(v) => {
-            if v {
-                evaluate_expression(*true_expression, ternary_environment.clone())
-            } else {
-                evaluate_expression(*false_expression, ternary_environment)
-            }
-        }
-        _ => Err(format!(
-            "First argument in ternary must be boolean '{}'",
-            condition
-        )),
-    }
-}
-
 fn evaluate_block<'a>(
     statements: Vec<TypedStatement>,
     _type_: Type,
@@ -648,6 +614,7 @@ fn evaluate_drop<'a>(
     _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
+    println!("Dropping '{}'", identifier);
     let variable = environment
         .borrow_mut()
         .remove_variable(&identifier)

@@ -46,7 +46,6 @@ pub enum Expression {
     Call(Call),
     Unary(Unary),
     Binary(Binary),
-    Ternary(Ternary),
     Block(Block),
     Loop(Block),
     While(While),
@@ -240,6 +239,11 @@ pub enum Member {
         member: Box<Member>,
         symbol: String,
     },
+    ParamPropagation {
+        object: Box<Expression>,
+        member: Box<Member>,
+        symbol: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -287,13 +291,6 @@ pub struct Binary {
     pub left: Box<Expression>,
     pub operator: BinaryOperator,
     pub right: Box<Expression>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Ternary {
-    pub condition: Box<Expression>,
-    pub true_expression: Box<Expression>,
-    pub false_expression: Box<Expression>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

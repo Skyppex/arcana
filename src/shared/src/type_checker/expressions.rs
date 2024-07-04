@@ -167,11 +167,12 @@ pub fn check_type<'a>(
                     type_,
                 }))
             }
-            crate::parser::Member::MemberAccess {
-                object,
-                member,
-                symbol: _,
-            } => check_type_member_access(object, discovered_types, type_environment, member),
+            crate::parser::Member::MemberAccess { object, member, .. } => {
+                check_type_member_access(object, discovered_types, type_environment, member, false)
+            }
+            crate::parser::Member::ParamPropagation { object, member, .. } => {
+                check_type_member_access(object, discovered_types, type_environment, member, true)
+            }
         },
         Expression::Literal(l) => {
             let literal = match l {
@@ -500,46 +501,6 @@ pub fn check_type<'a>(
                 type_,
             })
         }
-        Expression::Ternary(ternary) => {
-            let ternary_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
-                type_environment.clone(),
-            )));
-
-            let condition = check_type(
-                &ternary.condition,
-                discovered_types,
-                ternary_environment.clone(),
-            )?;
-            let true_expression = check_type(
-                &ternary.true_expression,
-                discovered_types,
-                ternary_environment.clone(),
-            )?;
-            let false_expression = check_type(
-                &ternary.false_expression,
-                discovered_types,
-                ternary_environment,
-            )?;
-
-            if !type_equals(&condition.get_type(), &Type::Bool) {
-                return Err(format!("Ternary condition must be of type bool"));
-            };
-
-            if !type_equals(&true_expression.get_type(), &false_expression.get_type()) {
-                return Err(format!(
-                    "Ternary true expression type {:?} does not match false expression type {:?}",
-                    true_expression.get_type(),
-                    false_expression.get_type()
-                ));
-            }
-
-            Ok(TypedExpression::Ternary {
-                condition: Box::new(condition),
-                true_expression: Box::new(true_expression.clone()),
-                false_expression: Box::new(false_expression),
-                type_: true_expression.get_type(),
-            })
-        }
         Expression::Block(statements) => {
             let mut statements_: Vec<TypedStatement> = vec![];
 
@@ -725,6 +686,7 @@ fn check_type_member_access(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     member: &Box<parser::Member>,
+    function_propagation: bool,
 ) -> Result<TypedExpression, String> {
     let object_type_expression = check_type(object, discovered_types, type_environment.clone())?;
     let object_type = object_type_expression.get_type();
@@ -734,6 +696,7 @@ fn check_type_member_access(
         type_environment,
         object_type_expression,
         discovered_types,
+        function_propagation,
     )
 }
 
@@ -743,9 +706,17 @@ fn check_type_member_access_recurse(
     type_environment: Rcrc<TypeEnvironment>,
     object_typed_expression: TypedExpression,
     _discovered_types: &Vec<DiscoveredType>,
+    function_propagation: bool,
 ) -> Result<TypedExpression, String> {
     match *member.clone() {
         parser::Member::Identifier { symbol } => {
+            if !function_propagation {
+                return Err(
+                    "Currently, only parameter propagation is supported for member access"
+                        .to_string(),
+                );
+            }
+
             let type_ = type_environment
                 .borrow()
                 .get_variable(&symbol)
@@ -776,6 +747,8 @@ fn check_type_member_access_recurse(
                 ))?
             }
 
+            println!("{:?}", object_typed_expression);
+
             Ok(TypedExpression::Closure {
                 param: None,
                 return_type: type_.clone(),
@@ -799,6 +772,7 @@ fn check_type_member_access_recurse(
             })
         }
         parser::Member::MemberAccess { .. } => todo!("Member access"),
+        parser::Member::ParamPropagation { .. } => todo!("Param propagation"),
     }
 }
 

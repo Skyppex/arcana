@@ -3,7 +3,7 @@ use crate::{
         AccessModifier, Assignment, Binary, BinaryOperator, Call, EnumDeclaration, EnumMember,
         EnumMemberField, EnumMemberFieldInitializers, Expression, FieldInitializer, FlagsMember,
         FunctionDeclaration, If, Literal, Member, Parameter, Statement, StructDeclaration,
-        StructField, Ternary, Unary, UnaryOperator, UnionDeclaration, VariableDeclaration, While,
+        StructField, Unary, UnaryOperator, UnionDeclaration, VariableDeclaration, While,
     },
     type_checker::{
         self,
@@ -576,42 +576,6 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Ternary(Ternary {
-                condition,
-                true_expression,
-                false_expression,
-            }) => {
-                let mut result = String::new();
-                result.push_str("<ternary>\n");
-                indent.increase();
-                result.push_str(
-                    format!(
-                        "{}condition: {}\n",
-                        indent.dash(),
-                        condition.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                result.push_str(
-                    format!(
-                        "{}true_expression: {}\n",
-                        indent.dash(),
-                        true_expression.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "{}false_expression: {}",
-                        indent.dash_end(),
-                        false_expression.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                indent.decrease();
-                result
-            }
             Expression::Block(statements) => {
                 let mut result = String::new();
                 result.push_str("<block>");
@@ -766,6 +730,35 @@ impl IndentDisplay for Member {
             } => {
                 let mut result = String::new();
                 result.push_str("<member access>\n");
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}object: {}\n",
+                        indent.dash(),
+                        object.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}member: {}\n",
+                        indent.dash(),
+                        member.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                indent.end_current();
+                result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
+                indent.decrease();
+                result
+            }
+            Member::ParamPropagation {
+                object,
+                member,
+                symbol,
+            } => {
+                let mut result = String::new();
+                result.push_str("<param propagation>\n");
                 indent.increase();
                 result.push_str(
                     format!(
@@ -1592,43 +1585,6 @@ impl IndentDisplay for TypedExpression {
                         "{}right: {}",
                         indent.dash_end(),
                         right.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                indent.decrease();
-                result
-            }
-            TypedExpression::Ternary {
-                condition,
-                true_expression,
-                false_expression,
-                type_,
-            } => {
-                let mut result = String::new();
-                result.push_str(format!("<ternary>: {}\n", type_).as_str());
-                indent.increase();
-                result.push_str(
-                    format!(
-                        "{}condition: {}\n",
-                        indent.dash(),
-                        condition.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                result.push_str(
-                    format!(
-                        "{}true_expression: {}\n",
-                        indent.dash(),
-                        true_expression.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "{}false_expression: {}",
-                        indent.dash_end(),
-                        false_expression.indent_display(indent)
                     )
                     .as_str(),
                 );

@@ -103,6 +103,10 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         return_type_annotation = Some(parse_type_annotation(cursor, true)?);
     }
 
+    let TokenKind::FatArrow = cursor.bump()?.kind else {
+        return Err(format!("Expected => but found {:?}", cursor.first().kind));
+    };
+
     let body = parse_expression(cursor)?;
     let body = handle_multiple_parameters(
         access_modifier,

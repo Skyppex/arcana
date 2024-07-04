@@ -8,7 +8,7 @@ use crate::{
 use super::{
     cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, Closure,
     EnumMemberFieldInitializers, Expression, FieldInitializer, If, Literal, Member, Parameter,
-    Statement, Ternary, Unary, UnaryOperator, VariableDeclaration, While,
+    Statement, Unary, UnaryOperator, VariableDeclaration, While,
 };
 use crate::types::{can_be_type_annotation, parse_type_annotation};
 
@@ -274,7 +274,7 @@ fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_ternary(cursor)?;
+    let mut expression = parse_closure(cursor)?;
 
     while matches!(
         cursor.first().kind,
@@ -315,33 +315,6 @@ fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> 
                 },
             })),
         });
-    }
-
-    Ok(expression)
-}
-
-fn parse_ternary(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_closure(cursor)?;
-
-    while let TokenKind::QuestionMark = cursor.first().kind {
-        cursor.bump()?; // Consume the ?
-
-        let true_expression = parse_expression(cursor)?;
-
-        expression = match cursor.first().kind {
-            TokenKind::Colon => {
-                cursor.bump()?; // Consume the :
-
-                let false_expression = parse_expression(cursor)?;
-
-                Expression::Ternary(Ternary {
-                    condition: Box::new(expression),
-                    true_expression: Box::new(true_expression),
-                    false_expression: Box::new(false_expression),
-                })
-            }
-            _ => return Err(format!("Expected : but found {:?}", cursor.first().kind)),
-        };
     }
 
     Ok(expression)
@@ -388,6 +361,11 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
     } else {
         None
     };
+
+    // Optional fat arrow
+    if cursor.first().kind == TokenKind::FatArrow {
+        cursor.bump()?; // Consume the =>
+    }
 
     let body = parse_expression(cursor)?;
 
@@ -789,6 +767,30 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
         };
 
         object = Expression::Member(Member::MemberAccess {
+            object: Box::new(object),
+            member: Box::new(member),
+            symbol: identifier,
+        });
+    }
+
+    while let TokenKind::Colon = cursor.first().kind {
+        cursor.bump()?; // Consume the .
+
+        let TokenKind::Identifier(identifier) = cursor.first().kind else {
+            return Err(format!(
+                "Expected identifier but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        let Expression::Member(member) = parse_literal(cursor)? else {
+            return Err(format!(
+                "Expected member but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        object = Expression::Member(Member::ParamPropagation {
             object: Box::new(object),
             member: Box::new(member),
             symbol: identifier,

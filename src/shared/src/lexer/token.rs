@@ -79,6 +79,7 @@ pub enum TokenKind {
     Semicolon,
     Dot,
     QuestionMark,
+    FatArrow,
 
     EndOfFile,
 }

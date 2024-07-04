@@ -2,7 +2,7 @@ mod common;
 
 use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
-use interpreter::{Value};
+use interpreter::Value;
 use shared::type_checker::{
     ast::{Literal, Typed, TypedExpression},
     Type,
@@ -166,7 +166,7 @@ fn variable_declaration_adds_variable_to_environment() {
     let environment = create_env();
 
     // Act
-    let value = evaluate_expression(input, environment.clone(), true);
+    let value = evaluate_expression(input, environment.clone(), false);
 
     // Assert
     assert!(environment.borrow().get_variable("x").is_some());
@@ -180,7 +180,7 @@ fn variable_declaration_adds_variable_to_environment_with_value() {
     let environment = create_env();
 
     // Act
-    let value = evaluate_expression(input, environment.clone(), true);
+    let value = evaluate_expression(input, environment.clone(), false);
 
     // Assert
     assert!(environment.borrow().get_variable("x").is_some());

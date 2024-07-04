@@ -107,7 +107,7 @@ fn closure_captures_environment() {
 fn closure_captures_function_environment() {
     // Arrange
     let input = r#"
-        fun add(x: int): fun(int): int {
+        fun add(x: int): fun(int): int => {
             |y: int|: int x + y
         }
 

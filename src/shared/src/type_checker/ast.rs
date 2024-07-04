@@ -307,12 +307,6 @@ pub enum TypedExpression {
         right: Box<TypedExpression>,
         type_: Type,
     },
-    Ternary {
-        condition: Box<TypedExpression>,
-        true_expression: Box<TypedExpression>,
-        false_expression: Box<TypedExpression>,
-        type_: Type,
-    },
     Block(Block),
     Drop {
         identifier: String,
@@ -341,7 +335,6 @@ impl Typed for TypedExpression {
             TypedExpression::Index { type_, .. } => type_.clone(),
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
-            TypedExpression::Ternary { type_, .. } => type_.clone(),
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
             TypedExpression::Drop { type_, .. } => type_.clone(),
             TypedExpression::Loop(Block { type_, .. }) => type_.clone(),
@@ -362,7 +355,6 @@ impl Typed for TypedExpression {
             TypedExpression::Index { type_, .. } => type_.clone(),
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
-            TypedExpression::Ternary { type_, .. } => type_.clone(),
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
             TypedExpression::Drop { type_, .. } => type_.clone(),
             TypedExpression::Loop(Block { type_, .. }) => type_.clone(),
@@ -460,16 +452,6 @@ impl Display for TypedExpression {
                 right,
                 ..
             } => write!(f, "{} {} {}", left, operator, right),
-            TypedExpression::Ternary {
-                condition,
-                true_expression,
-                false_expression,
-                ..
-            } => write!(
-                f,
-                "{} ? {} : {}",
-                condition, true_expression, false_expression
-            ),
             TypedExpression::Block(block) => write!(f, "{}", block),
             TypedExpression::Drop { identifier, .. } => write!(f, "drop {}", identifier),
             TypedExpression::Loop(block) => write!(f, "loop {}", block),
