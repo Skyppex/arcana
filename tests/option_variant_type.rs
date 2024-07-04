@@ -2,7 +2,10 @@ mod common;
 
 use std::collections::HashMap;
 
-use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
+use common::{
+    create_env, create_type_env, create_typed_ast, evaluate_expression, StatementExt,
+    VecStatementExt,
+};
 
 use interpreter::{value::EnumFields, Value};
 use shared::{
@@ -23,7 +26,7 @@ fn enum_variant_can_be_used_as_a_type() {
         "#;
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast

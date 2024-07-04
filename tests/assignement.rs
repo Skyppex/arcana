@@ -1,6 +1,8 @@
 mod common;
 
-use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
+use common::{
+    create_type_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt,
+};
 
 use interpreter::{value, Value};
 use shared::type_checker::{ast::TypedExpression, Type};
@@ -16,7 +18,7 @@ fn assignment_is_assignment() {
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
@@ -36,7 +38,7 @@ fn assignment_has_correct_type() {
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast

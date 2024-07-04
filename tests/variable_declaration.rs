@@ -1,6 +1,9 @@
 mod common;
 
-use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
+use common::{
+    create_env, create_type_env, create_typed_ast, evaluate_expression, StatementExt,
+    VecStatementExt,
+};
 
 use interpreter::Value;
 use shared::type_checker::{
@@ -14,7 +17,7 @@ fn variable_declaration_is_immutable() {
     let input = "let x: bool;";
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
@@ -40,7 +43,7 @@ fn variable_declaration_is_mutable() {
     let input = "let mut x: bool;";
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
@@ -66,7 +69,7 @@ fn variable_declaration_has_correct_identifier() {
     let input = "let x: bool;";
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
@@ -92,7 +95,7 @@ fn variable_declaration_has_correct_type() {
     let input = "let x: bool;";
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
@@ -110,7 +113,7 @@ fn variable_declaration_has_no_initializer() {
     let input = "let x: bool;";
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
@@ -136,7 +139,7 @@ fn variable_declaration_has_value() {
     let input = "let x: bool = true;";
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
@@ -185,4 +188,35 @@ fn variable_declaration_adds_variable_to_environment_with_value() {
     // Assert
     assert!(environment.borrow().get_variable("x").is_some());
     assert_eq!(value, Value::Bool(true));
+}
+
+#[test]
+fn variable_type_is_inferred() {
+    // Arrange
+    let input = "let x = true;";
+
+    // Act
+    let type_environment = create_type_env();
+    create_typed_ast(input, type_environment.clone());
+
+    // Assert
+    let variable_type = type_environment.borrow().get_variable("x").unwrap();
+    assert_eq!(variable_type, Type::Bool);
+}
+
+#[test]
+fn variable_type_inference_is_defered() {
+    // Arrange
+    let input = r#"
+        let x;
+        x = true;
+    "#;
+
+    // Act
+    let type_environment = create_type_env();
+    create_typed_ast(input, type_environment.clone());
+
+    // Assert
+    let variable_type = type_environment.borrow().get_variable("x").unwrap();
+    assert_eq!(variable_type, Type::Bool);
 }

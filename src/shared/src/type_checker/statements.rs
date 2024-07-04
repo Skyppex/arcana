@@ -11,7 +11,9 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    type_equals, Enum, EnumMember, Function, Parameter, Rcrc, Struct, Type, Union,
+    type_equals,
+    type_inference::TypeInferenceContext,
+    Enum, EnumMember, Function, Parameter, Rcrc, Struct, Type, Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -92,12 +94,20 @@ pub fn check_type<'a>(
     statement: &Statement,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
+    type_inference_context: &mut TypeInferenceContext,
 ) -> Result<TypedStatement, String> {
     match statement {
         Statement::Program { statements } => {
             let statements: Result<Vec<TypedStatement>, String> = statements
                 .iter()
-                .map(|s| check_type(s, discovered_types, type_environment.clone()))
+                .map(|s| {
+                    check_type(
+                        s,
+                        discovered_types,
+                        type_environment.clone(),
+                        type_inference_context,
+                    )
+                })
                 .collect();
 
             Ok(TypedStatement::Program {
@@ -143,6 +153,7 @@ pub fn check_type<'a>(
                         &field.type_annotation,
                         &discovered_types,
                         struct_type_environment.clone(),
+                        type_inference_context,
                     ) {
                         Ok(t) => Ok(ast::StructField {
                             mutable: field.mutable,
@@ -202,6 +213,7 @@ pub fn check_type<'a>(
                                 &field.type_annotation,
                                 &discovered_types,
                                 enum_type_environment.clone(),
+                                type_inference_context,
                             ) {
                                 Ok(t) => Ok(ast::EnumMemberField {
                                     enum_name: type_identifier.clone(),
@@ -280,6 +292,7 @@ pub fn check_type<'a>(
                         &TypeAnnotation::Literal(Box::new(literal.clone())),
                         discovered_types,
                         union_type_environment.clone(),
+                        type_inference_context,
                     )
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
@@ -333,6 +346,7 @@ pub fn check_type<'a>(
                     .unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
                 &discovered_types,
                 type_environment.clone(),
+                type_inference_context,
             )?;
 
             let body_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
@@ -345,6 +359,7 @@ pub fn check_type<'a>(
                     &param.type_annotation,
                     &discovered_types,
                     body_environment.clone(),
+                    type_inference_context,
                 ) {
                     Ok(t) => {
                         body_environment
@@ -372,14 +387,19 @@ pub fn check_type<'a>(
                             &param_type_annotation,
                             &discovered_types,
                             body_environment.clone(),
+                            type_inference_context,
                         )?),
                     })
                 }
                 None => None,
             };
 
-            let body_typed_expression: TypedExpression =
-                expressions::check_type(body, discovered_types, body_environment.clone())?;
+            let body_typed_expression: TypedExpression = expressions::check_type(
+                body,
+                discovered_types,
+                body_environment.clone(),
+                type_inference_context,
+            )?;
 
             let return_scope = body_environment.borrow().get_scope(&ScopeType::Return);
 
@@ -418,11 +438,16 @@ pub fn check_type<'a>(
             s,
             discovered_types,
             type_environment,
+            type_inference_context,
         )?))),
         Statement::Break(e) => match e {
             Some(e) => {
-                let typed_expression =
-                    expressions::check_type(e, discovered_types, type_environment.clone())?;
+                let typed_expression = expressions::check_type(
+                    e,
+                    discovered_types,
+                    type_environment.clone(),
+                    type_inference_context,
+                )?;
 
                 let break_type = typed_expression.get_type();
                 type_environment
@@ -440,8 +465,12 @@ pub fn check_type<'a>(
         Statement::Continue => Ok(TypedStatement::Continue),
         Statement::Return(e) => match e {
             Some(e) => {
-                let typed_expression =
-                    expressions::check_type(e, discovered_types, type_environment.clone())?;
+                let typed_expression = expressions::check_type(
+                    e,
+                    discovered_types,
+                    type_environment.clone(),
+                    type_inference_context,
+                )?;
 
                 let return_type = typed_expression.get_type();
                 type_environment
@@ -460,11 +489,13 @@ pub fn check_type<'a>(
             e,
             discovered_types,
             type_environment,
+            type_inference_context,
         )?)),
         Statement::Print(e) => Ok(TypedStatement::Print(expressions::check_type(
             e,
             discovered_types,
             type_environment,
+            type_inference_context,
         )?)),
     }
 }
@@ -474,6 +505,7 @@ fn check_type_identifier(
     type_identifier: &TypeIdentifier,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
+    type_inference_context: &mut TypeInferenceContext,
 ) -> Result<Type, String> {
     if let Some(type_) = type_environment
         .borrow()
@@ -505,6 +537,7 @@ fn check_type_identifier(
                             type_annotation,
                             discovered_types,
                             type_environment.clone(),
+                            type_inference_context,
                         )?,
                     );
                 }
@@ -527,6 +560,7 @@ fn check_type_identifier(
                                 type_annotation,
                                 discovered_types,
                                 type_environment.clone(),
+                                type_inference_context,
                             )?,
                         );
                     }
@@ -552,7 +586,12 @@ fn check_type_identifier(
             let literal_types = literals
                 .iter()
                 .map(|literal| {
-                    check_type_annotation(literal, discovered_types, type_environment.clone())
+                    check_type_annotation(
+                        literal,
+                        discovered_types,
+                        type_environment.clone(),
+                        type_inference_context,
+                    )
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
@@ -588,6 +627,7 @@ fn check_type_identifier(
                         &param.type_annotation,
                         discovered_types,
                         type_environment.clone(),
+                        type_inference_context,
                     )?),
                 }),
                 None => None,
@@ -600,6 +640,7 @@ fn check_type_identifier(
                     return_type_annotation,
                     discovered_types,
                     type_environment,
+                    type_inference_context,
                 )?),
             }));
         }
@@ -612,11 +653,13 @@ pub fn check_type_annotation(
     type_annotation: &TypeAnnotation,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
+    type_inference_context: &mut TypeInferenceContext,
 ) -> Result<Type, String> {
-    if let Ok(type_) = type_environment
-        .borrow()
-        .get_type_from_annotation(type_annotation, type_environment.clone())
-    {
+    if let Ok(type_) = type_environment.borrow().get_type_from_annotation(
+        type_annotation,
+        type_environment.clone(),
+        type_inference_context,
+    ) {
         return Ok(type_);
     }
 
@@ -648,6 +691,7 @@ pub fn check_type_annotation(
                             type_annotation,
                             discovered_types,
                             type_environment.clone(),
+                            type_inference_context,
                         )?,
                     );
                 }
@@ -670,6 +714,7 @@ pub fn check_type_annotation(
                                 type_annotation,
                                 discovered_types,
                                 type_environment.clone(),
+                                type_inference_context,
                             )?,
                         );
                     }
@@ -695,7 +740,12 @@ pub fn check_type_annotation(
             let literal_types = literals
                 .iter()
                 .map(|literal| {
-                    check_type_annotation(literal, discovered_types, type_environment.clone())
+                    check_type_annotation(
+                        literal,
+                        discovered_types,
+                        type_environment.clone(),
+                        type_inference_context,
+                    )
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
@@ -731,6 +781,7 @@ pub fn check_type_annotation(
                         &param.type_annotation,
                         discovered_types,
                         type_environment.clone(),
+                        type_inference_context,
                     )?),
                 }),
                 None => None,
@@ -743,6 +794,7 @@ pub fn check_type_annotation(
                     return_type_annotation,
                     discovered_types,
                     type_environment,
+                    type_inference_context,
                 )?),
             }))
         }

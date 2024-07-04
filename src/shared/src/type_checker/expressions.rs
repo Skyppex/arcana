@@ -12,14 +12,16 @@ use super::{
         TypedExpression, TypedParameter, TypedStatement, UnaryOperator,
     },
     scope::ScopeType,
-    statements, type_equals, DiscoveredType, Enum, EnumMember, FullName, Function, Rcrc, Struct,
-    Type, TypeEnvironment,
+    statements, type_equals,
+    type_inference::TypeInferenceContext,
+    DiscoveredType, Enum, EnumMember, FullName, Function, Rcrc, Struct, Type, TypeEnvironment,
 };
 
 pub fn check_type<'a>(
     expression: &Expression,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
+    type_inference_context: &mut TypeInferenceContext,
 ) -> Result<TypedExpression, String> {
     match expression {
         Expression::None => Ok(TypedExpression::None),
@@ -29,17 +31,36 @@ pub fn check_type<'a>(
             identifier,
             initializer,
         }) => {
-            let type_ = type_environment
-                .borrow()
-                .get_type_from_annotation(type_annotation, type_environment.clone())?;
+            let initializer_expr = initializer;
 
             let initializer = if let Some(initializer) = initializer {
-                let initializer =
-                    check_type(initializer, discovered_types, type_environment.clone())?;
+                let initializer = check_type(
+                    initializer,
+                    discovered_types,
+                    type_environment.clone(),
+                    type_inference_context,
+                )?;
                 Some(Box::new(initializer))
             } else {
                 None
             };
+
+            let type_ = type_annotation
+                .clone()
+                .map(|ta| {
+                    type_environment.borrow().get_type_from_annotation(
+                        &ta,
+                        type_environment.clone(),
+                        type_inference_context,
+                    )
+                })
+                .or_else(|| {
+                    initializer_expr
+                        .clone()
+                        .map(|i| type_inference_context.infer_type(&i, None))
+                })
+                .transpose()?
+                .unwrap_or(Type::Unknown);
 
             if let Some(initializer) = &initializer {
                 if !type_equals(&initializer.get_type(), &type_) {
@@ -71,8 +92,12 @@ pub fn check_type<'a>(
                 type_environment.clone(),
             )));
 
-            let if_condition =
-                check_type(&condition, discovered_types, if_else_environment.clone())?;
+            let if_condition = check_type(
+                &condition,
+                discovered_types,
+                if_else_environment.clone(),
+                type_inference_context,
+            )?;
 
             if !type_equals(&if_condition.get_type(), &Type::Bool) {
                 return Err(format!(
@@ -85,6 +110,7 @@ pub fn check_type<'a>(
                 &true_expression,
                 discovered_types,
                 if_else_environment.clone(),
+                type_inference_context,
             )?;
             let if_block_type = if_block.get_deep_type();
 
@@ -93,6 +119,7 @@ pub fn check_type<'a>(
                     false_expression,
                     discovered_types,
                     if_else_environment,
+                    type_inference_context,
                 )?)
             } else {
                 None
@@ -128,14 +155,42 @@ pub fn check_type<'a>(
             member,
             initializer,
         }) => {
+            let assignement_type = type_inference_context.infer_type(
+                &Expression::Assignment(Assignment {
+                    member: member.clone(),
+                    initializer: initializer.clone(),
+                }),
+                None,
+            )?;
+
             let member = check_type(
                 &Expression::Member(*member.clone()),
                 discovered_types,
                 type_environment.clone(),
+                type_inference_context,
             )?;
-            let initializer = check_type(initializer, discovered_types, type_environment)?;
 
-            if !type_equals(&member.get_type(), &initializer.get_type()) {
+            let initializer = check_type(
+                initializer,
+                discovered_types,
+                type_environment,
+                type_inference_context,
+            )?;
+
+            let TypedExpression::Member(member) = member else {
+                return Err("Expected member identifier".to_string());
+            };
+
+            let member_symbol = match &member {
+                Member::Identifier { symbol, .. } => symbol,
+                Member::MemberAccess { symbol, .. } => symbol,
+            };
+
+            let member_type = type_inference_context
+                .get_variable(member_symbol)
+                .expect("Variable must be defined here");
+
+            if !type_equals(&member_type, &initializer.get_type()) {
                 return Err(format!(
                     "Member type {} does not match initializer type {}",
                     member.get_type(),
@@ -143,14 +198,10 @@ pub fn check_type<'a>(
                 ));
             }
 
-            let TypedExpression::Member(member) = member else {
-                return Err("Expected member expression".to_string());
-            };
-
             Ok(TypedExpression::Assignment {
                 member: Box::new(member),
                 initializer: Box::new(initializer.clone()),
-                type_: initializer.get_type(),
+                type_: assignement_type,
             })
         }
         Expression::Member(member) => match member {
@@ -167,11 +218,23 @@ pub fn check_type<'a>(
                     type_,
                 }))
             }
-            crate::parser::Member::MemberAccess { object, member, .. } => {
-                check_type_member_access(object, discovered_types, type_environment, member, false)
-            }
+            crate::parser::Member::MemberAccess { object, member, .. } => check_type_member_access(
+                object,
+                discovered_types,
+                type_environment,
+                type_inference_context,
+                member,
+                false,
+            ),
             crate::parser::Member::ParamPropagation { object, member, .. } => {
-                check_type_member_access(object, discovered_types, type_environment, member, true)
+                check_type_member_access(
+                    object,
+                    discovered_types,
+                    type_environment,
+                    type_inference_context,
+                    member,
+                    true,
+                )
             }
         },
         Expression::Literal(l) => {
@@ -189,7 +252,12 @@ pub fn check_type<'a>(
                         let mut previous_type = Type::Void;
 
                         for e in v {
-                            let value = check_type(&e, discovered_types, type_environment.clone())?;
+                            let value = check_type(
+                                &e,
+                                discovered_types,
+                                type_environment.clone(),
+                                type_inference_context,
+                            )?;
                             let type_ = value.get_deep_type();
 
                             if !type_equals(&previous_type, &Type::Void)
@@ -224,6 +292,7 @@ pub fn check_type<'a>(
                                     &field_initializer.initializer,
                                     discovered_types,
                                     type_environment.clone(),
+                                    type_inference_context,
                                 )?,
                             };
                             field_initializers_.push(field_initializer);
@@ -231,9 +300,11 @@ pub fn check_type<'a>(
                         Ok(field_initializers_)
                     };
 
-                    let type_ = type_environment
-                        .borrow()
-                        .get_type_from_annotation(type_annotation, type_environment.clone())?;
+                    let type_ = type_environment.borrow().get_type_from_annotation(
+                        type_annotation,
+                        type_environment.clone(),
+                        type_inference_context,
+                    )?;
 
                     let Type::Struct(Struct { fields, .. }) = type_.clone() else {
                         Err(format!("{} is not a struct", type_.full_name()))?
@@ -279,6 +350,7 @@ pub fn check_type<'a>(
                                             &initializer,
                                             discovered_types,
                                             type_environment.clone(),
+                                            type_inference_context,
                                         )?,
                                     );
                                 }
@@ -290,9 +362,11 @@ pub fn check_type<'a>(
                         Ok(field_initializers)
                     };
 
-                    let type_ = type_environment
-                        .borrow()
-                        .get_type_from_annotation(type_annotation, type_environment.clone())?;
+                    let type_ = type_environment.borrow().get_type_from_annotation(
+                        type_annotation,
+                        type_environment.clone(),
+                        type_inference_context,
+                    )?;
 
                     let Type::Enum(Enum { members, .. }) = type_.clone() else {
                         Err(format!("{} is not an enum", type_.full_name()))?
@@ -352,6 +426,7 @@ pub fn check_type<'a>(
                     let type_ = type_environment.borrow().get_type_from_annotation(
                         &param.type_annotation,
                         type_environment.clone(),
+                        type_inference_context,
                     )?;
 
                     closure_environment
@@ -369,16 +444,23 @@ pub fn check_type<'a>(
 
             let return_type = match return_type_annotation {
                 Some(return_type) => {
-                    let type_ = type_environment
-                        .borrow()
-                        .get_type_from_annotation(&return_type, type_environment.clone())?;
+                    let type_ = type_environment.borrow().get_type_from_annotation(
+                        &return_type,
+                        type_environment.clone(),
+                        type_inference_context,
+                    )?;
 
                     type_
                 }
                 None => Type::Void,
             };
 
-            let body = check_type(&body, discovered_types, closure_environment.clone())?;
+            let body = check_type(
+                &body,
+                discovered_types,
+                closure_environment.clone(),
+                type_inference_context,
+            )?;
 
             let type_ = Type::Function(Function {
                 identifier: None,
@@ -397,7 +479,12 @@ pub fn check_type<'a>(
             })
         }
         Expression::Call(call) => {
-            let callee = check_type(&call.callee, discovered_types, type_environment.clone())?;
+            let callee = check_type(
+                &call.callee,
+                discovered_types,
+                type_environment.clone(),
+                type_inference_context,
+            )?;
 
             let callee_type = callee.get_type();
             if !matches!(&callee_type, &Type::Function(_)) {
@@ -420,7 +507,14 @@ pub fn check_type<'a>(
             let arg_typed_expression = call
                 .argument
                 .clone()
-                .map(|arg| check_type(&arg, discovered_types, type_environment.clone()))
+                .map(|arg| {
+                    check_type(
+                        &arg,
+                        discovered_types,
+                        type_environment.clone(),
+                        type_inference_context,
+                    )
+                })
                 .transpose()?;
 
             let mut callee = callee;
@@ -462,7 +556,12 @@ pub fn check_type<'a>(
             })
         }
         Expression::Unary(unary) => {
-            let expression = check_type(&unary.expression, discovered_types, type_environment)?;
+            let expression = check_type(
+                &unary.expression,
+                discovered_types,
+                type_environment,
+                type_inference_context,
+            )?;
             let type_ = expression.get_deep_type();
 
             Ok(TypedExpression::Unary {
@@ -477,8 +576,18 @@ pub fn check_type<'a>(
             })
         }
         Expression::Binary(binary) => {
-            let left = check_type(&binary.left, discovered_types, type_environment.clone())?;
-            let right = check_type(&binary.right, discovered_types, type_environment)?;
+            let left = check_type(
+                &binary.left,
+                discovered_types,
+                type_environment.clone(),
+                type_inference_context,
+            )?;
+            let right = check_type(
+                &binary.right,
+                discovered_types,
+                type_environment,
+                type_inference_context,
+            )?;
             let left_type = left.get_type();
             let right_type = right.get_type();
 
@@ -520,6 +629,7 @@ pub fn check_type<'a>(
                     statement,
                     discovered_types,
                     type_environment.clone(),
+                    type_inference_context,
                 )?);
             }
 
@@ -560,6 +670,7 @@ pub fn check_type<'a>(
                 &Expression::Block(block.clone()),
                 discovered_types,
                 loop_environment.clone(),
+                type_inference_context,
             )?;
 
             let TypedExpression::Block(block) = block else {
@@ -599,6 +710,7 @@ pub fn check_type<'a>(
                 condition,
                 discovered_types,
                 while_and_else_environment.clone(),
+                type_inference_context,
             )?;
 
             let Type::Bool = condition.get_type() else {
@@ -609,6 +721,7 @@ pub fn check_type<'a>(
                 &Expression::Block(block.clone()),
                 discovered_types,
                 while_environment.clone(),
+                type_inference_context,
             )?;
 
             let TypedExpression::Block(block) = block else {
@@ -620,6 +733,7 @@ pub fn check_type<'a>(
                     &Expression::Block(else_block.clone()),
                     discovered_types,
                     while_and_else_environment,
+                    type_inference_context,
                 )?),
                 None => None,
             };
@@ -696,10 +810,16 @@ fn check_type_member_access(
     object: &Box<Expression>,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
+    type_inference_context: &mut TypeInferenceContext,
     member: &Box<parser::Member>,
     function_propagation: bool,
 ) -> Result<TypedExpression, String> {
-    let object_type_expression = check_type(object, discovered_types, type_environment.clone())?;
+    let object_type_expression = check_type(
+        object,
+        discovered_types,
+        type_environment.clone(),
+        type_inference_context,
+    )?;
     let object_type = object_type_expression.get_type();
     check_type_member_access_recurse(
         object_type.clone(),

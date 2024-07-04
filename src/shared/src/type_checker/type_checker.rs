@@ -5,7 +5,10 @@ use crate::{
     types::{TypeAnnotation, TypeIdentifier},
 };
 
-use super::{ast::TypedStatement, statements, type_environment::TypeEnvironment, Rcrc};
+use super::{
+    ast::TypedStatement, statements, type_environment::TypeEnvironment,
+    type_inference::TypeInferenceContext, Rcrc,
+};
 
 #[derive(Debug)]
 pub enum DiscoveredType {
@@ -25,10 +28,16 @@ pub enum DiscoveredType {
 pub fn create_typed_ast<'a>(
     program: Statement,
     type_environment: Rcrc<TypeEnvironment>,
+    type_inference_context: &mut TypeInferenceContext,
 ) -> Result<TypedStatement, String> {
     // Discover user-defined types. Only store their names and fields with type names.
     let discovered_types = statements::discover_user_defined_types(&program)?;
 
     // Then check the types of the entire AST.
-    statements::check_type(&program, &discovered_types, type_environment)
+    statements::check_type(
+        &program,
+        &discovered_types,
+        type_environment,
+        type_inference_context,
+    )
 }

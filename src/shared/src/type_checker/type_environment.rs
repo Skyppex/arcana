@@ -4,6 +4,7 @@ use crate::types::{GenericType, TypeAnnotation, TypeIdentifier};
 
 use super::{
     scope::{Scope, ScopeType},
+    type_inference::TypeInferenceContext,
     FullName, Parameter, Type,
 };
 
@@ -140,6 +141,7 @@ impl TypeEnvironment {
         &self,
         type_annotation: &TypeAnnotation,
         type_environment: Rc<RefCell<TypeEnvironment>>,
+        type_inference_context: &mut TypeInferenceContext,
     ) -> Result<Type, String> {
         match type_annotation {
             TypeAnnotation::Type(type_name) => {
@@ -159,9 +161,11 @@ impl TypeEnvironment {
 
                     Ok(t.clone())
                 } else if let Some(parent) = &self.parent {
-                    parent
-                        .borrow()
-                        .get_type_from_annotation(type_annotation, type_environment)
+                    parent.borrow().get_type_from_annotation(
+                        type_annotation,
+                        type_environment,
+                        type_inference_context,
+                    )
                 } else {
                     Err(format!("Type {} not found", type_name))
                 }
@@ -170,32 +174,45 @@ impl TypeEnvironment {
                 if let Some((_, t)) = self.types.iter().find(|(k, _)| {
                     k.eq_names(&TypeIdentifier::GenericType(type_name.clone(), vec![]))
                 }) {
-                    let concrete =
-                        t.clone_with_concrete_types(concrete_types.clone(), type_environment);
+                    let concrete = t.clone_with_concrete_types(
+                        concrete_types.clone(),
+                        type_environment,
+                        type_inference_context,
+                    );
                     concrete
                 } else if let Some(parent) = &self.parent {
-                    parent
-                        .borrow()
-                        .get_type_from_annotation(type_annotation, type_environment)
+                    parent.borrow().get_type_from_annotation(
+                        type_annotation,
+                        type_environment,
+                        type_inference_context,
+                    )
                 } else {
                     Err(format!("Type {} not found", type_name))
                 }
             }
             TypeAnnotation::Array(type_annotation) => self
-                .get_type_from_annotation(type_annotation, type_environment)
+                .get_type_from_annotation(type_annotation, type_environment, type_inference_context)
                 .map(|t| Type::Array(Box::new(t))),
             TypeAnnotation::Literal(literal) => Ok(Type::from_literal(literal)?),
             TypeAnnotation::Function(param_type_annotation, return_type_annotation) => {
                 let param_type = param_type_annotation
                     .as_ref()
                     .map(|p| {
-                        self.get_type_from_annotation(&p, type_environment.clone())
-                            .map_err(|e| format!("Error getting type from annotation: {}", e))
+                        self.get_type_from_annotation(
+                            &p,
+                            type_environment.clone(),
+                            type_inference_context,
+                        )
+                        .map_err(|e| format!("Error getting type from annotation: {}", e))
                     })
                     .transpose()?;
 
                 let return_type = self
-                    .get_type_from_annotation(return_type_annotation, type_environment)
+                    .get_type_from_annotation(
+                        return_type_annotation,
+                        type_environment,
+                        type_inference_context,
+                    )
                     .map_err(|e| format!("Error getting type from annotation: {}", e))?;
 
                 Ok(Type::Function(super::Function {

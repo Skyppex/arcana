@@ -742,12 +742,6 @@ pub enum Member {
         symbol: String,
         type_: Type,
     },
-    // MemberFunctionAccess {
-    //     object: Box<TypedExpression>,
-    //     member: Box<Member>,
-    //     symbol: String,
-    //     type_: Type,
-    // },
 }
 
 impl Member {

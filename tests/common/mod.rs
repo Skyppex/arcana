@@ -7,15 +7,17 @@ use shared::{
     type_checker::{
         self,
         ast::{TypedExpression, TypedStatement},
+        type_environment,
+        type_inference::TypeInferenceContext,
+        TypeEnvironment,
     },
 };
 
-pub fn create_typed_ast(input: &str) -> TypedStatement {
+pub fn create_typed_ast(input: &str, type_environment: Rcrc<TypeEnvironment>) -> TypedStatement {
     let tokens = lexer::tokenize(input).unwrap();
     let ast = parser::create_ast(tokens).unwrap();
-    let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new()));
 
-    type_checker::create_typed_ast(ast, type_environment).unwrap()
+    type_checker::create_typed_ast(ast, type_environment, &mut create_inferer()).unwrap()
 }
 
 pub fn evaluate_expression(
@@ -25,8 +27,10 @@ pub fn evaluate_expression(
 ) -> Value {
     let tokens = lexer::tokenize(input).unwrap();
     let ast = parser::create_ast(tokens).unwrap();
-    let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new()));
-    let typed_ast = type_checker::create_typed_ast(ast, type_environment).unwrap();
+    let type_environment = create_type_env();
+    let type_inference_context = &mut create_inferer();
+    let typed_ast =
+        type_checker::create_typed_ast(ast, type_environment, type_inference_context).unwrap();
 
     if unwrap_semi {
         interpreter::evaluate(typed_ast.unwrap_semi(), environment).unwrap()
@@ -75,6 +79,14 @@ impl VecStatementExt for Vec<TypedStatement> {
 }
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
+
+pub fn create_type_env() -> Rcrc<TypeEnvironment> {
+    Rc::new(RefCell::new(TypeEnvironment::new()))
+}
+
+pub fn create_inferer() -> TypeInferenceContext {
+    TypeInferenceContext::new()
+}
 
 pub fn create_env() -> Rcrc<Environment> {
     Rc::new(RefCell::new(Environment::new()))

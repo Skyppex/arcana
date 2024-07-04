@@ -424,3 +424,23 @@ fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericType>, 
 
     Ok(types)
 }
+
+pub fn get_optional_type_annotation(
+    cursor: &mut Cursor,
+    allow_void: bool,
+) -> Option<TypeAnnotation> {
+    if cursor.first().kind != TokenKind::Colon {
+        return None;
+    }
+
+    cursor.bump().expect("Already checked"); // Consume the :
+
+    if can_be_type_annotation(cursor) {
+        match parse_type_annotation(cursor, allow_void) {
+            Ok(type_annotation) => Some(type_annotation),
+            Err(_) => None,
+        }
+    } else {
+        None
+    }
+}

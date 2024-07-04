@@ -2,6 +2,7 @@ pub mod ast;
 pub mod full_name;
 pub mod type_checker;
 pub mod type_environment;
+pub mod type_inference;
 
 mod expressions;
 mod scope;
@@ -10,6 +11,7 @@ mod statements;
 pub use full_name::*;
 pub use type_checker::*;
 pub use type_environment::*;
+use type_inference::TypeInferenceContext;
 
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
@@ -192,6 +194,7 @@ pub struct Parameter {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
+    Unknown, // Used for deferred type inference
     Generic(GenericType),
     Void,
     Unit,
@@ -407,6 +410,7 @@ impl Type {
         &self,
         concrete_types: Vec<TypeAnnotation>,
         type_environment: Rc<RefCell<TypeEnvironment>>,
+        type_inference_context: &mut TypeInferenceContext,
     ) -> Result<Type, String> {
         match self {
             Type::Struct(s) => {
@@ -436,8 +440,12 @@ impl Type {
                         generic.type_name
                     ))?;
 
-                    let concrete_type =
-                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+                    let concrete_type = check_type_annotation(
+                        &concrete_type,
+                        &vec![],
+                        type_environment.clone(),
+                        type_inference_context,
+                    )?;
 
                     fields.insert(field_name.clone(), concrete_type);
                 }
@@ -491,6 +499,7 @@ impl Type {
                             &concrete_type,
                             &vec![],
                             type_environment.clone(),
+                            type_inference_context,
                         )?;
 
                         fields.insert(field_name.clone(), concrete_type);
@@ -526,6 +535,7 @@ impl Type {
 impl FullName for Type {
     fn full_name(&self) -> String {
         match self {
+            Type::Unknown => "{unknown}".to_string(),
             Type::Generic(GenericType { type_name }) => type_name.to_string(),
             Type::Void => "void".to_string(),
             Type::Unit => "unit".to_string(),

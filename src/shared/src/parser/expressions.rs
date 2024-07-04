@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     lexer::token::{self, Keyword, TokenKind},
-    types::TypeAnnotation,
+    types::{get_optional_type_annotation, TypeAnnotation},
 };
 
 use super::{
@@ -10,7 +10,7 @@ use super::{
     EnumMemberFieldInitializers, Expression, FieldInitializer, If, Literal, Member, Parameter,
     Statement, Unary, UnaryOperator, VariableDeclaration, While,
 };
-use crate::types::{can_be_type_annotation, parse_type_annotation};
+use crate::types::parse_type_annotation;
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
     #[cfg(feature = "interpreter")]
@@ -622,20 +622,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         ));
     };
 
-    if cursor.first().kind != TokenKind::Colon {
-        return Err(format!("Expected : but found {:?}", cursor.first().kind));
-    }
-
-    cursor.bump()?; // Consume the :
-
-    if !can_be_type_annotation(cursor) {
-        return Err(format!(
-            "Expected type annotation but found {:?}",
-            cursor.first().kind
-        ));
-    }
-
-    let type_annotation = parse_type_annotation(cursor, false)?;
+    let type_annotation = get_optional_type_annotation(cursor, false);
 
     match cursor.first().kind {
         TokenKind::Equal => {

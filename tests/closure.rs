@@ -1,6 +1,6 @@
 mod common;
 
-use common::{create_typed_ast, StatementExt, VecStatementExt};
+use common::{create_type_env, create_typed_ast, StatementExt, VecStatementExt};
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
     ast::{Typed, TypedExpression},
@@ -14,7 +14,7 @@ fn closure_is_closure() {
     let input = "|| {}";
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
@@ -31,7 +31,7 @@ fn closure_has_correct_type() {
     let input = "|| {}";
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
@@ -55,7 +55,7 @@ fn closure_has_correct_type_with_param_and_return() {
     let input = "|x: int|: int x";
 
     // Act
-    let typed_ast = create_typed_ast(input);
+    let typed_ast = create_typed_ast(input, create_type_env());
 
     // Assert
     let expression = typed_ast
