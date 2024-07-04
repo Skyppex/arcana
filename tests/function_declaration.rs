@@ -73,7 +73,7 @@ pub fn function_declaration_has_correct_type_with_param_and_return() {
 }
 
 #[test]
-pub fn function_declaration_with_multiple_params_has_correct_type() {
+pub fn function_declaration_with_two_params_has_correct_type() {
     // Arrange
     let input = "fun foo(x: int, y: int): int => x";
 
@@ -98,6 +98,45 @@ pub fn function_declaration_with_multiple_params_has_correct_type() {
                     type_: Box::new(Type::Int),
                 }),
                 return_type: Box::new(Type::Int),
+            })),
+        })
+    );
+}
+
+// This one is added after going from only supporting two params to supporting any number of params
+#[test]
+pub fn function_declaration_with_multiple_params_has_correct_type() {
+    // Arrange
+    let input = "fun foo(x: int, y: int, z: int): int => x + y + z";
+
+    // Act
+    let typed_ast = create_typed_ast(input);
+
+    // Assert
+    let statement = typed_ast.unwrap_program().nth_statement(0);
+
+    assert_eq!(
+        statement.get_type(),
+        Type::Function(Function {
+            identifier: Some(TypeIdentifier::Type("foo".to_string())),
+            param: Some(Parameter {
+                identifier: "x".to_string(),
+                type_: Box::new(Type::Int),
+            }),
+            return_type: Box::new(Type::Function(Function {
+                identifier: None,
+                param: Some(Parameter {
+                    identifier: "int".to_string(),
+                    type_: Box::new(Type::Int),
+                }),
+                return_type: Box::new(Type::Function(Function {
+                    identifier: None,
+                    param: Some(Parameter {
+                        identifier: "int".to_string(),
+                        type_: Box::new(Type::Int),
+                    }),
+                    return_type: Box::new(Type::Int),
+                }))
             })),
         })
     );

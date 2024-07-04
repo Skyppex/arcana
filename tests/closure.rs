@@ -120,3 +120,17 @@ fn closure_captures_function_environment() {
     // Assert
     assert_eq!(value, Value::Number(Number::Int(3)));
 }
+
+#[test]
+fn closure_with_multiple_params_evalutes_correctly() {
+    // Arrange
+    let input = r#"
+        (|x: int, y: int, z: int|: int x + y + z)(1, 2, 3)
+    "#;
+
+    // Act
+    let value = common::evaluate_expression(input, common::create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Number(Number::Int(6)));
+}

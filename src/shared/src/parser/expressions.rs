@@ -377,32 +377,83 @@ fn unwrap_arguments(
     return_type_annotation: Option<TypeAnnotation>,
     body: Expression,
 ) -> Result<Expression, String> {
-    if params.len() <= 1 {
-        return Ok(Expression::Closure(Closure {
-            param: params.first().cloned(),
-            return_type_annotation,
-            body: Box::new(body),
-        }));
-    }
-
-    let first_param = params.first().cloned();
-    let second_param = params.get(1).cloned().unwrap();
-
-    Ok(Expression::Closure(Closure {
-        param: first_param,
-        return_type_annotation: Some(TypeAnnotation::Function(
-            Some(Box::new(second_param.clone().type_annotation)),
-            return_type_annotation
-                .clone()
-                .map(|r| Box::new(r))
-                .unwrap_or(Box::new(TypeAnnotation::void())),
-        )),
-        body: Box::new(Expression::Closure(Closure {
-            param: Some(second_param),
+    match params.first().cloned() {
+        None => Ok(Expression::Closure(Closure {
+            param: None,
             return_type_annotation,
             body: Box::new(body),
         })),
-    }))
+        Some(first) => {
+            let (new_body, new_return_type_annotation) = unwrap_arguments_recurse(
+                params.into_iter().skip(1).collect(),
+                return_type_annotation,
+                body,
+            )?;
+
+            Ok(Expression::Closure(Closure {
+                param: Some(first),
+                return_type_annotation: new_return_type_annotation,
+                body: Box::new(new_body),
+            }))
+        }
+    }
+    // if params.len() <= 1 {
+    //     return Ok(Expression::Closure(Closure {
+    //         param: params.first().cloned(),
+    //         return_type_annotation,
+    //         body: Box::new(body),
+    //     }));
+    // }
+    //
+    // let first_param = params.first().cloned();
+    // let second_param = params.get(1).cloned().unwrap();
+    //
+    // Ok(Expression::Closure(Closure {
+    //     param: first_param,
+    //     return_type_annotation: Some(TypeAnnotation::Function(
+    //         Some(Box::new(second_param.clone().type_annotation)),
+    //         return_type_annotation
+    //             .clone()
+    //             .map(|r| Box::new(r))
+    //             .unwrap_or(Box::new(TypeAnnotation::void())),
+    //     )),
+    //     body: Box::new(Expression::Closure(Closure {
+    //         param: Some(second_param),
+    //         return_type_annotation,
+    //         body: Box::new(body),
+    //     })),
+    // }))
+}
+
+fn unwrap_arguments_recurse(
+    params: Vec<Parameter>,
+    return_type_annotation: Option<TypeAnnotation>,
+    body: Expression,
+) -> Result<(Expression, Option<TypeAnnotation>), String> {
+    match params.first().cloned() {
+        None => Ok((body, return_type_annotation)),
+        Some(first) => {
+            let new_body = Expression::Closure(Closure {
+                param: Some(first.clone()),
+                return_type_annotation: return_type_annotation.clone(),
+                body: Box::new(body),
+            });
+
+            let new_return_type_annotation = Some(TypeAnnotation::Function(
+                Some(Box::new(first.type_annotation)),
+                return_type_annotation
+                    .clone()
+                    .map(|r| Box::new(r))
+                    .unwrap_or(Box::new(TypeAnnotation::void())),
+            ));
+
+            unwrap_arguments_recurse(
+                params.into_iter().skip(1).collect(),
+                new_return_type_annotation,
+                new_body,
+            )
+        }
+    }
 }
 
 fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {

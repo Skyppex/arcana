@@ -115,10 +115,10 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     };
 
     let body = parse_expression(cursor)?;
-    let body = handle_multiple_parameters(
+    let body = unwrap_parameters(
         access_modifier,
         type_identifier,
-        &params,
+        params,
         return_type_annotation.clone(),
         body,
     )?;
@@ -126,45 +126,64 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     Ok(body)
 }
 
-fn handle_multiple_parameters(
+fn unwrap_parameters(
     access_modifier: Option<AccessModifier>,
     type_identifier: TypeIdentifier,
-    params: &Vec<Parameter>,
+    params: Vec<Parameter>,
     return_type_annotation: Option<TypeAnnotation>,
     body: Expression,
 ) -> Result<Statement, String> {
-    let second_param = params.get(1).map(|p| p.clone());
-
-    if let None = second_param {
-        return Ok(Statement::FunctionDeclaration(FunctionDeclaration {
+    match params.first().cloned() {
+        None => Ok(Statement::FunctionDeclaration(FunctionDeclaration {
             access_modifier,
             identifier: type_identifier,
-            param: params.first().cloned(),
+            param: None,
             return_type_annotation,
             body,
-        }));
-    };
+        })),
+        Some(first) => {
+            let (new_body, new_return_type_annotation) = unwrap_parameters_recurse(
+                params.into_iter().skip(1).collect(),
+                return_type_annotation,
+                body,
+            )?;
 
-    let new_body = Expression::Closure(Closure {
-        param: second_param.clone(),
-        return_type_annotation: return_type_annotation.clone(),
-        body: Box::new(body),
-    });
+            Ok(Statement::FunctionDeclaration(FunctionDeclaration {
+                access_modifier,
+                identifier: type_identifier,
+                param: Some(first),
+                return_type_annotation: new_return_type_annotation,
+                body: new_body,
+            }))
+        }
+    }
+}
 
-    let new_return_type_annotation = return_type_annotation.map(|r| {
-        TypeAnnotation::Function(
-            second_param.map(|p| Box::new(p.type_annotation)),
-            Box::new(r),
-        )
-    });
+fn unwrap_parameters_recurse(
+    params: Vec<Parameter>,
+    return_type_annotation: Option<TypeAnnotation>,
+    body: Expression,
+) -> Result<(Expression, Option<TypeAnnotation>), String> {
+    match params.first().cloned() {
+        None => Ok((body, return_type_annotation)),
+        Some(first) => {
+            let new_body = Expression::Closure(Closure {
+                param: Some(first.clone()),
+                return_type_annotation: return_type_annotation.clone(),
+                body: Box::new(body),
+            });
 
-    Ok(Statement::FunctionDeclaration(FunctionDeclaration {
-        access_modifier,
-        identifier: type_identifier,
-        param: params.first().cloned(),
-        return_type_annotation: new_return_type_annotation,
-        body: new_body,
-    }))
+            let new_return_type_annotation = return_type_annotation.map(|r| {
+                TypeAnnotation::Function(Some(Box::new(first.type_annotation)), Box::new(r))
+            });
+
+            unwrap_parameters_recurse(
+                params.into_iter().skip(1).collect(),
+                new_return_type_annotation,
+                new_body,
+            )
+        }
+    }
 }
 
 fn parse_return(cursor: &mut Cursor) -> Result<Statement, String> {
