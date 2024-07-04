@@ -428,7 +428,7 @@ pub fn check_type<'a>(
                 }) = callee.get_type()
                 else {
                     return Err(format!(
-                        "Expected function type, found {}",
+                        "Expected function type with a parameter, found {}",
                         callee.get_type()
                     ));
                 };

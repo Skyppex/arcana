@@ -666,7 +666,7 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
-    let call = parse_function_propagation(cursor)?;
+    let call = parse_call_or_param_propagation(cursor)?;
 
     if cursor.first().kind != TokenKind::FatArrow {
         return Ok(call);
@@ -674,14 +674,14 @@ fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the =>
 
+    let body = parse_expression(cursor)?;
+
     let return_type_annotation = if cursor.first().kind == TokenKind::Colon {
         cursor.bump()?; // Consume the :
         Some(parse_type_annotation(cursor, true)?)
     } else {
         None
     };
-
-    let body = parse_expression(cursor)?;
 
     Ok(Expression::Call(Call {
         callee: Box::new(call),
@@ -693,47 +693,47 @@ fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
     }))
 }
 
-fn parse_function_propagation(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_call_member(cursor)?;
+fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, String> {
+    let mut expression = parse_member_access(cursor)?;
 
-    if cursor.first().kind == TokenKind::Colon {
-        cursor.bump()?; // Consume the :
+    loop {
+        match cursor.first().kind {
+            // Call expression
+            TokenKind::OpenParen => {
+                expression = parse_call_expression(expression, cursor)?;
+            }
+            // Param propagation
+            TokenKind::Colon => {
+                cursor.bump()?; // Consume the :
 
-        let TokenKind::Identifier(identifier) = cursor.first().kind else {
-            return Err(format!(
-                "Expected identifier but found {:?}",
-                cursor.first().kind
-            ));
-        };
+                let TokenKind::Identifier(identifier) = cursor.first().kind else {
+                    return Err(format!(
+                        "Expected identifier but found {:?}",
+                        cursor.first().kind
+                    ));
+                };
 
-        println!("kjhagsdkjhg");
-        let Expression::Member(member) = parse_primary(cursor)? else {
-            println!("{}", 300);
-            return Err(format!(
-                "Expected member but found {:?}",
-                cursor.first().kind
-            ));
-        };
+                println!("kjhagsdkjhg");
+                let Expression::Member(member) = parse_primary(cursor)? else {
+                    println!("{}", 300);
+                    return Err(format!(
+                        "Expected member but found {:?}",
+                        cursor.first().kind
+                    ));
+                };
 
-        println!("aaaaaa");
-        expression = Expression::Member(Member::ParamPropagation {
-            object: Box::new(expression),
-            member: Box::new(member),
-            symbol: identifier,
-        });
+                println!("aaaaaa");
+                expression = Expression::Member(Member::ParamPropagation {
+                    object: Box::new(expression),
+                    member: Box::new(member),
+                    symbol: identifier,
+                });
+            }
+            _ => break,
+        }
     }
 
-    Ok(expression)
-}
-
-fn parse_call_member(cursor: &mut Cursor) -> Result<Expression, String> {
-    let member = parse_member_access(cursor)?;
-
-    if cursor.first().kind == TokenKind::OpenParen {
-        return parse_call_expression(member, cursor);
-    }
-
-    return Ok(member);
+    return Ok(expression);
 }
 
 fn parse_call_expression(callee: Expression, cursor: &mut Cursor) -> Result<Expression, String> {

@@ -129,10 +129,7 @@ impl<'a> Display for Value {
                 param_name,
                 body: _,
                 environment: _,
-            } => match param_name {
-                Some(param_name) => write!(f, "({})", param_name),
-                None => write!(f, "()"),
-            },
+            } => write!(f, "fun({})", param_name.clone().unwrap_or("".to_owned())),
         }
     }
 }

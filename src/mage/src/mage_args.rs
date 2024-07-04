@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use clap::{ArgGroup, Parser};
 
 #[derive(Parser)]
@@ -20,7 +22,8 @@ pub struct MageArgs {
     /// If this option is not specified, mage will run interactively in your terminal
     /// If the 'main' file isn't specified in the spell.toml file, it will look for main.ar or lib.ar in the same directory
     /// If the spell isn't a library, it will look for a main function in the main.ar file
-    #[arg(short, long, group = "src")]
+    /// If the source is a file with the .ar extension, it will be run as a script
+    #[arg(group = "src")]
     pub source: Option<String>,
 
     #[arg(short = 'r', long)]
@@ -31,4 +34,43 @@ pub struct MageArgs {
 
     #[arg(short, long)]
     pub label: bool,
+
+    #[command(flatten)]
+    pub logging: Logging,
+}
+
+#[derive(Parser, Clone)]
+pub struct Logging {
+    #[arg(short = 'f', long, default_value = "")]
+    pub log_flags: LogFlags,
+}
+
+#[derive(Clone)]
+pub struct LogFlags {
+    pub tokens: bool,
+    pub ast: bool,
+    pub typed_ast: bool,
+}
+
+impl FromStr for LogFlags {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut flags = LogFlags {
+            tokens: false,
+            ast: false,
+            typed_ast: false,
+        };
+
+        for flag in s.split(',') {
+            match flag.trim() {
+                "tokens" | "k" => flags.tokens = true,
+                "ast" | "a" => flags.ast = true,
+                "typed-ast" | "typed" | "t" => flags.typed_ast = true,
+                _ => {}
+            }
+        }
+
+        Ok(flags)
+    }
 }

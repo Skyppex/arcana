@@ -6,11 +6,11 @@ use std::{
     rc::Rc,
 };
 
-use crate::read_input;
+use crate::{mage_args::MageArgs, read_input};
 use interpreter::Environment;
 use shared::type_checker::{Type, TypeEnvironment};
 
-pub(crate) fn interactive() -> Result<(), String> {
+pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
     let environment = Rc::new(RefCell::new(Environment::new()));
 
@@ -84,7 +84,8 @@ pub(crate) fn interactive() -> Result<(), String> {
             continue;
         }
 
-        if let Err(message) = read_input(input.clone(), type_environment, environment.clone()) {
+        if let Err(message) = read_input(input.clone(), type_environment, environment.clone(), args)
+        {
             println!("Error: {}", message);
             println!();
             println!("{}", input);
