@@ -118,6 +118,25 @@ fn call_takes_caller_variable_as_first_argument() {
 }
 
 #[test]
+fn function_propagation_can_be_chained() {
+    // Arrange
+    let input = r#"
+        fun a(x: int): int => x
+        let y: int = 5;
+        y:a():a()
+    "#;
+
+    // y.a() = a(y)
+    // y.a = || a(y)
+
+    // Act
+    let value = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Number(Number::Int(5)))
+}
+
+#[test]
 fn call_takes_caller_expression_as_first_argument() {
     // Arrange
     let input = r#"

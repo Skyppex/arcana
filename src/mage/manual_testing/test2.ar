@@ -1,7 +1,19 @@
-fun things(value: int, operation: fun(): int): int { 
-    operation(value)
-}
+// // Without param
+// fun things(value: int, operation: fun(): int): int { 
+//     operation() + value
+// }
+// 
+// things(13) => :int {
+//     // Function body
+// }
+// 
+// things(13)(||: int {
+//     // Function body
+// })
+// 
+// things(13, ||: int {
+//     // Function body
+// })
 
-things(13) => {
-
-}
+let add2: fun(int): int = add(2);
+let x: int = 10;
