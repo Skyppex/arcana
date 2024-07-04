@@ -147,7 +147,6 @@ impl Environment {
     pub fn set_variable(&mut self, member: Member, value: Value) -> Result<Value, String> {
         match member {
             Member::Identifier { symbol, type_: _ } => {
-                println!("Setting variable: {}", symbol);
                 let variable = self
                     .resolve(&symbol)
                     .ok_or(format!("Variable '{}' not found", symbol))?

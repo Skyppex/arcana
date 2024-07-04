@@ -231,17 +231,14 @@ fn evaluate_assignment<'a>(
 
 fn evaluate_member<'a>(member: Member, environment: Rcrc<Environment>) -> Result<Value, String> {
     match member {
-        Member::Identifier { symbol, type_: _ } => {
-            println!("Getting variable: {}", symbol);
-            Ok(environment
-                .borrow()
-                .get_variable(&symbol)
-                .or(environment.borrow().get_function(&symbol))
-                .ok_or(format!("Variable '{}' not found", symbol))?
-                .borrow()
-                .value
-                .clone())
-        }
+        Member::Identifier { symbol, type_: _ } => Ok(environment
+            .borrow()
+            .get_variable(&symbol)
+            .or(environment.borrow().get_function(&symbol))
+            .ok_or(format!("Variable '{}' not found", symbol))?
+            .borrow()
+            .value
+            .clone()),
         Member::MemberAccess { object, member, .. } => {
             evaluate_member_access(object, environment, member)
         } // Member::MemberFunctionAccess { object, member, .. } => {
@@ -614,7 +611,6 @@ fn evaluate_drop<'a>(
     _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
-    println!("Dropping '{}'", identifier);
     let variable = environment
         .borrow_mut()
         .remove_variable(&identifier)

@@ -747,8 +747,6 @@ fn check_type_member_access_recurse(
                 ))?
             }
 
-            println!("{:?}", object_typed_expression);
-
             Ok(TypedExpression::Closure {
                 param: None,
                 return_type: type_.clone(),
