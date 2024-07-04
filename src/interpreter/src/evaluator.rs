@@ -113,15 +113,15 @@ fn evaluate_expression<'a>(
             type_: _,
         } => evaluate_closure(param, *body, environment),
         TypedExpression::Call {
-            caller,
+            callee,
             argument,
             type_,
-        } => evaluate_call(caller, argument, type_, environment),
+        } => evaluate_call(callee, argument, type_, environment),
         TypedExpression::Index {
-            caller,
+            callee,
             argument,
             type_,
-        } => evaluate_index(caller, argument, type_, environment),
+        } => evaluate_index(callee, argument, type_, environment),
         TypedExpression::Unary {
             operator,
             expression,
@@ -489,12 +489,12 @@ fn evaluate_call(
 }
 
 fn evaluate_index(
-    caller: Box<TypedExpression>,
+    callee: Box<TypedExpression>,
     argument: Box<TypedExpression>,
     _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
-    let caller_value = evaluate_expression(*caller, environment.clone())?;
+    let callee_value = evaluate_expression(*callee, environment.clone())?;
 
     let evaluated_argument = evaluate_expression(*argument, environment.clone())?;
 
@@ -502,7 +502,7 @@ fn evaluate_index(
         unreachable!("Type is known after type checking, this should never happen")
     };
 
-    match caller_value {
+    match callee_value {
         Value::Array(values) => {
             let value = values
                 .get(index as usize)
@@ -511,7 +511,7 @@ fn evaluate_index(
 
             Ok(value)
         }
-        _ => Err(format!("Cannot call non-function value '{}'", caller_value)),
+        _ => Err(format!("Cannot index non-array value '{}'", callee_value)),
     }
 }
 

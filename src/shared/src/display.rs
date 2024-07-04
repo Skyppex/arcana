@@ -494,15 +494,12 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Call(Call {
-                callee: caller,
-                argument,
-            }) => {
+            Expression::Call(Call { callee, argument }) => {
                 let mut result = String::new();
                 result.push_str("<call>\n");
                 indent.increase();
                 result.push_str(
-                    format!("{}caller: {}", indent.dash(), caller.indent_display(indent)).as_str(),
+                    format!("{}callee: {}", indent.dash(), callee.indent_display(indent)).as_str(),
                 );
 
                 indent.end_current();
@@ -1480,7 +1477,7 @@ impl IndentDisplay for TypedExpression {
                 result
             }
             TypedExpression::Call {
-                caller,
+                callee,
                 argument,
                 type_,
             } => {
@@ -1488,7 +1485,7 @@ impl IndentDisplay for TypedExpression {
                 result.push_str(format!("<call>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(
-                    format!("{}caller: {}", indent.dash(), caller.indent_display(indent)).as_str(),
+                    format!("{}callee: {}", indent.dash(), callee.indent_display(indent)).as_str(),
                 );
 
                 indent.end_current();
@@ -1505,7 +1502,7 @@ impl IndentDisplay for TypedExpression {
                 result
             }
             TypedExpression::Index {
-                caller,
+                callee,
                 argument,
                 type_,
             } => {
@@ -1514,9 +1511,9 @@ impl IndentDisplay for TypedExpression {
                 indent.increase_leaf();
                 result.push_str(
                     format!(
-                        "{}caller: {}\n",
+                        "{}callee: {}\n",
                         indent.dash(),
-                        caller.indent_display(indent)
+                        callee.indent_display(indent)
                     )
                     .as_str(),
                 );

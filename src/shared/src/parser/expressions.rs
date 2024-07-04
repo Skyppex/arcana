@@ -713,16 +713,13 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
                     ));
                 };
 
-                println!("kjhagsdkjhg");
                 let Expression::Member(member) = parse_primary(cursor)? else {
-                    println!("{}", 300);
                     return Err(format!(
                         "Expected member but found {:?}",
                         cursor.first().kind
                     ));
                 };
 
-                println!("aaaaaa");
                 expression = Expression::Member(Member::ParamPropagation {
                     object: Box::new(expression),
                     member: Box::new(member),
@@ -738,9 +735,7 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
 
 fn parse_call_expression(callee: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
     let arguments = parse_args(cursor)?;
-    println!("666 {:?}", cursor.first().kind);
     cursor.bump()?; // Consume the )
-    println!("{:?}", cursor.first().kind);
 
     let mut call = Expression::Call(Call {
         callee: Box::new(callee.clone()),
@@ -823,7 +818,6 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
         };
 
         let Expression::Member(member) = parse_literal(cursor)? else {
-            println!("{}", 2);
             return Err(format!(
                 "Expected member but found {:?}",
                 cursor.first().kind
@@ -848,7 +842,6 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
         };
 
         let Expression::Member(member) = parse_literal(cursor)? else {
-            println!("{}", 1);
             return Err(format!(
                 "Expected member but found {:?}",
                 cursor.first().kind

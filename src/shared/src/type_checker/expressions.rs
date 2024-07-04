@@ -399,14 +399,15 @@ pub fn check_type<'a>(
         Expression::Call(call) => {
             let callee = check_type(&call.callee, discovered_types, type_environment.clone())?;
 
-            if !matches!(callee.get_type(), Type::Function(_)) {
+            let callee_type = callee.get_type();
+            if !matches!(&callee_type, &Type::Function(_)) {
                 return Err(format!(
                     "Expected function type, found {}",
                     callee.get_type()
                 ));
             }
 
-            let type_ = match callee.get_type() {
+            let type_ = match callee_type.clone() {
                 Type::Function(Function { return_type, .. }) => *return_type,
                 _ => {
                     return Err(format!(
@@ -422,30 +423,40 @@ pub fn check_type<'a>(
                 .map(|arg| check_type(&arg, discovered_types, type_environment.clone()))
                 .transpose()?;
 
+            let mut callee = callee;
+
             if let Some(ate) = arg_typed_expression.clone() {
-                let Type::Function(Function {
+                if let Type::Function(Function {
                     param: Some(param), ..
                 }) = callee.get_type()
-                else {
-                    return Err(format!(
-                        "Expected function type with a parameter, found {}",
-                        callee.get_type()
-                    ));
+                {
+                    if !type_equals(&ate.get_type(), &param.type_) {
+                        return Err(format!(
+                            "Argument type {} does not match parameter type {}",
+                            ate.get_type(),
+                            param.type_
+                        ));
+                    }
+                } else {
+                    if let Type::Function(Function { param: None, .. }) = callee_type {
+                        callee = TypedExpression::Call {
+                            callee: Box::new(callee),
+                            argument: None,
+                            type_: type_.clone(),
+                        };
+                    } else {
+                        return Err(format!(
+                            "Expected function type with a parameter, found {}",
+                            callee.get_type()
+                        ));
+                    }
                 };
-
-                if !type_equals(&ate.get_type(), &param.type_) {
-                    return Err(format!(
-                        "Argument type {} does not match parameter type {}",
-                        ate.get_type(),
-                        param.type_
-                    ));
-                }
             }
 
             let arg = arg_typed_expression.clone().map(|arg| Box::new(arg));
 
             Ok(TypedExpression::Call {
-                caller: Box::new(callee),
+                callee: Box::new(callee),
                 argument: arg,
                 type_,
             })
@@ -751,7 +762,7 @@ fn check_type_member_access_recurse(
                 param: None,
                 return_type: type_.clone(),
                 body: Box::new(TypedExpression::Call {
-                    caller: Box::new(TypedExpression::Member(Member::Identifier {
+                    callee: Box::new(TypedExpression::Member(Member::Identifier {
                         symbol: symbol.clone(),
                         type_: type_.clone(),
                     })),

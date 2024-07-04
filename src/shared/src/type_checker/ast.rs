@@ -287,12 +287,12 @@ pub enum TypedExpression {
         type_: Type,
     },
     Call {
-        caller: Box<TypedExpression>,
+        callee: Box<TypedExpression>,
         argument: Option<Box<TypedExpression>>,
         type_: Type,
     },
     Index {
-        caller: Box<TypedExpression>,
+        callee: Box<TypedExpression>,
         argument: Box<TypedExpression>,
         type_: Type,
     },
@@ -431,16 +431,16 @@ impl Display for TypedExpression {
                 )
             }
             TypedExpression::Call {
-                caller, argument, ..
+                callee, argument, ..
             } => write!(
                 f,
                 "{}({})",
-                caller,
+                callee,
                 argument.clone().map_or("".to_string(), |a| a.to_string())
             ),
             TypedExpression::Index {
-                caller, argument, ..
-            } => write!(f, "{}[{}]", caller, argument),
+                callee, argument, ..
+            } => write!(f, "{}[{}]", callee, argument),
             TypedExpression::Unary {
                 operator,
                 expression,
