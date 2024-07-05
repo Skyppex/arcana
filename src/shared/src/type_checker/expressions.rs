@@ -660,6 +660,42 @@ pub fn check_type<'a>(
     }
 }
 
+fn synthesize_type(
+    expression: &Expression,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rc<RefCell<TypeEnvironment>>,
+) -> Result<Option<TypedExpression>, String> {
+    match expression {
+        Expression::None => Ok(Some(TypedExpression::None)),
+        Expression::VariableDeclaration(_) => todo!(),
+        Expression::If(_) => todo!(),
+        Expression::Assignment(_) => todo!(),
+        Expression::Member(_) => todo!(),
+        Expression::Literal(l) => match l {
+            parser::Literal::Unit => Ok(Some(TypedExpression::Literal(Literal::Unit))),
+            parser::Literal::Int(v) => Ok(Some(TypedExpression::Literal(Literal::Int(*v)))),
+            parser::Literal::UInt(v) => Ok(Some(TypedExpression::Literal(Literal::UInt(*v)))),
+            parser::Literal::Float(v) => Ok(Some(TypedExpression::Literal(Literal::Float(*v)))),
+            parser::Literal::String(v) => {
+                Ok(Some(TypedExpression::Literal(Literal::String(v.clone()))))
+            }
+            parser::Literal::Char(v) => Ok(Some(TypedExpression::Literal(Literal::Char(*v)))),
+            parser::Literal::Bool(v) => Ok(Some(TypedExpression::Literal(Literal::Bool(*v)))),
+            parser::Literal::Array(v) => todo!("Synthesize array type"),
+            parser::Literal::Struct { .. } => todo!("Synthesize struct type"),
+            parser::Literal::Enum { .. } => todo!("Synthesize enum type"),
+        },
+        Expression::Closure(_) => todo!(),
+        Expression::Call(_) => todo!(),
+        Expression::Unary(_) => todo!(),
+        Expression::Binary(_) => todo!(),
+        Expression::Block(_) => todo!(),
+        Expression::Loop(_) => todo!(),
+        Expression::While(_) => todo!(),
+        Expression::Drop(_) => todo!(),
+    }
+}
+
 fn is_option(type_: &Option<Type>) -> bool {
     let Some(type_) = type_ else {
         return false;
