@@ -13,7 +13,7 @@ use interpreter::Environment;
 use shared::{
     parser::create_ast,
     pretty_print::PrettyPrint,
-    type_checker::{create_typed_ast, type_inference::TypeInferenceContext, TypeEnvironment},
+    type_checker::{create_typed_ast, TypeEnvironment},
 };
 
 fn main() {
@@ -45,16 +45,9 @@ pub fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
         .map_err(|error| format!("Failed to read file: {}", error))?;
 
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
-    let type_inference_context = &mut TypeInferenceContext::new();
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    let result = read_input(
-        source,
-        type_environment.clone(),
-        type_inference_context,
-        environment.clone(),
-        args,
-    );
+    let result = read_input(source, type_environment.clone(), environment.clone(), args);
 
     if args.variables {
         if args.label {
@@ -86,7 +79,6 @@ pub fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
 pub fn read_input(
     input: String,
     type_environment: Rc<RefCell<TypeEnvironment>>,
-    type_inference_context: &mut TypeInferenceContext,
     environment: Rc<RefCell<Environment>>,
     args: &MageArgs,
 ) -> Result<(), String> {
@@ -104,7 +96,7 @@ pub fn read_input(
         eprintln!("{}\n", program.prettify());
     }
 
-    let typed_program = create_typed_ast(program, type_environment, type_inference_context)?;
+    let typed_program = create_typed_ast(program, type_environment)?;
     if print_type_checker_ast {
         eprintln!("{}\n", typed_program.prettify());
     }

@@ -1,8 +1,6 @@
 mod common;
 
-use common::{
-    create_type_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt,
-};
+use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
 use interpreter::{value, Value};
 use shared::type_checker::{
@@ -18,7 +16,7 @@ fn if_is_if() {
     let input = "if true { 1 } else { 2 }";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -35,7 +33,7 @@ fn if_has_correct_type() {
     let input = "if true { 1 } else { 2 }";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -52,7 +50,7 @@ fn if_has_correct_type_2() {
     let input = "if true 1 else 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast

@@ -1,8 +1,6 @@
 mod common;
 
-use common::{
-    create_type_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt,
-};
+use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
 use interpreter::{value, Value};
 use shared::type_checker::{
@@ -21,7 +19,7 @@ fn identifier_is_identifier() {
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -46,7 +44,7 @@ fn member_access_is_member_access() {
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -69,7 +67,7 @@ fn identifier_has_correct_type() {
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -91,7 +89,7 @@ fn member_access_has_correct_type() {
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast

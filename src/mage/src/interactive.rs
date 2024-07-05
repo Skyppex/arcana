@@ -8,11 +8,10 @@ use std::{
 
 use crate::{mage_args::MageArgs, read_input};
 use interpreter::Environment;
-use shared::type_checker::{type_inference::TypeInferenceContext, Type, TypeEnvironment};
+use shared::type_checker::{Type, TypeEnvironment};
 
 pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
-    let type_inference_context = &mut TypeInferenceContext::new();
     let environment = Rc::new(RefCell::new(Environment::new()));
 
     loop {
@@ -85,13 +84,8 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
             continue;
         }
 
-        if let Err(message) = read_input(
-            input.clone(),
-            type_environment,
-            type_inference_context,
-            environment.clone(),
-            args,
-        ) {
+        if let Err(message) = read_input(input.clone(), type_environment, environment.clone(), args)
+        {
             println!("Error: {}", message);
             println!();
             println!("{}", input);

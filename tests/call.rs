@@ -1,9 +1,6 @@
 mod common;
 
-use common::{
-    create_env, create_type_env, create_typed_ast, evaluate_expression, StatementExt,
-    VecStatementExt,
-};
+use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
@@ -20,7 +17,7 @@ fn call_is_call() {
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -40,7 +37,7 @@ fn call_has_void_return_type() {
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -60,7 +57,7 @@ fn call_has_return_type() {
     "#;
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast

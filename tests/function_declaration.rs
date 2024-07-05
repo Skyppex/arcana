@@ -1,4 +1,4 @@
-use common::{create_type_env, create_typed_ast, StatementExt, VecStatementExt};
+use common::{create_typed_ast, StatementExt, VecStatementExt};
 use shared::{
     type_checker::{
         ast::{Typed, TypedStatement},
@@ -16,7 +16,7 @@ pub fn function_declaration_is_function_declaration() {
     let input = "fun foo() => {}";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let statement = typed_ast.unwrap_program().nth_statement(0);
@@ -33,7 +33,7 @@ pub fn function_declaration_has_correct_type() {
     let input = "fun foo() => {}";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let statement = typed_ast.unwrap_program().nth_statement(0);
@@ -54,7 +54,7 @@ pub fn function_declaration_has_correct_type_with_param_and_return() {
     let input = "fun foo(x: int): int => x";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let statement = typed_ast.unwrap_program().nth_statement(0);
@@ -78,7 +78,7 @@ pub fn function_declaration_with_two_params_has_correct_type() {
     let input = "fun foo(x: int, y: int): int => x";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let statement = typed_ast.unwrap_program().nth_statement(0);
@@ -110,7 +110,7 @@ pub fn function_declaration_with_multiple_params_has_correct_type() {
     let input = "fun foo(x: int, y: int, z: int): int => x + y + z";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let statement = typed_ast.unwrap_program().nth_statement(0);

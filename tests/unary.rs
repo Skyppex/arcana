@@ -1,6 +1,6 @@
 mod common;
 
-use common::{create_type_env, create_typed_ast, StatementExt, VecStatementExt};
+use common::{create_typed_ast, StatementExt, VecStatementExt};
 
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
@@ -14,7 +14,7 @@ fn identity_is_identity() {
     let input = "+1";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -22,13 +22,7 @@ fn identity_is_identity() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(
-        expression,
-        TypedExpression::Unary {
-            operator: UnaryOperator::Identity,
-            ..
-        }
-    ));
+    assert!(matches!(expression, TypedExpression::Unary { operator: UnaryOperator::Identity, .. }));
 }
 
 #[test]
@@ -37,7 +31,7 @@ fn negate_is_negate() {
     let input = "-1";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -45,13 +39,7 @@ fn negate_is_negate() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(
-        expression,
-        TypedExpression::Unary {
-            operator: UnaryOperator::Negate,
-            ..
-        }
-    ));
+    assert!(matches!(expression, TypedExpression::Unary { operator: UnaryOperator::Negate, .. }));
 }
 
 #[test]
@@ -60,7 +48,7 @@ fn logical_not_is_logical_not() {
     let input = "!true";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -68,13 +56,7 @@ fn logical_not_is_logical_not() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(
-        expression,
-        TypedExpression::Unary {
-            operator: UnaryOperator::LogicalNot,
-            ..
-        }
-    ));
+    assert!(matches!(expression, TypedExpression::Unary { operator: UnaryOperator::LogicalNot, .. }));
 }
 
 #[test]
@@ -83,7 +65,7 @@ fn bitwise_not_is_bitwise_not() {
     let input = "~1";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -91,13 +73,7 @@ fn bitwise_not_is_bitwise_not() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(
-        expression,
-        TypedExpression::Unary {
-            operator: UnaryOperator::BitwiseNot,
-            ..
-        }
-    ));
+    assert!(matches!(expression, TypedExpression::Unary { operator: UnaryOperator::BitwiseNot, .. }));
 }
 
 #[test]
@@ -106,7 +82,7 @@ fn identity_has_correct_type() {
     let input = "+1";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -123,7 +99,7 @@ fn negate_has_correct_type() {
     let input = "-1";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -140,7 +116,7 @@ fn logical_not_has_correct_type() {
     let input = "!true";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -157,7 +133,7 @@ fn bitwise_not_has_correct_type() {
     let input = "~1";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast

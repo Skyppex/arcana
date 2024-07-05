@@ -249,7 +249,7 @@ pub enum Member {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VariableDeclaration {
     pub mutable: bool,
-    pub type_annotation: Option<TypeAnnotation>,
+    pub type_annotation: TypeAnnotation,
     pub identifier: String,
     pub initializer: Option<Box<Expression>>,
 }

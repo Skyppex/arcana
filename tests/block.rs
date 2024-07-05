@@ -1,6 +1,6 @@
 mod common;
 
-use common::{create_type_env, create_typed_ast, StatementExt, VecStatementExt};
+use common::{create_typed_ast, StatementExt, VecStatementExt};
 
 use shared::type_checker::{
     ast::{Typed, TypedExpression},
@@ -13,7 +13,7 @@ fn block_is_block() {
     let input = "{}";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -30,7 +30,7 @@ fn block_has_correct_type() {
     let input = "{ 1 }";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast

@@ -1,6 +1,6 @@
 mod common;
 
-use common::{create_type_env, create_typed_ast, StatementExt, VecStatementExt};
+use common::{create_typed_ast, StatementExt, VecStatementExt};
 
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
@@ -16,7 +16,7 @@ fn add_is_add() {
     let input = "1 + 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -39,7 +39,7 @@ fn subtract_is_subtract() {
     let input = "1 - 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -62,7 +62,7 @@ fn multiply_is_multiply() {
     let input = "1 * 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -85,7 +85,7 @@ fn divide_is_divide() {
     let input = "1 / 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -108,7 +108,7 @@ fn modulo_is_modulo() {
     let input = "1 % 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -131,7 +131,7 @@ fn bitwise_and_is_bitwise_and() {
     let input = "1 & 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -154,7 +154,7 @@ fn bitwise_or_is_bitwise_or() {
     let input = "1 | 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -177,7 +177,7 @@ fn bitwise_xor_is_bitwise_xor() {
     let input = "1 ^ 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -200,7 +200,7 @@ fn bitwise_left_shift_is_bitwise_left_shift() {
     let input = "1 << 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -223,7 +223,7 @@ fn bitwise_right_shift_is_bitwise_right_shift() {
     let input = "1 >> 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -246,7 +246,7 @@ fn logical_and_is_logical_and() {
     let input = "true && false";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -267,7 +267,7 @@ fn logical_or_is_logical_or() {
     let input = "true || false";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -288,7 +288,7 @@ fn equal_is_equal() {
     let input = "1 == 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -309,7 +309,7 @@ fn not_equal_is_not_equal() {
     let input = "1 != 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -330,7 +330,7 @@ fn less_than_is_less_than() {
     let input = "1 < 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -351,7 +351,7 @@ fn less_than_or_equal_is_less_than_or_equal() {
     let input = "1 <= 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -372,7 +372,7 @@ fn greater_than_is_greater_than() {
     let input = "1 > 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -393,7 +393,7 @@ fn greater_than_or_equal_is_greater_than_or_equal() {
     let input = "1 >= 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -414,7 +414,7 @@ fn add_has_correct_type() {
     let input = "1 + 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -431,7 +431,7 @@ fn subtract_has_correct_type() {
     let input = "1 - 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -448,7 +448,7 @@ fn multiply_has_correct_type() {
     let input = "1 * 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -465,7 +465,7 @@ fn divide_has_correct_type() {
     let input = "1 / 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -482,7 +482,7 @@ fn modulo_has_correct_type() {
     let input = "1 % 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -499,7 +499,7 @@ fn bitwise_and_has_correct_type() {
     let input = "1 & 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -516,7 +516,7 @@ fn bitwise_or_has_correct_type() {
     let input = "1 | 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -533,7 +533,7 @@ fn bitwise_xor_has_correct_type() {
     let input = "1 ^ 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -550,7 +550,7 @@ fn bitwise_left_shift_has_correct_type() {
     let input = "1 << 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -567,7 +567,7 @@ fn bitwise_right_shift_has_correct_type() {
     let input = "1 >> 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -584,7 +584,7 @@ fn logical_and_has_correct_type() {
     let input = "true && false";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -601,7 +601,7 @@ fn logical_or_has_correct_type() {
     let input = "true || false";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -618,7 +618,7 @@ fn equal_has_correct_type() {
     let input = "1 == 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -635,7 +635,7 @@ fn not_equal_has_correct_type() {
     let input = "1 != 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -652,7 +652,7 @@ fn less_than_has_correct_type() {
     let input = "1 < 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -669,7 +669,7 @@ fn less_than_or_equal_has_correct_type() {
     let input = "1 <= 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -686,7 +686,7 @@ fn greater_than_has_correct_type() {
     let input = "1 > 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
@@ -703,7 +703,7 @@ fn greater_than_or_equal_has_correct_type() {
     let input = "1 >= 2";
 
     // Act
-    let typed_ast = create_typed_ast(input, create_type_env());
+    let typed_ast = create_typed_ast(input);
 
     // Assert
     let expression = typed_ast
