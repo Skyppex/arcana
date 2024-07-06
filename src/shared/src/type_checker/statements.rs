@@ -379,7 +379,7 @@ pub fn check_type<'a>(
             };
 
             let body_typed_expression: TypedExpression =
-                expressions::check_type(body, discovered_types, body_environment.clone())?;
+                expressions::check_type(body, discovered_types, body_environment.clone(), None)?;
 
             let return_scope = body_environment.borrow().get_scope(&ScopeType::Return);
 
@@ -422,7 +422,7 @@ pub fn check_type<'a>(
         Statement::Break(e) => match e {
             Some(e) => {
                 let typed_expression =
-                    expressions::check_type(e, discovered_types, type_environment.clone())?;
+                    expressions::check_type(e, discovered_types, type_environment.clone(), None)?;
 
                 let break_type = typed_expression.get_type();
                 type_environment
@@ -441,7 +441,7 @@ pub fn check_type<'a>(
         Statement::Return(e) => match e {
             Some(e) => {
                 let typed_expression =
-                    expressions::check_type(e, discovered_types, type_environment.clone())?;
+                    expressions::check_type(e, discovered_types, type_environment.clone(), None)?;
 
                 let return_type = typed_expression.get_type();
                 type_environment
@@ -460,11 +460,13 @@ pub fn check_type<'a>(
             e,
             discovered_types,
             type_environment,
+            None,
         )?)),
         Statement::Print(e) => Ok(TypedStatement::Print(expressions::check_type(
             e,
             discovered_types,
             type_environment,
+            None,
         )?)),
     }
 }
@@ -615,7 +617,7 @@ pub fn check_type_annotation(
 ) -> Result<Type, String> {
     if let Ok(type_) = type_environment
         .borrow()
-        .get_type_from_annotation(type_annotation, type_environment.clone())
+        .get_type_from_annotation(type_annotation)
     {
         return Ok(type_);
     }

@@ -186,3 +186,52 @@ fn variable_declaration_adds_variable_to_environment_with_value() {
     assert!(environment.borrow().get_variable("x").is_some());
     assert_eq!(value, Value::Bool(true));
 }
+
+#[test]
+fn variable_declaration_type_is_inferred() {
+    // Arrange
+    let input = "let x = true";
+
+    // Act
+    let typed_ast = create_typed_ast(input);
+
+    // Assert
+    let expression = typed_ast
+        .unwrap_program()
+        .nth_statement(0)
+        .unwrap_expression();
+
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "true".to_owned(),
+            type_: Box::new(Type::Bool)
+        }
+    );
+}
+
+#[test]
+fn variable_declaration_type_is_deferred() {
+    // Arrange
+    let input = r#"
+        let x;
+        x = true
+    "#;
+
+    // Act
+    let typed_ast = create_typed_ast(input);
+
+    // Assert
+    let expression = typed_ast
+        .unwrap_program()
+        .nth_statement(1)
+        .unwrap_expression();
+
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "true".to_owned(),
+            type_: Box::new(Type::Bool)
+        }
+    );
+}

@@ -35,8 +35,7 @@ type Block = Vec<Statement>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
-    None, // For testing purposes
-
+    // None, // For testing purposes
     VariableDeclaration(VariableDeclaration),
     If(If),
     Assignment(Assignment),
@@ -95,6 +94,21 @@ pub struct FunctionDeclaration {
 pub struct Parameter {
     pub identifier: String,
     pub type_annotation: TypeAnnotation,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClosureParameter {
+    pub identifier: String,
+    pub type_annotation: Option<TypeAnnotation>,
+}
+
+impl From<Parameter> for ClosureParameter {
+    fn from(param: Parameter) -> Self {
+        Self {
+            identifier: param.identifier,
+            type_annotation: Some(param.type_annotation),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -246,10 +260,20 @@ pub enum Member {
     },
 }
 
+impl Member {
+    pub fn get_symbol(&self) -> String {
+        match self {
+            Member::Identifier { symbol } => symbol.clone(),
+            Member::MemberAccess { symbol, .. } => symbol.clone(),
+            Member::ParamPropagation { symbol, .. } => symbol.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct VariableDeclaration {
     pub mutable: bool,
-    pub type_annotation: TypeAnnotation,
+    pub type_annotation: Option<TypeAnnotation>,
     pub identifier: String,
     pub initializer: Option<Box<Expression>>,
 }
@@ -269,7 +293,7 @@ pub struct Assignment {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Closure {
-    pub param: Option<Parameter>,
+    pub param: Option<ClosureParameter>,
     pub return_type_annotation: Option<TypeAnnotation>,
     pub body: Box<Expression>,
 }

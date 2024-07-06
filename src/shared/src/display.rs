@@ -1,13 +1,14 @@
 use crate::{
     parser::{
-        AccessModifier, Assignment, Binary, BinaryOperator, Call, EnumDeclaration, EnumMember,
-        EnumMemberField, EnumMemberFieldInitializers, Expression, FieldInitializer, FlagsMember,
-        FunctionDeclaration, If, Literal, Member, Parameter, Statement, StructDeclaration,
-        StructField, Unary, UnaryOperator, UnionDeclaration, VariableDeclaration, While,
+        AccessModifier, Assignment, Binary, BinaryOperator, Call, ClosureParameter,
+        EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
+        FieldInitializer, FlagsMember, FunctionDeclaration, If, Literal, Member, Parameter,
+        Statement, StructDeclaration, StructField, Unary, UnaryOperator, UnionDeclaration,
+        VariableDeclaration, While,
     },
     type_checker::{
         self,
-        ast::{Block, TypedExpression, TypedParameter, TypedStatement},
+        ast::{Block, TypedClosureParameter, TypedExpression, TypedParameter, TypedStatement},
         Type,
     },
     types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
@@ -365,7 +366,7 @@ impl IndentDisplay for FunctionDeclaration {
 impl IndentDisplay for Expression {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            Expression::None => String::new(),
+            // Expression::None => String::new(),
             Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
                 type_annotation,
@@ -1080,6 +1081,32 @@ impl IndentDisplay for Parameter {
     }
 }
 
+impl IndentDisplay for ClosureParameter {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<parameter>\n");
+        indent.increase_leaf();
+        result.push_str(
+            format!(
+                "{}name: {}\n",
+                indent.dash(),
+                self.identifier.indent_display(indent)
+            )
+            .as_str(),
+        );
+        result.push_str(
+            format!(
+                "{}type_annotation: {}",
+                indent.dash_end(),
+                self.type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.decrease();
+        result
+    }
+}
+
 impl IndentDisplay for UnaryOperator {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
@@ -1341,7 +1368,7 @@ impl IndentDisplay for TypedStatement {
 impl IndentDisplay for TypedExpression {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            TypedExpression::None => String::new(),
+            // TypedExpression::None => String::new(),
             TypedExpression::VariableDeclaration {
                 mutable,
                 identifier,
@@ -1726,6 +1753,32 @@ impl IndentDisplay for TypedExpression {
 }
 
 impl IndentDisplay for TypedParameter {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<parameter>\n");
+        indent.increase_leaf();
+        result.push_str(
+            format!(
+                "{}name: {}\n",
+                indent.dash(),
+                self.identifier.indent_display(indent)
+            )
+            .as_str(),
+        );
+        result.push_str(
+            format!(
+                "{}type_annotation: {}",
+                indent.dash_end(),
+                self.type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.decrease();
+        result
+    }
+}
+
+impl IndentDisplay for TypedClosureParameter {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
         result.push_str("<parameter>\n");

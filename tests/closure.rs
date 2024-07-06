@@ -136,16 +136,46 @@ fn closure_with_multiple_params_evalutes_correctly() {
 }
 
 #[test]
-fn trailing_closure() {
+fn closure_return_type_is_inferred() {
     // Arrange
     let input = r#"
         fun a(op: fun(): int): int => op()
-        a => :int 8
+        a(|| 5)
     "#;
 
     // Act
     let value = evaluate_expression(input, create_env(), false);
 
     // Assert
-    assert_eq!(value, Value::Number(Number::Int(8)))
+    assert_eq!(value, Value::Number(Number::Int(5)));
+}
+
+#[test]
+fn closure_param_type_is_inferred() {
+    // Arrange
+    let input = r#"
+        fun a(op: fun(int): int): int => op(8)
+        a(|x| x)
+    "#;
+
+    // Act
+    let value = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Number(Number::Int(8)));
+}
+
+#[test]
+fn closure_voids_body_if_return_type_is_void() {
+    // Arrange
+    let input = r#"
+        fun a(op: fun(int)) => op(0)
+        a(|x| x)
+    "#;
+
+    // Act
+    let value = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Void);
 }

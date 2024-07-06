@@ -197,3 +197,33 @@ fn call_takes_caller_expression_as_first_argument() {
     // Assert
     assert_eq!(value, Value::Number(Number::Int(8)))
 }
+
+#[test]
+fn trailing_closure_call() {
+    // Arrange
+    let input = r#"
+        fun a(op: fun(): int): int => op()
+        a => :int 8
+    "#;
+
+    // Act
+    let value = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Number(Number::Int(8)))
+}
+
+#[test]
+fn trailing_closure_call_return_type_is_inferred() {
+    // Arrange
+    let input = r#"
+        fun a(op: fun(): int): int => op()
+        a => 5
+    "#;
+
+    // Act
+    let value = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Number(Number::Int(5)))
+}

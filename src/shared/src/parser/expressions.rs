@@ -2,15 +2,15 @@ use std::collections::HashMap;
 
 use crate::{
     lexer::token::{self, Keyword, TokenKind},
-    types::TypeAnnotation,
+    types::{parse_optional_type_annotation, TypeAnnotation},
 };
 
 use super::{
     cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, Closure,
-    EnumMemberFieldInitializers, Expression, FieldInitializer, If, Literal, Member, Parameter,
-    Statement, Unary, UnaryOperator, VariableDeclaration, While,
+    ClosureParameter, EnumMemberFieldInitializers, Expression, FieldInitializer, If, Literal,
+    Member, Statement, Unary, UnaryOperator, VariableDeclaration, While,
 };
-use crate::types::{can_be_type_annotation, parse_type_annotation};
+use crate::types::parse_type_annotation;
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
     #[cfg(feature = "interpreter")]
@@ -337,13 +337,9 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
             ));
         };
 
-        let TokenKind::Colon = cursor.bump()?.kind else {
-            return Err(format!("Expected : but found {:?}", cursor.first().kind));
-        };
+        let type_annotation = parse_optional_type_annotation(cursor, false)?;
 
-        let type_annotation = parse_type_annotation(cursor, false)?;
-
-        params.push(Parameter {
+        params.push(ClosureParameter {
             identifier,
             type_annotation,
         });
@@ -355,12 +351,7 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the |
 
-    let return_type_annotation = if cursor.first().kind == TokenKind::Colon {
-        cursor.bump()?; // Consume the :
-        Some(parse_type_annotation(cursor, true)?)
-    } else {
-        None
-    };
+    let return_type_annotation = parse_optional_type_annotation(cursor, true)?;
 
     // Optional fat arrow
     if cursor.first().kind == TokenKind::FatArrow {
@@ -373,7 +364,7 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn unwrap_arguments(
-    params: Vec<Parameter>,
+    params: Vec<ClosureParameter>,
     return_type_annotation: Option<TypeAnnotation>,
     body: Expression,
 ) -> Result<Expression, String> {
@@ -426,7 +417,7 @@ fn unwrap_arguments(
 }
 
 fn unwrap_arguments_recurse(
-    params: Vec<Parameter>,
+    params: Vec<ClosureParameter>,
     return_type_annotation: Option<TypeAnnotation>,
     body: Expression,
 ) -> Result<(Expression, Option<TypeAnnotation>), String> {
@@ -440,11 +431,8 @@ fn unwrap_arguments_recurse(
             });
 
             let new_return_type_annotation = Some(TypeAnnotation::Function(
-                Some(Box::new(first.type_annotation)),
-                return_type_annotation
-                    .clone()
-                    .map(|r| Box::new(r))
-                    .unwrap_or(Box::new(TypeAnnotation::void())),
+                first.type_annotation.map(|ta| Box::new(ta)),
+                return_type_annotation.clone().map(|r| Box::new(r)),
             ));
 
             unwrap_arguments_recurse(
@@ -622,20 +610,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         ));
     };
 
-    if cursor.first().kind != TokenKind::Colon {
-        return Err(format!("Expected : but found {:?}", cursor.first().kind));
-    }
-
-    cursor.bump()?; // Consume the :
-
-    if !can_be_type_annotation(cursor) {
-        return Err(format!(
-            "Expected type annotation but found {:?}",
-            cursor.first().kind
-        ));
-    }
-
-    let type_annotation = parse_type_annotation(cursor, false)?;
+    let type_annotation = parse_optional_type_annotation(cursor, false)?;
 
     match cursor.first().kind {
         TokenKind::Equal => {
@@ -919,6 +894,7 @@ pub fn parse_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
+    println!("{:?}", cursor.first().kind);
     match cursor.first().kind {
         TokenKind::Identifier(identifier) => {
             cursor.bump()?; // Consume the identifier
@@ -927,9 +903,11 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
             }))
         }
         TokenKind::OpenParen => {
+            println!("we got a paren!");
             cursor.bump()?; // Consume the (
 
             let expression = parse_expression(cursor)?;
+            println!("{:?}", expression);
 
             match cursor.first().kind {
                 TokenKind::CloseParen => {

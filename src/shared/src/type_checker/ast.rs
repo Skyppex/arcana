@@ -229,6 +229,36 @@ impl Display for TypedParameter {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct TypedClosureParameter {
+    pub identifier: String,
+    pub type_annotation: Option<TypeAnnotation>,
+    pub type_: Box<Type>,
+}
+
+impl Typed for TypedClosureParameter {
+    fn get_type(&self) -> Type {
+        *self.type_.clone()
+    }
+
+    fn get_deep_type(&self) -> Type {
+        *self.type_.clone()
+    }
+}
+
+impl Display for TypedClosureParameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}: {}",
+            self.identifier,
+            self.type_annotation
+                .clone()
+                .unwrap_or(TypeAnnotation::Type("".to_string()))
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Block {
     pub statements: Vec<TypedStatement>,
     pub type_: Type,
@@ -260,7 +290,7 @@ impl Display for Block {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypedExpression {
-    None, // For testing purposes
+    // None, // For testing purposes
     VariableDeclaration {
         mutable: bool,
         identifier: String,
@@ -281,7 +311,7 @@ pub enum TypedExpression {
     Member(Member),
     Literal(Literal),
     Closure {
-        param: Option<TypedParameter>,
+        param: Option<TypedClosureParameter>,
         return_type: Type,
         body: Box<TypedExpression>,
         type_: Type,
@@ -324,7 +354,7 @@ pub enum TypedExpression {
 impl Typed for TypedExpression {
     fn get_type(&self) -> Type {
         match self {
-            TypedExpression::None => Type::Void,
+            // TypedExpression::None => Type::Void,
             TypedExpression::VariableDeclaration { type_, .. } => type_.clone(),
             TypedExpression::If { type_, .. } => type_.clone(),
             TypedExpression::Assignment { type_, .. } => type_.clone(),
@@ -344,7 +374,7 @@ impl Typed for TypedExpression {
 
     fn get_deep_type(&self) -> Type {
         match self {
-            TypedExpression::None => Type::Void,
+            // TypedExpression::None => Type::Void,
             TypedExpression::VariableDeclaration { type_, .. } => type_.clone(),
             TypedExpression::If { type_, .. } => type_.clone(),
             TypedExpression::Assignment { type_, .. } => type_.clone(),
@@ -373,7 +403,7 @@ impl PrettyPrint for TypedExpression {
 impl Display for TypedExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypedExpression::None => write!(f, "None"),
+            // TypedExpression::None => write!(f, "None"),
             TypedExpression::VariableDeclaration {
                 mutable,
                 identifier,
@@ -829,6 +859,31 @@ pub enum BinaryOperator {
     LessThanOrEqual,
     GreaterThan,
     GreaterThanOrEqual,
+}
+
+impl From<parser::BinaryOperator> for BinaryOperator {
+    fn from(value: parser::BinaryOperator) -> Self {
+        match value {
+            parser::BinaryOperator::Add => BinaryOperator::Add,
+            parser::BinaryOperator::Subtract => BinaryOperator::Subtract,
+            parser::BinaryOperator::Multiply => BinaryOperator::Multiply,
+            parser::BinaryOperator::Divide => BinaryOperator::Divide,
+            parser::BinaryOperator::Modulo => BinaryOperator::Modulo,
+            parser::BinaryOperator::BitwiseAnd => BinaryOperator::BitwiseAnd,
+            parser::BinaryOperator::BitwiseOr => BinaryOperator::BitwiseOr,
+            parser::BinaryOperator::BitwiseXor => BinaryOperator::BitwiseXor,
+            parser::BinaryOperator::BitwiseLeftShift => BinaryOperator::BitwiseLeftShift,
+            parser::BinaryOperator::BitwiseRightShift => BinaryOperator::BitwiseRightShift,
+            parser::BinaryOperator::LogicalAnd => BinaryOperator::LogicalAnd,
+            parser::BinaryOperator::LogicalOr => BinaryOperator::LogicalOr,
+            parser::BinaryOperator::Equal => BinaryOperator::Equal,
+            parser::BinaryOperator::NotEqual => BinaryOperator::NotEqual,
+            parser::BinaryOperator::LessThan => BinaryOperator::LessThan,
+            parser::BinaryOperator::LessThanOrEqual => BinaryOperator::LessThanOrEqual,
+            parser::BinaryOperator::GreaterThan => BinaryOperator::GreaterThan,
+            parser::BinaryOperator::GreaterThanOrEqual => BinaryOperator::GreaterThanOrEqual,
+        }
+    }
 }
 
 impl Display for BinaryOperator {

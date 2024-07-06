@@ -165,7 +165,7 @@ impl Function {
                     self.param
                         .clone()
                         .map(|p| Box::new(p.type_.type_annotation())),
-                    Box::new(self.return_type.type_annotation()),
+                    Some(Box::new(self.return_type.type_annotation())),
                 ))
             })
     }
@@ -192,6 +192,7 @@ pub struct Parameter {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
+    Unknown,
     Generic(GenericType),
     Void,
     Unit,
@@ -526,6 +527,7 @@ impl Type {
 impl FullName for Type {
     fn full_name(&self) -> String {
         match self {
+            Type::Unknown => "{unknown}".to_string(),
             Type::Generic(GenericType { type_name }) => type_name.to_string(),
             Type::Void => "void".to_string(),
             Type::Unit => "unit".to_string(),

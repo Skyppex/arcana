@@ -11,7 +11,7 @@ pub enum TypeAnnotation {
     ConcreteType(String, Vec<TypeAnnotation>),
     Array(Box<TypeAnnotation>),
     Literal(Box<Literal>),
-    Function(Option<Box<TypeAnnotation>>, Box<TypeAnnotation>),
+    Function(Option<Box<TypeAnnotation>>, Option<Box<TypeAnnotation>>),
 }
 
 impl TypeAnnotation {
@@ -61,7 +61,10 @@ impl TypeAnnotation {
                         .clone()
                         .map(|t| t.to_string())
                         .unwrap_or("".to_string()),
-                    return_type_annotation.to_string()
+                    return_type_annotation
+                        .clone()
+                        .map(|rt| rt.to_string())
+                        .unwrap_or("".to_string())
                 )
             }
         }
@@ -98,7 +101,10 @@ impl Display for TypeAnnotation {
                         .clone()
                         .map(|t| t.to_string())
                         .unwrap_or("".to_string()),
-                    return_type_annotation.to_string()
+                    return_type_annotation
+                        .clone()
+                        .map(|rt| rt.to_string())
+                        .unwrap_or("".to_string())
                 )
             }
         }
@@ -194,6 +200,26 @@ impl Display for GenericType {
 pub struct GenericConstraint {
     pub generic: GenericType,
     pub constraints: Vec<TypeIdentifier>,
+}
+
+pub(super) fn parse_optional_type_annotation(
+    cursor: &mut Cursor,
+    allow_void: bool,
+) -> Result<Option<TypeAnnotation>, String> {
+    if cursor.first().kind != TokenKind::Colon {
+        Ok(None)
+    } else {
+        cursor.bump()?; // Consume the :
+
+        if !can_be_type_annotation(cursor) {
+            return Err(format!(
+                "Expected type annotation but found {:?}",
+                cursor.first().kind
+            ));
+        }
+
+        Ok(Some(parse_type_annotation(cursor, allow_void)?))
+    }
 }
 
 pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
@@ -308,13 +334,7 @@ pub(super) fn parse_type_annotation(
 
             cursor.bump()?; // Consume the )
 
-            if cursor.first().kind != TokenKind::Colon {
-                return Err(format!("Expected : but found {:?}", cursor.first().kind));
-            }
-
-            cursor.bump()?; // Consume the :
-
-            let return_type_annotation = Box::new(parse_type_annotation(cursor, true)?);
+            let return_type_annotation = parse_optional_type_annotation(cursor, true)?;
 
             unwrap_function_annotation(params, return_type_annotation)
         }
@@ -327,16 +347,19 @@ pub(super) fn parse_type_annotation(
 
 fn unwrap_function_annotation(
     params: Vec<TypeAnnotation>,
-    return_type_annotation: Box<TypeAnnotation>,
+    return_type_annotation: Option<TypeAnnotation>,
 ) -> Result<TypeAnnotation, String> {
     if params.len() == 0 {
-        Ok(TypeAnnotation::Function(None, return_type_annotation))
+        Ok(TypeAnnotation::Function(
+            None,
+            return_type_annotation.map(|rt| Box::new(rt)),
+        ))
     } else if params.len() == 1 {
         let param = params[0].clone();
 
         Ok(TypeAnnotation::Function(
             Some(Box::new(param)),
-            return_type_annotation,
+            return_type_annotation.map(|rt| Box::new(rt)),
         ))
     } else {
         let first_param = params[0].clone();
@@ -344,10 +367,10 @@ fn unwrap_function_annotation(
 
         Ok(TypeAnnotation::Function(
             Some(Box::new(first_param)),
-            Box::new(TypeAnnotation::Function(
+            Some(Box::new(TypeAnnotation::Function(
                 Some(Box::new(second_param)),
-                return_type_annotation,
-            )),
+                return_type_annotation.map(|rt| Box::new(rt)),
+            ))),
         ))
     }
 }

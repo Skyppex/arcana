@@ -80,7 +80,7 @@ fn evaluate_expression<'a>(
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     match typed_expression {
-        TypedExpression::None => Ok(Value::Void),
+        // TypedExpression::None => Ok(Value::Void),
         TypedExpression::VariableDeclaration {
             mutable,
             identifier,
@@ -407,7 +407,7 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
 }
 
 fn evaluate_closure(
-    param: Option<TypedParameter>,
+    param: Option<TypedClosureParameter>,
     body: TypedExpression,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
