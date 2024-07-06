@@ -1,6 +1,6 @@
 mod common;
 
-use common::{create_typed_ast, StatementExt, VecStatementExt};
+use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
     ast::{Typed, TypedExpression},
@@ -82,7 +82,7 @@ fn closure_evalutes_correctly() {
     let input = "(|x: int|: int x)(1)";
 
     // Act
-    let value = common::evaluate_expression(input, common::create_env(), false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::Number(Number::Int(1)));
@@ -97,7 +97,7 @@ fn closure_captures_environment() {
     "#;
 
     // Act
-    let value = common::evaluate_expression(input, common::create_env(), false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::Number(Number::Int(1)));
@@ -115,7 +115,7 @@ fn closure_captures_function_environment() {
     "#;
 
     // Act
-    let value = common::evaluate_expression(input, common::create_env(), false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::Number(Number::Int(3)));
@@ -129,8 +129,23 @@ fn closure_with_multiple_params_evalutes_correctly() {
     "#;
 
     // Act
-    let value = common::evaluate_expression(input, common::create_env(), false);
+    let value = evaluate_expression(input, create_env(), false);
 
     // Assert
     assert_eq!(value, Value::Number(Number::Int(6)));
+}
+
+#[test]
+fn trailing_closure() {
+    // Arrange
+    let input = r#"
+        fun a(op: fun(): int): int => op()
+        a => :int 8
+    "#;
+
+    // Act
+    let value = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Number(Number::Int(8)))
 }

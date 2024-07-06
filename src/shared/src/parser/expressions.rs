@@ -725,14 +725,14 @@ fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the =>
 
-    let body = parse_expression(cursor)?;
-
     let return_type_annotation = if cursor.first().kind == TokenKind::Colon {
         cursor.bump()?; // Consume the :
         Some(parse_type_annotation(cursor, true)?)
     } else {
         None
     };
+
+    let body = parse_expression(cursor)?;
 
     Ok(Expression::Call(Call {
         callee: Box::new(call),

@@ -424,16 +424,17 @@ pub fn check_type<'a>(
                 .transpose()?;
 
             let mut callee = callee;
+            let mut type_ = type_;
 
-            if let Some(ate) = arg_typed_expression.clone() {
+            if let Some(arg) = arg_typed_expression.clone() {
                 if let Type::Function(Function {
                     param: Some(param), ..
                 }) = callee.get_type()
                 {
-                    if !type_equals(&ate.get_type(), &param.type_) {
+                    if !type_equals(&arg.get_type(), &param.type_) {
                         return Err(format!(
                             "Argument type {} does not match parameter type {}",
-                            ate.get_type(),
+                            arg.get_type(),
                             param.type_
                         ));
                     }
@@ -443,6 +444,15 @@ pub fn check_type<'a>(
                             callee: Box::new(callee),
                             argument: None,
                             type_: type_.clone(),
+                        };
+                        type_ = match type_ {
+                            Type::Function(Function { return_type, .. }) => *return_type,
+                            _ => {
+                                return Err(format!(
+                                    "Expected function type with a return type, found {}",
+                                    callee.get_type()
+                                ));
+                            }
                         };
                     } else {
                         return Err(format!(
@@ -776,7 +786,10 @@ fn check_type_member_access_recurse(
                     )
                 })?;
 
-            let Type::Function(Function { param, .. }) = type_.clone() else {
+            let Type::Function(Function {
+                param, return_type, ..
+            }) = type_.clone()
+            else {
                 return Err(format!("{} is not a function", symbol));
             };
 
@@ -789,14 +802,14 @@ fn check_type_member_access_recurse(
 
             if !type_equals(&object_type, &param.type_) {
                 Err(format!(
-                    "Function {} must be called on type {}",
-                    symbol, param.type_
+                    "Function '{}' must be called on type {}. Found {}",
+                    symbol, param.type_, object_type
                 ))?
             }
 
             Ok(TypedExpression::Closure {
                 param: None,
-                return_type: type_.clone(),
+                return_type: *return_type.clone(),
                 body: Box::new(TypedExpression::Call {
                     callee: Box::new(TypedExpression::Member(Member::Identifier {
                         symbol: symbol.clone(),
@@ -805,15 +818,11 @@ fn check_type_member_access_recurse(
                     argument: Some(Box::new(object_typed_expression)),
                     type_: type_.clone(),
                 }),
-                type_: if let Type::Function(Function { return_type, .. }) = type_ {
-                    Type::Function(Function {
-                        identifier: None,
-                        param: None,
-                        return_type,
-                    })
-                } else {
-                    return Err(format!("{} is not a function", symbol));
-                },
+                type_: Type::Function(Function {
+                    identifier: None,
+                    param: None,
+                    return_type,
+                }),
             })
         }
         parser::Member::MemberAccess { .. } => todo!("Member access"),
