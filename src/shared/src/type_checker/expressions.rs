@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, ffi::FromBytesUntilNulError, rc::Rc};
 
 use crate::{
     parser::{self, Assignment, Binary, Expression, If, VariableDeclaration, While},
@@ -13,7 +13,7 @@ use super::{
     },
     scope::ScopeType,
     statements, type_equals, DiscoveredType, Enum, EnumMember, FullName, Function, Rcrc, Struct,
-    Type, TypeEnvironment,
+    Type, TypeEnvironment, Union,
 };
 
 pub fn check_type<'a>(
@@ -969,6 +969,12 @@ fn get_binop_type(
         }
         (left_type, operator, Type::Literal { type_, .. }) => {
             get_binop_type(left_type, operator, type_)
+        }
+        (Type::Union(Union { literal_type, .. }), operator, right_type) => {
+            get_binop_type(literal_type, operator, right_type)
+        }
+        (left_type, operator, Type::Union(Union { literal_type, .. })) => {
+            get_binop_type(left_type, operator, literal_type)
         }
         _ => Err(format!(
             "Unexpected binary operator {:?} for types {:?} and {:?}",

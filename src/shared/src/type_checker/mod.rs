@@ -575,6 +575,8 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
     match (left, right) {
         (Type::Union(Union { literals, .. }), Type::Literal { .. }) => literals.contains(right),
         (Type::Literal { .. }, Type::Union(_)) => type_equals(right, left),
+        (Type::Union(Union { literal_type, .. }), other) => type_equals(literal_type, other),
+        (other, Type::Union(Union { literal_type, .. })) => type_equals(other, literal_type),
         (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
             type_equals(type_, type_2)
         }

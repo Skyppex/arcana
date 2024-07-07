@@ -894,7 +894,6 @@ pub fn parse_literal(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
-    println!("{:?}", cursor.first().kind);
     match cursor.first().kind {
         TokenKind::Identifier(identifier) => {
             cursor.bump()?; // Consume the identifier
@@ -903,11 +902,9 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
             }))
         }
         TokenKind::OpenParen => {
-            println!("we got a paren!");
             cursor.bump()?; // Consume the (
 
             let expression = parse_expression(cursor)?;
-            println!("{:?}", expression);
 
             match cursor.first().kind {
                 TokenKind::CloseParen => {
