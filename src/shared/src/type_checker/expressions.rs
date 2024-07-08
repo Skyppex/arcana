@@ -419,10 +419,10 @@ fn synthesize_type(
                 }))
             }
             crate::parser::Member::MemberAccess { object, member, .. } => {
-                check_type_member_access(object, discovered_types, type_environment, member, false)
+                check_type_member_access(object, discovered_types, type_environment, member)
             }
             crate::parser::Member::ParamPropagation { object, member, .. } => {
-                check_type_member_access(object, discovered_types, type_environment, member, true)
+                check_type_param_propagation(object, discovered_types, type_environment, member)
             }
         },
         Expression::Literal(l) => match l {
@@ -815,7 +815,6 @@ fn check_type_member_access(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     member: &Box<parser::Member>,
-    function_propagation: bool,
 ) -> Result<TypedExpression, String> {
     let object_type_expression =
         check_type(object, discovered_types, type_environment.clone(), None)?;
@@ -826,7 +825,6 @@ fn check_type_member_access(
         type_environment,
         object_type_expression,
         discovered_types,
-        function_propagation,
     )
 }
 
@@ -835,18 +833,72 @@ fn check_type_member_access_recurse(
     member: &Box<parser::Member>,
     type_environment: Rcrc<TypeEnvironment>,
     object_typed_expression: TypedExpression,
-    _discovered_types: &Vec<DiscoveredType>,
-    function_propagation: bool,
+    discovered_types: &Vec<DiscoveredType>,
+) -> Result<TypedExpression, String> {
+    match object_type {
+        Type::Struct(struct_) => match *member.clone() {
+            parser::Member::Identifier { symbol } => {
+                let field_type = struct_.fields.get(&symbol).ok_or(format!(
+                    "Struct {} does not have a field called '{}'",
+                    struct_.type_identifier, symbol
+                ))?;
+
+                if !type_environment.borrow().lookup_type(&field_type) {
+                    return Err(format!("Unexpected type: {}", field_type.full_name()));
+                }
+
+                let identifier_type = field_type.clone();
+
+                Ok(TypedExpression::Member(Member::MemberAccess {
+                    object: Box::new(object_typed_expression),
+                    member: Box::new(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: identifier_type.clone(),
+                    }),
+                    symbol: symbol.clone(),
+                    type_: field_type.clone(),
+                }))
+            }
+            parser::Member::MemberAccess {
+                object,
+                member,
+                symbol: _,
+            } => check_type_member_access(&object, discovered_types, type_environment, &member),
+            parser::Member::ParamPropagation {
+                object,
+                member,
+                symbol: _,
+            } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
+        },
+        _ => Err("Member access is only supported on structs".to_string()),
+    }
+}
+
+fn check_type_param_propagation(
+    object: &Box<Expression>,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+    member: &Box<parser::Member>,
+) -> Result<TypedExpression, String> {
+    let object_type_expression =
+        check_type(object, discovered_types, type_environment.clone(), None)?;
+    let object_type = object_type_expression.get_type();
+    check_type_param_propagation_recurse(
+        object_type.clone(),
+        member,
+        type_environment,
+        object_type_expression,
+    )
+}
+
+fn check_type_param_propagation_recurse(
+    object_type: Type,
+    member: &Box<parser::Member>,
+    type_environment: Rcrc<TypeEnvironment>,
+    object_typed_expression: TypedExpression,
 ) -> Result<TypedExpression, String> {
     match *member.clone() {
         parser::Member::Identifier { symbol } => {
-            if !function_propagation {
-                return Err(
-                    "Currently, only parameter propagation is supported for member access"
-                        .to_string(),
-                );
-            }
-
             let type_ = type_environment
                 .borrow()
                 .get_variable(&symbol)

@@ -34,7 +34,6 @@ fn identifier_is_identifier() {
 }
 
 #[test]
-#[ignore]
 fn member_access_is_member_access() {
     // Arrange
     let input = r#"
@@ -79,7 +78,6 @@ fn identifier_has_correct_type() {
 }
 
 #[test]
-#[ignore]
 fn member_access_has_correct_type() {
     // Arrange
     let input = r#"
@@ -116,7 +114,6 @@ fn identifier_returns_correct_value() {
 }
 
 #[test]
-#[ignore]
 fn member_access_returns_correct_value() {
     // Arrange
     let input = r#"
