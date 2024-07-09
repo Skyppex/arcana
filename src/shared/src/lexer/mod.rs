@@ -154,7 +154,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
         },
         '0'..='9' => Ok(parse_numeric_literal(cursor)),
         '"' => {
-            cursor.bump();
+            cursor.bump(); // Consume the "
             let mut string = String::new();
 
             while cursor.first() != '"' {
@@ -257,14 +257,10 @@ fn is_white_space(c: char) -> bool {
 
 fn always_escapable(c: char) -> Option<char> {
     match c {
-        'a' => Some('a'),
-        'b' => Some('b'),
-        'f' => Some('f'),
-        'n' => Some('n'),
-        'r' => Some('r'),
-        't' => Some('t'),
-        'v' => Some('v'),
-        '0' => Some('0'),
+        'n' => Some('\n'),
+        'r' => Some('\r'),
+        't' => Some('\t'),
+        '0' => Some('\0'),
         '\\' => Some('\\'),
         _ => None,
     }
