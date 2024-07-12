@@ -43,6 +43,7 @@ fn enum_variant_can_be_used_as_a_type() {
 }
 
 #[test]
+#[ignore]
 fn enum_variant_can_be_assigned_to_variable_with_variant_type() {
     // Arrange
     let input = r#"

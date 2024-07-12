@@ -235,3 +235,53 @@ fn variable_declaration_type_is_deferred() {
         }
     );
 }
+
+#[test]
+fn variable_declaration_function_type_is_used_to_infer_closure_parameter_types() {
+    // Arrange
+    let input = r#"
+        let f: fun(int, float, string, uint): int = |i, f, s, u| i
+    "#;
+
+    // Act
+    let typed_ast = create_typed_ast(input);
+
+    // Assert
+    let expression = typed_ast
+        .unwrap_program()
+        .nth_statement(0)
+        .unwrap_expression();
+
+    assert_eq!(
+        expression.get_type(),
+        Type::Function(shared::type_checker::Function {
+            identifier: None,
+            param: Some(shared::type_checker::Parameter {
+                identifier: "int".to_string(),
+                type_: Box::new(Type::Int)
+            }),
+            return_type: Box::new(Type::Function(shared::type_checker::Function {
+                identifier: None,
+                param: Some(shared::type_checker::Parameter {
+                    identifier: "float".to_string(),
+                    type_: Box::new(Type::Float)
+                }),
+                return_type: Box::new(Type::Function(shared::type_checker::Function {
+                    identifier: None,
+                    param: Some(shared::type_checker::Parameter {
+                        identifier: "string".to_string(),
+                        type_: Box::new(Type::String)
+                    }),
+                    return_type: Box::new(Type::Function(shared::type_checker::Function {
+                        identifier: None,
+                        param: Some(shared::type_checker::Parameter {
+                            identifier: "uint".to_string(),
+                            type_: Box::new(Type::UInt)
+                        }),
+                        return_type: Box::new(Type::Int)
+                    }))
+                }))
+            }))
+        })
+    );
+}
