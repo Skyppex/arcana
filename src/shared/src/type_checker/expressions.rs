@@ -33,6 +33,21 @@ pub fn check_type<'a>(
             let return_type_annotation = closure.return_type_annotation.clone();
             let body = closure.body.clone();
 
+            let mut return_type = match return_type_annotation.clone() {
+                Some(rta) => {
+                    let type_ = type_environment.borrow().get_type_from_annotation(&rta)?;
+
+                    type_
+                }
+                None => {
+                    if let Some(Type::Function(Function { return_type, .. })) = context.clone() {
+                        *return_type
+                    } else {
+                        Type::Void
+                    }
+                }
+            };
+
             let param = match param {
                 Some(param) => {
                     let type_ = &param
@@ -42,9 +57,13 @@ pub fn check_type<'a>(
                         .transpose()?;
 
                     let type_ = type_.clone().or_else(|| {
-                        if let Some(Type::Function(Function { param: Some(t), .. })) =
-                            context.clone()
+                        if let Some(Type::Function(Function {
+                            param: Some(t),
+                            return_type: rt,
+                            ..
+                        })) = context.clone()
                         {
+                            return_type = *rt;
                             return Some(*t.type_);
                         } else {
                             return None;
@@ -61,31 +80,27 @@ pub fn check_type<'a>(
 
                     Some(TypedClosureParameter {
                         identifier: param.identifier.clone(),
-                        type_annotation: param.type_annotation.clone(),
+                        type_annotation: param
+                            .type_annotation
+                            .clone()
+                            .or_else(|| Some(type_.clone().into())),
                         type_: Box::new(type_),
                     })
                 }
                 None => None,
             };
 
-            let return_type = match return_type_annotation {
-                Some(return_type) => {
-                    let type_ = type_environment
-                        .borrow()
-                        .get_type_from_annotation(&return_type)?;
-
-                    type_
-                }
-                None => {
-                    if let Some(Type::Function(Function { return_type, .. })) = context {
-                        *return_type
-                    } else {
-                        Type::Void
-                    }
-                }
+            let context = match context {
+                Some(Type::Function(Function { return_type, .. })) => Some(*return_type),
+                _ => None,
             };
 
-            let body = check_type(&body, discovered_types, closure_environment.clone(), None)?;
+            let body = check_type(
+                &body,
+                discovered_types,
+                closure_environment.clone(),
+                context,
+            )?;
 
             let type_ = Type::Function(Function {
                 identifier: None,
@@ -108,7 +123,7 @@ pub fn check_type<'a>(
                 &call.callee,
                 discovered_types,
                 type_environment.clone(),
-                None,
+                context,
             )?;
 
             let callee_type = callee.get_type();
@@ -215,7 +230,6 @@ fn synthesize_type(
             initializer,
         }) => {
             let mut type_ = Type::Unknown;
-
             let initializer = match (&initializer, type_annotation) {
                 (Some(initializer), Some(type_annotation)) => {
                     let context_type = type_environment
@@ -235,8 +249,9 @@ fn synthesize_type(
 
                     if !type_equals(&initializer.get_type(), &type_) {
                         return Err(format!(
-                            "Initializer type {} does not match variable type",
+                            "Initializer type {} does not match variable type {}",
                             initializer.get_type(),
+                            type_
                         ));
                     }
 

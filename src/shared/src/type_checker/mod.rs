@@ -179,7 +179,7 @@ impl FullName for Function {
                 .clone()
                 .map(|p| p.type_.full_name())
                 .unwrap_or_else(|| "".to_string()),
-            self.return_type
+            self.return_type.full_name()
         )
     }
 }

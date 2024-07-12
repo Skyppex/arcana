@@ -164,21 +164,21 @@ fn unwrap_parameters_recurse(
     return_type_annotation: Option<TypeAnnotation>,
     body: Expression,
 ) -> Result<(Expression, Option<TypeAnnotation>), String> {
-    match params.first().cloned() {
+    match params.last().cloned() {
         None => Ok((body, return_type_annotation)),
-        Some(first) => {
+        Some(last) => {
             let new_body = Expression::Closure(Closure {
-                param: Some(first.clone().into()),
+                param: Some(last.clone().into()),
                 return_type_annotation: return_type_annotation.clone(),
                 body: Box::new(body),
             });
 
             let new_return_type_annotation = return_type_annotation.map(|r| {
-                TypeAnnotation::Function(Some(Box::new(first.type_annotation)), Some(Box::new(r)))
+                TypeAnnotation::Function(Some(Box::new(last.type_annotation)), Some(Box::new(r)))
             });
 
             unwrap_parameters_recurse(
-                params.into_iter().skip(1).collect(),
+                params.into_iter().rev().skip(1).rev().collect(),
                 new_return_type_annotation,
                 new_body,
             )

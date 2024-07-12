@@ -227,3 +227,18 @@ fn trailing_closure_call_return_type_is_inferred() {
     // Assert
     assert_eq!(value, Value::Number(Number::Int(5)))
 }
+
+#[test]
+fn call_with_multiple_params_expects_args_in_correct_order() {
+    // Arrange
+    let input = r#"
+        fun a(x: string, y: int, z: float): int => 1
+        a("String", 5, 0.5)
+    "#;
+
+    // Act
+    let value = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Number(Number::Int(1)))
+}

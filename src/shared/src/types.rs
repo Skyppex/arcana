@@ -1,8 +1,9 @@
-use std::{fmt::Display, hash::Hash};
+use std::{fmt::Display, hash::Hash, ops::Deref};
 
 use crate::{
     lexer::token::{self, Keyword, TokenKind},
     parser::{cursor::Cursor, Literal},
+    type_checker::{Function, Type},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -34,6 +35,36 @@ impl From<TypeIdentifier> for TypeAnnotation {
             TypeIdentifier::MemberType(_, _) => {
                 panic!("Cannot convert member type to type annotation")
             }
+        }
+    }
+}
+
+impl From<Type> for TypeAnnotation {
+    fn from(t: Type) -> Self {
+        match t {
+            Type::Unknown => panic!("Cannot convert unknown type to type annotation"),
+            Type::Void => TypeAnnotation::Type("void".to_string()),
+            Type::Unit => TypeAnnotation::Type("unit".to_string()),
+            Type::Int => TypeAnnotation::Type("int".to_string()),
+            Type::Float => TypeAnnotation::Type("float".to_string()),
+            Type::String => TypeAnnotation::Type("string".to_string()),
+            Type::Char => TypeAnnotation::Type("char".to_string()),
+            Type::Bool => TypeAnnotation::Type("bool".to_string()),
+            Type::Array(t) => TypeAnnotation::Array(Box::new(t.deref().clone().into())),
+            Type::Function(Function {
+                param, return_type, ..
+            }) => TypeAnnotation::Function(
+                param.map(|p| Box::new(p.type_.deref().clone().into())),
+                Some(Box::new(return_type.deref().clone().into())),
+            ),
+            Type::Generic(g) => TypeAnnotation::Type(g.type_name),
+            Type::UInt => TypeAnnotation::Type("uint".to_string()),
+            Type::Struct(_) => todo!(),
+            Type::Enum(_) => todo!(),
+            Type::EnumMember(_) => todo!(),
+            Type::Union(_) => todo!(),
+            Type::Trait(_) => todo!(),
+            Type::Literal { name, type_ } => todo!(),
         }
     }
 }
@@ -99,11 +130,11 @@ impl Display for TypeAnnotation {
                     "fun({}): {}",
                     type_annotation
                         .clone()
-                        .map(|t| t.to_string())
+                        .map(|t| format!("{}", t))
                         .unwrap_or("".to_string()),
                     return_type_annotation
                         .clone()
-                        .map(|rt| rt.to_string())
+                        .map(|rt| format!("{}", rt))
                         .unwrap_or("".to_string())
                 )
             }
@@ -349,29 +380,42 @@ fn unwrap_function_annotation(
     params: Vec<TypeAnnotation>,
     return_type_annotation: Option<TypeAnnotation>,
 ) -> Result<TypeAnnotation, String> {
-    if params.len() == 0 {
-        Ok(TypeAnnotation::Function(
+    match params.first().cloned() {
+        None => Ok(TypeAnnotation::Function(
             None,
-            return_type_annotation.map(|rt| Box::new(rt)),
-        ))
-    } else if params.len() == 1 {
-        let param = params[0].clone();
+            return_type_annotation.map(Box::new),
+        )),
+        Some(first) => {
+            let new_return_type_annotation = unwrap_function_annotation_recurse(
+                params.into_iter().skip(1).collect(),
+                return_type_annotation,
+            )?;
 
-        Ok(TypeAnnotation::Function(
-            Some(Box::new(param)),
-            return_type_annotation.map(|rt| Box::new(rt)),
-        ))
-    } else {
-        let first_param = params[0].clone();
-        let second_param = params[1].clone();
+            Ok(TypeAnnotation::Function(
+                Some(Box::new(first)),
+                new_return_type_annotation.map(Box::new),
+            ))
+        }
+    }
+}
 
-        Ok(TypeAnnotation::Function(
-            Some(Box::new(first_param)),
-            Some(Box::new(TypeAnnotation::Function(
-                Some(Box::new(second_param)),
-                return_type_annotation.map(|rt| Box::new(rt)),
-            ))),
-        ))
+fn unwrap_function_annotation_recurse(
+    params: Vec<TypeAnnotation>,
+    return_type_annotation: Option<TypeAnnotation>,
+) -> Result<Option<TypeAnnotation>, String> {
+    match params.last().cloned() {
+        None => Ok(return_type_annotation),
+        Some(last) => {
+            let new_return_type_annotation = TypeAnnotation::Function(
+                Some(Box::new(last)),
+                return_type_annotation.map(Box::new),
+            );
+
+            unwrap_function_annotation_recurse(
+                params.into_iter().rev().skip(1).rev().collect(),
+                Some(new_return_type_annotation),
+            )
+        }
     }
 }
 

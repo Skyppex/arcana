@@ -388,32 +388,6 @@ fn unwrap_arguments(
             }))
         }
     }
-    // if params.len() <= 1 {
-    //     return Ok(Expression::Closure(Closure {
-    //         param: params.first().cloned(),
-    //         return_type_annotation,
-    //         body: Box::new(body),
-    //     }));
-    // }
-    //
-    // let first_param = params.first().cloned();
-    // let second_param = params.get(1).cloned().unwrap();
-    //
-    // Ok(Expression::Closure(Closure {
-    //     param: first_param,
-    //     return_type_annotation: Some(TypeAnnotation::Function(
-    //         Some(Box::new(second_param.clone().type_annotation)),
-    //         return_type_annotation
-    //             .clone()
-    //             .map(|r| Box::new(r))
-    //             .unwrap_or(Box::new(TypeAnnotation::void())),
-    //     )),
-    //     body: Box::new(Expression::Closure(Closure {
-    //         param: Some(second_param),
-    //         return_type_annotation,
-    //         body: Box::new(body),
-    //     })),
-    // }))
 }
 
 fn unwrap_arguments_recurse(
@@ -421,22 +395,22 @@ fn unwrap_arguments_recurse(
     return_type_annotation: Option<TypeAnnotation>,
     body: Expression,
 ) -> Result<(Expression, Option<TypeAnnotation>), String> {
-    match params.first().cloned() {
+    match params.last().cloned() {
         None => Ok((body, return_type_annotation)),
-        Some(first) => {
+        Some(last) => {
             let new_body = Expression::Closure(Closure {
-                param: Some(first.clone()),
+                param: Some(last.clone()),
                 return_type_annotation: return_type_annotation.clone(),
                 body: Box::new(body),
             });
 
             let new_return_type_annotation = Some(TypeAnnotation::Function(
-                first.type_annotation.map(|ta| Box::new(ta)),
-                return_type_annotation.clone().map(|r| Box::new(r)),
+                last.type_annotation.map(Box::new),
+                return_type_annotation.clone().map(Box::new),
             ));
 
             unwrap_arguments_recurse(
-                params.into_iter().skip(1).collect(),
+                params.into_iter().rev().skip(1).rev().collect(),
                 new_return_type_annotation,
                 new_body,
             )
