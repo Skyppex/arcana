@@ -2,6 +2,7 @@ use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
+use crate::lexer::token::IntLiteral;
 use crate::pretty_print::PrettyPrint;
 use crate::{
     parser,
@@ -303,6 +304,11 @@ pub enum TypedExpression {
         false_expression: Option<Box<TypedExpression>>,
         type_: Type,
     },
+    Match {
+        expression: Box<TypedExpression>,
+        arms: Vec<TypedMatchArm>,
+        type_: Type,
+    },
     Assignment {
         member: Box<Member>,
         initializer: Box<TypedExpression>,
@@ -357,6 +363,7 @@ impl Typed for TypedExpression {
             // TypedExpression::None => Type::Void,
             TypedExpression::VariableDeclaration { type_, .. } => type_.clone(),
             TypedExpression::If { type_, .. } => type_.clone(),
+            TypedExpression::Match { type_, .. } => type_.clone(),
             TypedExpression::Assignment { type_, .. } => type_.clone(),
             TypedExpression::Member(member) => member.get_type(),
             TypedExpression::Literal(literal) => literal.get_type(),
@@ -377,6 +384,7 @@ impl Typed for TypedExpression {
             // TypedExpression::None => Type::Void,
             TypedExpression::VariableDeclaration { type_, .. } => type_.clone(),
             TypedExpression::If { type_, .. } => type_.clone(),
+            TypedExpression::Match { type_, .. } => type_.clone(),
             TypedExpression::Assignment { type_, .. } => type_.clone(),
             TypedExpression::Member(member) => member.get_deep_type(),
             TypedExpression::Literal(literal) => literal.get_deep_type(),
@@ -434,6 +442,17 @@ impl Display for TypedExpression {
                 }
                 Ok(())
             }
+            TypedExpression::Match {
+                expression, arms, ..
+            } => write!(
+                f,
+                "match {} {}",
+                expression,
+                arms.iter()
+                    .map(|a| "|>".to_string() + &a.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
             TypedExpression::Assignment {
                 member,
                 initializer,
@@ -907,6 +926,42 @@ impl Display for BinaryOperator {
             BinaryOperator::LessThanOrEqual => write!(f, "<="),
             BinaryOperator::GreaterThan => write!(f, ">"),
             BinaryOperator::GreaterThanOrEqual => write!(f, ">="),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedMatchArm {
+    pub pattern: Pattern,
+    pub expression: TypedExpression,
+}
+
+impl Display for TypedMatchArm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} => {}", self.pattern, self.expression)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    Wildcard,
+    Int(i64),
+}
+
+impl From<parser::Pattern> for Pattern {
+    fn from(value: parser::Pattern) -> Self {
+        match value {
+            parser::Pattern::Wildcard => Pattern::Wildcard,
+            parser::Pattern::Int(v) => Pattern::Int(v),
+        }
+    }
+}
+
+impl Display for Pattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Pattern::Wildcard => write!(f, "_"),
+            Pattern::Int(v) => write!(f, "{}", v),
         }
     }
 }

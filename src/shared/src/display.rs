@@ -2,13 +2,16 @@ use crate::{
     parser::{
         AccessModifier, Assignment, Binary, BinaryOperator, Call, ClosureParameter,
         EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
-        FieldInitializer, FlagsMember, FunctionDeclaration, If, Literal, Member, Parameter,
-        Statement, StructDeclaration, StructField, Unary, UnaryOperator, UnionDeclaration,
-        VariableDeclaration, While,
+        FieldInitializer, FlagsMember, FunctionDeclaration, If, Literal, Match, MatchArm, Member,
+        Parameter, Pattern, Statement, StructDeclaration, StructField, Unary, UnaryOperator,
+        UnionDeclaration, VariableDeclaration, While,
     },
     type_checker::{
         self,
-        ast::{Block, TypedClosureParameter, TypedExpression, TypedParameter, TypedStatement},
+        ast::{
+            Block, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
+            TypedStatement,
+        },
         Type,
     },
     types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
@@ -431,6 +434,36 @@ impl IndentDisplay for Expression {
                     )
                     .as_str(),
                 );
+                indent.decrease();
+                result
+            }
+            Expression::Match(Match { expression, arms }) => {
+                let mut result = String::new();
+                result.push_str("<match>\n");
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}expression: {}\n",
+                        indent.dash(),
+                        expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                for (i, arm) in arms.iter().enumerate() {
+                    if i < arms.len() - 1 {
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), arm.indent_display(indent)).as_str(),
+                        );
+                    } else {
+                        indent.end_current();
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), arm.indent_display(indent))
+                                .as_str(),
+                        );
+                    }
+                }
+
                 indent.decrease();
                 result
             }
@@ -1143,6 +1176,42 @@ impl IndentDisplay for BinaryOperator {
     }
 }
 
+impl IndentDisplay for MatchArm {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<match arm>\n");
+        indent.increase_leaf();
+        result.push_str(
+            format!(
+                "{}pattern: {}\n",
+                indent.dash(),
+                self.pattern.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.end_current();
+        result.push_str(
+            format!(
+                "{}expression: {}",
+                indent.dash_end(),
+                self.expression.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.decrease();
+        result
+    }
+}
+
+impl IndentDisplay for Pattern {
+    fn indent_display(&self, _indent: &mut Indent) -> String {
+        match self {
+            Pattern::Wildcard => "_".to_string(),
+            Pattern::Int(v) => v.to_string(),
+        }
+    }
+}
+
 impl IndentDisplay for TypedStatement {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
@@ -1441,6 +1510,40 @@ impl IndentDisplay for TypedExpression {
                     result.push_str(
                         format!("\n{}false expression: None", indent.dash_end()).as_str(),
                     );
+                }
+
+                indent.decrease();
+                result
+            }
+            TypedExpression::Match {
+                expression,
+                arms,
+                type_,
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<match>: {}\n", type_).as_str());
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}expression: {}\n",
+                        indent.dash(),
+                        expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                for (i, arm) in arms.iter().enumerate() {
+                    if i < arms.len() - 1 {
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), arm.indent_display(indent)).as_str(),
+                        );
+                    } else {
+                        indent.end_current();
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), arm.indent_display(indent))
+                                .as_str(),
+                        );
+                    }
                 }
 
                 indent.decrease();
@@ -2372,6 +2475,41 @@ impl IndentDisplay for TypeAnnotation {
 
         indent.decrease();
         result
+    }
+}
+
+impl IndentDisplay for TypedMatchArm {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<match arm>\n");
+        indent.increase_leaf();
+        result.push_str(
+            format!(
+                "{}pattern: {}\n",
+                indent.dash(),
+                self.pattern.indent_display(indent)
+            )
+            .as_str(),
+        );
+        result.push_str(
+            format!(
+                "{}expression: {}",
+                indent.dash_end(),
+                self.expression.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.decrease();
+        result
+    }
+}
+
+impl IndentDisplay for type_checker::ast::Pattern {
+    fn indent_display(&self, _indent: &mut Indent) -> String {
+        match self {
+            type_checker::ast::Pattern::Wildcard => "_".to_string(),
+            type_checker::ast::Pattern::Int(v) => v.to_string(),
+        }
     }
 }
 

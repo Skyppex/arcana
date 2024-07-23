@@ -42,6 +42,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
         '[' => Ok(create_token(TokenKind::OpenBracket, cursor)),
         ']' => Ok(create_token(TokenKind::CloseBracket, cursor)),
         ',' => Ok(create_token(TokenKind::Comma, cursor)),
+        '_' => Ok(create_token(TokenKind::Underscore, cursor)),
         ':' => match cursor.second() {
             ':' => {
                 cursor.bump();
@@ -314,7 +315,8 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         // Control flow
         "if" => Some(TokenKind::Keyword(Keyword::If)),
         "else" => Some(TokenKind::Keyword(Keyword::Else)),
-        // "match" => Some(TokenKind::Keyword(Keyword::Match)),
+        "match" => Some(TokenKind::Keyword(Keyword::Match)),
+        "arm" => Some(TokenKind::Keyword(Keyword::Arm)),
         "loop" => Some(TokenKind::Keyword(Keyword::Loop)),
         "while" => Some(TokenKind::Keyword(Keyword::While)),
         // "for" => Some(TokenKind::Keyword(Keyword::For)),

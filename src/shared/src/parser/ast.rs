@@ -2,6 +2,7 @@ use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
+use crate::lexer::token::IntLiteral;
 use crate::pretty_print::PrettyPrint;
 use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 
@@ -38,6 +39,7 @@ pub enum Expression {
     // None, // For testing purposes
     VariableDeclaration(VariableDeclaration),
     If(If),
+    Match(Match),
     Assignment(Assignment),
     Member(Member),
     Literal(Literal),
@@ -283,6 +285,24 @@ pub struct If {
     pub condition: Box<Expression>,
     pub true_expression: Box<Expression>,
     pub false_expression: Option<Box<Expression>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Match {
+    pub expression: Box<Expression>,
+    pub arms: Vec<MatchArm>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchArm {
+    pub pattern: Pattern,
+    pub expression: Box<Expression>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    Wildcard,
+    Int(i64),
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -99,11 +99,14 @@ fn evaluate_expression<'a>(
             type_,
             environment,
         ),
+        TypedExpression::Match {
+            expression, arms, ..
+        } => evaluate_match(expression, arms, environment),
         TypedExpression::Assignment {
             member,
             initializer,
             type_,
-        } => evaluate_assignment(member, initializer, type_, environment),
+        } => evaluate_assignment(member, initializer, environment),
         TypedExpression::Member(m) => evaluate_member(m, environment),
         TypedExpression::Literal(l) => evaluate_literal(l, environment),
         TypedExpression::Closure {
@@ -216,10 +219,41 @@ fn evaluate_if<'a>(
     }
 }
 
+fn evaluate_match(
+    expression: Box<TypedExpression>,
+    arms: Vec<TypedMatchArm>,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let match_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
+    let value = evaluate_expression(*expression, match_environment.clone())?;
+
+    for arm in arms {
+        let arm_environment = Rc::new(RefCell::new(Environment::new_parent(
+            match_environment.clone(),
+        )));
+
+        match arm.pattern {
+            Pattern::Wildcard => {
+                return evaluate_expression(arm.expression, arm_environment);
+            }
+            Pattern::Int(v) => {
+                let Value::Number(Number::Int(value)) = value else {
+                    return Err(format!("Expected integer, found '{}'", value));
+                };
+
+                if value == v {
+                    return evaluate_expression(arm.expression, arm_environment);
+                }
+            }
+        }
+    }
+
+    Err(format!("No match arm found for value '{}'", value))
+}
+
 fn evaluate_assignment<'a>(
     member: Box<Member>,
     initializer: Box<TypedExpression>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let value = evaluate_expression(*initializer, environment.clone())?;

@@ -56,6 +56,7 @@ pub enum TokenKind {
     LessEqual,
     Greater,
     GreaterEqual,
+    Underscore,
 
     // Keywords
     Keyword(Keyword),
@@ -178,7 +179,8 @@ pub enum Keyword {
     // Control flow
     If,
     Else,
-    // Match,
+    Match,
+    Arm,
     Loop,
     While,
     // For,

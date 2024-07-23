@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    parser::{self, Assignment, Binary, Expression, If, VariableDeclaration, While},
+    parser::{self, Assignment, Binary, Expression, If, Match, VariableDeclaration, While},
     type_checker::ast::Literal,
     types::TypeIdentifier,
 };
@@ -9,7 +9,7 @@ use crate::{
 use super::{
     ast::{
         BinaryOperator, Block, EnumMemberFieldInitializers, FieldInitializer, Member, Typed,
-        TypedClosureParameter, TypedExpression, TypedStatement, UnaryOperator,
+        TypedClosureParameter, TypedExpression, TypedMatchArm, TypedStatement, UnaryOperator,
     },
     scope::ScopeType,
     statements, type_equals, DiscoveredType, Enum, EnumMember, FullName, Function, Rcrc, Struct,
@@ -357,6 +357,60 @@ fn synthesize_type(
                 type_,
             })
         }
+        Expression::Match(Match { expression, arms }) => {
+            let match_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
+                type_environment.clone(),
+            )));
+
+            let expression = check_type(
+                expression,
+                discovered_types,
+                match_environment.clone(),
+                None,
+            )?;
+
+            let mut typed_arms: Vec<TypedMatchArm> = vec![];
+
+            for arm in arms {
+                let pattern = arm.pattern.clone();
+                let expression = arm.expression.clone();
+
+                let expression = check_type(
+                    &expression,
+                    discovered_types,
+                    match_environment.clone(),
+                    None,
+                )?;
+
+                typed_arms.push(TypedMatchArm {
+                    pattern: pattern.into(),
+                    expression,
+                });
+            }
+
+            let mut type_ = Type::Unknown;
+
+            for TypedMatchArm { expression, .. } in typed_arms.clone() {
+                match type_ {
+                    Type::Unknown => type_ = expression.get_type(),
+                    _ => {
+                        if !type_equals(&type_, &expression.get_type()) {
+                            return Err(format!(
+                                "Match arm type {} does not match previous arm type {}",
+                                expression.get_type(),
+                                type_
+                            ));
+                        }
+                    }
+                }
+            }
+
+            Ok(TypedExpression::Match {
+                expression: Box::new(expression),
+                arms: typed_arms,
+                type_,
+            })
+        }
         Expression::Assignment(Assignment {
             member,
             initializer,
@@ -605,7 +659,6 @@ fn synthesize_type(
                 }))
             }
         },
-        Expression::Closure(_) => todo!(),
         Expression::Unary(unary) => {
             let expression =
                 check_type(&unary.expression, discovered_types, type_environment, None)?;

@@ -1,4 +1,4 @@
-use crate::lexer::token::Token;
+use crate::lexer::token::{Token, TokenKind};
 
 #[derive(Debug, Clone)]
 pub struct Cursor {
@@ -47,5 +47,17 @@ impl Cursor {
             .ok_or("Unexpected end of file".to_string())?;
         self.prev = token.clone();
         Ok(token)
+    }
+
+    pub(crate) fn expect(&mut self, expected: TokenKind) -> Result<Token, String> {
+        if self.first().kind == expected {
+            self.bump()
+        } else {
+            Err(format!(
+                "Expected {:?}, but found {:?}",
+                expected,
+                self.first().kind
+            ))
+        }
     }
 }

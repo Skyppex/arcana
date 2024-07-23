@@ -8,7 +8,7 @@ use crate::{
 use super::{
     cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, Closure,
     ClosureParameter, EnumMemberFieldInitializers, Expression, FieldInitializer, If, Literal,
-    Member, Statement, Unary, UnaryOperator, VariableDeclaration, While,
+    Match, MatchArm, Member, Pattern, Statement, Unary, UnaryOperator, VariableDeclaration, While,
 };
 use crate::types::parse_type_annotation;
 
@@ -566,7 +566,7 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
 
 fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Let) {
-        return parse_if(cursor);
+        return parse_match(cursor);
     }
 
     cursor.bump()?; // Consume the let
@@ -610,6 +610,37 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
             cursor.first().kind
         )),
     }
+}
+
+fn parse_match(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Match) {
+        return parse_if(cursor);
+    }
+
+    cursor.bump()?; // Consume the match
+
+    let expression = parse_expression(cursor)?;
+
+    let mut arms = vec![];
+
+    while cursor.first().kind == TokenKind::Keyword(Keyword::Arm) {
+        cursor.bump()?; // Consume the arm keyword
+        let pattern = parse_pattern(cursor)?;
+        cursor.expect(TokenKind::FatArrow)?; // Consume the =>
+        let body = parse_expression(cursor)?;
+
+        arms.push(MatchArm {
+            pattern,
+            expression: Box::new(body),
+        });
+    }
+
+    cursor.bump()?; // Consume the }
+
+    Ok(Expression::Match(Match {
+        expression: Box::new(expression),
+        arms,
+    }))
 }
 
 fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -907,6 +938,23 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
         }
         _ => Err(format!(
             "Expected primary expression but found {:?}",
+            cursor.first().kind
+        )),
+    }
+}
+
+fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
+    match cursor.first().kind {
+        TokenKind::Underscore => {
+            cursor.bump()?; // Consume the _
+            Ok(Pattern::Wildcard)
+        }
+        TokenKind::Literal(token::Literal::Int(v)) => {
+            cursor.bump()?; // Consume the literal
+            Ok(Pattern::Int(v.value))
+        }
+        _ => Err(format!(
+            "Unknown start of pattern: {:?}",
             cursor.first().kind
         )),
     }
