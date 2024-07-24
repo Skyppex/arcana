@@ -82,6 +82,45 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
                     length: cursor.position_within_token(),
                 })
             }
+            '-' => {
+                cursor.bump();
+                cursor.bump();
+
+                let mut length = 2;
+                // let mut nested = 1;
+
+                while !cursor.is_end_of_file() {
+                    // if cursor.first() == '/' && cursor.second() == '-' {
+                    //     cursor.bump();
+                    //     cursor.bump();
+                    //     nested += 1;
+                    //     length += 2;
+                    // } else if cursor.first() == '-' && cursor.second() == '/' {
+                    //     cursor.bump();
+                    //     cursor.bump();
+                    //     nested -= 1;
+                    //     length += 2;
+
+                    if cursor.first() == '-' && cursor.second() == '/' {
+                        cursor.bump();
+                        cursor.bump();
+                        length += 2;
+                        break;
+                    } else {
+                        cursor.bump();
+                        length += 1;
+                    }
+
+                    // if nested == 0 {
+                    //     break;
+                    // }
+                }
+
+                Ok(Token {
+                    kind: TokenKind::BlockComment,
+                    length,
+                })
+            }
             '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::SlashEqual, cursor))

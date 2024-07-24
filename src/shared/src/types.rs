@@ -71,11 +71,11 @@ impl From<Type> for TypeAnnotation {
 
 pub enum LiteralType {
     Unit,
+    Bool,
     Int,
     Float,
-    String,
     Char,
-    Bool,
+    String,
 }
 
 impl TypeAnnotation {

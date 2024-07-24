@@ -10,6 +10,10 @@ use shared::{
     },
 };
 
+pub fn tokenize(input: &str) -> Vec<lexer::token::Token> {
+    lexer::tokenize(input).unwrap()
+}
+
 pub fn create_typed_ast(input: &str) -> TypedStatement {
     let tokens = lexer::tokenize(input).unwrap();
     let ast = parser::create_ast(tokens).unwrap();
@@ -35,6 +39,10 @@ pub fn evaluate_expression(
     }
 }
 
+pub trait TokenExt {
+    fn nth_token(&self, n: usize) -> lexer::token::Token;
+}
+
 pub trait StatementExt {
     fn unwrap_program(self) -> Vec<TypedStatement>;
     fn unwrap_semi(self) -> TypedStatement;
@@ -43,6 +51,12 @@ pub trait StatementExt {
 
 pub trait VecStatementExt {
     fn nth_statement(self, n: usize) -> TypedStatement;
+}
+
+impl TokenExt for Vec<lexer::token::Token> {
+    fn nth_token(&self, n: usize) -> lexer::token::Token {
+        self.get(n).unwrap().clone()
+    }
 }
 
 impl StatementExt for TypedStatement {

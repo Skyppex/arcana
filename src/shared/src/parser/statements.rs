@@ -21,7 +21,7 @@ pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
         cursor.first().kind,
         TokenKind::LineComment | TokenKind::BlockComment
     ) {
-        cursor.bump()?; // Consume the ;
+        cursor.bump()?; // Consume the comment
     }
 
     match parse_break(cursor) {
@@ -44,13 +44,11 @@ fn parse_break(cursor: &mut Cursor) -> Result<Statement, String> {
 
     cursor.bump()?; // Consume the break
 
-    let expression = if cursor.first().kind != TokenKind::Semicolon {
-        let expression = parse_expression(cursor)?;
-        expect_semicolon(cursor)?;
-        Some(expression)
-    } else {
-        expect_semicolon(cursor)?;
+    let expression = if cursor.first().kind == TokenKind::Semicolon {
+        cursor.bump()?;
         None
+    } else {
+        Some(parse_expression(cursor)?)
     };
 
     Ok(Statement::Break(expression))
@@ -655,13 +653,4 @@ fn parse_generic_constraint(cursor: &mut Cursor) -> Result<GenericConstraint, St
         },
         constraints,
     })
-}
-
-fn expect_semicolon(cursor: &mut Cursor) -> Result<(), String> {
-    if cursor.first().kind != TokenKind::Semicolon {
-        return Err(format!("Expected ; but found {:?}", cursor.first().kind));
-    }
-
-    cursor.bump()?; // Consume the ;
-    Ok(())
 }
