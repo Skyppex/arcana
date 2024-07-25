@@ -150,8 +150,15 @@ fn evaluate_expression<'a>(
             condition,
             block,
             else_block,
-            type_,
-        } => evaluate_while(condition, block, else_block, type_, environment),
+            type_: _,
+        } => evaluate_while(condition, block, else_block, environment),
+        TypedExpression::For {
+            identifier,
+            iterable,
+            block,
+            else_block,
+            type_: _,
+        } => evaluate_for(identifier, iterable, block, else_block, environment),
     }
 }
 
@@ -762,7 +769,6 @@ fn evaluate_while(
     condition: Box<TypedExpression>,
     statements: Vec<TypedStatement>,
     else_statements: Option<Vec<TypedStatement>>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let while_environment = Rc::new(RefCell::new(Environment::new_scopes(
@@ -828,6 +834,123 @@ fn evaluate_while(
             }
 
             if while_environment
+                .borrow()
+                .get_scope(&ScopeType::Return)
+                .is_some()
+            {
+                break_value = Value::Void;
+                break 'outer;
+            }
+        }
+    }
+
+    Ok(break_value)
+}
+
+fn evaluate_for(
+    identifier: String,
+    iterable: Box<TypedExpression>,
+    statements: Vec<TypedStatement>,
+    else_statements: Option<Vec<TypedStatement>>,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let for_environment = Rc::new(RefCell::new(Environment::new_scopes(
+        environment,
+        [ScopeType::Break, ScopeType::Continue],
+    )));
+
+    let value = evaluate_expression(*iterable.clone(), for_environment.clone())?;
+    let array = match value {
+        Value::Array(array) => array,
+        _ => return Err(format!("For iterable must be an array '{}'", value)),
+    };
+
+    if array.len() == 0 {
+        match else_statements {
+            Some(else_statements) => {
+                let mut value = Value::Void;
+
+                for statement in else_statements {
+                    value = evaluate(statement, for_environment.clone())?;
+
+                    if for_environment
+                        .borrow()
+                        .get_scope(&ScopeType::Return)
+                        .is_some()
+                    {
+                        value = Value::Void;
+                        break;
+                    }
+                }
+
+                return Ok(value);
+            }
+            None => return Ok(Value::Void),
+        }
+    }
+
+    let mut index = 0;
+
+    let break_value;
+
+    'outer: loop {
+        if index >= array.len() {
+            break_value = match else_statements {
+                Some(else_statements) => {
+                    let mut value = Value::Void;
+
+                    for statement in else_statements {
+                        value = evaluate(statement, for_environment.clone())?;
+
+                        if for_environment
+                            .borrow()
+                            .get_scope(&ScopeType::Return)
+                            .is_some()
+                        {
+                            value = Value::Void;
+                            break;
+                        }
+                    }
+
+                    value
+                }
+                None => Value::Void,
+            };
+
+            break;
+        }
+
+        let value = array
+            .get(index)
+            .cloned()
+            .expect(format!("Index out of bounds: {}", index).as_str());
+        index += 1;
+
+        for_environment
+            .borrow_mut()
+            .add_variable(identifier.clone(), value.clone(), false);
+
+        for statement in statements.clone() {
+            evaluate(statement, for_environment.clone())?;
+
+            if let Some(Scope::Break(v)) = for_environment.borrow().get_scope(&ScopeType::Break) {
+                break_value = match v {
+                    Some(v) => match else_statements {
+                        None => Err(format!("Cannot break with a value in a for loop without an else block (add an else block with 'else {{}}')")),
+                        Some(_) => Ok(v.clone())
+                    },
+                    None => Ok(Value::Void)
+                }?;
+
+                break 'outer;
+            }
+
+            if let Some(Scope::Continue) = for_environment.borrow().get_scope(&ScopeType::Continue)
+            {
+                continue 'outer;
+            }
+
+            if for_environment
                 .borrow()
                 .get_scope(&ScopeType::Return)
                 .is_some()

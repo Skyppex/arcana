@@ -7,7 +7,7 @@ use crate::{
 
 use super::{
     cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, Closure,
-    ClosureParameter, EnumMemberFieldInitializers, Expression, FieldInitializer, If, Literal,
+    ClosureParameter, EnumMemberFieldInitializers, Expression, FieldInitializer, For, If, Literal,
     Match, MatchArm, Member, Pattern, Statement, Unary, UnaryOperator, VariableDeclaration, While,
 };
 use crate::types::parse_type_annotation;
@@ -62,7 +62,7 @@ pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
 
 pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::While) {
-        return parse_block(cursor);
+        return parse_for(cursor);
     }
 
     cursor.bump()?; // Consume the while
@@ -84,6 +84,48 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
 
     Ok(Expression::While(While {
         condition: Box::new(condition),
+        statements: block,
+        else_statements: Some(else_block),
+    }))
+}
+
+pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::For) {
+        return parse_block(cursor);
+    }
+
+    cursor.bump()?; // Consume the for
+
+    let TokenKind::Identifier(identifier) = cursor.first().kind else {
+        return Err(format!(
+            "Expected identifier but found {:?}",
+            cursor.first().kind
+        ));
+    };
+
+    cursor.bump()?; // Consume the identifier
+
+    cursor.expect(TokenKind::Keyword(Keyword::In))?;
+
+    let iterable = parse_expression(cursor)?;
+    let block = parse_block_statements(cursor)?;
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
+        return Ok(Expression::For(For {
+            identifier,
+            iterable: Box::new(iterable),
+            statements: block,
+            else_statements: None,
+        }));
+    }
+
+    cursor.bump()?; // Consume the else
+
+    let else_block = parse_block_statements(cursor)?;
+
+    Ok(Expression::For(For {
+        identifier,
+        iterable: Box::new(iterable),
         statements: block,
         else_statements: Some(else_block),
     }))

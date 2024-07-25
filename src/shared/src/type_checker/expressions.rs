@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    parser::{self, Assignment, Binary, Expression, If, Match, VariableDeclaration, While},
+    parser::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
     type_checker::ast::Literal,
     types::TypeIdentifier,
 };
@@ -542,8 +542,8 @@ fn synthesize_type(
                 let start = check_type(start, discovered_types, type_environment.clone(), None)?;
                 let end = check_type(end, discovered_types, type_environment, None)?;
 
-                let start_type = start.get_type();
-                let end_type = end.get_type();
+                let start_type = start.get_deep_type();
+                let end_type = end.get_deep_type();
 
                 if !type_equals(&start_type, &Type::Int)
                     && !type_equals(&start_type, &Type::UInt)
@@ -883,6 +883,93 @@ fn synthesize_type(
 
             Ok(TypedExpression::While {
                 condition: Box::new(condition),
+                block: block.statements,
+                else_block,
+                type_: type_.clone(),
+            })
+        }
+        Expression::For(For {
+            identifier,
+            iterable,
+            statements: block,
+            else_statements: else_block,
+        }) => {
+            let for_and_else_environment =
+                Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment)));
+
+            let for_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
+                for_and_else_environment.clone(),
+                ScopeType::Break,
+            )));
+
+            let iterable = check_type(
+                iterable,
+                discovered_types,
+                for_and_else_environment.clone(),
+                None,
+            )?;
+
+            let Type::Array(inner_type) = iterable.get_type() else {
+                return Err(format!(
+                    "For iterable must be of type array, found {}",
+                    iterable.get_type()
+                ));
+            };
+
+            for_environment
+                .borrow_mut()
+                .add_variable(identifier.clone(), *inner_type);
+
+            let block = check_type(
+                &Expression::Block(block.clone()),
+                discovered_types,
+                for_environment.clone(),
+                None,
+            )?;
+
+            let TypedExpression::Block(block) = block else {
+                return Err("For block must be a block".to_string());
+            };
+
+            let else_block = match else_block {
+                Some(else_block) => Some(check_type(
+                    &Expression::Block(else_block.clone()),
+                    discovered_types,
+                    for_and_else_environment,
+                    None,
+                )?),
+                None => None,
+            };
+
+            let type_ = for_environment
+                .borrow()
+                .get_scope(&ScopeType::Break)
+                .map(|scope| scope.fold())
+                .unwrap_or(Ok(Type::Void))?;
+
+            let else_block = match else_block {
+                Some(TypedExpression::Block(block)) => {
+                    if !type_equals(&type_, &Type::Void) && !type_equals(&type_, &block.type_) {
+                        return Err(format!("For block breaks with value of type {} which does not match else blocks type {}", type_, block.type_));
+                    }
+
+                    Some(block.statements)
+                }
+                None => {
+                    if !type_equals(&type_, &Type::Void) {
+                        return Err(format!(
+                            "Must have an else block if the for block breaks with a value"
+                        ));
+                    }
+
+                    None
+                }
+                _ => return Err("Else block must be a block".to_string()),
+            };
+
+            Ok(TypedExpression::For {
+                identifier: identifier.clone(),
+                iterable: Box::new(iterable),
                 block: block.statements,
                 else_block,
                 type_: type_.clone(),

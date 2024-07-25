@@ -2,9 +2,9 @@ use crate::{
     parser::{
         AccessModifier, Assignment, Binary, BinaryOperator, Call, ClosureParameter,
         EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
-        FieldInitializer, FlagsMember, FunctionDeclaration, If, Literal, Match, MatchArm, Member,
-        Parameter, Pattern, Statement, StructDeclaration, StructField, Unary, UnaryOperator,
-        UnionDeclaration, VariableDeclaration, While,
+        FieldInitializer, FlagsMember, For, FunctionDeclaration, If, Literal, Match, MatchArm,
+        Member, Parameter, Pattern, Statement, StructDeclaration, StructField, Unary,
+        UnaryOperator, UnionDeclaration, VariableDeclaration, While,
     },
     type_checker::{
         self,
@@ -686,6 +686,81 @@ impl IndentDisplay for Expression {
                     )
                     .as_str(),
                 );
+                result.push_str(format!("{}block: <block>", indent.dash()).as_str());
+                indent.increase();
+
+                for (i, statement) in statements.iter().enumerate() {
+                    if i < statements.len() - 1 {
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                .as_str(),
+                        );
+                    } else {
+                        indent.end_current();
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                statement.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
+                    }
+                }
+
+                indent.decrease();
+                indent.end_current();
+
+                if let Some(else_statements) = else_statements {
+                    result.push_str(format!("\n{}else: <block>", indent.dash_end()).as_str());
+                    indent.increase();
+
+                    for (i, statement) in else_statements.iter().enumerate() {
+                        if i < else_statements.len() - 1 {
+                            result.push_str(
+                                format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                    .as_str(),
+                            );
+                        } else {
+                            indent.end_current();
+                            result.push_str(
+                                format!(
+                                    "\n{}{}",
+                                    indent.dash_end(),
+                                    statement.indent_display(indent)
+                                )
+                                .as_str(),
+                            );
+                        }
+                    }
+
+                    indent.decrease();
+                } else {
+                    result.push_str(format!("\n{}else: <block> None", indent.dash_end()).as_str());
+                }
+
+                indent.decrease();
+                result
+            }
+            Expression::For(For {
+                identifier,
+                iterable,
+                statements,
+                else_statements,
+            }) => {
+                let mut result = String::new();
+                result.push_str("<for>");
+                indent.increase();
+                result.push_str(format!("\n{}identifier: {}", indent.dash(), identifier).as_str());
+                result.push_str(
+                    format!(
+                        "\n{}iterable: {}",
+                        indent.dash(),
+                        iterable.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
                 result.push_str(format!("{}block: <block>", indent.dash()).as_str());
                 indent.increase();
 
@@ -1815,6 +1890,90 @@ impl IndentDisplay for TypedExpression {
                     )
                     .as_str(),
                 );
+
+                result.push_str(format!("{}block: <block>", indent.dash()).as_str());
+                indent.increase();
+
+                for (i, statement) in block.iter().enumerate() {
+                    if i < block.len() - 1 {
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                .as_str(),
+                        );
+                    } else {
+                        indent.end_current();
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                statement.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
+                    }
+                }
+
+                indent.decrease();
+                indent.end_current();
+
+                if let Some(else_block) = else_block {
+                    result.push_str(format!("\n{}else: <block>", indent.dash_end()).as_str());
+                    indent.increase();
+
+                    for (i, statement) in else_block.iter().enumerate() {
+                        if i < else_block.len() - 1 {
+                            result.push_str(
+                                format!("\n{}{},", indent.dash(), statement.indent_display(indent))
+                                    .as_str(),
+                            );
+                        } else {
+                            indent.end_current();
+                            result.push_str(
+                                format!(
+                                    "\n{}{}",
+                                    indent.dash_end(),
+                                    statement.indent_display(indent)
+                                )
+                                .as_str(),
+                            );
+                        }
+                    }
+
+                    indent.decrease();
+                } else {
+                    result.push_str(format!("\n{}else: None", indent.dash_end()).as_str());
+                }
+
+                indent.decrease();
+                result
+            }
+            TypedExpression::For {
+                identifier,
+                iterable,
+                block,
+                else_block,
+                type_,
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<for>: {}\n", type_).as_str());
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}identifier: {}\n",
+                        indent.dash(),
+                        identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}iterable: {}\n",
+                        indent.dash(),
+                        iterable.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
                 result.push_str(format!("{}block: <block>", indent.dash()).as_str());
                 indent.increase();
 

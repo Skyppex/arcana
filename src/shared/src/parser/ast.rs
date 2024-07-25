@@ -50,6 +50,7 @@ pub enum Expression {
     Block(Block),
     Loop(Block),
     While(While),
+    For(For),
     #[cfg(feature = "interpreter")]
     Drop(String),
 }
@@ -180,6 +181,14 @@ impl ToString for Literal {
 #[derive(Debug, Clone, PartialEq)]
 pub struct While {
     pub condition: Box<Expression>,
+    pub statements: Vec<Statement>,
+    pub else_statements: Option<Vec<Statement>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct For {
+    pub identifier: String,
+    pub iterable: Box<Expression>,
     pub statements: Vec<Statement>,
     pub else_statements: Option<Vec<Statement>>,
 }
