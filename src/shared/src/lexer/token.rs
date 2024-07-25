@@ -79,6 +79,7 @@ pub enum TokenKind {
     DoubleColon,
     Semicolon,
     Dot,
+    DoubleDot,
     QuestionMark,
     FatArrow,
 

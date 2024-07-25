@@ -1,8 +1,8 @@
 use std::hash::Hash;
+use std::ops::Deref;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
-use crate::lexer::token::IntLiteral;
 use crate::pretty_print::PrettyPrint;
 use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 
@@ -123,6 +123,11 @@ pub enum Literal {
     Char(char),
     Bool(bool),
     Array(Vec<Expression>),
+    Range {
+        start: Box<Expression>,
+        end: Box<Expression>,
+        inclusive: bool,
+    },
     Struct {
         type_annotation: TypeAnnotation,
         field_initializers: Vec<FieldInitializer>,
@@ -165,15 +170,9 @@ impl ToString for Literal {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Literal::Struct {
-                type_annotation: _,
-                field_initializers: _,
-            } => todo!(),
-            Literal::Enum {
-                type_annotation: _,
-                member: _,
-                field_initializers: _,
-            } => todo!(),
+            Literal::Range { .. } => todo!(),
+            Literal::Struct { .. } => todo!(),
+            Literal::Enum { .. } => todo!(),
         }
     }
 }

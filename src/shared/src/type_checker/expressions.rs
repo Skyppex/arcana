@@ -534,6 +534,52 @@ fn synthesize_type(
                     type_: v.1,
                 }))
             }
+            parser::Literal::Range {
+                start,
+                end,
+                inclusive,
+            } => {
+                let start = check_type(start, discovered_types, type_environment.clone(), None)?;
+                let end = check_type(end, discovered_types, type_environment, None)?;
+
+                let start_type = start.get_type();
+                let end_type = end.get_type();
+
+                if !type_equals(&start_type, &Type::Int)
+                    && !type_equals(&start_type, &Type::UInt)
+                    && !type_equals(&start_type, &Type::Char)
+                {
+                    return Err(format!(
+                        "Start of range must be of type int, uint or char. Found {}",
+                        start_type.full_name()
+                    ));
+                }
+
+                if !type_equals(&end_type, &Type::Int)
+                    && !type_equals(&end_type, &Type::UInt)
+                    && !type_equals(&end_type, &Type::Char)
+                {
+                    return Err(format!(
+                        "End of range must be of type int, uint or char. Found {}",
+                        end_type.full_name()
+                    ));
+                }
+
+                if !type_equals(&start_type, &end_type) {
+                    return Err(format!(
+                        "Start and end of range must be of the same type. Found {} and {}",
+                        start_type.full_name(),
+                        end_type.full_name()
+                    ));
+                }
+
+                Ok(TypedExpression::Literal(Literal::Range {
+                    start: Box::new(start),
+                    end: Box::new(end),
+                    inclusive: *inclusive,
+                    type_: start_type,
+                }))
+            }
             parser::Literal::Struct {
                 type_annotation,
                 field_initializers,

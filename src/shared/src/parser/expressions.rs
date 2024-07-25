@@ -929,6 +929,26 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 
                 if cursor.first().kind == TokenKind::Comma {
                     cursor.bump()?; // Consume the ,
+                } else if cursor.first().kind == TokenKind::DoubleDot {
+                    cursor.bump()?; // Consume the ..
+
+                    let inclusive = if cursor.first().kind == TokenKind::Equal {
+                        cursor.bump()?; // Consume the =
+                        true
+                    } else {
+                        false
+                    };
+
+                    let start = elements.pop().unwrap();
+                    let end = parse_expression(cursor)?;
+
+                    cursor.expect(TokenKind::CloseBracket)?; // Consume the ]
+
+                    return Ok(Expression::Literal(Literal::Range {
+                        start: Box::new(start),
+                        end: Box::new(end),
+                        inclusive,
+                    }));
                 }
             }
 

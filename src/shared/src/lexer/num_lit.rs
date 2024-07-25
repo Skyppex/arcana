@@ -71,7 +71,7 @@ fn parse_base_prefix(cursor: &mut Cursor) -> Option<IntLiteralBase> {
 fn parse_numeric_literal_value(cursor: &mut Cursor, base: IntLiteralBase) -> String {
     let mut value = String::new();
 
-    while is_numeric_literal_continue(cursor.first(), base.clone()) {
+    while is_numeric_literal_continue(cursor.first(), cursor.second(), base.clone()) {
         value.push(cursor.first());
         cursor.bump();
     }
@@ -88,13 +88,13 @@ fn parse_suffix(cursor: &mut Cursor) -> Option<NumericLiteralType> {
     }
 }
 
-fn is_numeric_literal_continue(c: char, base: IntLiteralBase) -> bool {
+fn is_numeric_literal_continue(first: char, second: char, base: IntLiteralBase) -> bool {
     let base = match base {
         IntLiteralBase::None => 10,
         other => other as u32,
     };
 
-    c.is_digit(base) || c == '.'
+    first.is_digit(base) || (first == '.' && second != '.')
 }
 
 fn is_numeric_literal_suffix_start(c: char) -> bool {

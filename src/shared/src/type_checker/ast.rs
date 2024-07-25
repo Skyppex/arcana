@@ -624,6 +624,12 @@ pub enum Literal {
         values: Vec<TypedExpression>,
         type_: Type,
     },
+    Range {
+        start: Box<TypedExpression>,
+        end: Box<TypedExpression>,
+        inclusive: bool,
+        type_: Type,
+    },
     Struct {
         type_annotation: TypeAnnotation,
         field_initializers: Vec<FieldInitializer>,
@@ -674,6 +680,7 @@ impl Typed for Literal {
                 type_: Box::new(Type::Bool),
             },
             Literal::Array { type_, .. } => Type::Array(Box::new(type_.clone())),
+            Literal::Range { type_, .. } => Type::Array(Box::new(type_.clone())),
             Literal::Struct { type_, .. } => type_.clone(),
             Literal::Enum { type_, .. } => type_.clone(),
         }
@@ -690,6 +697,7 @@ impl Typed for Literal {
             Literal::Char(_) => Type::Char,
             Literal::Bool(_) => Type::Bool,
             Literal::Array { type_, .. } => type_.clone(),
+            Literal::Range { type_, .. } => type_.clone(),
             Literal::Struct { type_, .. } => type_.clone(),
             Literal::Enum { type_, .. } => type_.clone(),
         }
@@ -716,6 +724,7 @@ impl Display for Literal {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Literal::Range { start, end, .. } => write!(f, "[{}..{}]", start, end),
             Literal::Struct {
                 field_initializers, ..
             } => write!(

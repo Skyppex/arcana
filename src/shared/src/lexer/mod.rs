@@ -51,7 +51,13 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             _ => Ok(create_token(TokenKind::Colon, cursor)),
         },
         ';' => Ok(create_token(TokenKind::Semicolon, cursor)),
-        '.' => Ok(create_token(TokenKind::Dot, cursor)),
+        '.' => match cursor.second() {
+            '.' => {
+                cursor.bump();
+                Ok(create_token(TokenKind::DoubleDot, cursor))
+            }
+            _ => Ok(create_token(TokenKind::Dot, cursor)),
+        },
         '?' => Ok(create_token(TokenKind::QuestionMark, cursor)),
         '+' => match cursor.second() {
             '=' => {
