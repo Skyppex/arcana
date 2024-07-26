@@ -392,67 +392,6 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
 
             Ok(Value::Array(array))
         }
-        Literal::Range {
-            start,
-            end,
-            inclusive,
-            type_: _,
-        } => {
-            let start = evaluate_expression(*start, environment.clone())?;
-            let end = evaluate_expression(*end, environment.clone())?;
-
-            match (start, end) {
-                (Value::Number(Number::Int(start)), Value::Number(Number::Int(end))) => {
-                    let mut array = Vec::new();
-
-                    if inclusive {
-                        for i in start..=end {
-                            array.push(Value::Number(Number::Int(i)));
-                        }
-                    } else {
-                        for i in start..end {
-                            array.push(Value::Number(Number::Int(i)));
-                        }
-                    }
-
-                    Ok(Value::Array(array))
-                }
-                (Value::Number(Number::UInt(start)), Value::Number(Number::UInt(end))) => {
-                    let mut array = Vec::new();
-
-                    if inclusive {
-                        for i in start..=end {
-                            array.push(Value::Number(Number::UInt(i)));
-                        }
-                    } else {
-                        for i in start..end {
-                            array.push(Value::Number(Number::UInt(i)));
-                        }
-                    }
-
-                    Ok(Value::Array(array))
-                }
-                (Value::Char(start), Value::Char(end)) => {
-                    let mut array = Vec::new();
-
-                    if inclusive {
-                        for i in start..=end {
-                            array.push(Value::Char(i));
-                        }
-                    } else {
-                        for i in start..end {
-                            array.push(Value::Char(i));
-                        }
-                    }
-
-                    Ok(Value::Array(array))
-                }
-                (s, e) => Err(format!(
-                    "Range start and end must be unsigned integers, found '{}' and '{}'",
-                    s, e
-                )),
-            }
-        }
         Literal::Struct {
             type_annotation,
             field_initializers,

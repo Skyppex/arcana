@@ -25,7 +25,7 @@ pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
 #[cfg(feature = "interpreter")]
 fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Drop) {
-        return parse_loop(cursor);
+        return parse_range(cursor);
     }
 
     cursor.bump()?; // Consume the drop
@@ -46,6 +46,26 @@ fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     };
 
     Ok(Expression::Drop(identifier))
+}
+
+fn parse_range(cursor: &mut Cursor) -> Result<Expression, String> {
+    let mut expression = parse_loop(cursor)?;
+
+    while cursor.first().kind == TokenKind::DoubleDot {
+        let operator = cursor.bump()?.kind; // Consume the ..
+        let right = parse_loop(cursor)?;
+
+        expression = Expression::Binary(Binary {
+            left: Box::new(expression),
+            right: Box::new(right),
+            operator: match operator {
+                TokenKind::DoubleDot => BinaryOperator::Range,
+                _ => unreachable!("Expected .. or ... but found {:?}", operator),
+            },
+        });
+    }
+
+    Ok(expression)
 }
 
 pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -971,26 +991,6 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 
                 if cursor.first().kind == TokenKind::Comma {
                     cursor.bump()?; // Consume the ,
-                } else if cursor.first().kind == TokenKind::DoubleDot {
-                    cursor.bump()?; // Consume the ..
-
-                    let inclusive = if cursor.first().kind == TokenKind::Equal {
-                        cursor.bump()?; // Consume the =
-                        true
-                    } else {
-                        false
-                    };
-
-                    let start = elements.pop().unwrap();
-                    let end = parse_expression(cursor)?;
-
-                    cursor.expect(TokenKind::CloseBracket)?; // Consume the ]
-
-                    return Ok(Expression::Literal(Literal::Range {
-                        start: Box::new(start),
-                        end: Box::new(end),
-                        inclusive,
-                    }));
                 }
             }
 

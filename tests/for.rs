@@ -11,7 +11,7 @@ use shared::type_checker::{
 #[test]
 fn for_is_for() {
     // Arrange
-    let input = "for x in [0..1] {}";
+    let input = "for x in 0..1 {}";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -28,7 +28,7 @@ fn for_is_for() {
 #[test]
 fn for_has_correct_type() {
     // Arrange
-    let input = "for x in [0..1] { 1 }";
+    let input = "for x in 0..1 { 1 }";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -46,7 +46,7 @@ fn for_has_correct_type() {
 fn for_has_correct_type_when_using_break() {
     // Arrange
     let input = r#"
-        for x in [0..1] {
+        for x in 0..1 {
             break 1 + 1
         } else {
             2 + 2
@@ -69,7 +69,7 @@ fn for_has_correct_type_when_using_break() {
 fn while_does_not_require_body_or_else_body_to_be_a_block() {
     // Arrange
     let input = r#"
-        for x in [0..1] 1 + 1
+        for x in 0..1 1 + 1
         else 2 + 2
         "#;
 
@@ -90,7 +90,7 @@ fn while_does_not_require_body_or_else_body_to_be_a_block() {
 fn for_should_panic_if_else_body_has_different_type_than_body() {
     // Arrange
     let input = r#"
-        for x in [0..1] {
+        for x in 0..1 {
             break 1 + 1
         } else {
             "Hello, World!"
@@ -105,7 +105,7 @@ fn for_should_panic_if_else_body_has_different_type_than_body() {
 fn for_returns_void() {
     // Arrange
     let input = r#"
-        for x in [0..1] {
+        for x in 0..1 {
             1 + 1
         }
         "#;
@@ -121,7 +121,7 @@ fn for_returns_void() {
 fn for_returns_break_value() {
     // Arrange
     let input = r#"
-        for x in [0..1] {
+        for x in 0..1 {
             break 1 + 1
         } else {
             2 + 2
@@ -139,7 +139,7 @@ fn for_returns_break_value() {
 fn for_returns_else_value_after_iteration() {
     // Arrange
     let input = r#"
-        for x in [0..1] {
+        for x in 0..1 {
             if x > 10 {
                 break 1 + 1
             }

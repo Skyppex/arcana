@@ -26,6 +26,7 @@ pub(crate) fn evaluate_binop<'a>(
         BinaryOperator::LessThanOrEqual => evaluate_less_than_or_equal(left, right),
         BinaryOperator::GreaterThan => evaluate_greater_than(left, right),
         BinaryOperator::GreaterThanOrEqual => evaluate_greater_than_or_equal(left, right),
+        BinaryOperator::Range => evaluate_range(left, right),
     }
 }
 
@@ -298,5 +299,27 @@ fn evaluate_greater_than_or_equal<'a>(left: Value, right: Value) -> Result<Value
             "Cannot greater than or equal {:?} and {:?}",
             left, right
         )),
+    }
+}
+
+fn evaluate_range<'a>(left: Value, right: Value) -> Result<Value, String> {
+    match (left, right) {
+        (Value::Number(left), Value::Number(right)) => match (left, right) {
+            (Number::Int(left), Number::Int(right)) => Ok(Value::Array(
+                (left..right)
+                    .map(|v| Value::Number(Number::Int(v)))
+                    .collect(),
+            )),
+            (Number::UInt(left), Number::UInt(right)) => Ok(Value::Array(
+                (left..right)
+                    .map(|v| Value::Number(Number::UInt(v)))
+                    .collect(),
+            )),
+            (left, right) => Err(format!("Cannot range {:?} and {:?}", left, right)),
+        },
+        (Value::Char(left), Value::Char(right)) => {
+            Ok(Value::Array((left..right).map(Value::Char).collect()))
+        }
+        (left, right) => Err(format!("Cannot range {:?} and {:?}", left, right)),
     }
 }

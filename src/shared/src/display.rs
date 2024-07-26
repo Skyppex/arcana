@@ -869,26 +869,6 @@ impl IndentDisplay for Literal {
                 indent.decrease();
                 result
             }
-            Literal::Range {
-                start,
-                end,
-                inclusive,
-            } => {
-                let mut result = String::new();
-                result.push_str("<range>");
-                indent.increase();
-                result.push_str(
-                    format!("\n{}start: {}", indent.dash(), start.indent_display(indent)).as_str(),
-                );
-                result.push_str(
-                    format!("\n{}end: {}", indent.dash(), end.indent_display(indent)).as_str(),
-                );
-                indent.end_current();
-                result
-                    .push_str(format!("\n{}inclusive: {}", indent.dash_end(), inclusive).as_str());
-                indent.decrease();
-                result
-            }
             Literal::Struct {
                 type_annotation: type_identifier,
                 field_initializers,
@@ -1208,6 +1188,7 @@ impl IndentDisplay for BinaryOperator {
             BinaryOperator::LessThanOrEqual => "<=".to_string(),
             BinaryOperator::GreaterThan => ">".to_string(),
             BinaryOperator::GreaterThanOrEqual => ">=".to_string(),
+            BinaryOperator::Range => "..".to_string(),
         }
     }
 }
@@ -2077,27 +2058,6 @@ impl IndentDisplay for type_checker::ast::Literal {
                 indent.decrease();
                 result
             }
-            type_checker::ast::Literal::Range {
-                start,
-                end,
-                inclusive,
-                type_,
-            } => {
-                let mut result = String::new();
-                result.push_str(format!("<range>: {}", type_).as_str());
-                indent.increase();
-                result.push_str(
-                    format!("\n{}start: {}", indent.dash(), start.indent_display(indent)).as_str(),
-                );
-                result.push_str(
-                    format!("\n{}end: {}", indent.dash(), end.indent_display(indent)).as_str(),
-                );
-                indent.end_current();
-                result
-                    .push_str(format!("\n{}inclusive: {}", indent.dash_end(), inclusive).as_str());
-                indent.decrease();
-                result
-            }
             type_checker::ast::Literal::Struct {
                 type_annotation: type_identifier,
                 field_initializers,
@@ -2248,6 +2208,7 @@ impl IndentDisplay for type_checker::ast::BinaryOperator {
             type_checker::ast::BinaryOperator::LessThanOrEqual => "<=".to_string(),
             type_checker::ast::BinaryOperator::GreaterThan => ">".to_string(),
             type_checker::ast::BinaryOperator::GreaterThanOrEqual => ">=".to_string(),
+            type_checker::ast::BinaryOperator::Range => "..".to_string(),
         }
     }
 }

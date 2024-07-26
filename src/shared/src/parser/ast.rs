@@ -123,11 +123,7 @@ pub enum Literal {
     Char(char),
     Bool(bool),
     Array(Vec<Expression>),
-    Range {
-        start: Box<Expression>,
-        end: Box<Expression>,
-        inclusive: bool,
-    },
+
     Struct {
         type_annotation: TypeAnnotation,
         field_initializers: Vec<FieldInitializer>,
@@ -170,7 +166,6 @@ impl ToString for Literal {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Literal::Range { .. } => todo!(),
             Literal::Struct { .. } => todo!(),
             Literal::Enum { .. } => todo!(),
         }
@@ -372,4 +367,5 @@ pub enum BinaryOperator {
     LessThanOrEqual,
     GreaterThan,
     GreaterThanOrEqual,
+    Range,
 }
