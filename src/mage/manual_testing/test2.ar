@@ -1,5 +1,18 @@
-for i in let x = [0..20] {
-    if i > 15 { break [1..=100] }
-} else {
-    x
+union HeaderLevel { 1, 2, 3, 4, 5, 6 }
+
+fun repeat(n: int, f: string): string => {
+    let mut result = "";
+
+    for i in 0..n {
+        result += f;
+    }
+
+    result
+}
+
+fun header(level: HeaderLevel, append: fun(): string): string =>
+    repeat(level, "#") + "\n" + append()
+
+3:header => {
+    "Hello, World!"
 }

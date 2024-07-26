@@ -25,7 +25,7 @@ pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
 #[cfg(feature = "interpreter")]
 fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Drop) {
-        return parse_range(cursor);
+        return parse_loop(cursor);
     }
 
     cursor.bump()?; // Consume the drop
@@ -46,26 +46,6 @@ fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     };
 
     Ok(Expression::Drop(identifier))
-}
-
-fn parse_range(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_loop(cursor)?;
-
-    while cursor.first().kind == TokenKind::DoubleDot {
-        let operator = cursor.bump()?.kind; // Consume the ..
-        let right = parse_loop(cursor)?;
-
-        expression = Expression::Binary(Binary {
-            left: Box::new(expression),
-            right: Box::new(right),
-            operator: match operator {
-                TokenKind::DoubleDot => BinaryOperator::Range,
-                _ => unreachable!("Expected .. or ... but found {:?}", operator),
-            },
-        });
-    }
-
-    Ok(expression)
 }
 
 pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -179,15 +159,21 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
 
 fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
     let TokenKind::Identifier(_) = cursor.first().kind else {
-        return parse_assignment(cursor);
+        return parse_range(cursor);
     };
 
     if !matches!(
         cursor.second().kind,
         TokenKind::OpenBrace | TokenKind::DoubleColon
     ) {
-        return parse_assignment(cursor);
+        return parse_range(cursor);
     };
+
+    println!(
+        "First: {:?}, Second: {:?}",
+        cursor.first().kind,
+        cursor.second().kind
+    );
 
     let type_annotation = parse_type_annotation(cursor, false)?;
 
@@ -211,6 +197,7 @@ fn parse_struct_literal(
 
     while cursor.first().kind != TokenKind::CloseBrace {
         if !has_comma {
+            println!("ashdakjhsgdkjahgsdkjhg");
             return Err(format!("Expected , but found {:?}", cursor.first().kind));
         }
 
@@ -313,6 +300,26 @@ fn parse_named_enum_member_field_initializers(
     }
 
     Ok(EnumMemberFieldInitializers::Named(field_initializers))
+}
+
+fn parse_range(cursor: &mut Cursor) -> Result<Expression, String> {
+    let mut expression = parse_assignment(cursor)?;
+
+    while cursor.first().kind == TokenKind::DoubleDot {
+        let operator = cursor.bump()?.kind; // Consume the ..
+        let right = parse_assignment(cursor)?;
+
+        expression = Expression::Binary(Binary {
+            left: Box::new(expression),
+            right: Box::new(right),
+            operator: match operator {
+                TokenKind::DoubleDot => BinaryOperator::Range,
+                _ => unreachable!("Expected .. or ... but found {:?}", operator),
+            },
+        });
+    }
+
+    Ok(expression)
 }
 
 fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
