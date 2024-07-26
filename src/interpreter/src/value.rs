@@ -63,7 +63,7 @@ impl<'a> Display for Value {
             Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),
             Value::Char(character) => write!(f, "'{}'", character),
-            Value::String(string) => write!(f, "\"{}\"", string),
+            Value::String(string) => write!(f, "{}", string),
             Value::Array(values) => {
                 write!(f, "[")?;
 
