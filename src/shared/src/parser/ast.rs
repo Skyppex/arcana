@@ -1,5 +1,4 @@
 use std::hash::Hash;
-use std::ops::Deref;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
@@ -48,7 +47,7 @@ pub enum Expression {
     Unary(Unary),
     Binary(Binary),
     Block(Block),
-    Loop(Block),
+    Loop(Box<Expression>),
     While(While),
     For(For),
     #[cfg(feature = "interpreter")]
@@ -181,16 +180,16 @@ impl ToString for Literal {
 #[derive(Debug, Clone, PartialEq)]
 pub struct While {
     pub condition: Box<Expression>,
-    pub statements: Vec<Statement>,
-    pub else_statements: Option<Vec<Statement>>,
+    pub body: Box<Expression>,
+    pub else_body: Option<Box<Expression>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct For {
     pub identifier: String,
     pub iterable: Box<Expression>,
-    pub statements: Vec<Statement>,
-    pub else_statements: Option<Vec<Statement>>,
+    pub body: Box<Expression>,
+    pub else_body: Option<Box<Expression>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

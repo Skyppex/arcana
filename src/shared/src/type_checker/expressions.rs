@@ -777,43 +777,34 @@ fn synthesize_type(
                 type_,
             })
         }
-        Expression::Loop(block) => {
+        Expression::Loop(body) => {
             let loop_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
                 type_environment,
                 ScopeType::Break,
             )));
 
-            let block = check_type(
-                &Expression::Block(block.clone()),
-                discovered_types,
-                loop_environment.clone(),
-                None,
-            )?;
-
-            let TypedExpression::Block(block) = block else {
-                return Err("Loop must have a block".to_string());
-            };
+            let body = check_type(body, discovered_types, loop_environment.clone(), None)?;
 
             let scope = loop_environment.borrow().get_scope(&ScopeType::Break);
             match scope {
                 Some(scope) => {
                     let type_ = scope.fold()?;
 
-                    Ok(TypedExpression::Loop(Block {
-                        statements: block.statements,
+                    Ok(TypedExpression::Loop {
+                        body: Box::new(body),
                         type_,
-                    }))
+                    })
                 }
-                _ => Ok(TypedExpression::Loop(Block {
-                    statements: block.statements,
+                _ => Ok(TypedExpression::Loop {
+                    body: Box::new(body),
                     type_: Type::Void,
-                })),
+                }),
             }
         }
         Expression::While(While {
             condition,
-            statements: block,
-            else_statements: else_block,
+            body,
+            else_body,
         }) => {
             let while_and_else_environment =
                 Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment)));
@@ -830,24 +821,15 @@ fn synthesize_type(
                 None,
             )?;
 
-            let Type::Bool = condition.get_type() else {
+            if !type_equals(&condition.get_type(), &Type::Bool) {
                 return Err(format!("While condition must be of type bool"));
             };
 
-            let block = check_type(
-                &Expression::Block(block.clone()),
-                discovered_types,
-                while_environment.clone(),
-                None,
-            )?;
+            let body = check_type(body, discovered_types, while_environment.clone(), None)?;
 
-            let TypedExpression::Block(block) = block else {
-                return Err("While block must be a block".to_string());
-            };
-
-            let else_block = match else_block {
+            let else_body = match else_body {
                 Some(else_block) => Some(check_type(
-                    &Expression::Block(else_block.clone()),
+                    else_block,
                     discovered_types,
                     while_and_else_environment,
                     None,
@@ -855,19 +837,21 @@ fn synthesize_type(
                 None => None,
             };
 
-            let type_ = while_environment
+            let mut type_ = while_environment
                 .borrow()
                 .get_scope(&ScopeType::Break)
                 .map(|scope| scope.fold())
                 .unwrap_or(Ok(Type::Void))?;
 
-            let else_block = match else_block {
-                Some(TypedExpression::Block(block)) => {
-                    if !type_equals(&type_, &Type::Void) && !type_equals(&type_, &block.type_) {
-                        return Err(format!("While block breaks with value of type {} which does not match else blocks type {}", type_, block.type_));
+            match &else_body {
+                Some(else_body) => {
+                    let else_type = else_body.get_type();
+
+                    if !type_equals(&type_, &Type::Void) && !type_equals(&type_, &else_type) {
+                        return Err(format!("While block breaks with value of type {} which does not match else blocks type {}", type_, else_body.get_type()));
                     }
 
-                    Some(block.statements)
+                    type_ = else_type
                 }
                 None => {
                     if !type_equals(&type_, &Type::Void) {
@@ -875,24 +859,21 @@ fn synthesize_type(
                             "Must have an else block if the while block breaks with a value"
                         ));
                     }
-
-                    None
                 }
-                _ => return Err("Else block must be a block".to_string()),
             };
 
             Ok(TypedExpression::While {
                 condition: Box::new(condition),
-                block: block.statements,
-                else_block,
+                body: Box::new(body),
+                else_body: else_body.map(Box::new),
                 type_: type_.clone(),
             })
         }
         Expression::For(For {
             identifier,
             iterable,
-            statements: block,
-            else_statements: else_block,
+            body,
+            else_body,
         }) => {
             let for_and_else_environment =
                 Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment)));
@@ -920,20 +901,11 @@ fn synthesize_type(
                 .borrow_mut()
                 .add_variable(identifier.clone(), *inner_type);
 
-            let block = check_type(
-                &Expression::Block(block.clone()),
-                discovered_types,
-                for_environment.clone(),
-                None,
-            )?;
+            let body = check_type(body, discovered_types, for_environment.clone(), None)?;
 
-            let TypedExpression::Block(block) = block else {
-                return Err("For block must be a block".to_string());
-            };
-
-            let else_block = match else_block {
-                Some(else_block) => Some(check_type(
-                    &Expression::Block(else_block.clone()),
+            let else_body = match else_body {
+                Some(else_body) => Some(check_type(
+                    else_body,
                     discovered_types,
                     for_and_else_environment,
                     None,
@@ -941,19 +913,23 @@ fn synthesize_type(
                 None => None,
             };
 
-            let type_ = for_environment
+            let mut type_ = for_environment
                 .borrow()
                 .get_scope(&ScopeType::Break)
                 .map(|scope| scope.fold())
                 .unwrap_or(Ok(Type::Void))?;
 
-            let else_block = match else_block {
-                Some(TypedExpression::Block(block)) => {
-                    if !type_equals(&type_, &Type::Void) && !type_equals(&type_, &block.type_) {
-                        return Err(format!("For block breaks with value of type {} which does not match else blocks type {}", type_, block.type_));
+            match &else_body {
+                Some(else_body) => {
+                    let else_type = else_body.get_type();
+
+                    if !type_equals(&type_, &Type::Void)
+                        && !type_equals(&type_, &else_body.get_type())
+                    {
+                        return Err(format!("For block breaks with value of type {} which does not match else blocks type {}", type_, else_body.get_type()));
                     }
 
-                    Some(block.statements)
+                    type_ = else_type
                 }
                 None => {
                     if !type_equals(&type_, &Type::Void) {
@@ -961,17 +937,14 @@ fn synthesize_type(
                             "Must have an else block if the for block breaks with a value"
                         ));
                     }
-
-                    None
                 }
-                _ => return Err("Else block must be a block".to_string()),
             };
 
             Ok(TypedExpression::For {
                 identifier: identifier.clone(),
                 iterable: Box::new(iterable),
-                block: block.statements,
-                else_block,
+                body: Box::new(body),
+                else_body: else_body.map(Box::new),
                 type_: type_.clone(),
             })
         }

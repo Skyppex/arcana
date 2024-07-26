@@ -1,2 +1,2 @@
-fun add(x: int, y: int): int => x + y
-fun mul(x: int, y: int): int => x * y
+while false 1 + 1
+else 2 + 2

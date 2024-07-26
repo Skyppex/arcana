@@ -1,1 +1,5 @@
-for i in let x = [0..20] { if i > 15 { break [1..=100] } } else { x }
+for i in let x = [0..20] {
+    if i > 15 { break [1..=100] }
+} else {
+    x
+}

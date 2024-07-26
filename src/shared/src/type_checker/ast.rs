@@ -348,18 +348,21 @@ pub enum TypedExpression {
         identifier: String,
         type_: Type,
     },
-    Loop(Block),
+    Loop {
+        body: Box<TypedExpression>,
+        type_: Type,
+    },
     While {
         condition: Box<TypedExpression>,
-        block: Vec<TypedStatement>,
-        else_block: Option<Vec<TypedStatement>>,
+        body: Box<TypedExpression>,
+        else_body: Option<Box<TypedExpression>>,
         type_: Type,
     },
     For {
         identifier: String,
         iterable: Box<TypedExpression>,
-        block: Vec<TypedStatement>,
-        else_block: Option<Vec<TypedStatement>>,
+        body: Box<TypedExpression>,
+        else_body: Option<Box<TypedExpression>>,
         type_: Type,
     },
 }
@@ -381,7 +384,7 @@ impl Typed for TypedExpression {
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
             TypedExpression::Drop { type_, .. } => type_.clone(),
-            TypedExpression::Loop(Block { type_, .. }) => type_.clone(),
+            TypedExpression::Loop { type_, .. } => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
             TypedExpression::For { type_, .. } => type_.clone(),
         }
@@ -403,7 +406,7 @@ impl Typed for TypedExpression {
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
             TypedExpression::Drop { type_, .. } => type_.clone(),
-            TypedExpression::Loop(Block { type_, .. }) => type_.clone(),
+            TypedExpression::Loop { type_, .. } => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
             TypedExpression::For { type_, .. } => type_.clone(),
         }
@@ -512,64 +515,29 @@ impl Display for TypedExpression {
             } => write!(f, "{} {} {}", left, operator, right),
             TypedExpression::Block(block) => write!(f, "{}", block),
             TypedExpression::Drop { identifier, .. } => write!(f, "drop {}", identifier),
-            TypedExpression::Loop(block) => write!(f, "loop {}", block),
+            TypedExpression::Loop { body, .. } => write!(f, "loop {}", body),
             TypedExpression::While {
                 condition,
-                block,
-                else_block,
+                body,
+                else_body,
                 ..
             } => {
-                write!(
-                    f,
-                    "while {} {{ {} }}",
-                    condition,
-                    block
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )?;
-                if let Some(else_block) = else_block {
-                    write!(
-                        f,
-                        " else {{ {} }}",
-                        else_block
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    )?;
+                write!(f, "while {} {}", condition, body)?;
+                if let Some(else_body) = else_body {
+                    write!(f, " else {}", else_body)?;
                 }
                 Ok(())
             }
             TypedExpression::For {
                 identifier,
                 iterable,
-                block,
-                else_block,
+                body,
+                else_body,
                 ..
             } => {
-                write!(
-                    f,
-                    "for {} in {} {{ {} }}",
-                    identifier,
-                    iterable,
-                    block
-                        .iter()
-                        .map(|s| s.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )?;
-                if let Some(else_block) = else_block {
-                    write!(
-                        f,
-                        " else {{ {} }}",
-                        else_block
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    )?;
+                write!(f, "for {} in {} {}", identifier, iterable, body)?;
+                if let Some(else_body) = else_body {
+                    write!(f, " else {}", else_body)?;
                 }
                 Ok(())
             }

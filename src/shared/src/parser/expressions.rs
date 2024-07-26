@@ -55,9 +55,9 @@ pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the loop
 
-    let block = parse_block_statements(cursor)?;
+    let body = parse_expression(cursor)?;
 
-    Ok(Expression::Loop(block))
+    Ok(Expression::Loop(Box::new(body)))
 }
 
 pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -68,24 +68,24 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.bump()?; // Consume the while
 
     let condition = parse_expression(cursor)?;
-    let block = parse_block_statements(cursor)?;
+    let body = parse_expression(cursor)?;
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
         return Ok(Expression::While(While {
             condition: Box::new(condition),
-            statements: block,
-            else_statements: None,
+            body: Box::new(body),
+            else_body: None,
         }));
     }
 
     cursor.bump()?; // Consume the else
 
-    let else_block = parse_block_statements(cursor)?;
+    let else_body = parse_expression(cursor)?;
 
     Ok(Expression::While(While {
         condition: Box::new(condition),
-        statements: block,
-        else_statements: Some(else_block),
+        body: Box::new(body),
+        else_body: Some(Box::new(else_body)),
     }))
 }
 
@@ -108,26 +108,26 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.expect(TokenKind::Keyword(Keyword::In))?;
 
     let iterable = parse_expression(cursor)?;
-    let block = parse_block_statements(cursor)?;
+    let body = parse_expression(cursor)?;
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
         return Ok(Expression::For(For {
             identifier,
             iterable: Box::new(iterable),
-            statements: block,
-            else_statements: None,
+            body: Box::new(body),
+            else_body: None,
         }));
     }
 
     cursor.bump()?; // Consume the else
 
-    let else_block = parse_block_statements(cursor)?;
+    let else_block = parse_expression(cursor)?;
 
     Ok(Expression::For(For {
         identifier,
         iterable: Box::new(iterable),
-        statements: block,
-        else_statements: Some(else_block),
+        body: Box::new(body),
+        else_body: Some(Box::new(else_block)),
     }))
 }
 
