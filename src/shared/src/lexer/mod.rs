@@ -43,6 +43,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
         ']' => Ok(create_token(TokenKind::CloseBracket, cursor)),
         ',' => Ok(create_token(TokenKind::Comma, cursor)),
         '_' => Ok(create_token(TokenKind::Underscore, cursor)),
+        '#' => Ok(create_token(TokenKind::Hash, cursor)),
         ':' => match cursor.second() {
             ':' => {
                 cursor.bump();

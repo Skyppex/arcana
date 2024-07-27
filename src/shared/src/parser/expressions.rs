@@ -750,6 +750,23 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
         let operator = cursor.bump()?.kind; // Consume the +, -, !, or ~
         let right = parse_unary(cursor)?;
 
+        if matches!(operator, TokenKind::Minus)
+            && matches!(
+                right,
+                Expression::Literal(Literal::Int(_)) | Expression::Literal(Literal::Float(_))
+            )
+        {
+            match right {
+                Expression::Literal(Literal::Int(value)) => {
+                    return Ok(Expression::Literal(Literal::Int(-value)));
+                }
+                Expression::Literal(Literal::Float(value)) => {
+                    return Ok(Expression::Literal(Literal::Float(-value)));
+                }
+                _ => unreachable!("Checked in previous if"),
+            }
+        }
+
         return Ok(Expression::Unary(Unary {
             operator: match operator {
                 TokenKind::Plus => UnaryOperator::Identity,
@@ -1038,7 +1055,7 @@ fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> 
         token::Literal::Float(value) => Ok(Expression::Literal(Literal::Float(value))),
         token::Literal::String(value) => Ok(Expression::Literal(Literal::String(value))),
         token::Literal::Char(value) => Ok(Expression::Literal(Literal::Char(
-            value.parse::<char>().unwrap(),
+            value.parse::<char>().expect("Failed to parse char literal"),
         ))),
         token::Literal::Bool(value) => Ok(Expression::Literal(Literal::Bool(value))),
     }

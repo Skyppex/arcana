@@ -172,7 +172,7 @@ pub fn check_type<'a>(
                     param: Some(param), ..
                 }) = callee.get_type()
                 {
-                    if !type_equals(&arg.get_type(), &param.type_) {
+                    if !type_equals(&param.type_, &arg.get_type()) {
                         return Err(format!(
                             "Argument type {} does not match parameter type {}",
                             arg.get_type(),
@@ -247,7 +247,7 @@ fn synthesize_type(
                         .borrow()
                         .get_type_from_annotation(type_annotation)?;
 
-                    if !type_equals(&initializer.get_type(), &type_) {
+                    if !type_equals(&type_, &initializer.get_type()) {
                         return Err(format!(
                             "Initializer type {} does not match variable type {}",
                             initializer.get_type(),
@@ -305,7 +305,7 @@ fn synthesize_type(
                 None,
             )?;
 
-            if !type_equals(&if_condition.get_type(), &Type::Bool) {
+            if !type_equals(&Type::Bool, &if_condition.get_type()) {
                 return Err(format!(
                     "If condition must be of type bool but found {}",
                     if_condition.get_type()
@@ -434,7 +434,7 @@ fn synthesize_type(
             let mut member_type = member.get_type();
 
             if member_type == Type::Unknown {
-                member_type = initializer.get_type();
+                member_type = initializer.get_deep_type();
 
                 type_environment
                     .borrow_mut()
@@ -664,13 +664,17 @@ fn synthesize_type(
                 check_type(&unary.expression, discovered_types, type_environment, None)?;
             let type_ = expression.get_deep_type();
 
+            let operator = match unary.operator {
+                parser::UnaryOperator::Identity => UnaryOperator::Identity,
+                parser::UnaryOperator::Negate => UnaryOperator::Negate,
+                parser::UnaryOperator::LogicalNot => UnaryOperator::LogicalNot,
+                parser::UnaryOperator::BitwiseNot => UnaryOperator::BitwiseNot,
+            };
+
+            let type_ = get_unop_type(&operator, &type_)?;
+
             Ok(TypedExpression::Unary {
-                operator: match unary.operator {
-                    parser::UnaryOperator::Identity => UnaryOperator::Identity,
-                    parser::UnaryOperator::Negate => UnaryOperator::Negate,
-                    parser::UnaryOperator::LogicalNot => UnaryOperator::LogicalNot,
-                    parser::UnaryOperator::BitwiseNot => UnaryOperator::BitwiseNot,
-                },
+                operator,
                 expression: Box::new(expression),
                 type_: type_.clone(),
             })
@@ -775,7 +779,7 @@ fn synthesize_type(
                 None,
             )?;
 
-            if !type_equals(&condition.get_type(), &Type::Bool) {
+            if !type_equals(&Type::Bool, &condition.get_type()) {
                 return Err(format!("While condition must be of type bool"));
             };
 
@@ -1053,7 +1057,7 @@ fn check_type_param_propagation_recurse(
                 ))?
             };
 
-            if !type_equals(&object_type, &param.type_) {
+            if !type_equals(&param.type_, &object_type) {
                 Err(format!(
                     "Function '{}' must be called on type {}. Found {}",
                     symbol, param.type_, object_type
@@ -1080,6 +1084,36 @@ fn check_type_param_propagation_recurse(
         }
         parser::Member::MemberAccess { .. } => todo!("Member access"),
         parser::Member::ParamPropagation { .. } => todo!("Param propagation"),
+    }
+}
+
+fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, String> {
+    match (operator, operand) {
+        (UnaryOperator::Identity, Type::Int) => Ok(Type::Int),
+        (UnaryOperator::Identity, Type::UInt) => Ok(Type::UInt),
+        (UnaryOperator::Identity, Type::Float) => Ok(Type::Float),
+        (UnaryOperator::Negate, Type::Int) => Ok(Type::Int),
+        (UnaryOperator::Negate, Type::UInt) => Ok(Type::UInt),
+        (UnaryOperator::Negate, Type::Float) => Ok(Type::Float),
+        (UnaryOperator::Negate, Type::Literal { name, type_ })
+            if matches!(**type_, Type::Int | Type::UInt | Type::Float) =>
+        {
+            let mut buf = String::new();
+            buf.push_str("-");
+            buf.push_str(name);
+
+            Ok(Type::Literal {
+                name: buf,
+                type_: type_.clone(),
+            })
+        }
+        (UnaryOperator::LogicalNot, Type::Bool) => Ok(Type::Bool),
+        (UnaryOperator::BitwiseNot, Type::Int) => Ok(Type::Int),
+        (UnaryOperator::BitwiseNot, Type::UInt) => Ok(Type::UInt),
+        _ => Err(format!(
+            "Invalid unary operator {:?} for type {}",
+            operator, operand
+        )),
     }
 }
 

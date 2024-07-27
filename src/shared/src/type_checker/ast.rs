@@ -2,7 +2,6 @@ use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
-use crate::lexer::token::IntLiteral;
 use crate::pretty_print::PrettyPrint;
 use crate::{
     parser,

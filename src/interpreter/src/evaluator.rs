@@ -30,17 +30,16 @@ pub fn evaluate<'a>(
         TypedStatement::FunctionDeclaration {
             identifier,
             param,
-            return_type: _,
             body,
-            type_: _,
+            ..
         } => evaluate_function_declaration(environment, identifier, param, body),
         TypedStatement::Semi(s) => {
             evaluate(*s, environment)?;
             Ok(Value::Void)
         }
-        TypedStatement::Break(e) => evaluate_break(e, Type::Void, environment),
+        TypedStatement::Break(e) => evaluate_break(e, environment),
         TypedStatement::Continue => evaluate_continue(environment),
-        TypedStatement::Return(e) => evaluate_return(e, Type::Void, environment),
+        TypedStatement::Return(e) => evaluate_return(e, environment),
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
         TypedStatement::Print(e) => {
             let value = evaluate_expression(e, environment)?;
@@ -85,27 +84,21 @@ fn evaluate_expression<'a>(
             mutable,
             identifier,
             initializer,
-            type_,
-        } => evaluate_variable_declaration(mutable, identifier, initializer, type_, environment),
+            ..
+        } => evaluate_variable_declaration(mutable, identifier, initializer, environment),
         TypedExpression::If {
             condition,
             true_expression,
             false_expression,
-            type_,
-        } => evaluate_if(
-            condition,
-            true_expression,
-            false_expression,
-            type_,
-            environment,
-        ),
+            ..
+        } => evaluate_if(condition, true_expression, false_expression, environment),
         TypedExpression::Match {
             expression, arms, ..
         } => evaluate_match(expression, arms, environment),
         TypedExpression::Assignment {
             member,
             initializer,
-            type_,
+            ..
         } => evaluate_assignment(member, initializer, environment),
         TypedExpression::Member(m) => evaluate_member(m, environment),
         TypedExpression::Literal(l) => evaluate_literal(l, environment),
@@ -113,7 +106,7 @@ fn evaluate_expression<'a>(
             param,
             return_type: _,
             body,
-            type_: _,
+            ..
         } => evaluate_closure(param, *body, environment),
         TypedExpression::Call {
             callee,
@@ -121,40 +114,34 @@ fn evaluate_expression<'a>(
             type_,
         } => evaluate_call(callee, argument, type_, environment),
         TypedExpression::Index {
-            callee,
-            argument,
-            type_,
-        } => evaluate_index(callee, argument, type_, environment),
+            callee, argument, ..
+        } => evaluate_index(callee, argument, environment),
         TypedExpression::Unary {
             operator,
             expression,
-            type_,
-        } => evaluate_unary(operator, expression, type_, environment),
+            ..
+        } => evaluate_unary(operator, expression, environment),
         TypedExpression::Binary {
             left,
             operator,
             right,
-            type_,
-        } => evaluate_binary(left, operator, right, type_, environment),
-        TypedExpression::Block(Block { statements, type_ }) => {
-            evaluate_block(statements, type_, environment)
-        }
-        TypedExpression::Drop { identifier, type_ } => {
-            evaluate_drop(identifier, type_, environment)
-        }
-        TypedExpression::Loop { body, type_: _ } => evaluate_loop(body, environment),
+            ..
+        } => evaluate_binary(left, operator, right, environment),
+        TypedExpression::Block(Block { statements, .. }) => evaluate_block(statements, environment),
+        TypedExpression::Drop { identifier, .. } => evaluate_drop(identifier, environment),
+        TypedExpression::Loop { body, .. } => evaluate_loop(body, environment),
         TypedExpression::While {
             condition,
             body,
             else_body,
-            type_: _,
+            ..
         } => evaluate_while(condition, body, else_body, environment),
         TypedExpression::For {
             identifier,
             iterable,
             body,
             else_body,
-            type_: _,
+            ..
         } => evaluate_for(identifier, iterable, body, else_body, environment),
     }
 }
@@ -178,7 +165,6 @@ fn evaluate_variable_declaration<'a>(
     mutable: bool,
     identifier: String,
     initializer: Option<Box<TypedExpression>>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let value = match initializer {
@@ -195,7 +181,6 @@ fn evaluate_if<'a>(
     condition: Box<TypedExpression>,
     true_expression: Box<TypedExpression>,
     false_expression: Option<Box<TypedExpression>>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let if_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
@@ -269,7 +254,7 @@ fn evaluate_assignment<'a>(
 
 fn evaluate_member<'a>(member: Member, environment: Rcrc<Environment>) -> Result<Value, String> {
     match member {
-        Member::Identifier { symbol, type_: _ } => Ok(environment
+        Member::Identifier { symbol, .. } => Ok(environment
             .borrow()
             .get_variable(&symbol)
             .or(environment.borrow().get_function(&symbol))
@@ -297,7 +282,7 @@ fn evaluate_member_access<'a>(
             struct_name,
             fields,
         } => match *member.clone() {
-            Member::Identifier { symbol, type_: _ } => {
+            Member::Identifier { symbol, .. } => {
                 let field_value = fields.get(&symbol).ok_or(format!(
                     "Field '{}' not found in struct '{}'",
                     symbol, struct_name
@@ -330,7 +315,7 @@ fn evaluate_member_access<'a>(
 //             struct_name,
 //             fields,
 //         } => match *member.clone() {
-//             Member::Identifier { symbol, type_: _ } => {
+//             Member::Identifier { symbol, .. } => {
 //                 let field_value = fields.get(&symbol).ok_or(format!(
 //                     "Field '{}' not found in struct '{}'",
 //                     symbol, struct_name
@@ -383,7 +368,7 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
         Literal::String(v) => Ok(Value::String(v)),
         Literal::Char(v) => Ok(Value::Char(v)),
         Literal::Bool(v) => Ok(Value::Bool(v)),
-        Literal::Array { values, type_: _ } => {
+        Literal::Array { values, .. } => {
             let mut array = Vec::new();
 
             for element in values {
@@ -395,7 +380,7 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
         Literal::Struct {
             type_annotation,
             field_initializers,
-            type_: _,
+            ..
         } => {
             let mut fields = std::collections::HashMap::new();
 
@@ -415,7 +400,7 @@ fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Res
             type_annotation,
             member,
             field_initializers,
-            type_: _,
+            ..
         } => {
             let fields: EnumFields = match field_initializers {
                 EnumMemberFieldInitializers::None => EnumFields::None,
@@ -529,7 +514,6 @@ fn evaluate_call(
 fn evaluate_index(
     callee: Box<TypedExpression>,
     argument: Box<TypedExpression>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let callee_value = evaluate_expression(*callee, environment.clone())?;
@@ -556,7 +540,6 @@ fn evaluate_index(
 fn evaluate_unary<'a>(
     operator: UnaryOperator,
     expression: Box<TypedExpression>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let value = evaluate_expression(*expression, environment)?;
@@ -611,7 +594,6 @@ fn evaluate_binary<'a>(
     left: Box<TypedExpression>,
     operator: BinaryOperator,
     right: Box<TypedExpression>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let left = evaluate_expression(*left, environment.clone())?;
@@ -622,7 +604,6 @@ fn evaluate_binary<'a>(
 
 fn evaluate_block<'a>(
     statements: Vec<TypedStatement>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let block_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
@@ -644,11 +625,7 @@ fn evaluate_block<'a>(
     Ok(value)
 }
 
-fn evaluate_drop<'a>(
-    identifier: String,
-    _type_: Type,
-    environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+fn evaluate_drop<'a>(identifier: String, environment: Rcrc<Environment>) -> Result<Value, String> {
     let variable = environment
         .borrow_mut()
         .remove_variable(&identifier)
@@ -879,7 +856,6 @@ fn evaluate_for(
 
 fn evaluate_break(
     expression: Option<TypedExpression>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     if !environment.borrow().has_scope(&ScopeType::Break) {
@@ -914,7 +890,6 @@ fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, String> {
 
 fn evaluate_return(
     expression: Option<TypedExpression>,
-    _type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     if !environment.borrow().has_scope(&ScopeType::Return) {

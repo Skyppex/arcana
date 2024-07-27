@@ -139,15 +139,15 @@ Needed checks:
 - Check if all of a set of flags are not set
 - Check if any of a set of flags are not set
 
-## Implementation Blocks for Types
+## Implementation Blocks for Traits
 
-Implementation blocks are used to implement functions or traits for types.
+Implementation blocks are used to implement traits for types.
 
 ### Syntax
 
 ```rs
-implement Type {
-    // Functions and traits
+imp Trait for Type {
+    // Trait function implementations
 }
 ```
 
@@ -160,9 +160,9 @@ struct Foo {
     bar: int,
 }
 
-implement Foo {
-    fn new(bar: int): Foo {
-        return Foo { bar: bar };
+imp Foo {
+    fun new(bar: int): Foo {
+        Foo { bar: bar }
     }
 }
 ```
@@ -184,21 +184,32 @@ lit b = #255;
 Here's an example of when you'd have to use the literal syntax if you wished to specify the generic type.
 Note that this example doesn't require the explicit generic annotation because it can be inferred.
 
+Here a union is used as a type constraint. This causes the generic type to only
+allow one of the union's variants at a time.
 ```rs
+union Choice { 1, 2, 3 }
+
 struct A<T>
-where T is 1 or 2 or 3 {
+where T is Choice {
     a: T
 }
 
+// Here you must specify which variant of the union you want to use
 let a = A::<#2> { a: 2 }
+let a2 = A::<#2> { a: 3 } // This would fail
 ```
 
+This is different from allowing any type as a generic parameter and using a
+union as the generic type. In this case, the generic type can be any of the
 ```rs
-struct A {
-    a: 1 or 2 or 3
+union Choice { 1, 2, 3 }
+
+struct A<T> {
+    a: Choice
 }
 
-let a = A { a: 2 }
+let a = A::<Choice> { a: 2 } // This would not fail
+let a2 = A::<Choice> { a: 3 } // This would not fail
 ```
 
 ## Type Aliases

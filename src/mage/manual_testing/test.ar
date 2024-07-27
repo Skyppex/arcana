@@ -1,2 +1,5 @@
-while false 1 + 1
-else 2 + 2
+let md = 3:header => {
+    "Hello, World!"
+} + paragraph => {
+    "This is a paragraph."
+}

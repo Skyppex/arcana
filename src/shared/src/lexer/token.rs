@@ -63,6 +63,7 @@ pub enum TokenKind {
 
     // Literals
     Literal(Literal),
+    Hash,
 
     // Identifiers
     Identifier(String),

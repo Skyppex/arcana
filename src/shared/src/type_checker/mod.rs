@@ -572,16 +572,42 @@ impl Display for Type {
     }
 }
 
+/// Check if two types are equal
+/// The logic is as follows:
+/// - The 'left' type can be made from the 'right' type
+/// - The 'right' type cannot be made from the 'left' type
+///
+/// # Examples
+/// ```
+/// use crate::types::{Type, type_equals};
+///
+/// let literal_int = Type::Literal(Literal::Int(0));
+/// let int = Type::Int;
+///
+/// // Left type is stricter than right type.
+/// // This causes the function to return false as they are not equal
+/// assert_eq!(type_equals(&literal_int, &int), false);
+///
+/// // Left type is less strict than right type.
+/// // This causes the function to return true as the left type can be made from the right type
+/// assert_eq!(type_equals(&int, &literal_int), true);
 pub fn type_equals(left: &Type, right: &Type) -> bool {
     match (left, right) {
-        (Type::Union(Union { literals, .. }), Type::Literal { .. }) => literals.contains(right),
-        (Type::Literal { .. }, Type::Union(_)) => type_equals(right, left),
-        (Type::Union(Union { literal_type, .. }), other) => type_equals(literal_type, other),
-        (other, Type::Union(Union { literal_type, .. })) => type_equals(other, literal_type),
-        (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
-            type_equals(type_, type_2)
+        (Type::UInt, Type::Literal { name, type_ }) if matches!(**type_, Type::Int) => {
+            name.parse::<u64>().is_ok()
         }
-        (Type::Literal { type_, .. }, other) => type_equals(type_, other),
+        (Type::Int, Type::Literal { name, type_ }) if matches!(**type_, Type::UInt) => {
+            name.parse::<i64>().is_ok()
+        }
+        (Type::Union(Union { literals, .. }), Type::Literal { .. }) => literals.contains(right),
+        (other, Type::Union(Union { literal_type, .. })) => type_equals(other, literal_type),
+        (
+            Type::Literal { name, type_ },
+            Type::Literal {
+                name: name_2,
+                type_: type_2,
+            },
+        ) => name == name_2 && type_equals(type_, type_2),
         (other, Type::Literal { type_, .. }) => type_equals(other, type_),
         (Type::Function(fl), Type::Function(fr)) => {
             type_equals(fl.return_type.as_ref(), fr.return_type.as_ref())
