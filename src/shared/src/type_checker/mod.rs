@@ -64,6 +64,7 @@ impl FullName for StructField {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Enum {
     pub type_identifier: TypeIdentifier,
+    pub shared_fields: HashMap<String, Type>,
     pub members: HashMap<String, Type>,
 }
 
@@ -86,9 +87,24 @@ pub struct EnumMember {
     pub fields: HashMap<String, Type>,
 }
 
+impl EnumMember {
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        TypeAnnotation::from(self.enum_name.clone())
+    }
+}
+
 impl FullName for EnumMember {
     fn full_name(&self) -> String {
-        format!("{}::{}", self.enum_name, self.discriminant_name)
+        format!(
+            "{}::{} {{{}}}",
+            self.enum_name,
+            self.discriminant_name,
+            self.fields
+                .iter()
+                .map(|(name, type_)| format!("{}: {}", name, type_.full_name()))
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
     }
 }
 
@@ -235,6 +251,7 @@ impl Type {
 
         Type::Enum(Enum {
             type_identifier: option_ident,
+            shared_fields: HashMap::new(),
             members: vec![
                 (
                     "Some".to_string(),
@@ -271,6 +288,7 @@ impl Type {
                 "Option".to_string(),
                 vec![concrete.type_annotation()],
             ),
+            shared_fields: HashMap::new(),
             members: vec![
                 (
                     "Some".to_string(),
@@ -394,6 +412,7 @@ impl Type {
             Type::Array(type_) => TypeAnnotation::Array(Box::new(type_.type_annotation())),
             Type::Struct(s) => s.type_annotation(),
             Type::Enum(e) => e.type_annotation(),
+            Type::EnumMember(em) => em.type_annotation(),
             Type::Union(u) => u.type_annotation(),
             Type::Function(f) => f
                 .type_annotation()
@@ -466,6 +485,25 @@ impl Type {
                 let type_identifier =
                     TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone());
 
+                let mut shared_fields = HashMap::new();
+
+                for (field_name, field_type) in u.shared_fields.iter() {
+                    let Type::Generic(generic) = field_type.clone() else {
+                        shared_fields.insert(field_name.clone(), field_type.clone());
+                        continue;
+                    };
+
+                    let concrete_type = type_map.get(&generic).ok_or(format!(
+                        "No concrete type found for generic type {}",
+                        generic.type_name
+                    ))?;
+
+                    let concrete_type =
+                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+
+                    shared_fields.insert(field_name.clone(), concrete_type);
+                }
+
                 let mut members = HashMap::new();
 
                 for (member_name, type_) in u.members.iter() {
@@ -512,6 +550,7 @@ impl Type {
 
                 let enum_ = Type::Enum(Enum {
                     type_identifier,
+                    shared_fields,
                     members,
                 });
 
@@ -621,6 +660,7 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
             Type::Enum(Enum {
                 type_identifier,
                 members,
+                ..
             }),
             Type::EnumMember(EnumMember {
                 enum_name,

@@ -73,6 +73,7 @@ pub struct StructDeclaration {
 pub struct EnumDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
+    pub shared_fields: Vec<StructField>,
     pub members: Vec<EnumMember>,
 }
 

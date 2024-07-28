@@ -291,14 +291,14 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
     }
 }
 
-pub(super) fn parse_type_annotation_from_str(
-    type_str: &str,
-    allow_void: bool,
-) -> Result<TypeAnnotation, String> {
-    let tokens = crate::lexer::tokenize(type_str)?;
-    let mut cursor = Cursor::new(tokens);
-    parse_type_annotation(&mut cursor, allow_void)
-}
+// pub(super) fn parse_type_annotation_from_str(
+//     type_str: &str,
+//     allow_void: bool,
+// ) -> Result<TypeAnnotation, String> {
+//     let tokens = crate::lexer::tokenize(type_str)?;
+//     let mut cursor = Cursor::new(tokens);
+//     parse_type_annotation(&mut cursor, allow_void)
+// }
 
 pub(super) fn parse_type_annotation(
     cursor: &mut Cursor,

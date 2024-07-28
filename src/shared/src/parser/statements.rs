@@ -3,8 +3,8 @@ use std::vec;
 use crate::{
     lexer::token::{Keyword, TokenKind},
     types::{
-        can_be_type_annotation, parse_type_annotation, parse_type_annotation_from_str,
-        parse_type_identifier, GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier,
+        can_be_type_annotation, parse_type_annotation, parse_type_identifier, GenericConstraint,
+        GenericType, TypeAnnotation, TypeIdentifier,
     },
 };
 
@@ -236,7 +236,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
         }
 
         has_comma = true;
-        fields.push(parse_struct_field(cursor)?);
+        fields.push(parse_struct_field(cursor, true)?);
 
         if cursor.first().kind == TokenKind::Comma {
             cursor.bump()?; // Consume the ,
@@ -279,6 +279,7 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
     };
 
+    let mut shared_fields = vec![];
     let mut members = vec![];
     let mut has_comma = true;
 
@@ -288,7 +289,14 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
         }
 
         has_comma = true;
-        members.push(parse_enum_member(cursor)?);
+
+        if let (TokenKind::Identifier(_), TokenKind::Colon) =
+            (cursor.first().kind, cursor.second().kind)
+        {
+            shared_fields.push(parse_struct_field(cursor, false)?);
+        } else {
+            members.push(parse_enum_member(cursor, shared_fields.clone())?);
+        }
 
         if cursor.first().kind == TokenKind::Comma {
             cursor.bump()?; // Consume the ,
@@ -302,6 +310,7 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
     Ok(Statement::EnumDeclaration(EnumDeclaration {
         access_modifier,
         type_identifier: type_name,
+        shared_fields,
         members,
     }))
 }
@@ -463,10 +472,20 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
     })
 }
 
-fn parse_struct_field(cursor: &mut Cursor) -> Result<StructField, String> {
+fn parse_struct_field(
+    cursor: &mut Cursor,
+    allow_access_modifier: bool,
+) -> Result<StructField, String> {
     let mut access_modifier = None;
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+        if !allow_access_modifier {
+            return Err(format!(
+                "Unexpected access modifier {:?}",
+                cursor.first().kind
+            ));
+        }
+
         cursor.bump()?; // Consume the access modifier
         access_modifier = Some(am);
     }
@@ -507,7 +526,10 @@ fn parse_struct_field(cursor: &mut Cursor) -> Result<StructField, String> {
     })
 }
 
-fn parse_enum_member(cursor: &mut Cursor) -> Result<EnumMember, String> {
+fn parse_enum_member(
+    cursor: &mut Cursor,
+    shared_fields: Vec<StructField>,
+) -> Result<EnumMember, String> {
     let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
         return Err(format!(
             "Expected identifier but found {:?}",
@@ -520,6 +542,13 @@ fn parse_enum_member(cursor: &mut Cursor) -> Result<EnumMember, String> {
             cursor.bump()?; // Consume the (
 
             let mut fields = vec![];
+
+            for shared_field in shared_fields {
+                fields.push(EnumMemberField {
+                    identifier: shared_field.identifier,
+                    type_annotation: shared_field.type_annotation,
+                });
+            }
 
             let mut has_comma = true;
 
@@ -542,10 +571,18 @@ fn parse_enum_member(cursor: &mut Cursor) -> Result<EnumMember, String> {
 
             Ok(EnumMember { identifier, fields })
         }
-        _ => Ok(EnumMember {
-            identifier,
-            fields: vec![],
-        }),
+        _ => {
+            let mut fields = vec![];
+
+            for shared_field in shared_fields {
+                fields.push(EnumMemberField {
+                    identifier: shared_field.identifier,
+                    type_annotation: shared_field.type_annotation,
+                });
+            }
+
+            Ok(EnumMember { identifier, fields })
+        }
     }
 }
 

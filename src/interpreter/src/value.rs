@@ -184,3 +184,12 @@ pub enum EnumFields {
     None,
     Named(HashMap<String, Value>),
 }
+
+impl EnumFields {
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        match self {
+            EnumFields::None => None,
+            EnumFields::Named(fields) => fields.get(key),
+        }
+    }
+}

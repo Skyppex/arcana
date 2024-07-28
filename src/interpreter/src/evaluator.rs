@@ -296,10 +296,25 @@ fn evaluate_member_access<'a>(
               //     evaluate_member_function_access(object, environment, member)
               // }
         },
-        _ => Err(format!(
-            "Cannot access member of non-struct value '{}'",
-            value
-        )),
+        Value::Enum {
+            enum_member,
+            fields,
+        } => match *member.clone() {
+            Member::Identifier { symbol, .. } => {
+                let field_value = fields.get(&symbol).ok_or(format!(
+                    "Field '{}' not found in enum member '{}.{}'",
+                    symbol, enum_member.enum_name, enum_member.member_name
+                ))?;
+
+                Ok(field_value.clone())
+            }
+            Member::MemberAccess { object, member, .. } => {
+                evaluate_member_access(object, environment, member)
+            } // Member::MemberFunctionAccess { object, member, .. } => {
+              //     evaluate_member_function_access(object, environment, member)
+              // }
+        },
+        _ => Err(format!("Cannot access member value: '{}'", value)),
     }
 }
 

@@ -619,8 +619,6 @@ fn synthesize_type(
                     .borrow()
                     .get_type_from_annotation(type_annotation)?;
 
-                println!("Type: {:?}", type_);
-
                 let Type::EnumMember(EnumMember { fields, .. }) = &type_ else {
                     Err(format!(
                         "{} is not a member of {}",
@@ -634,9 +632,16 @@ fn synthesize_type(
                 match field_initializers {
                     EnumMemberFieldInitializers::None => (),
                     EnumMemberFieldInitializers::Named(ref field_initializers) => {
-                        for ((_, field_type), (_, initializer)) in
+                        for ((field_name, field_type), (initializer_field_name, initializer)) in
                             fields.iter().zip(field_initializers.iter())
                         {
+                            if field_name != initializer_field_name {
+                                return Err(format!(
+                                    "Field '{}' does not match initializer field '{}'",
+                                    field_name, initializer_field_name
+                                ));
+                            }
+
                             let initializer_type = initializer.get_type();
 
                             if !type_equals(field_type, &initializer_type) {
@@ -915,6 +920,7 @@ fn is_option(type_: &Option<Type>) -> bool {
 
     let Type::Enum(Enum {
         type_identifier,
+        shared_fields,
         members,
     }) = type_
     else {
@@ -926,6 +932,10 @@ fn is_option(type_: &Option<Type>) -> bool {
     };
 
     if name != "Option" {
+        return false;
+    }
+
+    if shared_fields.len() != 0 {
         return false;
     }
 
@@ -969,7 +979,7 @@ fn check_type_member_access_recurse(
         Type::Struct(struct_) => match *member.clone() {
             parser::Member::Identifier { symbol } => {
                 let field_type = struct_.fields.get(&symbol).ok_or(format!(
-                    "Struct {} does not have a field called '{}'",
+                    "Struct '{}' does not have a field called '{}'",
                     struct_.type_identifier, symbol
                 ))?;
 
@@ -1000,7 +1010,84 @@ fn check_type_member_access_recurse(
                 symbol: _,
             } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
         },
-        _ => Err("Member access is only supported on structs".to_string()),
+        Type::EnumMember(EnumMember {
+            enum_name, fields, ..
+        }) => match *member.clone() {
+            parser::Member::Identifier { symbol } => {
+                let field_type = fields.get(&symbol).ok_or(format!(
+                    "EnumMember '{}' does not have a field called '{}'",
+                    enum_name, symbol
+                ))?;
+
+                if !type_environment.borrow().lookup_type(&field_type) {
+                    return Err(format!("Unexpected type: {}", field_type.full_name()));
+                }
+
+                let identifier_type = field_type.clone();
+
+                Ok(TypedExpression::Member(Member::MemberAccess {
+                    object: Box::new(object_typed_expression),
+                    member: Box::new(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: identifier_type.clone(),
+                    }),
+                    symbol: symbol.clone(),
+                    type_: field_type.clone(),
+                }))
+            }
+            parser::Member::MemberAccess {
+                object,
+                member,
+                symbol: _,
+            } => check_type_member_access(&object, discovered_types, type_environment, &member),
+            parser::Member::ParamPropagation {
+                object,
+                member,
+                symbol: _,
+            } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
+        },
+        Type::Enum(Enum {
+            type_identifier,
+            shared_fields,
+            ..
+        }) => match *member.clone() {
+            parser::Member::Identifier { symbol } => {
+                let field_type = shared_fields.get(&symbol).ok_or(format!(
+                    "Enum '{}' does not have a shared field called '{}'",
+                    type_identifier, symbol
+                ))?;
+
+                if !type_environment.borrow().lookup_type(&field_type) {
+                    return Err(format!("Unexpected type: {}", field_type.full_name()));
+                }
+
+                let identifier_type = field_type.clone();
+
+                Ok(TypedExpression::Member(Member::MemberAccess {
+                    object: Box::new(object_typed_expression),
+                    member: Box::new(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: identifier_type.clone(),
+                    }),
+                    symbol: symbol.clone(),
+                    type_: field_type.clone(),
+                }))
+            }
+            parser::Member::MemberAccess {
+                object,
+                member,
+                symbol: _,
+            } => check_type_member_access(&object, discovered_types, type_environment, &member),
+            parser::Member::ParamPropagation {
+                object,
+                member,
+                symbol: _,
+            } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
+        },
+        other => Err(format!(
+            "Member access is not supported on type: {}",
+            other.full_name()
+        )),
     }
 }
 

@@ -29,6 +29,7 @@ pub enum TypedStatement {
     },
     EnumDeclaration {
         type_identifier: TypeIdentifier,
+        shared_fields: Vec<StructField>,
         members: Vec<EnumMember>,
         type_: Type,
     },

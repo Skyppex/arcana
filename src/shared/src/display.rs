@@ -153,6 +153,7 @@ impl IndentDisplay for Statement {
             Statement::EnumDeclaration(EnumDeclaration {
                 access_modifier,
                 type_identifier,
+                shared_fields,
                 members,
             }) => {
                 let mut result = String::new();
@@ -175,6 +176,29 @@ impl IndentDisplay for Statement {
                     )
                     .as_str(),
                 );
+
+                for (i, shared_field) in shared_fields.iter().enumerate() {
+                    if i < shared_fields.len() - 1 {
+                        result.push_str(
+                            format!(
+                                "\n{}{},",
+                                indent.dash(),
+                                shared_field.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
+                    } else {
+                        indent.end_current();
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                shared_field.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
+                    }
+                }
 
                 for (i, member) in members.iter().enumerate() {
                     if i < members.len() - 1 {
@@ -1294,6 +1318,7 @@ impl IndentDisplay for TypedStatement {
             }
             TypedStatement::EnumDeclaration {
                 type_identifier,
+                shared_fields,
                 members,
                 type_,
             } => {
@@ -1309,6 +1334,29 @@ impl IndentDisplay for TypedStatement {
                     )
                     .as_str(),
                 );
+
+                for (i, shared_field) in shared_fields.iter().enumerate() {
+                    if i < members.len() - 1 {
+                        result.push_str(
+                            format!(
+                                "\n{}{},",
+                                indent.dash(),
+                                shared_field.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
+                    } else {
+                        indent.end_current();
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                shared_field.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
+                    }
+                }
 
                 for (i, member) in members.iter().enumerate() {
                     if i < members.len() - 1 {
@@ -2142,8 +2190,7 @@ impl IndentDisplay for type_checker::ast::StructField {
 impl IndentDisplay for type_checker::ast::EnumMember {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result
-            .push_str(format!("<enum member> {}: {}", self.discriminant_name, self.type_).as_str());
+        result.push_str(format!("<enum member> {}", self.type_).as_str());
         indent.increase();
 
         for (i, field) in self.fields.iter().enumerate() {

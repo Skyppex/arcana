@@ -12,6 +12,7 @@ pub enum DiscoveredType {
     Struct(TypeIdentifier, HashMap<String, TypeAnnotation>),
     Enum(
         TypeIdentifier,
+        HashMap<String, TypeAnnotation>,
         HashMap<String, HashMap<String, TypeAnnotation>>,
     ),
     Union(TypeIdentifier, Vec<TypeAnnotation>),
