@@ -516,29 +516,26 @@ fn parse_enum_member(cursor: &mut Cursor) -> Result<EnumMember, String> {
     };
 
     match cursor.first().kind {
-        TokenKind::OpenParen => {
+        TokenKind::OpenBrace => {
             cursor.bump()?; // Consume the (
 
             let mut fields = vec![];
 
             let mut has_comma = true;
 
-            let mut field_position = 0;
-            while cursor.first().kind != TokenKind::CloseParen {
+            while cursor.first().kind != TokenKind::CloseBrace {
                 if !has_comma {
                     return Err(format!("Expected , but found {:?}", cursor.first().kind));
                 }
 
                 has_comma = true;
-                fields.push(parse_enum_field(cursor, field_position)?);
+                fields.push(parse_enum_field(cursor)?);
 
                 if cursor.first().kind == TokenKind::Comma {
                     cursor.bump()?; // Consume the ,
                 } else {
                     has_comma = false;
                 }
-
-                field_position += 1;
             }
 
             cursor.bump()?; // Consume the )
@@ -552,7 +549,7 @@ fn parse_enum_member(cursor: &mut Cursor) -> Result<EnumMember, String> {
     }
 }
 
-fn parse_enum_field(cursor: &mut Cursor, field_position: usize) -> Result<EnumMemberField, String> {
+fn parse_enum_field(cursor: &mut Cursor) -> Result<EnumMemberField, String> {
     let TokenKind::Identifier(first_ident) = cursor.bump()?.kind else {
         return Err(format!(
             "Expected identifier but found {:?}",
@@ -560,31 +557,23 @@ fn parse_enum_field(cursor: &mut Cursor, field_position: usize) -> Result<EnumMe
         ));
     };
 
-    match cursor.first().kind {
-        TokenKind::Colon => {
-            cursor.bump()?; // Consume the :
+    let TokenKind::Colon = cursor.bump()?.kind else {
+        return Err(format!("Expected : but found {:?}", cursor.first().kind));
+    };
 
-            if !can_be_type_annotation(cursor) {
-                return Err(format!(
-                    "Expected type identifier but found {:?}",
-                    cursor.first().kind
-                ));
-            }
-
-            let type_annotation = parse_type_annotation(cursor, false)?;
-
-            Ok(EnumMemberField {
-                identifier: first_ident,
-                type_annotation,
-            })
-        }
-        _ => {
-            return Ok(EnumMemberField {
-                identifier: format!("f{}", field_position.to_string()),
-                type_annotation: parse_type_annotation_from_str(&first_ident, false)?,
-            });
-        }
+    if !can_be_type_annotation(cursor) {
+        return Err(format!(
+            "Expected type identifier but found {:?}",
+            cursor.first().kind
+        ));
     }
+
+    let type_annotation = parse_type_annotation(cursor, false)?;
+
+    Ok(EnumMemberField {
+        identifier: first_ident,
+        type_annotation,
+    })
 }
 
 // fn parse_flags_member(cursor: &mut Cursor) -> Result<FlagsMember, String> {

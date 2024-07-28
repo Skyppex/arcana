@@ -619,11 +619,9 @@ fn synthesize_type(
                     .borrow()
                     .get_type_from_annotation(type_annotation)?;
 
-                let Type::Enum(Enum { members, .. }) = type_.clone() else {
-                    Err(format!("{} is not an enum", type_.full_name()))?
-                };
+                println!("Type: {:?}", type_);
 
-                let Some(Type::EnumMember(EnumMember { fields, .. })) = members.get(member) else {
+                let Type::EnumMember(EnumMember { fields, .. }) = &type_ else {
                     Err(format!(
                         "{} is not a member of {}",
                         member,

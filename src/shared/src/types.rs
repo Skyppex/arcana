@@ -19,6 +19,14 @@ impl TypeAnnotation {
     pub fn void() -> Self {
         TypeAnnotation::Type("void".to_string())
     }
+
+    pub fn is_enum_member(&self) -> bool {
+        let TypeAnnotation::Type(s) = self else {
+            return false;
+        };
+
+        s.contains("::")
+    }
 }
 
 impl From<TypeIdentifier> for TypeAnnotation {

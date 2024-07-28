@@ -38,7 +38,7 @@ impl Value {
                     enum_name: TypeAnnotation::ConcreteType("Option".to_owned(), vec![]),
                     member_name: "Some".to_owned(),
                 },
-                fields: EnumFields::Unnamed(vec![v]),
+                fields: EnumFields::Named(HashMap::from([("v".to_owned(), v)])),
             },
         }
     }
@@ -49,7 +49,7 @@ impl Value {
                 enum_name: TypeAnnotation::ConcreteType("Option".to_owned(), vec![]),
                 member_name: "None".to_owned(),
             },
-            fields: EnumFields::Unnamed(vec![]),
+            fields: EnumFields::None,
         }
     }
 }
@@ -97,9 +97,11 @@ impl<'a> Display for Value {
                 enum_member,
                 fields,
             } => match fields {
-                EnumFields::None => write!(f, ""),
+                EnumFields::None => {
+                    write!(f, "{}", enum_member.enum_name)
+                }
                 EnumFields::Named(fields) => {
-                    write!(f, "{}::{}(", enum_member.enum_name, enum_member.member_name)?;
+                    write!(f, "{} {{ ", enum_member.enum_name)?;
 
                     for (index, (identifier, value)) in fields.iter().enumerate() {
                         write!(f, "{}: {}", identifier, value)?;
@@ -109,20 +111,7 @@ impl<'a> Display for Value {
                         }
                     }
 
-                    write!(f, ")")
-                }
-                EnumFields::Unnamed(fields) => {
-                    write!(f, "{}::{}(", enum_member.enum_name, enum_member.member_name)?;
-
-                    for (index, value) in fields.iter().enumerate() {
-                        write!(f, "{}", value)?;
-
-                        if index < fields.len() - 1 {
-                            write!(f, ", ")?;
-                        }
-                    }
-
-                    write!(f, ")")
+                    write!(f, " }}")
                 }
             },
             Value::Function {
@@ -159,7 +148,7 @@ pub struct EnumMember {
 
 impl Display for EnumMember {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}", self.enum_name, self.member_name)
+        write!(f, "{}", self.enum_name)
     }
 }
 
@@ -182,7 +171,11 @@ impl Variable {
 
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.identifier, self.value)
+        write!(
+            f,
+            "{} = {} -> {:?}",
+            self.identifier, self.value, self.value
+        )
     }
 }
 
@@ -190,5 +183,4 @@ impl Display for Variable {
 pub enum EnumFields {
     None,
     Named(HashMap<String, Value>),
-    Unnamed(Vec<Value>),
 }

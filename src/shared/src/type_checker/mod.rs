@@ -617,6 +617,17 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                     .zip(fr.param.as_ref())
                     .map_or(true, |(p, p2)| type_equals(&p.type_, &p2.type_))
         }
+        (
+            Type::Enum(Enum {
+                type_identifier,
+                members,
+            }),
+            Type::EnumMember(EnumMember {
+                enum_name,
+                discriminant_name,
+                ..
+            }),
+        ) => type_identifier == enum_name && members.contains_key(discriminant_name),
         _ => left == right,
     }
 }

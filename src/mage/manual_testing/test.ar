@@ -1,5 +1,9 @@
-let md = 3:header => {
-    "Hello, World!"
-} + paragraph => {
-    "This is a paragraph."
-}
+enum A { A, B }
+
+enum B { A, B { x: int } }
+
+fun p(b: B::B): int => b.x
+
+let x = B::B { x: 1 }
+
+p(x)

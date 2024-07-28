@@ -169,18 +169,12 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_range(cursor);
     };
 
-    println!(
-        "First: {:?}, Second: {:?}",
-        cursor.first().kind,
-        cursor.second().kind
-    );
-
     let type_annotation = parse_type_annotation(cursor, false)?;
 
-    if cursor.first().kind == TokenKind::OpenBrace {
-        parse_struct_literal(cursor, type_annotation)
-    } else {
+    if type_annotation.is_enum_member() {
         parse_enum_literal(cursor, type_annotation)
+    } else {
+        parse_struct_literal(cursor, type_annotation)
     }
 }
 
@@ -249,7 +243,7 @@ fn parse_enum_literal(
     type_annotation: TypeAnnotation,
 ) -> Result<Expression, String> {
     let field_initializers = {
-        if cursor.first().kind == TokenKind::OpenParen {
+        if cursor.first().kind == TokenKind::OpenBrace {
             cursor.bump()?; // Consume the (
             parse_named_enum_member_field_initializers(cursor)?
         } else {
@@ -275,7 +269,7 @@ fn parse_named_enum_member_field_initializers(
 ) -> Result<EnumMemberFieldInitializers, String> {
     let mut field_initializers = HashMap::new();
 
-    while cursor.first().kind != TokenKind::CloseParen {
+    while cursor.first().kind != TokenKind::CloseBrace {
         let TokenKind::Identifier(identifier) = cursor.first().kind else {
             return Err(format!(
                 "Expected identifier but found {:?}",

@@ -2,6 +2,7 @@ use std::{
     cell::RefCell,
     fs,
     io::{stdin, stdout, Write},
+    ops::Deref,
     path::Path,
     rc::Rc,
 };
@@ -59,9 +60,17 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
         }
 
         if input.trim() == "vars" {
-            for (name, variable) in type_environment.borrow().get_variables() {
-                println!("{}: {}", name, variable);
+            println!("Type environment variables:");
+            for (name, type_) in type_environment.borrow().get_variables() {
+                println!("{}: {}", name, type_);
             }
+
+            println!();
+            println!("Environment variables:");
+            for (_, variable) in environment.borrow().get_variables() {
+                println!("{}", variable.clone().deref().borrow().deref());
+            }
+
             continue;
         }
 
