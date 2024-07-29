@@ -89,7 +89,6 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         Statement::Continue => Ok(vec![]),
         Statement::Return(_) => Ok(vec![]),
         Statement::Expression(_) => Ok(vec![]),
-        Statement::Print(_) => Ok(vec![]),
     }
 }
 
@@ -481,12 +480,6 @@ pub fn check_type<'a>(
             }
         },
         Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(
-            e,
-            discovered_types,
-            type_environment,
-            None,
-        )?)),
-        Statement::Print(e) => Ok(TypedStatement::Print(expressions::check_type(
             e,
             discovered_types,
             type_environment,

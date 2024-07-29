@@ -1,7 +1,101 @@
-enum A {
-    name: string,
-    A,
-    B {
-        value: int
-    }
+// This is a comment
+/- This is a block comment -/
+/-
+ - Block comments can be on multiple lines
+ -/
+
+// This is a struct
+struct Struct {
+    // This is a field
+    field: string
 }
+
+// This is an enum
+enum Enum {
+    // This is an enum variant with a field
+    A { field: string },
+    // This is an enum variant with multiple fields of different types
+    B { field1: string, field2: int },
+    // This is an enum variant without fields
+    C
+}
+
+// This is a union of literals
+// All literals must be of the same type
+union HeaderLevel {
+    // These are the tree first literals
+    1, 2, 3,
+    // These are the tree last literals
+    4, 5, 6
+}
+
+// This is a function declaration
+fun to_string(x: HeaderLevel): string => {
+    // This is an if expression
+    if x == 1 {
+        // This is a return statement
+        return "1"
+    };
+
+    //There are several more of them
+    if x == 2 { return "2" };
+    if x == 3 { return "3" };
+    if x == 4 { return "4" };
+    if x == 5 { return "5" };
+    if x == 6 { return "6" };
+}
+
+// Here's another function declaration
+// It has a closure as its lasst parameter
+fun header(level: HeaderLevel, header: string, append: fun(): string): string => {
+    // This is a variable declaration with an initializer
+    let mut text = "\n";
+
+    let mut i = 0;
+
+    // This is a while loop
+    while i < level {
+        // This is a compound assignement
+        text += "#";
+        i += 1;
+    }
+
+    text += " ";
+
+    // This is a function call
+    text += append()
+}
+
+fun text(append: fun(): string): string => "\n" + append()
+
+header(4, "Title") => {
+    text => { "This is a bit of text" }
+    +
+    text => { "This is another bit of text" }
+}
+
+4:header("Title") => {
+    text => { "This is a bit of text" }
+    +
+    text => { "This is another bit of text" }
+}
+
+// This is a for loop using a range expression to iterate over
+for i in let x = 0..20 {
+    if i > 15 {
+        // This is a break statement
+        break 1..=100
+    }
+} else { // This is the for loop's else block
+    x
+}
+
+// This is a for loop where the blocks are removed
+for i in let x = 0..20
+    i * i
+else x // The for loops else body is a single expression
+
+while false
+    3 + 3
+else print("Hello World") // This is the while loop's else block
+

@@ -14,12 +14,33 @@ use crate::types::parse_type_annotation;
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
     #[cfg(feature = "interpreter")]
-    let expression = parse_drop(cursor);
+    let expression = parse_print(cursor);
 
     #[cfg(not(feature = "interpreter"))]
     let expression = parse_loop(cursor);
 
     return expression;
+}
+
+#[cfg(feature = "interpreter")]
+fn parse_print(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Print) {
+        return parse_drop(cursor);
+    }
+
+    cursor.bump()?; // Consume the drop
+
+    let TokenKind::OpenParen = cursor.bump()?.kind else {
+        return Err(format!("Expected ( but found {:?}", cursor.first().kind));
+    };
+
+    let expression = parse_expression(cursor)?;
+
+    let TokenKind::CloseParen = cursor.bump()?.kind else {
+        return Err(format!("Expected ) but found {:?}", cursor.first().kind));
+    };
+
+    Ok(Expression::Print(Box::new(expression)))
 }
 
 #[cfg(feature = "interpreter")]
@@ -191,7 +212,6 @@ fn parse_struct_literal(
 
     while cursor.first().kind != TokenKind::CloseBrace {
         if !has_comma {
-            println!("ashdakjhsgdkjahgsdkjhg");
             return Err(format!("Expected , but found {:?}", cursor.first().kind));
         }
 
@@ -301,14 +321,22 @@ fn parse_range(cursor: &mut Cursor) -> Result<Expression, String> {
 
     while cursor.first().kind == TokenKind::DoubleDot {
         let operator = cursor.bump()?.kind; // Consume the ..
+
+        let inclusive = cursor.first().kind == TokenKind::Equal;
+
+        if inclusive {
+            cursor.bump()?; // Consume the =
+        }
+
         let right = parse_assignment(cursor)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
             right: Box::new(right),
-            operator: match operator {
-                TokenKind::DoubleDot => BinaryOperator::Range,
-                _ => unreachable!("Expected .. or ... but found {:?}", operator),
+            operator: match (&operator, inclusive) {
+                (TokenKind::DoubleDot, false) => BinaryOperator::Range,
+                (TokenKind::DoubleDot, true) => BinaryOperator::RangeInclusive,
+                _ => unreachable!("Expected .. but found {:?}", operator),
             },
         });
     }

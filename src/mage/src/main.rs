@@ -91,7 +91,7 @@ pub fn read_input(
         eprintln!("{}\n", tokens.prettify());
     }
 
-    let program = create_ast(tokens)?;
+    let program = create_ast(tokens, args.logging.verbose)?;
     if print_parser_ast {
         eprintln!("{}\n", program.prettify());
     }

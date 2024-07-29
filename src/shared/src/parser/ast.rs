@@ -7,9 +7,7 @@ use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
-    Program {
-        statements: Vec<Statement>,
-    },
+    Program { statements: Vec<Statement> },
     StructDeclaration(StructDeclaration),
     EnumDeclaration(EnumDeclaration),
     UnionDeclaration(UnionDeclaration),
@@ -19,9 +17,6 @@ pub enum Statement {
     Continue,
     Return(Option<Expression>),
     Expression(Expression),
-
-    #[cfg(feature = "interpreter")]
-    Print(Expression),
 }
 
 impl PrettyPrint for Statement {
@@ -50,6 +45,9 @@ pub enum Expression {
     Loop(Box<Expression>),
     While(While),
     For(For),
+
+    #[cfg(feature = "interpreter")]
+    Print(Box<Expression>),
     #[cfg(feature = "interpreter")]
     Drop(String),
 }
@@ -369,4 +367,5 @@ pub enum BinaryOperator {
     GreaterThan,
     GreaterThanOrEqual,
     Range,
+    RangeInclusive,
 }

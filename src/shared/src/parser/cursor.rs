@@ -4,6 +4,7 @@ use crate::lexer::token::{Token, TokenKind};
 pub struct Cursor {
     tokens: Vec<Token>,
     prev: Token,
+    verbose: bool,
 }
 
 const END_OF_FILE_TOKEN: Token = Token {
@@ -12,12 +13,13 @@ const END_OF_FILE_TOKEN: Token = Token {
 };
 
 impl Cursor {
-    pub fn new(mut tokens: Vec<Token>) -> Cursor {
+    pub fn new(mut tokens: Vec<Token>, verbose: bool) -> Cursor {
         tokens.reverse();
 
         Cursor {
             tokens,
             prev: END_OF_FILE_TOKEN,
+            verbose,
         }
     }
 
@@ -40,7 +42,10 @@ impl Cursor {
     }
 
     pub(crate) fn bump(&mut self) -> Result<Token, String> {
-        // println!("Bumping: {:?}", self.first());
+        if self.verbose {
+            println!("Bumping: {:?}", self.first());
+        }
+
         let token = self
             .tokens
             .pop()
@@ -50,6 +55,10 @@ impl Cursor {
     }
 
     pub(crate) fn expect(&mut self, expected: TokenKind) -> Result<Token, String> {
+        if self.verbose {
+            println!("Expecting: {:?}", self.first());
+        }
+
         if self.first().kind == expected {
             self.bump()
         } else {

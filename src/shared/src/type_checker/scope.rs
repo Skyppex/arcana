@@ -1,6 +1,6 @@
 use std::{fmt::Display, vec};
 
-use super::{type_equals, Type};
+use super::{type_equals_coerce, Type};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scope {
@@ -17,10 +17,10 @@ impl Scope {
         let type_ = self.types.iter().fold(Ok(Type::Void), |acc, t| {
             let acc = acc?;
 
-            if acc == Type::Void || type_equals(&acc, t) {
+            if acc == Type::Void || type_equals_coerce(&acc, t) {
                 Ok(t.clone())
             } else {
-                Err(format!("Type mismatch: {} != {}", acc, t))
+                Err(format!("Type mismatch in scope: {} != {}", acc, t))
             }
         })?;
 

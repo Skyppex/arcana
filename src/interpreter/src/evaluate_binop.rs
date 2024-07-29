@@ -26,7 +26,8 @@ pub(crate) fn evaluate_binop<'a>(
         BinaryOperator::LessThanOrEqual => evaluate_less_than_or_equal(left, right),
         BinaryOperator::GreaterThan => evaluate_greater_than(left, right),
         BinaryOperator::GreaterThanOrEqual => evaluate_greater_than_or_equal(left, right),
-        BinaryOperator::Range => evaluate_range(left, right),
+        BinaryOperator::Range => evaluate_range(left, right, false),
+        BinaryOperator::RangeInclusive => evaluate_range(left, right, true),
     }
 }
 
@@ -302,23 +303,37 @@ fn evaluate_greater_than_or_equal<'a>(left: Value, right: Value) -> Result<Value
     }
 }
 
-fn evaluate_range<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_range<'a>(left: Value, right: Value, inclusive: bool) -> Result<Value, String> {
     match (left, right) {
-        (Value::Number(left), Value::Number(right)) => match (left, right) {
-            (Number::Int(left), Number::Int(right)) => Ok(Value::Array(
+        (Value::Number(left), Value::Number(right)) => match (left, right, inclusive) {
+            (Number::Int(left), Number::Int(right), false) => Ok(Value::Array(
                 (left..right)
                     .map(|v| Value::Number(Number::Int(v)))
                     .collect(),
             )),
-            (Number::UInt(left), Number::UInt(right)) => Ok(Value::Array(
+            (Number::Int(left), Number::Int(right), true) => Ok(Value::Array(
+                (left..=right)
+                    .map(|v| Value::Number(Number::Int(v)))
+                    .collect(),
+            )),
+            (Number::UInt(left), Number::UInt(right), false) => Ok(Value::Array(
                 (left..right)
                     .map(|v| Value::Number(Number::UInt(v)))
                     .collect(),
             )),
-            (left, right) => Err(format!("Cannot range {:?} and {:?}", left, right)),
+            (Number::UInt(left), Number::UInt(right), true) => Ok(Value::Array(
+                (left..right)
+                    .map(|v| Value::Number(Number::UInt(v)))
+                    .collect(),
+            )),
+            (left, right, _) => Err(format!("Cannot range {:?} and {:?}", left, right)),
         },
         (Value::Char(left), Value::Char(right)) => {
-            Ok(Value::Array((left..right).map(Value::Char).collect()))
+            if !inclusive {
+                Ok(Value::Array((left..right).map(Value::Char).collect()))
+            } else {
+                Ok(Value::Array((left..=right).map(Value::Char).collect()))
+            }
         }
         (left, right) => Err(format!("Cannot range {:?} and {:?}", left, right)),
     }

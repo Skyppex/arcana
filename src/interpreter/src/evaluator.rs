@@ -41,11 +41,6 @@ pub fn evaluate<'a>(
         TypedStatement::Continue => evaluate_continue(environment),
         TypedStatement::Return(e) => evaluate_return(e, environment),
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
-        TypedStatement::Print(e) => {
-            let value = evaluate_expression(e, environment)?;
-            println!("{}", value);
-            Ok(Value::Void)
-        }
     }
 }
 
@@ -128,6 +123,11 @@ fn evaluate_expression<'a>(
             ..
         } => evaluate_binary(left, operator, right, environment),
         TypedExpression::Block(Block { statements, .. }) => evaluate_block(statements, environment),
+        TypedExpression::Print { value } => {
+            let value = evaluate_expression(*value, environment)?;
+            println!("{}", value);
+            Ok(Value::Void)
+        }
         TypedExpression::Drop { identifier, .. } => evaluate_drop(identifier, environment),
         TypedExpression::Loop { body, .. } => evaluate_loop(body, environment),
         TypedExpression::While {

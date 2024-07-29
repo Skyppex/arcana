@@ -84,10 +84,11 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
         '/' => match cursor.second() {
             '/' => {
                 cursor.eat_while(|c| !is_end_of_line_comment(c));
-                Ok(Token {
-                    kind: TokenKind::LineComment,
-                    length: cursor.position_within_token(),
-                })
+                tokenize_next(cursor)
+                // Ok(Token {
+                //     kind: TokenKind::LineComment,
+                //     length: cursor.position_within_token(),
+                // })
             }
             '-' => {
                 cursor.bump();

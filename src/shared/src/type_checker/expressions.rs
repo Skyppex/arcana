@@ -12,8 +12,8 @@ use super::{
         TypedClosureParameter, TypedExpression, TypedMatchArm, TypedStatement, UnaryOperator,
     },
     scope::ScopeType,
-    statements, type_equals, DiscoveredType, Enum, EnumMember, FullName, Function, Rcrc, Struct,
-    Type, TypeEnvironment, Union,
+    statements, type_equals, type_equals_coerce, DiscoveredType, Enum, EnumMember, FullName,
+    Function, Rcrc, Struct, Type, TypeEnvironment, Union,
 };
 
 pub fn check_type<'a>(
@@ -277,6 +277,16 @@ fn synthesize_type(
                 }
                 _ => None,
             };
+
+            if *mutable {
+                if let Type::Literal {
+                    type_: literal_type,
+                    ..
+                } = type_
+                {
+                    type_ = *literal_type;
+                }
+            }
 
             type_environment
                 .borrow_mut()
@@ -693,6 +703,19 @@ fn synthesize_type(
             let operator: BinaryOperator = operator.clone().into();
             let type_ = get_binop_type(&left.get_type(), &operator, &right.get_type())?;
 
+            if matches!(
+                operator,
+                BinaryOperator::Range | BinaryOperator::RangeInclusive
+            ) {
+                if !type_equals_coerce(&left.get_type(), &right.get_type()) {
+                    return Err(format!(
+                        "Range operator requires both sides to be of the same type, found {} and {}",
+                        left.get_type(),
+                        right.get_type()
+                    ));
+                }
+            }
+
             Ok(TypedExpression::Binary {
                 left: Box::new(left),
                 operator,
@@ -726,6 +749,9 @@ fn synthesize_type(
                 type_,
             }))
         }
+        Expression::Print(e) => Ok(TypedExpression::Print {
+            value: Box::new(check_type(e, discovered_types, type_environment, None)?),
+        }),
         Expression::Drop(symbol) => {
             let type_ = type_environment
                 .borrow()
@@ -1266,6 +1292,15 @@ fn get_binop_type(
         (Type::Int, BinaryOperator::Range, Type::Int) => Ok(Type::Array(Box::new(Type::Int))),
         (Type::UInt, BinaryOperator::Range, Type::UInt) => Ok(Type::Array(Box::new(Type::UInt))),
         (Type::Char, BinaryOperator::Range, Type::Char) => Ok(Type::Array(Box::new(Type::Char))),
+        (Type::Int, BinaryOperator::RangeInclusive, Type::Int) => {
+            Ok(Type::Array(Box::new(Type::Int)))
+        }
+        (Type::UInt, BinaryOperator::RangeInclusive, Type::UInt) => {
+            Ok(Type::Array(Box::new(Type::UInt)))
+        }
+        (Type::Char, BinaryOperator::RangeInclusive, Type::Char) => {
+            Ok(Type::Array(Box::new(Type::Char)))
+        }
         (Type::Literal { type_, .. }, operator, right_type) => {
             get_binop_type(type_, operator, right_type)
         }

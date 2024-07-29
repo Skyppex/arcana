@@ -320,7 +320,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
-            return parse_next(cursor);
+            return parse_expression_map(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -328,7 +328,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
-        return parse_next(cursor);
+        return parse_expression_map(cursor);
     }
 
     cursor.bump()?; // Consume the union keyword
@@ -377,35 +377,6 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         type_identifier: TypeIdentifier::Type(type_name),
         literals: literals?,
     }))
-}
-
-fn parse_next(cursor: &mut Cursor) -> Result<Statement, String> {
-    #[cfg(feature = "interpreter")]
-    return parse_print(cursor);
-
-    #[cfg(not(feature = "interpreter"))]
-    return parse_expression_map(cursor);
-}
-
-#[cfg(feature = "interpreter")]
-fn parse_print(cursor: &mut Cursor) -> Result<Statement, String> {
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Print) {
-        return parse_expression_map(cursor);
-    }
-
-    cursor.bump()?; // Consume the drop
-
-    let TokenKind::OpenParen = cursor.bump()?.kind else {
-        return Err(format!("Expected ( but found {:?}", cursor.first().kind));
-    };
-
-    let expression = expressions::parse_expression(cursor)?;
-
-    let TokenKind::CloseParen = cursor.bump()?.kind else {
-        return Err(format!("Expected ) but found {:?}", cursor.first().kind));
-    };
-
-    Ok(Statement::Print(expression))
 }
 
 fn parse_expression_map(cursor: &mut Cursor) -> Result<Statement, String> {
@@ -490,12 +461,14 @@ fn parse_struct_field(
         access_modifier = Some(am);
     }
 
-    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
+    let TokenKind::Identifier(identifier) = cursor.first().kind else {
         return Err(format!(
             "Expected identifier but found {:?}",
             cursor.first().kind
         ));
     };
+
+    cursor.bump()?; // Consume the identifier
 
     let TokenKind::Colon = cursor.bump()?.kind else {
         return Err(format!("Expected : but found {:?}", cursor.first().kind));

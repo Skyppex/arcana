@@ -341,7 +341,6 @@ impl IndentDisplay for Statement {
                 result
             }
             Statement::Expression(e) => e.indent_display(indent),
-            Statement::Print(e) => e.indent_display(indent),
         }
     }
 }
@@ -656,6 +655,18 @@ impl IndentDisplay for Expression {
                 }
 
                 indent.decrease();
+                result
+            }
+            Expression::Print(value) => {
+                let mut result = String::new();
+                result.push_str(
+                    format!(
+                        "{}<print> {}",
+                        indent.dash_end(),
+                        value.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 result
             }
             Expression::Drop(identifier) => {
@@ -1213,6 +1224,7 @@ impl IndentDisplay for BinaryOperator {
             BinaryOperator::GreaterThan => ">".to_string(),
             BinaryOperator::GreaterThanOrEqual => ">=".to_string(),
             BinaryOperator::Range => "..".to_string(),
+            BinaryOperator::RangeInclusive => "..=".to_string(),
         }
     }
 }
@@ -1494,7 +1506,6 @@ impl IndentDisplay for TypedStatement {
                 result
             }
             TypedStatement::Expression(e) => e.indent_display(indent),
-            TypedStatement::Print(e) => e.indent_display(indent),
         }
     }
 }
@@ -1808,6 +1819,11 @@ impl IndentDisplay for TypedExpression {
                 }
 
                 indent.decrease();
+                result
+            }
+            TypedExpression::Print { value } => {
+                let mut result = String::new();
+                result.push_str(format!("<print> {}: {}", value, Type::Void).as_str());
                 result
             }
             TypedExpression::Drop { identifier, type_ } => {
@@ -2256,6 +2272,7 @@ impl IndentDisplay for type_checker::ast::BinaryOperator {
             type_checker::ast::BinaryOperator::GreaterThan => ">".to_string(),
             type_checker::ast::BinaryOperator::GreaterThanOrEqual => ">=".to_string(),
             type_checker::ast::BinaryOperator::Range => "..".to_string(),
+            type_checker::ast::BinaryOperator::RangeInclusive => "..=".to_string(),
         }
     }
 }

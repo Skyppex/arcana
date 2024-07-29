@@ -50,9 +50,6 @@ pub enum TypedStatement {
     Continue,
     Return(Option<TypedExpression>),
     Expression(TypedExpression),
-
-    #[cfg(feature = "interpreter")]
-    Print(TypedExpression),
 }
 
 impl TypedStatement {
@@ -78,7 +75,6 @@ impl Typed for TypedStatement {
             TypedStatement::Continue => Type::Void,
             TypedStatement::Return(_) => Type::Void,
             TypedStatement::Expression(e) => e.get_type(),
-            TypedStatement::Print(_) => Type::Void,
         }
     }
 
@@ -95,7 +91,6 @@ impl Typed for TypedStatement {
             TypedStatement::Continue => Type::Void,
             TypedStatement::Return(e) => e.as_ref().map_or(Type::Void, |e| e.get_deep_type()),
             TypedStatement::Expression(e) => e.get_deep_type(),
-            TypedStatement::Print(e) => e.get_deep_type(),
         }
     }
 }
@@ -201,7 +196,6 @@ impl Display for TypedStatement {
                 }
             ),
             TypedStatement::Expression(e) => write!(f, "{}", e),
-            TypedStatement::Print(e) => write!(f, "print {}", e),
         }
     }
 }
@@ -344,6 +338,11 @@ pub enum TypedExpression {
         type_: Type,
     },
     Block(Block),
+    #[cfg(feature = "interpreter")]
+    Print {
+        value: Box<TypedExpression>,
+    },
+    #[cfg(feature = "interpreter")]
     Drop {
         identifier: String,
         type_: Type,
@@ -383,10 +382,11 @@ impl Typed for TypedExpression {
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
-            TypedExpression::Drop { type_, .. } => type_.clone(),
             TypedExpression::Loop { type_, .. } => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
             TypedExpression::For { type_, .. } => type_.clone(),
+            TypedExpression::Print { .. } => Type::Void,
+            TypedExpression::Drop { type_, .. } => type_.clone(),
         }
     }
 
@@ -405,10 +405,11 @@ impl Typed for TypedExpression {
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
-            TypedExpression::Drop { type_, .. } => type_.clone(),
             TypedExpression::Loop { type_, .. } => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
             TypedExpression::For { type_, .. } => type_.clone(),
+            TypedExpression::Print { value } => value.get_deep_type(),
+            TypedExpression::Drop { type_, .. } => type_.clone(),
         }
     }
 }
@@ -515,6 +516,7 @@ impl Display for TypedExpression {
             } => write!(f, "{} {} {}", left, operator, right),
             TypedExpression::Block(block) => write!(f, "{}", block),
             TypedExpression::Drop { identifier, .. } => write!(f, "drop {}", identifier),
+            TypedExpression::Print { value, .. } => write!(f, "print {}", value),
             TypedExpression::Loop { body, .. } => write!(f, "loop {}", body),
             TypedExpression::While {
                 condition,
@@ -887,6 +889,7 @@ pub enum BinaryOperator {
     GreaterThan,
     GreaterThanOrEqual,
     Range,
+    RangeInclusive,
 }
 
 impl From<parser::BinaryOperator> for BinaryOperator {
@@ -911,6 +914,7 @@ impl From<parser::BinaryOperator> for BinaryOperator {
             parser::BinaryOperator::GreaterThan => BinaryOperator::GreaterThan,
             parser::BinaryOperator::GreaterThanOrEqual => BinaryOperator::GreaterThanOrEqual,
             parser::BinaryOperator::Range => BinaryOperator::Range,
+            parser::BinaryOperator::RangeInclusive => BinaryOperator::RangeInclusive,
         }
     }
 }
@@ -937,6 +941,7 @@ impl Display for BinaryOperator {
             BinaryOperator::GreaterThan => write!(f, ">"),
             BinaryOperator::GreaterThanOrEqual => write!(f, ">="),
             BinaryOperator::Range => write!(f, ".."),
+            BinaryOperator::RangeInclusive => write!(f, "..="),
         }
     }
 }

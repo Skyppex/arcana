@@ -41,6 +41,9 @@ pub struct MageArgs {
 
 #[derive(Parser, Clone)]
 pub struct Logging {
+    #[arg(short = 'v', long)]
+    pub verbose: bool,
+
     #[arg(short = 'f', long, default_value = "")]
     pub log_flags: LogFlags,
 }

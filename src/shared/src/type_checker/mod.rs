@@ -671,3 +671,12 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
         _ => left == right,
     }
 }
+
+pub fn type_equals_coerce(left: &Type, right: &Type) -> bool {
+    match (left, right) {
+        (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
+            type_equals(type_, type_2)
+        }
+        _ => type_equals(left, right),
+    }
+}

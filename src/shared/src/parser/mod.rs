@@ -11,8 +11,8 @@ use crate::lexer::token::Token;
 
 use self::cursor::Cursor;
 
-pub fn create_ast(tokens: Vec<Token>) -> Result<Statement, String> {
-    let mut cursor = Cursor::new(tokens);
+pub fn create_ast(tokens: Vec<Token>, verbose: bool) -> Result<Statement, String> {
+    let mut cursor = Cursor::new(tokens, verbose);
     let mut statements = vec![];
 
     while !cursor.is_end_of_file() {
