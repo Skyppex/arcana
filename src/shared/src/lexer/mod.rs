@@ -29,11 +29,10 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             cursor.bump();
             cursor.eat_while(|c| is_white_space(c));
 
-            tokenize_next(cursor)
-            // Ok(Token {
-            //     kind: TokenKind::WhiteSpace,
-            //     length: cursor.position_within_token(),
-            // })
+            Ok(Token {
+                kind: TokenKind::WhiteSpace,
+                length: cursor.position_within_token(),
+            })
         }
         '(' => Ok(create_token(TokenKind::OpenParen, cursor)),
         ')' => Ok(create_token(TokenKind::CloseParen, cursor)),
@@ -84,11 +83,10 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
         '/' => match cursor.second() {
             '/' => {
                 cursor.eat_while(|c| !is_end_of_line_comment(c));
-                tokenize_next(cursor)
-                // Ok(Token {
-                //     kind: TokenKind::LineComment,
-                //     length: cursor.position_within_token(),
-                // })
+                Ok(Token {
+                    kind: TokenKind::LineComment,
+                    length: cursor.position_within_token(),
+                })
             }
             '-' => {
                 cursor.bump();

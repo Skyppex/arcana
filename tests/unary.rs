@@ -4,7 +4,7 @@ use common::{create_typed_ast, StatementExt, VecStatementExt};
 
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
-    ast::{Typed, TypedExpression, UnaryOperator},
+    ast::{Literal, Typed, TypedExpression, UnaryOperator},
     Type,
 };
 
@@ -22,7 +22,13 @@ fn identity_is_identity() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Unary { operator: UnaryOperator::Identity, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Unary {
+            operator: UnaryOperator::Identity,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -39,7 +45,7 @@ fn negate_is_negate() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Unary { operator: UnaryOperator::Negate, .. }));
+    assert_eq!(expression, TypedExpression::Literal(Literal::Int(-1)));
 }
 
 #[test]
@@ -56,7 +62,13 @@ fn logical_not_is_logical_not() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Unary { operator: UnaryOperator::LogicalNot, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Unary {
+            operator: UnaryOperator::LogicalNot,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -73,7 +85,13 @@ fn bitwise_not_is_bitwise_not() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Unary { operator: UnaryOperator::BitwiseNot, .. }));
+    assert!(matches!(
+        expression,
+        TypedExpression::Unary {
+            operator: UnaryOperator::BitwiseNot,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -107,7 +125,13 @@ fn negate_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Int);
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "-1".to_owned(),
+            type_: Box::new(Type::Int)
+        }
+    );
 }
 
 #[test]

@@ -3,7 +3,10 @@ mod common;
 use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
 use interpreter::{value, Value};
-use shared::type_checker::{ast::TypedExpression, Type};
+use shared::type_checker::{
+    ast::{Literal, Member, TypedExpression},
+    Type,
+};
 
 use crate::common::create_env;
 
@@ -24,7 +27,20 @@ fn assignment_is_assignment() {
         .nth_statement(1)
         .unwrap_expression();
 
-    assert!(matches!(expression, TypedExpression::Assignment { .. }));
+    assert_eq!(
+        expression,
+        TypedExpression::Assignment {
+            member: Box::new(Member::Identifier {
+                symbol: "x".to_owned(),
+                type_: Type::Int
+            }),
+            initializer: Box::new(TypedExpression::Literal(Literal::Int(1))),
+            type_: Type::Literal {
+                name: "1".to_owned(),
+                type_: Box::new(Type::Int)
+            }
+        }
+    );
 }
 
 #[test]

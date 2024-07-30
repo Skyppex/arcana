@@ -668,12 +668,14 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         cursor.bump()?; // Consume the mutable
     }
 
-    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
+    let TokenKind::Identifier(identifier) = cursor.first().kind else {
         return Err(format!(
             "Expected identifier but found {:?}",
             cursor.first().kind
         ));
     };
+
+    cursor.bump()?; // Consume the identifier
 
     let type_annotation = parse_optional_type_annotation(cursor, false)?;
 

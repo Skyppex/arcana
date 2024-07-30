@@ -17,13 +17,6 @@ use super::{
 };
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
-    while matches!(
-        cursor.first().kind,
-        TokenKind::LineComment | TokenKind::BlockComment
-    ) {
-        cursor.bump()?; // Consume the comment
-    }
-
     match parse_break(cursor) {
         Ok(s) => {
             if let TokenKind::Semicolon = cursor.first().kind {

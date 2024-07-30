@@ -258,6 +258,7 @@ pub(super) fn parse_optional_type_annotation(
     cursor: &mut Cursor,
     allow_void: bool,
 ) -> Result<Option<TypeAnnotation>, String> {
+    println!("ASKLDJHALKSDJH {:?}", cursor.first().kind);
     if cursor.first().kind != TokenKind::Colon {
         Ok(None)
     } else {
