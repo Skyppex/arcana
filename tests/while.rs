@@ -11,7 +11,7 @@ use shared::type_checker::{
 #[test]
 fn while_is_while() {
     // Arrange
-    let input = "while false {}";
+    let input = "while false => {}";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -28,7 +28,7 @@ fn while_is_while() {
 #[test]
 fn while_has_correct_type() {
     // Arrange
-    let input = "while false { 1 }";
+    let input = "while false => { 1 }";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -46,7 +46,7 @@ fn while_has_correct_type() {
 fn while_has_correct_type_when_using_break() {
     // Arrange
     let input = r#"
-        while true {
+        while true => {
             break 1 + 1
         } else {
             2 + 2
@@ -69,7 +69,7 @@ fn while_has_correct_type_when_using_break() {
 fn while_does_not_require_body_or_else_body_to_be_a_block() {
     // Arrange
     let input = r#"
-        while true 1 + 1
+        while true => 1 + 1
         else 2 + 2
         "#;
 
@@ -90,7 +90,7 @@ fn while_does_not_require_body_or_else_body_to_be_a_block() {
 fn while_should_panic_if_else_body_has_different_type_than_body() {
     // Arrange
     let input = r#"
-        while true {
+        while true => {
             break 1 + 1
         } else {
             "Hello, World!"
@@ -105,7 +105,7 @@ fn while_should_panic_if_else_body_has_different_type_than_body() {
 fn while_returns_void() {
     // Arrange
     let input = r#"
-        while false {
+        while false => {
             1 + 1
         }
         "#;
@@ -121,7 +121,7 @@ fn while_returns_void() {
 fn while_returns_break_value() {
     // Arrange
     let input = r#"
-        while true {
+        while true => {
             break 1 + 1
         } else {
             2 + 2
@@ -139,7 +139,7 @@ fn while_returns_break_value() {
 fn while_returns_else_body() {
     // Arrange
     let input = r#"
-        while false {
+        while false => {
             break 1 + 1
         } else {
             2 + 2

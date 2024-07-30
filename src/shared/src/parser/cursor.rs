@@ -111,37 +111,37 @@ impl Cursor {
         }
     }
 
-    // pub(crate) fn optional_bump(&mut self, optional: TokenKind) -> Result<Option<Token>, String> {
-    //     loop {
-    //         if matches!(
-    //             self.first_no_skip().kind,
-    //             TokenKind::WhiteSpace | TokenKind::LineComment | TokenKind::BlockComment
-    //         ) {
-    //             if self.verbose {
-    //                 println!("Skipping: {:?}", self.first_no_skip());
-    //             }
-    //
-    //             self.bump()?;
-    //             continue;
-    //         }
-    //
-    //         if self.first_no_skip().kind != optional {
-    //             return Ok(None);
-    //         }
-    //
-    //         if self.verbose {
-    //             println!("Bumping: {:?}", self.first_no_skip());
-    //         }
-    //
-    //         let token = self
-    //             .tokens
-    //             .pop()
-    //             .ok_or("Unexpected end of file".to_string())?;
-    //         self.prev = token.clone();
-    //
-    //         return Ok(Some(token));
-    //     }
-    // }
+    pub(crate) fn optional_bump(&mut self, optional: TokenKind) -> Result<Option<Token>, String> {
+        loop {
+            if matches!(
+                self.first_no_skip().kind,
+                TokenKind::WhiteSpace | TokenKind::LineComment | TokenKind::BlockComment
+            ) {
+                if self.verbose {
+                    println!("Skipping: {:?}", self.first_no_skip());
+                }
+
+                self.tokens.pop();
+                continue;
+            }
+
+            if self.first_no_skip().kind != optional {
+                return Ok(None);
+            }
+
+            if self.verbose {
+                println!("Bumping: {:?}", self.first_no_skip());
+            }
+
+            let token = self
+                .tokens
+                .pop()
+                .ok_or("Unexpected end of file".to_string())?;
+            self.prev = token.clone();
+
+            return Ok(Some(token));
+        }
+    }
 
     pub(crate) fn expect(&mut self, expected: TokenKind) -> Result<Token, String> {
         loop {

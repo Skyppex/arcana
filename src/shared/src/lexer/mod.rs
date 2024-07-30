@@ -67,6 +67,10 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             _ => Ok(create_token(TokenKind::Plus, cursor)),
         },
         '-' => match cursor.second() {
+            '>' => {
+                cursor.bump();
+                Ok(create_token(TokenKind::Arrow, cursor))
+            }
             '=' => {
                 cursor.bump();
                 Ok(create_token(TokenKind::MinusEqual, cursor))

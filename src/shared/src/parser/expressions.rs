@@ -75,6 +75,7 @@ pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
     }
 
     cursor.bump()?; // Consume the loop
+    cursor.optional_bump(TokenKind::FatArrow)?;
 
     let body = parse_expression(cursor)?;
 
@@ -89,6 +90,7 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.bump()?; // Consume the while
 
     let condition = parse_expression(cursor)?;
+    cursor.expect(TokenKind::FatArrow)?;
     let body = parse_expression(cursor)?;
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
@@ -100,6 +102,7 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
     }
 
     cursor.bump()?; // Consume the else
+    cursor.optional_bump(TokenKind::FatArrow)?;
 
     let else_body = parse_expression(cursor)?;
 
@@ -129,6 +132,7 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.expect(TokenKind::Keyword(Keyword::In))?;
 
     let iterable = parse_expression(cursor)?;
+    cursor.expect(TokenKind::FatArrow)?;
     let body = parse_expression(cursor)?;
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
@@ -141,6 +145,7 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
     }
 
     cursor.bump()?; // Consume the else
+    cursor.optional_bump(TokenKind::FatArrow)?;
 
     let else_block = parse_expression(cursor)?;
 
@@ -809,11 +814,11 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
     let call = parse_call_or_param_propagation(cursor)?;
 
-    if cursor.first().kind != TokenKind::FatArrow {
+    if cursor.first().kind != TokenKind::Arrow {
         return Ok(call);
     }
 
-    cursor.bump()?; // Consume the =>
+    cursor.bump()?; // Consume the ->
 
     let return_type_annotation = if cursor.first().kind == TokenKind::Colon {
         cursor.bump()?; // Consume the :

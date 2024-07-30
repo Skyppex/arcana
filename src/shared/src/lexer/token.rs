@@ -82,6 +82,7 @@ pub enum TokenKind {
     Dot,
     DoubleDot,
     QuestionMark,
+    Arrow,
     FatArrow,
 
     EndOfFile,

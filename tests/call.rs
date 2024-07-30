@@ -203,7 +203,7 @@ fn trailing_closure_call() {
     // Arrange
     let input = r#"
         fun a(op: fun(): int): int => op()
-        a => :int 8
+        a -> :int 8
     "#;
 
     // Act
@@ -218,7 +218,7 @@ fn trailing_closure_call_return_type_is_inferred() {
     // Arrange
     let input = r#"
         fun a(op: fun(): int): int => op()
-        a => 5
+        a -> 5
     "#;
 
     // Act
