@@ -140,7 +140,7 @@ fn for_returns_else_value_after_iteration() {
     // Arrange
     let input = r#"
         for x in 0..1 => {
-            if x > 10 {
+            if x > 10 => {
                 break 1 + 1
             }
         } else {

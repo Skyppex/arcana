@@ -749,6 +749,7 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.bump()?; // Consume the if
 
     let if_condition = parse_expression(cursor)?;
+    cursor.expect(TokenKind::FatArrow)?;
     let if_block = parse_expression(cursor)?;
 
     let mut r#else = None;
@@ -759,6 +760,7 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
         if cursor.first().kind == TokenKind::Keyword(Keyword::If) {
             r#else = Some(Box::new(parse_if(cursor)?));
         } else {
+            cursor.optional_bump(TokenKind::FatArrow)?;
             let block = parse_block(cursor)?;
             r#else = Some(Box::new(block));
         }

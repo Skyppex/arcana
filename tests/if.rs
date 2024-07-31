@@ -13,7 +13,7 @@ use crate::common::create_env;
 #[test]
 fn if_is_if() {
     // Arrange
-    let input = "if true { 1 } else { 2 }";
+    let input = "if true => { 1 } else { 2 }";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -30,7 +30,7 @@ fn if_is_if() {
 #[test]
 fn if_has_correct_type() {
     // Arrange
-    let input = "if true { 1 } else { 2 }";
+    let input = "if true => { 1 } else { 2 }";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -47,7 +47,7 @@ fn if_has_correct_type() {
 #[test]
 fn if_has_correct_type_2() {
     // Arrange
-    let input = "if true 1 else 2";
+    let input = "if true => 1 else 2";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -63,7 +63,7 @@ fn if_has_correct_type_2() {
 #[test]
 fn if_returns_if_block() {
     // Arrange
-    let input = "if true { 1 } else { 2 }";
+    let input = "if true => { 1 } else { 2 }";
     // Act
     let value = evaluate_expression(input, create_env(), false);
     // Assert
@@ -73,7 +73,7 @@ fn if_returns_if_block() {
 #[test]
 fn if_returns_else_block() {
     // Arrange
-    let input = "if false { 1 } else { 2 }";
+    let input = "if false => { 1 } else { 2 }";
     // Act
     let value = evaluate_expression(input, create_env(), false);
 
@@ -84,7 +84,7 @@ fn if_returns_else_block() {
 #[test]
 fn if_returns_else_if_block() {
     // Arrange
-    let input = "if false { 1 } else if true { 2 } else { 3 }";
+    let input = "if false => { 1 } else if true => { 2 } else { 3 }";
     // Act
     let value = evaluate_expression(input, create_env(), false);
 
@@ -95,7 +95,7 @@ fn if_returns_else_if_block() {
 #[test]
 fn if_returns_option_some() {
     // Arrange
-    let input = "if true { 1 }";
+    let input = "if true => { 1 }";
     // Act
     let value = evaluate_expression(input, create_env(), false);
 
@@ -109,7 +109,7 @@ fn if_returns_option_some() {
 #[test]
 fn if_returns_option_some_2() {
     // Arrange
-    let input = "if false { 1 } else if true { 2 }";
+    let input = "if false => { 1 } else if true => { 2 }";
     // Act
     let value = evaluate_expression(input, create_env(), false);
 
@@ -123,7 +123,7 @@ fn if_returns_option_some_2() {
 #[test]
 fn if_returns_option_none() {
     // Arrange
-    let input = "if false { 1 }";
+    let input = "if false => { 1 }";
     // Act
     let value = evaluate_expression(input, create_env(), false);
 
@@ -134,7 +134,7 @@ fn if_returns_option_none() {
 #[test]
 fn if_returns_option_none_2() {
     // Arrange
-    let input = "if false { 1 } else if false { 2 }";
+    let input = "if false => { 1 } else if false => { 2 }";
     // Act
     let value = evaluate_expression(input, create_env(), false);
 
@@ -145,7 +145,7 @@ fn if_returns_option_none_2() {
 #[test]
 fn if_does_not_require_brackets() {
     // Arrange
-    let input = "if true 1 else 2";
+    let input = "if true => 1 else 2";
 
     // Act
     let value = evaluate_expression(input, create_env(), false);
@@ -157,7 +157,7 @@ fn if_does_not_require_brackets() {
 #[test]
 fn if_should_correctly_evaluate_this_nonsense() {
     // Arrange
-    let input = "if true if false false else true else false";
+    let input = "if true => if false => false else true else false";
 
     // Act
     let value = evaluate_expression(input, create_env(), false);
@@ -169,8 +169,8 @@ fn if_should_correctly_evaluate_this_nonsense() {
 #[test]
 fn ifs_are_equals() {
     // Arrange
-    let input = "if false { 1 } else if true { 2 } else { 3 }";
-    let input2 = "if false { 1 } else { if true { 2 } else { 3 } }";
+    let input = "if false => { 1 } else if true => { 2 } else { 3 }";
+    let input2 = "if false => { 1 } else { if true => { 2 } else { 3 } }";
 
     // Act
     let value = evaluate_expression(input, create_env(), false);
