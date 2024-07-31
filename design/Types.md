@@ -118,9 +118,9 @@ public flags Foo(uint) {
     FirstAndSecond = First | Second, // value is 0b0011
 }
 
-// The type can be omitted and will default to the smallest possible integer type using
+// The type can be omitted and will default to using
 // unsinged integers if possible.
-public flags Foo { // The underlying type here ends up being u8
+public flags Foo { // The underlying type here ends up being int
     First, // default value is 0b0000_0001
     Second, // default value is 0b0000_0010
     Third, // default value is 0b0000_0100
@@ -136,8 +136,10 @@ Needed checks:
 
 - Check if all of a set of flags are set
 - Check if any of a set of flags are set
+- Check if only one of a set of flags are set
 - Check if all of a set of flags are not set
 - Check if any of a set of flags are not set
+- Check if only one of a set of flags are not set
 
 ## Implementation Blocks for Traits
 

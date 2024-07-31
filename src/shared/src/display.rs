@@ -9,10 +9,11 @@ use crate::{
     type_checker::{
         self,
         ast::{
-            Block, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
+            Block, Typed, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
             TypedStatement,
         },
-        Type,
+        decision_tree::{Case, Decision, Variable},
+        FullName, Type,
     },
     types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
 };
@@ -297,43 +298,6 @@ impl IndentDisplay for Statement {
                         "{}statement: {}",
                         indent.dash_end(),
                         statement.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                indent.decrease();
-                result
-            }
-            Statement::Break(e) => {
-                let mut result = String::new();
-                result.push_str("<break>\n");
-                indent.increase();
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "{}expression: {}",
-                        indent.dash_end(),
-                        e.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                indent.decrease();
-                result
-            }
-            Statement::Continue => {
-                let mut result = String::new();
-                result.push_str("<continue>");
-                result
-            }
-            Statement::Return(e) => {
-                let mut result = String::new();
-                result.push_str("<return>\n");
-                indent.increase();
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "{}expression: {}",
-                        indent.dash_end(),
-                        e.indent_display(indent)
                     )
                     .as_str(),
                 );
@@ -790,6 +754,43 @@ impl IndentDisplay for Expression {
                     result.push_str(format!("\n{}else: None", indent.dash_end()).as_str());
                 }
 
+                indent.decrease();
+                result
+            }
+            Expression::Break(e) => {
+                let mut result = String::new();
+                result.push_str("<break>\n");
+                indent.increase();
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            Expression::Continue => {
+                let mut result = String::new();
+                result.push_str("<continue>");
+                result
+            }
+            Expression::Return(e) => {
+                let mut result = String::new();
+                result.push_str("<return>\n");
+                indent.increase();
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
             }
@@ -1260,7 +1261,14 @@ impl IndentDisplay for Pattern {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
             Pattern::Wildcard => "_".to_string(),
+            Pattern::Unit => "unit".to_string(),
+            Pattern::Bool(b) => b.to_string(),
             Pattern::Int(v) => v.to_string(),
+            Pattern::UInt(v) => v.to_string(),
+            Pattern::Float(v) => v.to_string(),
+            Pattern::Char(c) => c.to_string(),
+            Pattern::String(s) => s.to_string(),
+            Pattern::Variable(v) => v.to_string(),
         }
     }
 }
@@ -1468,43 +1476,6 @@ impl IndentDisplay for TypedStatement {
                 indent.decrease();
                 result
             }
-            TypedStatement::Break(e) => {
-                let mut result = String::new();
-                result.push_str(format!("<break>: {}\n", Type::Void).as_str());
-                indent.increase();
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "{}expression: {}",
-                        indent.dash_end(),
-                        e.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                indent.decrease();
-                result
-            }
-            TypedStatement::Continue => {
-                let mut result = String::new();
-                result.push_str(format!("<continue>: {}\n", Type::Void).as_str());
-                result
-            }
-            TypedStatement::Return(e) => {
-                let mut result = String::new();
-                result.push_str(format!("<return>: {}\n", Type::Void).as_str());
-                indent.increase();
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "{}expression: {}",
-                        indent.dash_end(),
-                        e.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                indent.decrease();
-                result
-            }
             TypedStatement::Expression(e) => e.indent_display(indent),
         }
     }
@@ -1594,6 +1565,7 @@ impl IndentDisplay for TypedExpression {
             TypedExpression::Match {
                 expression,
                 arms,
+                decision_tree,
                 type_,
             } => {
                 let mut result = String::new();
@@ -1621,6 +1593,15 @@ impl IndentDisplay for TypedExpression {
                         );
                     }
                 }
+
+                result.push_str(
+                    format!(
+                        "{}decision_tree: {}",
+                        indent.dash_end(),
+                        decision_tree.indent_display(indent)
+                    )
+                    .as_str(),
+                );
 
                 indent.decrease();
                 result
@@ -1954,6 +1935,43 @@ impl IndentDisplay for TypedExpression {
                     result.push_str(format!("\n{}else: None", indent.dash_end()).as_str());
                 }
 
+                indent.decrease();
+                result
+            }
+            TypedExpression::Break(e) => {
+                let mut result = String::new();
+                result.push_str(format!("<break>: {}\n", Type::Void).as_str());
+                indent.increase();
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            TypedExpression::Continue => {
+                let mut result = String::new();
+                result.push_str(format!("<continue>: {}\n", Type::Void).as_str());
+                result
+            }
+            TypedExpression::Return(e) => {
+                let mut result = String::new();
+                result.push_str(format!("<return>: {}\n", Type::Void).as_str());
+                indent.increase();
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.decrease();
                 result
             }
@@ -2615,8 +2633,175 @@ impl IndentDisplay for type_checker::ast::Pattern {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
             type_checker::ast::Pattern::Wildcard => "_".to_string(),
+            type_checker::ast::Pattern::Unit => "()".to_string(),
+            type_checker::ast::Pattern::Bool(v) => v.to_string(),
             type_checker::ast::Pattern::Int(v) => v.to_string(),
+            type_checker::ast::Pattern::UInt(v) => v.to_string(),
+            type_checker::ast::Pattern::Float(v) => v.to_string(),
+            type_checker::ast::Pattern::Char(c) => c.to_string(),
+            type_checker::ast::Pattern::String(s) => s.to_string(),
+            type_checker::ast::Pattern::Variable(v) => v.to_string(),
         }
+    }
+}
+
+impl IndentDisplay for Decision {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<decision>");
+        indent.increase_leaf();
+
+        match self {
+            Decision::Success { expression, type_ } => {
+                result.push_str(format!(": {}", type_).as_str());
+                result.push_str(
+                    format!(
+                        "\n{}expression: {}",
+                        indent.dash_end(),
+                        expression.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+            }
+            Decision::Failure { error_message } => {
+                result.push_str(format!(": {}", Type::Unknown).as_str());
+                result.push_str(
+                    format!(
+                        "\n{}error_message: {}",
+                        indent.dash_end(),
+                        error_message.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+            }
+            Decision::Guard {
+                condition,
+                consequence: true_,
+                alternative: false_,
+                type_,
+            } => {
+                result.push_str(format!(": {}", type_).as_str());
+                result.push_str(
+                    format!(
+                        "\n{}condition: {}",
+                        indent.dash(),
+                        condition.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!("\n{}true: {}", indent.dash(), true_.indent_display(indent)).as_str(),
+                );
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "\n{}false: {}",
+                        indent.dash_end(),
+                        false_.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+            }
+            Decision::Switch {
+                variable,
+                cases,
+                fallback,
+                type_,
+            } => {
+                result.push_str(format!(": {}", type_).as_str());
+                result.push_str(
+                    format!(
+                        "\n{}variable: {}",
+                        indent.dash(),
+                        variable.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                for (i, case) in cases.iter().enumerate() {
+                    if i < cases.len() - 1 {
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), case.indent_display(indent)).as_str(),
+                        );
+                    } else {
+                        indent.end_current();
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), case.indent_display(indent))
+                                .as_str(),
+                        );
+                    }
+                }
+
+                result.push_str(
+                    format!(
+                        "\n{}fallback: {}",
+                        indent.dash_end(),
+                        fallback.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+            }
+        }
+
+        result
+    }
+}
+
+impl IndentDisplay for Case {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<case>");
+        indent.increase_leaf();
+        result.push_str(
+            format!(
+                "{}pattern: {}\n",
+                indent.dash(),
+                self.pattern.indent_display(indent)
+            )
+            .as_str(),
+        );
+        result.push_str(
+            format!(
+                "{}argument: {}",
+                indent.dash(),
+                self.argument.indent_display(indent) // indent_display_vec(&self.arguments, "arguments", "argument", indent)
+            )
+            .as_str(),
+        );
+        result.push_str(
+            format!(
+                "\n{}decision: {}",
+                indent.dash_end(),
+                self.body.indent_display(indent)
+            )
+            .as_str(),
+        );
+
+        result
+    }
+}
+
+impl IndentDisplay for Variable {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<variable>");
+        result.push_str(format!(": {}", self.type_.full_name()).as_str());
+
+        indent.increase_leaf();
+        result.push_str(
+            format!(
+                "\n{}name: {}",
+                indent.dash(),
+                self.identifier.indent_display(indent)
+            )
+            .as_str(),
+        );
+        result
+            .push_str(format!("\n{}type_: {}", indent.dash_end(), self.type_.full_name()).as_str());
+
+        indent.decrease();
+
+        result
     }
 }
 

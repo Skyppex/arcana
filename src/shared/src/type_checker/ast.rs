@@ -2,13 +2,15 @@ use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
+use crate::parser::Expression;
 use crate::pretty_print::PrettyPrint;
 use crate::{
     parser,
     types::{GenericConstraint, TypeAnnotation, TypeIdentifier},
 };
 
-use super::Type;
+use super::decision_tree::Decision;
+use super::{Rcrc, Type, TypeEnvironment};
 
 pub trait Typed {
     fn get_type(&self) -> Type;
@@ -46,9 +48,6 @@ pub enum TypedStatement {
         type_: Type,
     },
     Semi(Box<TypedStatement>),
-    Break(Option<TypedExpression>),
-    Continue,
-    Return(Option<TypedExpression>),
     Expression(TypedExpression),
 }
 
@@ -71,9 +70,6 @@ impl Typed for TypedStatement {
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Semi { .. } => Type::Void,
-            TypedStatement::Break(_) => Type::Void,
-            TypedStatement::Continue => Type::Void,
-            TypedStatement::Return(_) => Type::Void,
             TypedStatement::Expression(e) => e.get_type(),
         }
     }
@@ -87,9 +83,6 @@ impl Typed for TypedStatement {
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Semi(e) => e.get_deep_type(),
-            TypedStatement::Break(e) => e.as_ref().map_or(Type::Void, |e| e.get_deep_type()),
-            TypedStatement::Continue => Type::Void,
-            TypedStatement::Return(e) => e.as_ref().map_or(Type::Void, |e| e.get_deep_type()),
             TypedStatement::Expression(e) => e.get_deep_type(),
         }
     }
@@ -176,25 +169,6 @@ impl Display for TypedStatement {
                 body.to_string()
             ),
             TypedStatement::Semi(s) => write!(f, "{};", s),
-            TypedStatement::Break(e) => write!(
-                f,
-                "break{}",
-                if let Some(e) = e {
-                    format!(" {}", e)
-                } else {
-                    "".to_string()
-                }
-            ),
-            TypedStatement::Continue => write!(f, "continue"),
-            TypedStatement::Return(e) => write!(
-                f,
-                "return{}",
-                if let Some(e) = e {
-                    format!(" {}", e)
-                } else {
-                    "".to_string()
-                }
-            ),
             TypedStatement::Expression(e) => write!(f, "{}", e),
         }
     }
@@ -301,6 +275,7 @@ pub enum TypedExpression {
     Match {
         expression: Box<TypedExpression>,
         arms: Vec<TypedMatchArm>,
+        decision_tree: Decision,
         type_: Type,
     },
     Assignment {
@@ -364,6 +339,9 @@ pub enum TypedExpression {
         else_body: Option<Box<TypedExpression>>,
         type_: Type,
     },
+    Break(Option<Box<TypedExpression>>),
+    Continue,
+    Return(Option<Box<TypedExpression>>),
 }
 
 impl Typed for TypedExpression {
@@ -387,6 +365,9 @@ impl Typed for TypedExpression {
             TypedExpression::For { type_, .. } => type_.clone(),
             TypedExpression::Print { .. } => Type::Void,
             TypedExpression::Drop { type_, .. } => type_.clone(),
+            TypedExpression::Break(_) => Type::Void,
+            TypedExpression::Continue => Type::Void,
+            TypedExpression::Return(_) => Type::Void,
         }
     }
 
@@ -410,6 +391,9 @@ impl Typed for TypedExpression {
             TypedExpression::For { type_, .. } => type_.clone(),
             TypedExpression::Print { value } => value.get_deep_type(),
             TypedExpression::Drop { type_, .. } => type_.clone(),
+            TypedExpression::Break(_) => Type::Void,
+            TypedExpression::Continue => Type::Void,
+            TypedExpression::Return(_) => Type::Void,
         }
     }
 }
@@ -543,6 +527,25 @@ impl Display for TypedExpression {
                 }
                 Ok(())
             }
+            TypedExpression::Break(e) => write!(
+                f,
+                "break{}",
+                if let Some(e) = e {
+                    format!(" {}", e)
+                } else {
+                    "".to_string()
+                }
+            ),
+            TypedExpression::Continue => write!(f, "continue"),
+            TypedExpression::Return(e) => write!(
+                f,
+                "return{}",
+                if let Some(e) = e {
+                    format!(" {}", e)
+                } else {
+                    "".to_string()
+                }
+            ),
         }
     }
 }
@@ -949,26 +952,41 @@ impl Display for BinaryOperator {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedMatchArm {
     pub pattern: Pattern,
-    pub expression: TypedExpression,
+    pub expression: Expression,
+    pub type_environment: Rcrc<TypeEnvironment>,
 }
 
 impl Display for TypedMatchArm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} => {}", self.pattern, self.expression)
+        write!(f, "{} => {:?}", self.pattern, self.expression)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Wildcard,
+    Unit,
+    Bool(bool),
     Int(i64),
+    UInt(u64),
+    Float(f64),
+    Char(char),
+    String(String),
+    Variable(String),
 }
 
 impl From<parser::Pattern> for Pattern {
     fn from(value: parser::Pattern) -> Self {
         match value {
             parser::Pattern::Wildcard => Pattern::Wildcard,
+            parser::Pattern::Unit => Pattern::Unit,
+            parser::Pattern::Bool(v) => Pattern::Bool(v),
             parser::Pattern::Int(v) => Pattern::Int(v),
+            parser::Pattern::UInt(v) => Pattern::UInt(v),
+            parser::Pattern::Float(v) => Pattern::Float(v),
+            parser::Pattern::Char(v) => Pattern::Char(v),
+            parser::Pattern::String(v) => Pattern::String(v),
+            parser::Pattern::Variable(v) => Pattern::Variable(v),
         }
     }
 }
@@ -977,7 +995,14 @@ impl Display for Pattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Pattern::Wildcard => write!(f, "_"),
+            Pattern::Unit => write!(f, "()"),
+            Pattern::Bool(v) => write!(f, "{}", v),
             Pattern::Int(v) => write!(f, "{}", v),
+            Pattern::UInt(v) => write!(f, "{}", v),
+            Pattern::Float(v) => write!(f, "{}", v),
+            Pattern::Char(v) => write!(f, "{}", v),
+            Pattern::String(v) => write!(f, "{}", v),
+            Pattern::Variable(v) => write!(f, "{}", v),
         }
     }
 }

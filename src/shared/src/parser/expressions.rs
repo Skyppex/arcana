@@ -17,7 +17,7 @@ pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
     let expression = parse_print(cursor);
 
     #[cfg(not(feature = "interpreter"))]
-    let expression = parse_loop(cursor);
+    let expression = parse_break(cursor);
 
     return expression;
 }
@@ -46,7 +46,7 @@ fn parse_print(cursor: &mut Cursor) -> Result<Expression, String> {
 #[cfg(feature = "interpreter")]
 fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Drop) {
-        return parse_loop(cursor);
+        return parse_break(cursor);
     }
 
     cursor.bump()?; // Consume the drop
@@ -67,6 +67,49 @@ fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     };
 
     Ok(Expression::Drop(identifier))
+}
+
+fn parse_break(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Break) {
+        return parse_continue(cursor);
+    }
+
+    cursor.bump()?; // Consume the break
+
+    let expression = if cursor.first().kind == TokenKind::Semicolon {
+        cursor.bump()?;
+        None
+    } else {
+        Some(parse_expression(cursor)?)
+    };
+
+    Ok(Expression::Break(expression.map(Box::new)))
+}
+
+fn parse_continue(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Continue) {
+        return parse_return(cursor);
+    }
+
+    cursor.bump()?; // Consume the continue
+    Ok(Expression::Continue)
+}
+
+fn parse_return(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Return) {
+        return parse_loop(cursor);
+    }
+
+    cursor.bump()?; // Consume the return
+
+    let expression = if cursor.first().kind == TokenKind::Semicolon {
+        cursor.bump()?; // Consume the ;
+        None
+    } else {
+        Some(parse_expression(cursor)?)
+    };
+
+    Ok(Expression::Return(expression.map(Box::new)))
 }
 
 pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -418,7 +461,7 @@ fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> 
 
 fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Pipe {
-        return parse_boolean_logical(cursor);
+        return parse_match(cursor);
     }
 
     cursor.bump()?; // Consume the |
@@ -512,6 +555,39 @@ fn unwrap_arguments_recurse(
             )
         }
     }
+}
+
+fn parse_match(cursor: &mut Cursor) -> Result<Expression, String> {
+    let expression = parse_boolean_logical(cursor)?;
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Match) {
+        return Ok(expression);
+    }
+
+    cursor.bump()?; // Consume the match
+
+    let mut arms = vec![];
+
+    while cursor.first().kind == TokenKind::Pipe {
+        cursor.bump()?; // Consume the arm keyword
+        let pattern = parse_pattern(cursor)?;
+        cursor.expect(TokenKind::FatArrow)?; // Consume the =>
+        let body = parse_expression(cursor)?;
+
+        arms.push(MatchArm {
+            pattern,
+            expression: Box::new(body),
+        });
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        }
+    }
+
+    Ok(Expression::Match(Match {
+        expression: Box::new(expression),
+        arms,
+    }))
 }
 
 fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -662,7 +738,7 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
 
 fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Let) {
-        return parse_match(cursor);
+        return parse_if(cursor);
     }
 
     cursor.bump()?; // Consume the let
@@ -708,37 +784,6 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
             cursor.first().kind
         )),
     }
-}
-
-fn parse_match(cursor: &mut Cursor) -> Result<Expression, String> {
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Match) {
-        return parse_if(cursor);
-    }
-
-    cursor.bump()?; // Consume the match
-
-    let expression = parse_expression(cursor)?;
-
-    let mut arms = vec![];
-
-    while cursor.first().kind == TokenKind::Keyword(Keyword::Arm) {
-        cursor.bump()?; // Consume the arm keyword
-        let pattern = parse_pattern(cursor)?;
-        cursor.expect(TokenKind::FatArrow)?; // Consume the =>
-        let body = parse_expression(cursor)?;
-
-        arms.push(MatchArm {
-            pattern,
-            expression: Box::new(body),
-        });
-    }
-
-    cursor.bump()?; // Consume the }
-
-    Ok(Expression::Match(Match {
-        expression: Box::new(expression),
-        arms,
-    }))
 }
 
 fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -1066,9 +1111,39 @@ fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
             cursor.bump()?; // Consume the _
             Ok(Pattern::Wildcard)
         }
+        TokenKind::Literal(token::Literal::Unit) => {
+            cursor.bump()?; // Consume the ()
+            Ok(Pattern::Unit)
+        }
+        TokenKind::Literal(token::Literal::Bool(v)) => {
+            cursor.bump()?; // Consume the ()
+            Ok(Pattern::Bool(v))
+        }
         TokenKind::Literal(token::Literal::Int(v)) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::Int(v.value))
+        }
+        TokenKind::Literal(token::Literal::UInt(v)) => {
+            cursor.bump()?; // Consume the literal
+            Ok(Pattern::UInt(v.value))
+        }
+        TokenKind::Literal(token::Literal::Float(v)) => {
+            cursor.bump()?; // Consume the literal
+            Ok(Pattern::Float(v))
+        }
+        TokenKind::Literal(token::Literal::Char(v)) => {
+            cursor.bump()?; // Consume the literal
+            Ok(Pattern::Char(
+                v.parse::<char>().expect("Failed to parse char literal"),
+            ))
+        }
+        TokenKind::Literal(token::Literal::String(v)) => {
+            cursor.bump()?; // Consume the literal
+            Ok(Pattern::String(v))
+        }
+        TokenKind::Identifier(identifier) => {
+            cursor.bump()?; // Consume the identifier
+            Ok(Pattern::Variable(identifier))
         }
         _ => Err(format!(
             "Unknown start of pattern: {:?}",

@@ -1,9 +1,9 @@
 pub mod ast;
+pub mod decision_tree;
 pub mod full_name;
 pub mod type_checker;
 pub mod type_environment;
 
-mod desicion_tree;
 mod expressions;
 mod scope;
 mod statements;

@@ -85,9 +85,6 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
         }]),
         Statement::Semi(_) => Ok(vec![]),
-        Statement::Break(_) => Ok(vec![]),
-        Statement::Continue => Ok(vec![]),
-        Statement::Return(_) => Ok(vec![]),
         Statement::Expression(_) => Ok(vec![]),
     }
 }
@@ -442,43 +439,6 @@ pub fn check_type<'a>(
             discovered_types,
             type_environment,
         )?))),
-        Statement::Break(e) => match e {
-            Some(e) => {
-                let typed_expression =
-                    expressions::check_type(e, discovered_types, type_environment.clone(), None)?;
-
-                let break_type = typed_expression.get_type();
-                type_environment
-                    .borrow_mut()
-                    .activate_scope(ScopeType::Break, break_type)?;
-                Ok(TypedStatement::Break(Some(typed_expression)))
-            }
-            None => {
-                type_environment
-                    .borrow_mut()
-                    .activate_scope(ScopeType::Break, Type::Void)?;
-                Ok(TypedStatement::Break(None))
-            }
-        },
-        Statement::Continue => Ok(TypedStatement::Continue),
-        Statement::Return(e) => match e {
-            Some(e) => {
-                let typed_expression =
-                    expressions::check_type(e, discovered_types, type_environment.clone(), None)?;
-
-                let return_type = typed_expression.get_type();
-                type_environment
-                    .borrow_mut()
-                    .activate_scope(ScopeType::Return, return_type)?;
-                Ok(TypedStatement::Return(Some(typed_expression)))
-            }
-            None => {
-                type_environment
-                    .borrow_mut()
-                    .activate_scope(ScopeType::Return, Type::Void)?;
-                Ok(TypedStatement::Return(None))
-            }
-        },
         Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(
             e,
             discovered_types,

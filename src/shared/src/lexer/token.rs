@@ -183,7 +183,6 @@ pub enum Keyword {
     If,
     Else,
     Match,
-    Arm,
     Loop,
     While,
     For,

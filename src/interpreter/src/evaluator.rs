@@ -3,6 +3,7 @@ use std::{cell::RefCell, ops::Deref, rc::Rc};
 use shared::{
     type_checker::{
         ast::{Block, *},
+        decision_tree::Decision,
         Type,
     },
     types::TypeIdentifier,
@@ -37,9 +38,6 @@ pub fn evaluate<'a>(
             evaluate(*s, environment)?;
             Ok(Value::Void)
         }
-        TypedStatement::Break(e) => evaluate_break(e, environment),
-        TypedStatement::Continue => evaluate_continue(environment),
-        TypedStatement::Return(e) => evaluate_return(e, environment),
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
     }
 }
@@ -88,8 +86,10 @@ fn evaluate_expression<'a>(
             ..
         } => evaluate_if(condition, true_expression, false_expression, environment),
         TypedExpression::Match {
-            expression, arms, ..
-        } => evaluate_match(expression, arms, environment),
+            expression,
+            decision_tree,
+            ..
+        } => evaluate_match(expression, decision_tree, environment),
         TypedExpression::Assignment {
             member,
             initializer,
@@ -143,6 +143,9 @@ fn evaluate_expression<'a>(
             else_body,
             ..
         } => evaluate_for(identifier, iterable, body, else_body, environment),
+        TypedExpression::Break(e) => evaluate_break(e, environment),
+        TypedExpression::Continue => evaluate_continue(environment),
+        TypedExpression::Return(e) => evaluate_return(e, environment),
     }
 }
 
@@ -210,34 +213,153 @@ fn evaluate_if<'a>(
 
 fn evaluate_match(
     expression: Box<TypedExpression>,
-    arms: Vec<TypedMatchArm>,
+    decision_tree: Decision,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let match_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
     let value = evaluate_expression(*expression, match_environment.clone())?;
 
-    for arm in arms {
-        let arm_environment = Rc::new(RefCell::new(Environment::new_parent(
-            match_environment.clone(),
-        )));
+    evaluate_decision_tree(decision_tree, value, match_environment)
+}
 
-        match arm.pattern {
-            Pattern::Wildcard => {
-                return evaluate_expression(arm.expression, arm_environment);
-            }
-            Pattern::Int(v) => {
-                let Value::Number(Number::Int(value)) = value else {
-                    return Err(format!("Expected integer, found '{}'", value));
-                };
+fn evaluate_decision_tree(
+    decision_tree: Decision,
+    value: Value,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    match decision_tree {
+        Decision::Success { expression, .. } => evaluate_expression(*expression, environment),
+        Decision::Failure { error_message } => Err(error_message),
+        Decision::Guard {
+            condition,
+            consequence: true_,
+            alternative: false_,
+            type_: _,
+        } => {
+            let condition = evaluate_expression(*condition, environment.clone())?;
 
-                if value == v {
-                    return evaluate_expression(arm.expression, arm_environment);
+            match condition {
+                Value::Bool(v) => {
+                    if v {
+                        evaluate_decision_tree(*true_, value, environment)
+                    } else {
+                        evaluate_decision_tree(*false_, value, environment)
+                    }
                 }
+                _ => Err(format!(
+                    "Match guard condition must be boolean '{}'",
+                    condition
+                )),
             }
         }
-    }
+        Decision::Switch {
+            variable: _,
+            cases,
+            fallback,
+            type_: _,
+        } => {
+            for case in cases {
+                let pattern = case.pattern;
+                let argument = case.argument;
+                let body = case.body;
 
-    Err(format!("No match arm found for value '{}'", value))
+                let case_environment =
+                    Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
+
+                if let Some(bindings) = evaluate_pattern(pattern, &value)? {
+                    for (identifier, value) in bindings {
+                        case_environment
+                            .borrow_mut()
+                            .add_variable(identifier, value, false);
+                    }
+
+                    case_environment.borrow_mut().add_variable(
+                        argument.identifier,
+                        value.clone(),
+                        false,
+                    );
+
+                    return evaluate_decision_tree(body, value, case_environment);
+                }
+            }
+
+            evaluate_decision_tree(*fallback, value, environment)
+        }
+    }
+}
+
+fn evaluate_pattern(
+    pattern: Pattern,
+    value: &Value,
+) -> Result<Option<Vec<(String, Value)>>, String> {
+    match pattern {
+        Pattern::Wildcard => Ok(Some(Vec::new())),
+        Pattern::Unit => match value {
+            Value::Unit => Ok(Some(Vec::new())),
+            _ => Err(format!("Expected unit, found '{}'", value)),
+        },
+        Pattern::Bool(v) => match value {
+            Value::Bool(v2) => {
+                if v == *v2 {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Err(format!("Expected boolean, found '{}'", value)),
+        },
+        Pattern::Int(v) => match value {
+            Value::Number(Number::Int(v2)) => {
+                if v == *v2 {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Err(format!("Expected int, found '{}'", value)),
+        },
+        Pattern::UInt(v) => match value {
+            Value::Number(Number::UInt(v2)) => {
+                if v == *v2 {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Err(format!("Expected uint, found '{}'", value)),
+        },
+        Pattern::Float(v) => match value {
+            Value::Number(Number::Float(v2)) => {
+                if v == *v2 {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Err(format!("Expected float, found '{}'", value)),
+        },
+        Pattern::Char(v) => match value {
+            Value::Char(v2) => {
+                if v == *v2 {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Err(format!("Expected char, found '{}'", value)),
+        },
+        Pattern::String(v) => match value {
+            Value::String(v2) => {
+                if v == *v2 {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Err(format!("Expected string, found '{}'", value)),
+        },
+        Pattern::Variable(v) => Ok(Some(vec![(v, value.clone())])),
+    }
 }
 
 fn evaluate_assignment<'a>(
@@ -870,7 +992,7 @@ fn evaluate_for(
 }
 
 fn evaluate_break(
-    expression: Option<TypedExpression>,
+    expression: Option<Box<TypedExpression>>,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     if !environment.borrow().has_scope(&ScopeType::Break) {
@@ -879,7 +1001,7 @@ fn evaluate_break(
 
     match expression {
         Some(expression) => {
-            let value = evaluate_expression(expression, environment.clone())?;
+            let value = evaluate_expression(*expression, environment.clone())?;
             environment
                 .borrow_mut()
                 .activate_scope(Scope::Break(Some(value)))?;
@@ -904,7 +1026,7 @@ fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, String> {
 }
 
 fn evaluate_return(
-    expression: Option<TypedExpression>,
+    expression: Option<Box<TypedExpression>>,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     if !environment.borrow().has_scope(&ScopeType::Return) {
@@ -913,7 +1035,7 @@ fn evaluate_return(
 
     match expression {
         Some(expression) => {
-            let value = evaluate_expression(expression, environment.clone())?;
+            let value = evaluate_expression(*expression, environment.clone())?;
             environment
                 .borrow_mut()
                 .activate_scope(Scope::Return(Some(value)))?;

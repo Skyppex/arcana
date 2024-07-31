@@ -17,7 +17,7 @@ use super::{
 };
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
-    match parse_break(cursor) {
+    match parse_function_declaration_statement(cursor) {
         Ok(s) => {
             if let TokenKind::Semicolon = cursor.first().kind {
                 cursor.bump()?; // Consume the ;
@@ -30,38 +30,12 @@ pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     }
 }
 
-fn parse_break(cursor: &mut Cursor) -> Result<Statement, String> {
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Break) {
-        return parse_continue(cursor);
-    }
-
-    cursor.bump()?; // Consume the break
-
-    let expression = if cursor.first().kind == TokenKind::Semicolon {
-        cursor.bump()?;
-        None
-    } else {
-        Some(parse_expression(cursor)?)
-    };
-
-    Ok(Statement::Break(expression))
-}
-
-fn parse_continue(cursor: &mut Cursor) -> Result<Statement, String> {
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Continue) {
-        return parse_function_declaration_statement(cursor);
-    }
-
-    cursor.bump()?; // Consume the continue
-    Ok(Statement::Continue)
-}
-
 fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let mut access_modifier = None;
 
     if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Fun) {
-            return parse_return(cursor);
+            return parse_struct_declaration_statement(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -69,7 +43,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Fun) {
-        return parse_return(cursor);
+        return parse_struct_declaration_statement(cursor);
     }
 
     cursor.bump()?; // Consume the func keyword
@@ -175,23 +149,6 @@ fn unwrap_parameters_recurse(
             )
         }
     }
-}
-
-fn parse_return(cursor: &mut Cursor) -> Result<Statement, String> {
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Return) {
-        return parse_struct_declaration_statement(cursor);
-    }
-
-    cursor.bump()?; // Consume the return
-
-    let expression = if cursor.first().kind == TokenKind::Semicolon {
-        cursor.bump()?; // Consume the ;
-        None
-    } else {
-        Some(parse_expression(cursor)?)
-    };
-
-    Ok(Statement::Return(expression))
 }
 
 fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {

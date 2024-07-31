@@ -11,6 +11,7 @@ use super::{
         BinaryOperator, Block, EnumMemberFieldInitializers, FieldInitializer, Member, Typed,
         TypedClosureParameter, TypedExpression, TypedMatchArm, TypedStatement, UnaryOperator,
     },
+    decision_tree::create_decision_tree,
     scope::ScopeType,
     statements, type_equals, type_equals_coerce, DiscoveredType, Enum, EnumMember, FullName,
     Function, Rcrc, Struct, Type, TypeEnvironment, Union,
@@ -24,6 +25,43 @@ pub fn check_type<'a>(
 ) -> Result<TypedExpression, String> {
     match expression {
         // Expression::None => Ok(TypedExpression::None),
+        Expression::Break(e) => match e {
+            Some(e) => {
+                let typed_expression =
+                    check_type(e, discovered_types, type_environment.clone(), None)?;
+
+                let break_type = typed_expression.get_type();
+                type_environment
+                    .borrow_mut()
+                    .activate_scope(ScopeType::Break, break_type)?;
+                Ok(TypedExpression::Break(Some(Box::new(typed_expression))))
+            }
+            None => {
+                type_environment
+                    .borrow_mut()
+                    .activate_scope(ScopeType::Break, Type::Void)?;
+                Ok(TypedExpression::Break(None))
+            }
+        },
+        Expression::Continue => Ok(TypedExpression::Continue),
+        Expression::Return(e) => match e {
+            Some(e) => {
+                let typed_expression =
+                    check_type(e, discovered_types, type_environment.clone(), None)?;
+
+                let return_type = typed_expression.get_type();
+                type_environment
+                    .borrow_mut()
+                    .activate_scope(ScopeType::Return, return_type)?;
+                Ok(TypedExpression::Return(Some(Box::new(typed_expression))))
+            }
+            None => {
+                type_environment
+                    .borrow_mut()
+                    .activate_scope(ScopeType::Return, Type::Void)?;
+                Ok(TypedExpression::Return(None))
+            }
+        },
         Expression::Closure(closure) => {
             let closure_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
@@ -382,42 +420,33 @@ fn synthesize_type(
             let mut typed_arms: Vec<TypedMatchArm> = vec![];
 
             for arm in arms {
+                let arm_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
+                    match_environment.clone(),
+                )));
+
                 let pattern = arm.pattern.clone();
                 let expression = arm.expression.clone();
 
-                let expression = check_type(
-                    &expression,
-                    discovered_types,
-                    match_environment.clone(),
-                    None,
-                )?;
-
                 typed_arms.push(TypedMatchArm {
                     pattern: pattern.into(),
-                    expression,
+                    expression: *expression,
+                    type_environment: arm_environment.clone(),
                 });
             }
 
-            let mut type_ = Type::Unknown;
+            let decision_tree = create_decision_tree(
+                expression.clone(),
+                typed_arms.clone(),
+                discovered_types,
+                None,
+            )?;
 
-            for TypedMatchArm { expression, .. } in typed_arms.clone() {
-                match type_ {
-                    Type::Unknown => type_ = expression.get_type(),
-                    _ => {
-                        if !type_equals(&type_, &expression.get_type()) {
-                            return Err(format!(
-                                "Match arm type {} does not match previous arm type {}",
-                                expression.get_type(),
-                                type_
-                            ));
-                        }
-                    }
-                }
-            }
+            let type_ = decision_tree.get_type();
 
             Ok(TypedExpression::Match {
                 expression: Box::new(expression),
                 arms: typed_arms,
+                decision_tree,
                 type_,
             })
         }
@@ -883,6 +912,8 @@ fn synthesize_type(
                     iterable.get_type()
                 ));
             };
+
+            println!("For iterable type: {:?}", inner_type.full_name());
 
             for_environment
                 .borrow_mut()

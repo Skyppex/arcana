@@ -13,9 +13,6 @@ pub enum Statement {
     UnionDeclaration(UnionDeclaration),
     FunctionDeclaration(FunctionDeclaration),
     Semi(Box<Statement>),
-    Break(Option<Expression>),
-    Continue,
-    Return(Option<Expression>),
     Expression(Expression),
 }
 
@@ -45,6 +42,10 @@ pub enum Expression {
     Loop(Box<Expression>),
     While(While),
     For(For),
+
+    Break(Option<Box<Expression>>),
+    Continue,
+    Return(Option<Box<Expression>>),
 
     #[cfg(feature = "interpreter")]
     Print(Box<Expression>),
@@ -303,7 +304,14 @@ pub struct MatchArm {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
     Wildcard,
+    Unit,
+    Bool(bool),
     Int(i64),
+    UInt(u64),
+    Float(f64),
+    Char(char),
+    String(String),
+    Variable(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -9,7 +9,7 @@ use super::{
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
     types: HashMap<TypeIdentifier, Type>,

@@ -215,30 +215,32 @@ fn evaluate_boolean_logical_or<'a>(left: Value, right: Value) -> Result<Value, S
 
 fn evaluate_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
+        (Value::Unit, Value::Unit) => Ok(Value::Bool(true)),
+        (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left == right)),
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left == right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left == right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left == right)),
             (left, right) => Err(format!("Cannot equal {:?} and {:?}", left, right)),
         },
+        (Value::Char(left), Value::Char(right)) => Ok(Value::Bool(left == right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left == right)),
-        (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left == right)),
-        (Value::Unit, Value::Unit) => Ok(Value::Bool(true)),
         (left, right) => Err(format!("Cannot equal {:?} and {:?}", left, right)),
     }
 }
 
 fn evaluate_not_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
+        (Value::Unit, Value::Unit) => Ok(Value::Bool(false)),
+        (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left != right)),
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left != right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left != right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left != right)),
             (left, right) => Err(format!("Cannot not equal {:?} and {:?}", left, right)),
         },
+        (Value::Char(left), Value::Char(right)) => Ok(Value::Bool(left != right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left != right)),
-        (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left != right)),
-        (Value::Unit, Value::Unit) => Ok(Value::Bool(false)),
         (left, right) => Err(format!("Cannot not equal {:?} and {:?}", left, right)),
     }
 }
