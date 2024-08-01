@@ -1,6 +1,7 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use shared::{
+    parser::{FieldPattern, Pattern},
     type_checker::{
         ast::{Block, *},
         decision_tree::Decision,
@@ -253,31 +254,38 @@ fn evaluate_decision_tree(
             }
         }
         Decision::Switch {
-            variable: _,
+            variable,
             cases,
             fallback,
             type_: _,
         } => {
             for case in cases {
                 let pattern = case.pattern;
-                let argument = case.argument;
                 let body = case.body;
+
+                println!("Pattern: {:?}", pattern);
+                println!("Value: {:?}", value);
+                println!("Body: {:?}", body);
 
                 let case_environment =
                     Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
 
                 if let Some(bindings) = evaluate_pattern(pattern, &value)? {
                     for (identifier, value) in bindings {
+                        println!("Adding variable: {} = {:?}", identifier, value);
+
                         case_environment
                             .borrow_mut()
                             .add_variable(identifier, value, false);
                     }
 
-                    case_environment.borrow_mut().add_variable(
-                        argument.identifier,
-                        value.clone(),
-                        false,
-                    );
+                    let value = case_environment
+                        .borrow()
+                        .get_variable(&variable.identifier)
+                        .expect("Variable not found in case environment")
+                        .borrow()
+                        .value
+                        .clone();
 
                     return evaluate_decision_tree(body, value, case_environment);
                 }
@@ -310,6 +318,7 @@ fn evaluate_pattern(
         },
         Pattern::Int(v) => match value {
             Value::Number(Number::Int(v2)) => {
+                println!("Int Pattern: {:?}", v);
                 if v == *v2 {
                     Ok(Some(Vec::new()))
                 } else {
@@ -359,6 +368,61 @@ fn evaluate_pattern(
             _ => Err(format!("Expected string, found '{}'", value)),
         },
         Pattern::Variable(v) => Ok(Some(vec![(v, value.clone())])),
+        Pattern::Struct {
+            type_annotation,
+            field_patterns,
+        } => {
+            let fields = match value {
+                Value::Struct {
+                    struct_name,
+                    fields,
+                } => {
+                    if struct_name != &type_annotation {
+                        return Err(format!(
+                            "Expected struct '{}', found struct '{}'",
+                            type_annotation, struct_name
+                        ));
+                    }
+
+                    fields
+                }
+                _ => return Err(format!("Expected struct, found '{}'", value)),
+            };
+
+            let mut bindings = Vec::new();
+
+            for FieldPattern {
+                identifier,
+                pattern,
+            } in field_patterns
+            {
+                let field_value = fields.get(&identifier).ok_or(format!(
+                    "Field '{}' not found in struct '{}'",
+                    identifier, type_annotation
+                ))?;
+
+                println!("Field Value: {:?}", field_value);
+                println!("Recurse");
+                println!("Field Pattern: {:?}", pattern);
+
+                match evaluate_pattern(pattern, field_value)? {
+                    Some(mut bindings_) => {
+                        println!("Uncurse");
+                        for b in bindings_.iter() {
+                            println!("Binding: {:?}", b);
+                        }
+
+                        bindings.append(&mut bindings_)
+                    }
+                    None => {
+                        println!("Unrecurse");
+                        return Ok(None);
+                    }
+                }
+            }
+
+            Ok(Some(bindings))
+        }
     }
 }
 

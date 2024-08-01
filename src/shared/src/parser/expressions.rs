@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     lexer::token::{self, Keyword, TokenKind},
+    parser::FieldPattern,
     types::{parse_optional_type_annotation, TypeAnnotation},
 };
 
@@ -1106,43 +1107,89 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
-    match cursor.first().kind {
-        TokenKind::Underscore => {
+    match (cursor.first().kind, cursor.second().kind) {
+        (TokenKind::Underscore, _) => {
             cursor.bump()?; // Consume the _
             Ok(Pattern::Wildcard)
         }
-        TokenKind::Literal(token::Literal::Unit) => {
+        (TokenKind::Literal(token::Literal::Unit), _) => {
             cursor.bump()?; // Consume the ()
             Ok(Pattern::Unit)
         }
-        TokenKind::Literal(token::Literal::Bool(v)) => {
+        (TokenKind::Literal(token::Literal::Bool(v)), _) => {
             cursor.bump()?; // Consume the ()
             Ok(Pattern::Bool(v))
         }
-        TokenKind::Literal(token::Literal::Int(v)) => {
+        (TokenKind::Literal(token::Literal::Int(v)), _) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::Int(v.value))
         }
-        TokenKind::Literal(token::Literal::UInt(v)) => {
+        (TokenKind::Literal(token::Literal::UInt(v)), _) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::UInt(v.value))
         }
-        TokenKind::Literal(token::Literal::Float(v)) => {
+        (TokenKind::Literal(token::Literal::Float(v)), _) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::Float(v))
         }
-        TokenKind::Literal(token::Literal::Char(v)) => {
+        (TokenKind::Literal(token::Literal::Char(v)), _) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::Char(
                 v.parse::<char>().expect("Failed to parse char literal"),
             ))
         }
-        TokenKind::Literal(token::Literal::String(v)) => {
+        (TokenKind::Literal(token::Literal::String(v)), _) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::String(v))
         }
-        TokenKind::Identifier(identifier) => {
+        (TokenKind::Identifier(_), TokenKind::OpenBrace) => {
+            let type_annotation = parse_type_annotation(cursor, false)?;
+            cursor.bump()?; // Consume the {
+
+            let mut fields = vec![];
+
+            while cursor.first().kind != TokenKind::CloseBrace {
+                let TokenKind::Identifier(identifier) = cursor.first().kind else {
+                    return Err(format!(
+                        "Expected identifier but found {:?}",
+                        cursor.first().kind
+                    ));
+                };
+
+                cursor.bump()?; // Consume the identifier
+
+                if cursor.first().kind != TokenKind::Colon {
+                    fields.push(FieldPattern {
+                        identifier: identifier.clone(),
+                        pattern: Pattern::Variable(identifier),
+                    });
+
+                    continue;
+                }
+
+                cursor.bump()?; // Consume the :
+
+                let pattern = parse_pattern(cursor)?;
+
+                fields.push(FieldPattern {
+                    identifier,
+                    pattern,
+                });
+
+                if cursor.first().kind == TokenKind::Comma {
+                    cursor.bump()?; // Consume the ,
+                }
+            }
+
+            cursor.expect(TokenKind::CloseBrace)?;
+            Ok(Pattern::Struct {
+                type_annotation,
+                field_patterns: fields,
+            })
+        }
+        (TokenKind::Identifier(identifier), _) => {
             cursor.bump()?; // Consume the identifier
+
             Ok(Pattern::Variable(identifier))
         }
         _ => Err(format!(

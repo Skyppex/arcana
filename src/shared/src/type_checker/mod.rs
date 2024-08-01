@@ -12,7 +12,7 @@ pub use full_name::*;
 pub use type_checker::*;
 pub use type_environment::*;
 
-use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
+use std::{any::TypeId, cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
     parser,
@@ -678,5 +678,33 @@ pub fn type_equals_coerce(left: &Type, right: &Type) -> bool {
             type_equals(type_, type_2)
         }
         _ => type_equals(left, right),
+    }
+}
+
+pub fn type_annotation_equals(left: &TypeAnnotation, right: &TypeAnnotation) -> bool {
+    match (left, right) {
+        (TypeAnnotation::Literal(l), TypeAnnotation::Literal(r)) => l == r,
+        (TypeAnnotation::Array(l), TypeAnnotation::Array(r)) => l == r,
+        (TypeAnnotation::Function(lp, lr), TypeAnnotation::Function(rp, rr)) => {
+            let p = match (lp.as_ref(), rp.as_ref()) {
+                (Some(lp), Some(rp)) => type_annotation_equals(lp.as_ref(), rp.as_ref()),
+                (None, None) => true,
+                _ => false,
+            };
+
+            if !p {
+                return false;
+            }
+
+            let r = match (lr.as_ref(), rr.as_ref()) {
+                (Some(lr), Some(rr)) => type_annotation_equals(lr.as_ref(), rr.as_ref()),
+                (None, None) => true,
+                _ => false,
+            };
+
+            r
+        }
+        (TypeAnnotation::Type(l), TypeAnnotation::Type(r)) => l == r,
+        _ => false,
     }
 }

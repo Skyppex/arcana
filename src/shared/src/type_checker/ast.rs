@@ -2,7 +2,7 @@ use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
-use crate::parser::Expression;
+use crate::parser::{Expression, Pattern};
 use crate::pretty_print::PrettyPrint;
 use crate::{
     parser,
@@ -959,50 +959,5 @@ pub struct TypedMatchArm {
 impl Display for TypedMatchArm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} => {:?}", self.pattern, self.expression)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Pattern {
-    Wildcard,
-    Unit,
-    Bool(bool),
-    Int(i64),
-    UInt(u64),
-    Float(f64),
-    Char(char),
-    String(String),
-    Variable(String),
-}
-
-impl From<parser::Pattern> for Pattern {
-    fn from(value: parser::Pattern) -> Self {
-        match value {
-            parser::Pattern::Wildcard => Pattern::Wildcard,
-            parser::Pattern::Unit => Pattern::Unit,
-            parser::Pattern::Bool(v) => Pattern::Bool(v),
-            parser::Pattern::Int(v) => Pattern::Int(v),
-            parser::Pattern::UInt(v) => Pattern::UInt(v),
-            parser::Pattern::Float(v) => Pattern::Float(v),
-            parser::Pattern::Char(v) => Pattern::Char(v),
-            parser::Pattern::String(v) => Pattern::String(v),
-            parser::Pattern::Variable(v) => Pattern::Variable(v),
-        }
-    }
-}
-
-impl Display for Pattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Pattern::Wildcard => write!(f, "_"),
-            Pattern::Unit => write!(f, "()"),
-            Pattern::Bool(v) => write!(f, "{}", v),
-            Pattern::Int(v) => write!(f, "{}", v),
-            Pattern::UInt(v) => write!(f, "{}", v),
-            Pattern::Float(v) => write!(f, "{}", v),
-            Pattern::Char(v) => write!(f, "{}", v),
-            Pattern::String(v) => write!(f, "{}", v),
-            Pattern::Variable(v) => write!(f, "{}", v),
-        }
     }
 }

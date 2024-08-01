@@ -1,18 +1,32 @@
-union HeaderLevel { 1, 2, 3, 4, 5, 6 }
-
-fun repeat(n: int, f: string): string => {
-    let mut result = "";
-
-    for i in 0..n {
-        result += f;
-    }
-
-    result
+struct A {
+    a: int
 }
 
-fun header(level: HeaderLevel, append: fun(): string): string =>
-    repeat(level, "#") + "\n" + append()
-
-3:header => {
-    "Hello, World!"
+struct B {
+    a: A
 }
+
+let v = A { a: 1 };
+let b = B { a: v };
+
+v match
+| A { a: 1 } => 100,
+| A { a } => a + 10,
+
+// v match
+// | A { a } => a match
+//     | 1 => 100,
+//     | a => a + 10,
+// | _ => {} // Error
+
+// b match
+// | B { a: A { a: 1 } } => 100,
+// | B { a: A { a } } => a + 10,
+
+// b match
+// | B { a } => a match
+//     | A { a } => a match
+//         | 1 => 100,
+//         | a => a + 10,
+//     | _ => {}, // Error
+// | _ => {} // Error

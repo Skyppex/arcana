@@ -1,7 +1,10 @@
-use crate::type_checker::{
-    ast::{BinaryOperator, Pattern, Typed},
-    expressions::check_type,
-    type_equals, type_equals_coerce, Type,
+use crate::{
+    parser::Pattern,
+    type_checker::{
+        ast::{BinaryOperator, Member, Typed},
+        expressions::check_type,
+        type_annotation_equals, type_equals, type_equals_coerce, Struct, Type,
+    },
 };
 
 use super::{
@@ -50,7 +53,7 @@ impl Typed for Decision {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Case {
     pub pattern: Pattern,
-    pub argument: Variable,
+    pub arguments: Vec<Variable>,
     pub body: Decision,
 }
 
@@ -94,6 +97,8 @@ pub fn create_decision_tree(
 
     let arm = arms.first().expect("testing matches");
 
+    println!("matchee: {:?}", matchee);
+
     let decision = match arm.pattern.clone() {
         Pattern::Wildcard => {
             let expression = &arm.expression;
@@ -118,8 +123,8 @@ pub fn create_decision_tree(
             if !type_equals(&Type::Unit, &matchee.get_type()) {
                 return Err(format!(
                     "Expected type {:?} but got {:?}",
+                    matchee.get_type(),
                     Type::Unit,
-                    matchee.get_type()
                 ));
             }
 
@@ -136,7 +141,7 @@ pub fn create_decision_tree(
                 }
             }
 
-            let false_ = create_decision_tree(
+            let alternative = create_decision_tree(
                 matchee.clone(),
                 arms.into_iter().skip(1).collect(),
                 discovered_types,
@@ -156,7 +161,7 @@ pub fn create_decision_tree(
                     expression: Box::new(expression),
                     type_: type_.clone(),
                 }),
-                alternative: Box::new(false_),
+                alternative: Box::new(alternative),
                 type_,
             };
 
@@ -166,8 +171,8 @@ pub fn create_decision_tree(
             if !type_equals(&Type::Bool, &matchee.get_type()) {
                 return Err(format!(
                     "Expected type {:?} but got {:?}",
+                    matchee.get_type(),
                     Type::Bool,
-                    matchee.get_type()
                 ));
             }
 
@@ -184,7 +189,7 @@ pub fn create_decision_tree(
                 }
             }
 
-            let false_ = create_decision_tree(
+            let alternative = create_decision_tree(
                 matchee.clone(),
                 arms.into_iter().skip(1).collect(),
                 discovered_types,
@@ -204,7 +209,7 @@ pub fn create_decision_tree(
                     expression: Box::new(expression),
                     type_: type_.clone(),
                 }),
-                alternative: Box::new(false_),
+                alternative: Box::new(alternative),
                 type_,
             };
 
@@ -214,8 +219,8 @@ pub fn create_decision_tree(
             if !type_equals(&Type::Int, &matchee.get_type()) {
                 return Err(format!(
                     "Expected type {:?} but got {:?}",
+                    matchee.get_type(),
                     Type::Int,
-                    matchee.get_type()
                 ));
             }
             let expression = &arm.expression;
@@ -231,7 +236,7 @@ pub fn create_decision_tree(
                 }
             }
 
-            let false_ = create_decision_tree(
+            let alternative = create_decision_tree(
                 matchee.clone(),
                 arms.into_iter().skip(1).collect(),
                 discovered_types,
@@ -251,7 +256,7 @@ pub fn create_decision_tree(
                     expression: Box::new(expression),
                     type_: type_.clone(),
                 }),
-                alternative: Box::new(false_),
+                alternative: Box::new(alternative),
                 type_,
             };
 
@@ -261,8 +266,8 @@ pub fn create_decision_tree(
             if !type_equals(&Type::UInt, &matchee.get_type()) {
                 return Err(format!(
                     "Expected type {:?} but got {:?}",
+                    matchee.get_type(),
                     Type::UInt,
-                    matchee.get_type()
                 ));
             }
             let expression = &arm.expression;
@@ -278,7 +283,7 @@ pub fn create_decision_tree(
                 }
             }
 
-            let false_ = create_decision_tree(
+            let alternative = create_decision_tree(
                 matchee.clone(),
                 arms.into_iter().skip(1).collect(),
                 discovered_types,
@@ -298,7 +303,7 @@ pub fn create_decision_tree(
                     expression: Box::new(expression),
                     type_: type_.clone(),
                 }),
-                alternative: Box::new(false_),
+                alternative: Box::new(alternative),
                 type_,
             };
 
@@ -308,8 +313,8 @@ pub fn create_decision_tree(
             if !type_equals(&Type::Float, &matchee.get_type()) {
                 return Err(format!(
                     "Expected type {:?} but got {:?}",
+                    matchee.get_type(),
                     Type::Float,
-                    matchee.get_type()
                 ));
             }
             let expression = &arm.expression;
@@ -325,7 +330,7 @@ pub fn create_decision_tree(
                 }
             }
 
-            let false_ = create_decision_tree(
+            let alternative = create_decision_tree(
                 matchee.clone(),
                 arms.into_iter().skip(1).collect(),
                 discovered_types,
@@ -345,7 +350,7 @@ pub fn create_decision_tree(
                     expression: Box::new(expression),
                     type_: type_.clone(),
                 }),
-                alternative: Box::new(false_),
+                alternative: Box::new(alternative),
                 type_,
             };
 
@@ -355,8 +360,8 @@ pub fn create_decision_tree(
             if !type_equals(&Type::Char, &matchee.get_type()) {
                 return Err(format!(
                     "Expected type {:?} but got {:?}",
+                    matchee.get_type(),
                     Type::Char,
-                    matchee.get_type()
                 ));
             }
             let expression = &arm.expression;
@@ -372,7 +377,7 @@ pub fn create_decision_tree(
                 }
             }
 
-            let false_ = create_decision_tree(
+            let alternative = create_decision_tree(
                 matchee.clone(),
                 arms.into_iter().skip(1).collect(),
                 discovered_types,
@@ -392,7 +397,7 @@ pub fn create_decision_tree(
                     expression: Box::new(expression),
                     type_: type_.clone(),
                 }),
-                alternative: Box::new(false_),
+                alternative: Box::new(alternative),
                 type_,
             };
 
@@ -402,8 +407,8 @@ pub fn create_decision_tree(
             if !type_equals(&Type::String, &matchee.get_type()) {
                 return Err(format!(
                     "Expected type {:?} but got {:?}",
+                    matchee.get_type(),
                     Type::String,
-                    matchee.get_type()
                 ));
             }
             let expression = &arm.expression;
@@ -419,7 +424,7 @@ pub fn create_decision_tree(
                 }
             }
 
-            let false_ = create_decision_tree(
+            let alternative = create_decision_tree(
                 matchee.clone(),
                 arms.into_iter().skip(1).collect(),
                 discovered_types,
@@ -439,7 +444,7 @@ pub fn create_decision_tree(
                     expression: Box::new(expression),
                     type_: type_.clone(),
                 }),
-                alternative: Box::new(false_),
+                alternative: Box::new(alternative),
                 type_,
             };
 
@@ -449,6 +454,9 @@ pub fn create_decision_tree(
             let expression = &arm.expression;
             let type_environment = &arm.type_environment;
             let matchee_type = matchee.get_type();
+
+            println!("identifier: {:?}", identifier);
+            println!("matchee_type: {:?}", matchee_type);
 
             type_environment
                 .borrow_mut()
@@ -467,10 +475,10 @@ pub fn create_decision_tree(
 
             let case = Case {
                 pattern: Pattern::Variable(identifier.clone()),
-                argument: Variable {
+                arguments: vec![Variable {
                     identifier: identifier.clone(),
                     type_: matchee_type.clone(),
-                },
+                }],
                 body: Decision::Success {
                     expression: Box::new(expression),
                     type_: type_.clone(),
@@ -487,6 +495,90 @@ pub fn create_decision_tree(
                     error_message: "No match found".to_string(),
                 }),
                 type_,
+            })
+        }
+        Pattern::Struct {
+            type_annotation,
+            field_patterns,
+        } => {
+            if !type_annotation_equals(
+                &matchee.get_type().type_annotation(),
+                &type_annotation.clone(),
+            ) {
+                return Err(format!(
+                    "Expected type annotation {} but got {}",
+                    matchee.get_type().type_annotation(),
+                    type_annotation,
+                ));
+            }
+
+            let expression = &arm.expression;
+            let type_environment = arm.type_environment.clone();
+            let matchee_type = matchee.get_type();
+
+            println!("struct_matchee: {:?}", matchee);
+            println!("matchee_type: {:?}", matchee_type);
+
+            let Type::Struct(Struct { fields, .. }) = matchee_type.clone() else {
+                return Err(format!(
+                    "Expected struct but got {:?}",
+                    matchee_type.clone()
+                ));
+            };
+
+            let field_name = field_patterns.first().unwrap().identifier.clone();
+            let field_type = fields.get(&field_name).expect("testing matches").clone();
+
+            let case = Case {
+                pattern: Pattern::Struct {
+                    type_annotation: type_annotation.clone(),
+                    field_patterns: field_patterns.clone(),
+                },
+                arguments: fields
+                    .iter()
+                    .map(|(field, type_)| Variable {
+                        identifier: field.clone(),
+                        type_: type_.clone(),
+                    })
+                    .collect(),
+                body: create_decision_tree(
+                    TypedExpression::Member(Member::MemberAccess {
+                        object: Box::new(matchee.clone()),
+                        member: Box::new(Member::Identifier {
+                            symbol: field_name.clone(),
+                            type_: field_type.clone(),
+                        }),
+                        symbol: field_name.clone(),
+                        type_: field_type.clone(),
+                    }),
+                    field_patterns
+                        .into_iter()
+                        .map(|field_pattern| TypedMatchArm {
+                            pattern: field_pattern.pattern,
+                            expression: expression.clone(),
+                            type_environment: type_environment.clone(),
+                        })
+                        .collect(),
+                    discovered_types,
+                    body_type.clone(),
+                )?,
+            };
+
+            let fallback = create_decision_tree(
+                matchee.clone(),
+                arms.into_iter().skip(1).collect(),
+                discovered_types,
+                body_type,
+            )?;
+
+            Ok(Decision::Switch {
+                variable: Variable {
+                    identifier: field_name.clone(),
+                    type_: field_type.clone(),
+                },
+                cases: vec![case],
+                fallback: Box::new(fallback),
+                type_: field_type.clone(),
             })
         }
     };

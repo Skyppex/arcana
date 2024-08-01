@@ -198,6 +198,31 @@ impl Hash for TypeIdentifier {
     }
 }
 
+impl From<TypeAnnotation> for TypeIdentifier {
+    fn from(value: TypeAnnotation) -> Self {
+        match value {
+            TypeAnnotation::Type(name) => {
+                if name.contains("::") {
+                    let mut parts = name.split("::");
+                    let parent = parts.next().unwrap();
+                    let member = parts.next().unwrap();
+
+                    TypeIdentifier::MemberType(
+                        Box::new(TypeIdentifier::Type(parent.to_string())),
+                        member.to_string(),
+                    )
+                } else {
+                    TypeIdentifier::Type(name)
+                }
+            }
+            TypeAnnotation::ConcreteType(name, generics) => {
+                TypeIdentifier::ConcreteType(name, generics)
+            }
+            _ => panic!("Cannot convert {:?} to TypeIdentifier", value),
+        }
+    }
+}
+
 impl Display for TypeIdentifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

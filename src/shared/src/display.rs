@@ -2,14 +2,14 @@ use crate::{
     parser::{
         AccessModifier, Assignment, Binary, BinaryOperator, Call, ClosureParameter,
         EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
-        FieldInitializer, FlagsMember, For, FunctionDeclaration, If, Literal, Match, MatchArm,
-        Member, Parameter, Pattern, Statement, StructDeclaration, StructField, Unary,
+        FieldInitializer, FieldPattern, FlagsMember, For, FunctionDeclaration, If, Literal, Match,
+        MatchArm, Member, Parameter, Pattern, Statement, StructDeclaration, StructField, Unary,
         UnaryOperator, UnionDeclaration, VariableDeclaration, While,
     },
     type_checker::{
         self,
         ast::{
-            Block, Typed, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
+            Block, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
             TypedStatement,
         },
         decision_tree::{Case, Decision, Variable},
@@ -41,17 +41,21 @@ impl Indent {
 
     fn end_current(&mut self) {
         let len = self.levels.len();
+
         if len == 0 {
             return;
         }
+
         self.levels[len - 1] = true;
     }
 
     fn dash(&self) -> String {
         let mut result = String::new();
+
         for is_end in self.levels.iter().rev().skip(1).rev() {
             result.push_str(if *is_end { "  " } else { "┆ " });
         }
+
         result.push_str("├─");
         result
     }
@@ -426,11 +430,11 @@ impl IndentDisplay for Expression {
             }
             Expression::Match(Match { expression, arms }) => {
                 let mut result = String::new();
-                result.push_str("<match>\n");
+                result.push_str("<match>");
                 indent.increase();
                 result.push_str(
                     format!(
-                        "{}expression: {}\n",
+                        "\n{}expression: {}",
                         indent.dash(),
                         expression.indent_display(indent)
                     )
@@ -1233,11 +1237,11 @@ impl IndentDisplay for BinaryOperator {
 impl IndentDisplay for MatchArm {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str("<match arm>\n");
-        indent.increase_leaf();
+        result.push_str("<match arm>");
+        indent.increase();
         result.push_str(
             format!(
-                "{}pattern: {}\n",
+                "\n{}pattern: {}",
                 indent.dash(),
                 self.pattern.indent_display(indent)
             )
@@ -1246,7 +1250,7 @@ impl IndentDisplay for MatchArm {
         indent.end_current();
         result.push_str(
             format!(
-                "{}expression: {}",
+                "\n{}expression: {}",
                 indent.dash_end(),
                 self.expression.indent_display(indent)
             )
@@ -1258,7 +1262,7 @@ impl IndentDisplay for MatchArm {
 }
 
 impl IndentDisplay for Pattern {
-    fn indent_display(&self, _indent: &mut Indent) -> String {
+    fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
             Pattern::Wildcard => "_".to_string(),
             Pattern::Unit => "unit".to_string(),
@@ -1269,7 +1273,78 @@ impl IndentDisplay for Pattern {
             Pattern::Char(c) => c.to_string(),
             Pattern::String(s) => s.to_string(),
             Pattern::Variable(v) => v.to_string(),
+            Pattern::Struct {
+                type_annotation,
+                field_patterns,
+            } => {
+                let mut result = String::new();
+
+                result.push_str("<struct pattern>");
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "\n{}type_annotation: {}",
+                        indent.dash(),
+                        type_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                for (i, field_pattern) in field_patterns.iter().enumerate() {
+                    if i < field_patterns.len() - 1 {
+                        result.push_str(
+                            format!(
+                                "\n{}{},",
+                                indent.dash(),
+                                field_pattern.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
+                    } else {
+                        indent.end_current();
+                        result.push_str(
+                            format!(
+                                "\n{}{}",
+                                indent.dash_end(),
+                                field_pattern.indent_display(indent)
+                            )
+                            .as_str(),
+                        );
+                    }
+                }
+
+                indent.decrease();
+
+                result
+            }
         }
+    }
+}
+
+impl IndentDisplay for FieldPattern {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<field pattern>\n");
+        indent.increase_leaf();
+        result.push_str(
+            format!(
+                "{}identifier: {}\n",
+                indent.dash(),
+                self.identifier.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.end_current();
+        result.push_str(
+            format!(
+                "{}pattern: {}",
+                indent.dash_end(),
+                self.pattern.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.decrease();
+        result
     }
 }
 
@@ -1580,23 +1655,19 @@ impl IndentDisplay for TypedExpression {
                     .as_str(),
                 );
 
-                for (i, arm) in arms.iter().enumerate() {
-                    if i < arms.len() - 1 {
-                        result.push_str(
-                            format!("\n{}{},", indent.dash(), arm.indent_display(indent)).as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!("\n{}{}", indent.dash_end(), arm.indent_display(indent))
-                                .as_str(),
-                        );
-                    }
-                }
-
                 result.push_str(
                     format!(
-                        "{}decision_tree: {}",
+                        "{}{}",
+                        indent.dash(),
+                        indent_display_vec(arms, "arms", "arm", indent)
+                    )
+                    .as_str(),
+                );
+
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "\n{}decision_tree: {}",
                         indent.dash_end(),
                         decision_tree.indent_display(indent)
                     )
@@ -2606,19 +2677,20 @@ impl IndentDisplay for TypeAnnotation {
 impl IndentDisplay for TypedMatchArm {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str("<match arm>\n");
-        indent.increase_leaf();
+        result.push_str("<match arm>");
+        indent.increase();
         result.push_str(
             format!(
-                "{}pattern: {}\n",
+                "\n{}pattern: {}",
                 indent.dash(),
                 self.pattern.indent_display(indent)
             )
             .as_str(),
         );
+        indent.end_current();
         result.push_str(
             format!(
-                "{}expression: {}",
+                "\n{}expression: {}",
                 indent.dash_end(),
                 self.expression.indent_display(indent)
             )
@@ -2629,31 +2701,17 @@ impl IndentDisplay for TypedMatchArm {
     }
 }
 
-impl IndentDisplay for type_checker::ast::Pattern {
-    fn indent_display(&self, _indent: &mut Indent) -> String {
-        match self {
-            type_checker::ast::Pattern::Wildcard => "_".to_string(),
-            type_checker::ast::Pattern::Unit => "()".to_string(),
-            type_checker::ast::Pattern::Bool(v) => v.to_string(),
-            type_checker::ast::Pattern::Int(v) => v.to_string(),
-            type_checker::ast::Pattern::UInt(v) => v.to_string(),
-            type_checker::ast::Pattern::Float(v) => v.to_string(),
-            type_checker::ast::Pattern::Char(c) => c.to_string(),
-            type_checker::ast::Pattern::String(s) => s.to_string(),
-            type_checker::ast::Pattern::Variable(v) => v.to_string(),
-        }
-    }
-}
-
 impl IndentDisplay for Decision {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
         result.push_str("<decision>");
-        indent.increase_leaf();
+        indent.increase();
 
         match self {
             Decision::Success { expression, type_ } => {
                 result.push_str(format!(": {}", type_).as_str());
+                result.push_str(format!("\n{}variant: Success", indent.dash()).as_str());
+                indent.end_current();
                 result.push_str(
                     format!(
                         "\n{}expression: {}",
@@ -2665,6 +2723,8 @@ impl IndentDisplay for Decision {
             }
             Decision::Failure { error_message } => {
                 result.push_str(format!(": {}", Type::Unknown).as_str());
+                result.push_str(format!("\n{}variant: Failure", indent.dash()).as_str());
+                indent.end_current();
                 result.push_str(
                     format!(
                         "\n{}error_message: {}",
@@ -2676,11 +2736,12 @@ impl IndentDisplay for Decision {
             }
             Decision::Guard {
                 condition,
-                consequence: true_,
-                alternative: false_,
+                consequence,
+                alternative,
                 type_,
             } => {
                 result.push_str(format!(": {}", type_).as_str());
+                result.push_str(format!("\n{}variant: Guard", indent.dash()).as_str());
                 result.push_str(
                     format!(
                         "\n{}condition: {}",
@@ -2689,15 +2750,22 @@ impl IndentDisplay for Decision {
                     )
                     .as_str(),
                 );
+
                 result.push_str(
-                    format!("\n{}true: {}", indent.dash(), true_.indent_display(indent)).as_str(),
+                    format!(
+                        "\n{}consequence: {}",
+                        indent.dash(),
+                        consequence.indent_display(indent)
+                    )
+                    .as_str(),
                 );
+
                 indent.end_current();
                 result.push_str(
                     format!(
-                        "\n{}false: {}",
+                        "\n{}alternative: {}",
                         indent.dash_end(),
-                        false_.indent_display(indent)
+                        alternative.indent_display(indent)
                     )
                     .as_str(),
                 );
@@ -2709,6 +2777,7 @@ impl IndentDisplay for Decision {
                 type_,
             } => {
                 result.push_str(format!(": {}", type_).as_str());
+                result.push_str(format!("\n{}variant: Switch", indent.dash()).as_str());
                 result.push_str(
                     format!(
                         "\n{}variable: {}",
@@ -2718,20 +2787,16 @@ impl IndentDisplay for Decision {
                     .as_str(),
                 );
 
-                for (i, case) in cases.iter().enumerate() {
-                    if i < cases.len() - 1 {
-                        result.push_str(
-                            format!("\n{}{},", indent.dash(), case.indent_display(indent)).as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!("\n{}{}", indent.dash_end(), case.indent_display(indent))
-                                .as_str(),
-                        );
-                    }
-                }
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash(),
+                        indent_display_vec(cases, "cases", "case", indent)
+                    )
+                    .as_str(),
+                );
 
+                indent.end_current();
                 result.push_str(
                     format!(
                         "\n{}fallback: {}",
@@ -2743,6 +2808,8 @@ impl IndentDisplay for Decision {
             }
         }
 
+        indent.decrease();
+
         result
     }
 }
@@ -2751,23 +2818,26 @@ impl IndentDisplay for Case {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
         result.push_str("<case>");
-        indent.increase_leaf();
+        indent.increase();
         result.push_str(
             format!(
-                "{}pattern: {}\n",
+                "\n{}pattern: {}",
                 indent.dash(),
                 self.pattern.indent_display(indent)
             )
             .as_str(),
         );
+
         result.push_str(
             format!(
-                "{}argument: {}",
+                "\n{}{}",
                 indent.dash(),
-                self.argument.indent_display(indent) // indent_display_vec(&self.arguments, "arguments", "argument", indent)
+                indent_display_vec(&self.arguments, "arguments", "argument", indent)
             )
             .as_str(),
         );
+
+        indent.end_current();
         result.push_str(
             format!(
                 "\n{}decision: {}",
@@ -2776,6 +2846,8 @@ impl IndentDisplay for Case {
             )
             .as_str(),
         );
+
+        indent.decrease();
 
         result
     }
