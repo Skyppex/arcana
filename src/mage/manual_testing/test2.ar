@@ -6,12 +6,12 @@ struct B {
     a: A
 }
 
-let v = A { a: 1 };
+let v = A { a: 0 };
 let b = B { a: v };
 
-v match
-| A { a: 1 } => 100,
-| A { a } => a + 10,
+// v match
+// | A { a: 1 } => 100,
+// | A { a } => a + 10,
 
 // v match
 // | A { a } => a match
@@ -19,9 +19,9 @@ v match
 //     | a => a + 10,
 // | _ => {} // Error
 
-// b match
-// | B { a: A { a: 1 } } => 100,
-// | B { a: A { a } } => a + 10,
+b match
+| B { a: A { a: 1 } } => 100,
+| B { a: A { a } } => a + 10,
 
 // b match
 // | B { a } => a match

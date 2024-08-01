@@ -2,14 +2,14 @@ use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
-use crate::parser::{Expression, Pattern};
+use crate::parser::Expression;
 use crate::pretty_print::PrettyPrint;
 use crate::{
     parser,
     types::{GenericConstraint, TypeAnnotation, TypeIdentifier},
 };
 
-use super::decision_tree::Decision;
+use super::decision_tree::{Decision, Pattern};
 use super::{Rcrc, Type, TypeEnvironment};
 
 pub trait Typed {

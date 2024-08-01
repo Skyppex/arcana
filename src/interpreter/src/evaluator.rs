@@ -1,10 +1,9 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use shared::{
-    parser::{FieldPattern, Pattern},
     type_checker::{
         ast::{Block, *},
-        decision_tree::Decision,
+        decision_tree::{Accessor, Constructor, Decision, FieldPattern, Pattern},
         Type,
     },
     types::TypeIdentifier,
@@ -259,16 +258,56 @@ fn evaluate_decision_tree(
             fallback,
             type_: _,
         } => {
+            println!("Variable: {:?}", variable);
+
+            let switch_value = match variable.accessor {
+                Accessor::Environment => value.clone(),
+                Accessor::Expression(expression) => {
+                    let argument_value = evaluate_expression(*expression, environment.clone())?;
+                    println!("Argument Value: {:?}", argument_value);
+
+                    environment.borrow_mut().add_variable(
+                        variable.identifier.clone(),
+                        argument_value.clone(),
+                        false,
+                    );
+
+                    argument_value
+                }
+            };
+
+            println!("Value: {:?}", value);
+            println!("Switch Value: {:?}", switch_value);
+
             for case in cases {
                 let pattern = case.pattern;
+                let arguments = case.arguments;
                 let body = case.body;
 
                 println!("Pattern: {:?}", pattern);
-                println!("Value: {:?}", value);
                 println!("Body: {:?}", body);
 
                 let case_environment =
                     Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
+
+                for argument in arguments {
+                    println!("Case Argument: {:?}", argument);
+
+                    match argument.accessor {
+                        Accessor::Environment => continue,
+                        Accessor::Expression(expression) => {
+                            let argument_value =
+                                evaluate_expression(*expression, environment.clone())?;
+                            println!("Case Argument Value: {:?}", argument_value);
+
+                            case_environment.borrow_mut().add_variable(
+                                argument.identifier,
+                                argument_value,
+                                false,
+                            );
+                        }
+                    }
+                }
 
                 if let Some(bindings) = evaluate_pattern(pattern, &value)? {
                     for (identifier, value) in bindings {
@@ -279,15 +318,7 @@ fn evaluate_decision_tree(
                             .add_variable(identifier, value, false);
                     }
 
-                    let value = case_environment
-                        .borrow()
-                        .get_variable(&variable.identifier)
-                        .expect("Variable not found in case environment")
-                        .borrow()
-                        .value
-                        .clone();
-
-                    return evaluate_decision_tree(body, value, case_environment);
+                    return evaluate_decision_tree(body, switch_value, case_environment);
                 }
             }
 
@@ -368,10 +399,10 @@ fn evaluate_pattern(
             _ => Err(format!("Expected string, found '{}'", value)),
         },
         Pattern::Variable(v) => Ok(Some(vec![(v, value.clone())])),
-        Pattern::Struct {
+        Pattern::Constructor(Constructor::Struct {
             type_annotation,
             field_patterns,
-        } => {
+        }) => {
             let fields = match value {
                 Value::Struct {
                     struct_name,

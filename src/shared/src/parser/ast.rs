@@ -3,6 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
 use crate::pretty_print::PrettyPrint;
+use crate::type_checker::decision_tree::Pattern;
 use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -299,64 +300,6 @@ pub struct Match {
 pub struct MatchArm {
     pub pattern: Pattern,
     pub expression: Box<Expression>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Pattern {
-    Wildcard,
-    Unit,
-    Bool(bool),
-    Int(i64),
-    UInt(u64),
-    Float(f64),
-    Char(char),
-    String(String),
-    Variable(String),
-    Struct {
-        type_annotation: TypeAnnotation,
-        field_patterns: Vec<FieldPattern>,
-    },
-}
-
-impl Display for Pattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Pattern::Wildcard => write!(f, "_"),
-            Pattern::Unit => write!(f, "()"),
-            Pattern::Bool(v) => write!(f, "{}", v),
-            Pattern::Int(v) => write!(f, "{}", v),
-            Pattern::UInt(v) => write!(f, "{}", v),
-            Pattern::Float(v) => write!(f, "{}", v),
-            Pattern::Char(v) => write!(f, "{}", v),
-            Pattern::String(v) => write!(f, "{}", v),
-            Pattern::Variable(v) => write!(f, "{}", v),
-            Pattern::Struct {
-                type_annotation,
-                field_patterns,
-            } => {
-                write!(f, "{} {{ ", type_annotation)?;
-                for (i, field_pattern) in field_patterns.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", field_pattern)?;
-                }
-                write!(f, " }}")
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct FieldPattern {
-    pub identifier: String,
-    pub pattern: Pattern,
-}
-
-impl Display for FieldPattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.identifier, self.pattern)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

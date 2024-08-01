@@ -2,9 +2,9 @@ use crate::{
     parser::{
         AccessModifier, Assignment, Binary, BinaryOperator, Call, ClosureParameter,
         EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
-        FieldInitializer, FieldPattern, FlagsMember, For, FunctionDeclaration, If, Literal, Match,
-        MatchArm, Member, Parameter, Pattern, Statement, StructDeclaration, StructField, Unary,
-        UnaryOperator, UnionDeclaration, VariableDeclaration, While,
+        FieldInitializer, FlagsMember, For, FunctionDeclaration, If, Literal, Match, MatchArm,
+        Member, Parameter, Statement, StructDeclaration, StructField, Unary, UnaryOperator,
+        UnionDeclaration, VariableDeclaration, While,
     },
     type_checker::{
         self,
@@ -12,7 +12,7 @@ use crate::{
             Block, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
             TypedStatement,
         },
-        decision_tree::{Case, Decision, Variable},
+        decision_tree::{Case, Constructor, Decision, FieldPattern, Pattern, Variable},
         FullName, Type,
     },
     types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
@@ -1273,10 +1273,10 @@ impl IndentDisplay for Pattern {
             Pattern::Char(c) => c.to_string(),
             Pattern::String(s) => s.to_string(),
             Pattern::Variable(v) => v.to_string(),
-            Pattern::Struct {
+            Pattern::Constructor(Constructor::Struct {
                 type_annotation,
                 field_patterns,
-            } => {
+            }) => {
                 let mut result = String::new();
 
                 result.push_str("<struct pattern>");

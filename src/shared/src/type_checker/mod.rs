@@ -12,7 +12,7 @@ pub use full_name::*;
 pub use type_checker::*;
 pub use type_environment::*;
 
-use std::{any::TypeId, cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use crate::{
     parser,

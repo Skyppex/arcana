@@ -1,16 +1,81 @@
+use std::fmt::Display;
+
 use crate::{
-    parser::Pattern,
     type_checker::{
         ast::{BinaryOperator, Member, Typed},
         expressions::check_type,
         type_annotation_equals, type_equals, type_equals_coerce, Struct, Type,
     },
+    types::TypeAnnotation,
 };
 
 use super::{
     ast::{TypedExpression, TypedMatchArm},
     DiscoveredType,
 };
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Constructor {
+    Struct {
+        type_annotation: TypeAnnotation,
+        field_patterns: Vec<FieldPattern>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern {
+    Wildcard,
+    Unit,
+    Bool(bool),
+    Int(i64),
+    UInt(u64),
+    Float(f64),
+    Char(char),
+    String(String),
+    Variable(String),
+    Constructor(Constructor),
+}
+
+impl Display for Pattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Pattern::Wildcard => write!(f, "_"),
+            Pattern::Unit => write!(f, "()"),
+            Pattern::Bool(v) => write!(f, "{}", v),
+            Pattern::Int(v) => write!(f, "{}", v),
+            Pattern::UInt(v) => write!(f, "{}", v),
+            Pattern::Float(v) => write!(f, "{}", v),
+            Pattern::Char(v) => write!(f, "{}", v),
+            Pattern::String(v) => write!(f, "{}", v),
+            Pattern::Variable(v) => write!(f, "{}", v),
+            Pattern::Constructor(Constructor::Struct {
+                type_annotation,
+                field_patterns,
+            }) => {
+                write!(f, "{} {{ ", type_annotation)?;
+                for (i, field_pattern) in field_patterns.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", field_pattern)?;
+                }
+                write!(f, " }}")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FieldPattern {
+    pub identifier: String,
+    pub pattern: Pattern,
+}
+
+impl Display for FieldPattern {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.identifier, self.pattern)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decision {
@@ -70,6 +135,7 @@ impl Typed for Case {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
     pub identifier: String,
+    pub accessor: Accessor,
     pub type_: Type,
 }
 
@@ -81,6 +147,12 @@ impl Typed for Variable {
     fn get_deep_type(&self) -> Type {
         self.get_type()
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Accessor {
+    Expression(Box<TypedExpression>),
+    Environment,
 }
 
 pub fn create_decision_tree(
@@ -473,12 +545,15 @@ pub fn create_decision_tree(
                 }
             }
 
+            let variable = Variable {
+                identifier: identifier.clone(),
+                accessor: Accessor::Environment,
+                type_: matchee_type.clone(),
+            };
+
             let case = Case {
                 pattern: Pattern::Variable(identifier.clone()),
-                arguments: vec![Variable {
-                    identifier: identifier.clone(),
-                    type_: matchee_type.clone(),
-                }],
+                arguments: vec![variable.clone()],
                 body: Decision::Success {
                     expression: Box::new(expression),
                     type_: type_.clone(),
@@ -486,10 +561,7 @@ pub fn create_decision_tree(
             };
 
             Ok(Decision::Switch {
-                variable: Variable {
-                    identifier: identifier.clone(),
-                    type_: matchee_type.clone(),
-                },
+                variable,
                 cases: vec![case],
                 fallback: Box::new(Decision::Failure {
                     error_message: "No match found".to_string(),
@@ -497,10 +569,10 @@ pub fn create_decision_tree(
                 type_,
             })
         }
-        Pattern::Struct {
+        Pattern::Constructor(Constructor::Struct {
             type_annotation,
             field_patterns,
-        } => {
+        }) => {
             if !type_annotation_equals(
                 &matchee.get_type().type_annotation(),
                 &type_annotation.clone(),
@@ -526,31 +598,39 @@ pub fn create_decision_tree(
                 ));
             };
 
+            for field in fields.iter() {
+                println!("field_ident: {:?}", field.0);
+                println!("field_type: {:?}", field.1);
+            }
+
             let field_name = field_patterns.first().unwrap().identifier.clone();
             let field_type = fields.get(&field_name).expect("testing matches").clone();
 
+            let expr = TypedExpression::Member(Member::MemberAccess {
+                object: Box::new(matchee.clone()),
+                member: Box::new(Member::Identifier {
+                    symbol: field_name.clone(),
+                    type_: field_type.clone(),
+                }),
+                symbol: field_name.clone(),
+                type_: field_type.clone(),
+            });
+
             let case = Case {
-                pattern: Pattern::Struct {
+                pattern: Pattern::Constructor(Constructor::Struct {
                     type_annotation: type_annotation.clone(),
                     field_patterns: field_patterns.clone(),
-                },
+                }),
                 arguments: fields
                     .iter()
                     .map(|(field, type_)| Variable {
                         identifier: field.clone(),
+                        accessor: Accessor::Environment,
                         type_: type_.clone(),
                     })
                     .collect(),
                 body: create_decision_tree(
-                    TypedExpression::Member(Member::MemberAccess {
-                        object: Box::new(matchee.clone()),
-                        member: Box::new(Member::Identifier {
-                            symbol: field_name.clone(),
-                            type_: field_type.clone(),
-                        }),
-                        symbol: field_name.clone(),
-                        type_: field_type.clone(),
-                    }),
+                    expr.clone(),
                     field_patterns
                         .into_iter()
                         .map(|field_pattern| TypedMatchArm {
@@ -574,6 +654,7 @@ pub fn create_decision_tree(
             Ok(Decision::Switch {
                 variable: Variable {
                     identifier: field_name.clone(),
+                    accessor: Accessor::Expression(Box::new(expr.clone())),
                     type_: field_type.clone(),
                 },
                 cases: vec![case],

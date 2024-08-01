@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use crate::{
     lexer::token::{self, Keyword, TokenKind},
-    parser::FieldPattern,
+    type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
     types::{parse_optional_type_annotation, TypeAnnotation},
 };
 
 use super::{
     cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, Closure,
     ClosureParameter, EnumMemberFieldInitializers, Expression, FieldInitializer, For, If, Literal,
-    Match, MatchArm, Member, Pattern, Statement, Unary, UnaryOperator, VariableDeclaration, While,
+    Match, MatchArm, Member, Statement, Unary, UnaryOperator, VariableDeclaration, While,
 };
 use crate::types::parse_type_annotation;
 
@@ -1182,10 +1182,10 @@ fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
             }
 
             cursor.expect(TokenKind::CloseBrace)?;
-            Ok(Pattern::Struct {
+            Ok(Pattern::Constructor(Constructor::Struct {
                 type_annotation,
                 field_patterns: fields,
-            })
+            }))
         }
         (TokenKind::Identifier(identifier), _) => {
             cursor.bump()?; // Consume the identifier

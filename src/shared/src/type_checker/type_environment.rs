@@ -15,10 +15,11 @@ pub struct TypeEnvironment {
     types: HashMap<TypeIdentifier, Type>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
+    allow_override_types: bool,
 }
 
 impl TypeEnvironment {
-    pub fn new() -> Self {
+    pub fn new(allow_override_types: bool) -> Self {
         Self {
             parent: None,
             types: HashMap::from([
@@ -42,15 +43,19 @@ impl TypeEnvironment {
             ]),
             variables: HashMap::new(),
             scopes: Vec::new(),
+            allow_override_types,
         }
     }
 
     pub fn new_parent(parent: Rcrc<Self>) -> Self {
+        let allow_override_types = parent.borrow().allow_override_types;
+
         Self {
             parent: Some(parent),
             types: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
+            allow_override_types,
         }
     }
 
@@ -62,6 +67,8 @@ impl TypeEnvironment {
         parent: Rcrc<Self>,
         scopes: U,
     ) -> Self {
+        let allow_override_types = parent.borrow().allow_override_types;
+
         Self {
             parent: Some(parent),
             variables: HashMap::new(),
@@ -70,6 +77,7 @@ impl TypeEnvironment {
                 .into_iter()
                 .map(|scope| scope.into())
                 .collect::<Vec<Scope>>(),
+            allow_override_types,
         }
     }
 
@@ -113,7 +121,7 @@ impl TypeEnvironment {
     }
 
     pub fn add_type(&mut self, type_: Type) -> Result<(), String> {
-        if self.types.contains_key(&type_.type_identifier()) {
+        if !self.allow_override_types && self.types.contains_key(&type_.type_identifier()) {
             return Err(format!("Type {} already exists", type_.full_name()));
         }
 

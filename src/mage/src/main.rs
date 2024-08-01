@@ -44,7 +44,9 @@ pub fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
     let source = std::fs::read_to_string(source)
         .map_err(|error| format!("Failed to read file: {}", error))?;
 
-    let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
+    let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
+        args.behavior.override_types,
+    )));
     let environment = Rc::new(RefCell::new(Environment::new()));
 
     let result = read_input(source, type_environment.clone(), environment.clone(), args);

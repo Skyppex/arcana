@@ -37,6 +37,9 @@ pub struct MageArgs {
 
     #[command(flatten)]
     pub logging: Logging,
+
+    #[command(flatten)]
+    pub behavior: Behavior,
 }
 
 #[derive(Parser, Clone)]
@@ -76,4 +79,10 @@ impl FromStr for LogFlags {
 
         Ok(flags)
     }
+}
+
+#[derive(Parser, Clone)]
+pub struct Behavior {
+    #[arg(short, long, default_value = "1")]
+    pub override_types: bool,
 }
