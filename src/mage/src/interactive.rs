@@ -33,7 +33,7 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
         let type_environment = type_environment.clone();
         stdout.flush().unwrap();
 
-        let mut index = 0;
+        let mut index = None;
         let mut input = String::new();
 
         loop {
@@ -44,7 +44,10 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
                     }
 
                     match key_event.code {
-                        KeyCode::Enter => break,
+                        KeyCode::Enter => {
+                            write!(stdout, "\r\n").unwrap();
+                            break;
+                        }
                         KeyCode::Char(c) => {
                             // Check if the Control modifier is pressed
                             if key_event.modifiers.contains(KeyModifiers::CONTROL) {
@@ -78,23 +81,32 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
                             }
                         }
                         KeyCode::Up => {
-                            if index < lines.len() {
-                                // Clear current input
-                                write!(stdout, "\r{}", " ".repeat(input.len())).unwrap();
-                                write!(stdout, "\r").unwrap();
-                                stdout.flush().unwrap();
+                            let i: usize = match index {
+                                Some(mut i) => {
+                                    if i < lines.len() - 1 {
+                                        i += 1;
+                                        index = Some(i);
+                                    }
 
-                                // Update input with the previous line
-                                if index < lines.len() - 1 {
-                                    index += 1;
+                                    i
                                 }
+                                None => {
+                                    index = Some(0);
+                                    0
+                                }
+                            };
 
-                                input = lines[index].clone();
+                            // Clear current input
+                            write!(stdout, "\r{}", " ".repeat(input.len())).unwrap();
+                            write!(stdout, "\r").unwrap();
+                            stdout.flush().unwrap();
 
-                                // Print the previous line
-                                write!(stdout, "{}", input).unwrap();
-                                stdout.flush().unwrap();
-                            }
+                            // Update input with the previous line
+                            input = lines[i].clone();
+
+                            // Print the previous line
+                            write!(stdout, "{}", input).unwrap();
+                            stdout.flush().unwrap();
                         }
                         KeyCode::Down => {
                             // Clear current input
@@ -102,15 +114,21 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
                             write!(stdout, "\r").unwrap();
                             stdout.flush().unwrap();
 
-                            index -= 1;
+                            match index {
+                                Some(mut i) => {
+                                    if i > 0 {
+                                        i -= 1;
+                                        index = Some(i);
 
-                            if index == 0 {
-                                input = "".to_string();
-                                continue;
+                                        // Update input with the next line
+                                        input = lines[i].clone();
+                                    } else {
+                                        index = None;
+                                        input = "".to_string();
+                                    }
+                                }
+                                None => input = "".to_string(),
                             }
-
-                            // Update input with the next line
-                            input = lines[index].clone();
 
                             // Print the next line
                             write!(stdout, "{}", input).unwrap();
@@ -126,7 +144,16 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
             break;
         }
 
-        lines.insert(0, input.clone());
+        if let "lines" = input.trim() {
+            for line in &lines {
+                println!("{}", line);
+            }
+            continue;
+        }
+
+        if input.trim() != lines.get(0).unwrap_or(&String::new()).trim() {
+            lines.insert(0, input.clone());
+        }
 
         if input.trim().starts_with("read") {
             let path = Path::new("src/mage/manual_testing");

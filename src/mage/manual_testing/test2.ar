@@ -6,8 +6,13 @@ struct B {
     a: A
 }
 
-let v = A { a: 0 };
-let b = B { a: v };
+struct C {
+    b: B
+}
+
+let a = A { a: 2 };
+let b = B { a: a };
+let c = C { b: b };
 
 // v match
 // | A { a: 1 } => 100,
@@ -19,9 +24,9 @@ let b = B { a: v };
 //     | a => a + 10,
 // | _ => {} // Error
 
-b match
-| B { a: A { a: 1 } } => 100,
-| B { a: A { a } } => a + 10,
+// b match
+// | B { a: A { a: 1 } } => 100,
+// | B { a: A { a } } => a + 10,
 
 // b match
 // | B { a } => a match
@@ -30,3 +35,17 @@ b match
 //         | a => a + 10,
 //     | _ => {}, // Error
 // | _ => {} // Error
+
+c match
+| C { b: B { a: A { a: 1 } } } => 100,
+| C { b: B { a: A { a } } } => a + 10,
+
+c match
+| C { b } => b match
+    | B { a } => a match
+        | A { a } => a match
+            | 1 => 100,
+            | a => a + 10,
+        | _ => {}, // Error
+    | _ => {}, // Error
+| _ => {} // Error

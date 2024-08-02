@@ -83,6 +83,6 @@ impl FromStr for LogFlags {
 
 #[derive(Parser, Clone)]
 pub struct Behavior {
-    #[arg(short, long, default_value = "1")]
+    #[arg(short, long)]
     pub override_types: bool,
 }
