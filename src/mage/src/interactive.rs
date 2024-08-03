@@ -7,138 +7,21 @@ use std::{
     rc::Rc,
 };
 
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
-    execute,
-    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
-};
-
 use crate::{mage_args::MageArgs, read_input};
 use interpreter::Environment;
 use shared::type_checker::{Type, TypeEnvironment};
 
 pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
-    let mut stdout = io::stdout();
-    let _ = execute!(stdout, EnterAlternateScreen);
-    let _ = terminal::enable_raw_mode();
-
-    let mut lines = Vec::<String>::new();
-
-    let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
-        args.behavior.override_types,
-    )));
+    let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    'outer: loop {
+    loop {
         let type_environment = type_environment.clone();
-        stdout.flush().unwrap();
-
-        let mut index = None;
+        let _ = io::stdout().flush();
         let mut input = String::new();
-
-        loop {
-            if event::poll(std::time::Duration::from_millis(500)).unwrap_or(false) {
-                if let Event::Key(key_event) = event::read().map_err(|_| "Reading failed")? {
-                    if key_event.kind != KeyEventKind::Press {
-                        continue;
-                    }
-
-                    match key_event.code {
-                        KeyCode::Enter => {
-                            write!(stdout, "\r\n").unwrap();
-                            break;
-                        }
-                        KeyCode::Char(c) => {
-                            // Check if the Control modifier is pressed
-                            if key_event.modifiers.contains(KeyModifiers::CONTROL) {
-                                match c {
-                                    'c' => {
-                                        break 'outer;
-                                    }
-                                    'w' => {
-                                        // Handle Ctrl+W (e.g., delete last word)
-                                        while let Some(ch) = input.pop() {
-                                            write!(stdout, "\x08 \x08").unwrap(); // Move cursor back, print space to erase, move cursor back again
-                                            if ch.is_whitespace() {
-                                                break;
-                                            }
-                                        }
-                                        stdout.flush().unwrap();
-                                    }
-                                    _ => {}
-                                }
-                            } else {
-                                input.push(c);
-                                write!(stdout, "{}", c).unwrap();
-                                stdout.flush().unwrap();
-                            }
-                        }
-                        KeyCode::Backspace => {
-                            if !input.is_empty() {
-                                input.pop();
-                                write!(stdout, "\x08 \x08").unwrap(); // Move cursor back, print space to erase, move cursor back again
-                                stdout.flush().unwrap();
-                            }
-                        }
-                        KeyCode::Up => {
-                            let i: usize = match index {
-                                Some(mut i) => {
-                                    if i < lines.len() - 1 {
-                                        i += 1;
-                                        index = Some(i);
-                                    }
-
-                                    i
-                                }
-                                None => {
-                                    index = Some(0);
-                                    0
-                                }
-                            };
-
-                            // Clear current input
-                            write!(stdout, "\r{}", " ".repeat(input.len())).unwrap();
-                            write!(stdout, "\r").unwrap();
-                            stdout.flush().unwrap();
-
-                            // Update input with the previous line
-                            input = lines[i].clone();
-
-                            // Print the previous line
-                            write!(stdout, "{}", input).unwrap();
-                            stdout.flush().unwrap();
-                        }
-                        KeyCode::Down => {
-                            // Clear current input
-                            write!(stdout, "\r{}", " ".repeat(input.len())).unwrap();
-                            write!(stdout, "\r").unwrap();
-                            stdout.flush().unwrap();
-
-                            match index {
-                                Some(mut i) => {
-                                    if i > 0 {
-                                        i -= 1;
-                                        index = Some(i);
-
-                                        // Update input with the next line
-                                        input = lines[i].clone();
-                                    } else {
-                                        index = None;
-                                        input = "".to_string();
-                                    }
-                                }
-                                None => input = "".to_string(),
-                            }
-
-                            // Print the next line
-                            write!(stdout, "{}", input).unwrap();
-                            stdout.flush().unwrap();
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
+        io::stdin()
+            .read_line(&mut input)
+            .expect("Failed to read line");
 
         if let "q" | "quit" | "exit" = input.trim() {
             break;
@@ -232,9 +115,6 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
 
         println!()
     }
-
-    let _ = terminal::disable_raw_mode();
-    let _ = execute!(stdout, LeaveAlternateScreen);
 
     Ok(())
 }
