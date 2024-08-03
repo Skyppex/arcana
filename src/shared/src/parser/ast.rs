@@ -9,6 +9,7 @@ use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Program { statements: Vec<Statement> },
+    ModuleDeclaration(ModuleDeclaration),
     StructDeclaration(StructDeclaration),
     EnumDeclaration(EnumDeclaration),
     UnionDeclaration(UnionDeclaration),
@@ -59,6 +60,12 @@ impl PrettyPrint for Expression {
         let mut indent = Indent::new();
         self.indent_display(&mut indent)
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModuleDeclaration {
+    pub access_modifier: Option<AccessModifier>,
+    pub module_path: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -244,8 +251,8 @@ pub enum EnumMemberFieldInitializers {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AccessModifier {
     Public,
-    Module,
     Super,
+    Module,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -3,8 +3,6 @@ pub mod cursor;
 mod expressions;
 mod statements;
 
-use std::vec;
-
 pub use ast::*;
 
 use crate::lexer::token::Token;
@@ -13,11 +11,8 @@ use self::cursor::Cursor;
 
 pub fn create_ast(tokens: Vec<Token>, verbose: bool) -> Result<Statement, String> {
     let mut cursor = Cursor::new(tokens, verbose);
-    let mut statements = vec![];
 
-    while !cursor.is_end_of_file() {
-        statements.push(statements::parse_statement(&mut cursor)?);
-    }
+    let statements = statements::parse_file(&mut cursor)?;
 
     Ok(Statement::Program { statements })
 }

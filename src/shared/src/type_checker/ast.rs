@@ -23,6 +23,11 @@ pub enum TypedStatement {
     Program {
         statements: Vec<TypedStatement>,
     },
+    ModuleDeclaration {
+        access_modifier: Option<AccessModifier>,
+        module_path: Vec<String>,
+        type_: Type,
+    },
     StructDeclaration {
         type_identifier: TypeIdentifier,
         where_clause: Option<Vec<GenericConstraint>>,
@@ -65,6 +70,7 @@ impl Typed for TypedStatement {
         match self {
             TypedStatement::None => Type::Void,
             TypedStatement::Program { .. } => Type::Void,
+            TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
@@ -78,6 +84,7 @@ impl Typed for TypedStatement {
         match self {
             TypedStatement::None => Type::Void,
             TypedStatement::Program { .. } => Type::Void,
+            TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
@@ -108,6 +115,9 @@ impl Display for TypedStatement {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            TypedStatement::ModuleDeclaration { module_path, .. } => {
+                write!(f, "mod {}", module_path.join("::"))
+            }
             TypedStatement::StructDeclaration {
                 type_identifier,
                 fields,
@@ -572,7 +582,7 @@ impl Display for StructField {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AccessModifier {
     Public,
-    Internal,
+    Module,
     Super,
 }
 
@@ -580,8 +590,8 @@ impl Into<AccessModifier> for parser::AccessModifier {
     fn into(self) -> AccessModifier {
         match self {
             parser::AccessModifier::Public => AccessModifier::Public,
-            parser::AccessModifier::Module => AccessModifier::Internal,
             parser::AccessModifier::Super => AccessModifier::Super,
+            parser::AccessModifier::Module => AccessModifier::Module,
         }
     }
 }

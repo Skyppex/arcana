@@ -5,6 +5,7 @@ pub trait Iterator {
     func next(&mut self) -> Option<Self::Item>;
 }
 
-pub trait DoubleSidedIterator: Iterator {
+pub trait DoubleSidedIterator 
+where imp is Iterator {
     func prev(&mut self) -> Option<Self::Item>;
 }

@@ -88,6 +88,17 @@ pub enum TokenKind {
     EndOfFile,
 }
 
+impl TokenKind {
+    pub fn is_access_modifier(&self) -> Option<AccessModifier> {
+        match self {
+            TokenKind::Keyword(Keyword::Pub) => Some(AccessModifier::Public),
+            TokenKind::Keyword(Keyword::Sup) => Some(AccessModifier::Super),
+            TokenKind::Keyword(Keyword::Mod) => Some(AccessModifier::Module),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Void,
@@ -157,8 +168,10 @@ pub enum NumericLiteralType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Keyword {
-    // Access modifiers
-    AccessModifier(AccessModifier),
+    // Modules & Access modifiers
+    Mod,
+    Pub,
+    Sup,
 
     // Variable declarations
     Let,

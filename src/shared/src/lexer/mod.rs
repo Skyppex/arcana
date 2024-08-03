@@ -1,8 +1,6 @@
 use cursor::Cursor;
 use token::{Literal, Token, TokenKind};
 
-use crate::parser::AccessModifier;
-
 use self::{num_lit::parse_numeric_literal, token::Keyword};
 
 pub mod cursor;
@@ -333,15 +331,9 @@ fn escapable_is_char(c: char) -> Option<char> {
 fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
     match string {
         // Access modifiers
-        "pub" => Some(TokenKind::Keyword(Keyword::AccessModifier(
-            AccessModifier::Public,
-        ))),
-        "mod" => Some(TokenKind::Keyword(Keyword::AccessModifier(
-            AccessModifier::Module,
-        ))),
-        "sup" => Some(TokenKind::Keyword(Keyword::AccessModifier(
-            AccessModifier::Super,
-        ))),
+        "pub" => Some(TokenKind::Keyword(Keyword::Pub)),
+        "mod" => Some(TokenKind::Keyword(Keyword::Mod)),
+        "sup" => Some(TokenKind::Keyword(Keyword::Sup)),
 
         // Variable declarations
         "let" => Some(TokenKind::Keyword(Keyword::Let)),

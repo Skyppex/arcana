@@ -7,35 +7,43 @@ use std::{
     rc::Rc,
 };
 
-use crate::{mage_args::MageArgs, read_input};
+use crate::{mage_args::MageArgs, read_input, utils::get_path};
 use interpreter::Environment;
 use shared::type_checker::{Type, TypeEnvironment};
 
 pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
-    let type_environment = Rc::new(RefCell::new(TypeEnvironment::new()));
+    let lib = get_path("lib/lib.ar")
+        .map_err(|e| e.to_string())?
+        .to_str()
+        .ok_or_else(|| "Failed to convert path to string".to_string())?
+        .to_string();
+
+    let lib =
+        std::fs::read_to_string(lib).map_err(|error| format!("Failed to read file: {}", error))?;
+
+    let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
+        args.behavior.override_types,
+    )));
+
     let environment = Rc::new(RefCell::new(Environment::new()));
 
+    read_input(lib, type_environment.clone(), environment.clone(), args)?;
+
     loop {
-        let type_environment = type_environment.clone();
         let _ = io::stdout().flush();
         let mut input = String::new();
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read line");
 
+        let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
+            args.behavior.override_types,
+        )));
+
+        let environment = Rc::new(RefCell::new(Environment::new()));
+
         if let "q" | "quit" | "exit" = input.trim() {
             break;
-        }
-
-        if let "lines" = input.trim() {
-            for line in &lines {
-                println!("{}", line);
-            }
-            continue;
-        }
-
-        if input.trim() != lines.get(0).unwrap_or(&String::new()).trim() {
-            lines.insert(0, input.clone());
         }
 
         if input.trim().starts_with("read") {

@@ -44,10 +44,22 @@ pub fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
     let source = std::fs::read_to_string(source)
         .map_err(|error| format!("Failed to read file: {}", error))?;
 
+    let lib = get_path("lib/lib.ar")
+        .map_err(|e| e.to_string())?
+        .to_str()
+        .ok_or_else(|| "Failed to convert path to string".to_string())?
+        .to_string();
+
+    let lib =
+        std::fs::read_to_string(lib).map_err(|error| format!("Failed to read file: {}", error))?;
+
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
     )));
+
     let environment = Rc::new(RefCell::new(Environment::new()));
+
+    read_input(lib, type_environment.clone(), environment.clone(), args)?;
 
     let result = read_input(source, type_environment.clone(), environment.clone(), args);
 

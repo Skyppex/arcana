@@ -19,4 +19,3 @@ clap = { version = "4.5.8", features = ["derive"] }
 shared = { path = "src/shared"}
 interpreter = { path = "src/interpreter"}
 dirs = "5.0.1"
-crossterm = "0.28.1"

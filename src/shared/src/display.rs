@@ -3,8 +3,8 @@ use crate::{
         AccessModifier, Assignment, Binary, BinaryOperator, Call, ClosureParameter,
         EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
         FieldInitializer, FlagsMember, For, FunctionDeclaration, If, Literal, Match, MatchArm,
-        Member, Parameter, Statement, StructDeclaration, StructField, Unary, UnaryOperator,
-        UnionDeclaration, VariableDeclaration, While,
+        Member, ModuleDeclaration, Parameter, Statement, StructDeclaration, StructField, Unary,
+        UnaryOperator, UnionDeclaration, VariableDeclaration, While,
     },
     type_checker::{
         self,
@@ -91,6 +91,33 @@ impl IndentDisplay for Statement {
                     }
                 }
 
+                result
+            }
+            Statement::ModuleDeclaration(ModuleDeclaration {
+                access_modifier,
+                module_path,
+            }) => {
+                let mut result = String::new();
+                result.push_str("<module statement>\n");
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}access_modifier: {}\n",
+                        indent.dash(),
+                        access_modifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "{}module_path: {}",
+                        indent.dash_end(),
+                        module_path.join("::")
+                    )
+                    .as_str(),
+                );
+                indent.decrease();
                 result
             }
             Statement::StructDeclaration(StructDeclaration {
@@ -1070,7 +1097,7 @@ impl IndentDisplay for AccessModifier {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
             AccessModifier::Public => "public".to_string(),
-            AccessModifier::Module => "internal".to_string(),
+            AccessModifier::Module => "module".to_string(),
             AccessModifier::Super => "super".to_string(),
         }
     }
@@ -1362,6 +1389,28 @@ impl IndentDisplay for TypedStatement {
                     }
                 }
 
+                result
+            }
+            TypedStatement::ModuleDeclaration {
+                access_modifier,
+                module_path,
+                type_,
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<module declaration> {}\n", type_).as_str());
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}access_modifier: {}\n",
+                        indent.dash(),
+                        access_modifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!("{}module_path: {}", indent.dash(), module_path.join("::")).as_str(),
+                );
+                indent.decrease();
                 result
             }
             TypedStatement::StructDeclaration {
@@ -2366,6 +2415,16 @@ impl IndentDisplay for type_checker::ast::BinaryOperator {
     }
 }
 
+impl IndentDisplay for type_checker::ast::AccessModifier {
+    fn indent_display(&self, _indent: &mut Indent) -> String {
+        match self {
+            type_checker::ast::AccessModifier::Public => "public".to_string(),
+            type_checker::ast::AccessModifier::Module => "module".to_string(),
+            type_checker::ast::AccessModifier::Super => "super".to_string(),
+        }
+    }
+}
+
 impl IndentDisplay for type_checker::ast::FieldInitializer {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
@@ -2889,6 +2948,12 @@ impl<T: IndentDisplay> IndentDisplay for Option<T> {
 impl<T: IndentDisplay> IndentDisplay for Box<T> {
     fn indent_display(&self, indent: &mut Indent) -> String {
         self.as_ref().indent_display(indent)
+    }
+}
+
+impl<T: IndentDisplay> IndentDisplay for &T {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        (*self).indent_display(indent)
     }
 }
 

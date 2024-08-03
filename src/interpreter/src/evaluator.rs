@@ -24,6 +24,7 @@ pub fn evaluate<'a>(
 ) -> Result<Value, String> {
     match typed_statement {
         TypedStatement::None => Ok(Value::Void),
+        TypedStatement::ModuleDeclaration { .. } => Ok(Value::Void),
         TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
         TypedStatement::EnumDeclaration { .. } => Ok(Value::Void),
         TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),

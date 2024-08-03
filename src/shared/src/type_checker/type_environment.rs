@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::types::{GenericType, TypeAnnotation, TypeIdentifier};
+use crate::types::{TypeAnnotation, TypeIdentifier};
 
 use super::{
     scope::{Scope, ScopeType},
@@ -31,15 +31,6 @@ impl TypeEnvironment {
                 (TypeIdentifier::Type("float".to_string()), Type::Float),
                 (TypeIdentifier::Type("char".to_string()), Type::Char),
                 (TypeIdentifier::Type("string".to_string()), Type::String),
-                (
-                    TypeIdentifier::GenericType(
-                        "Option".to_string(),
-                        vec![GenericType {
-                            type_name: "T".to_string(),
-                        }],
-                    ),
-                    Type::option(),
-                ),
             ]),
             variables: HashMap::new(),
             scopes: Vec::new(),

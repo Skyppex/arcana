@@ -12,9 +12,73 @@ use super::{
     cursor::Cursor,
     expressions::{self, parse_expression},
     AccessModifier, Closure, EnumDeclaration, EnumMember, EnumMemberField, Expression,
-    FunctionDeclaration, Literal, Parameter, Statement, StructDeclaration, StructField,
-    UnionDeclaration,
+    FunctionDeclaration, Literal, ModuleDeclaration, Parameter, Statement, StructDeclaration,
+    StructField, UnionDeclaration,
 };
+
+pub fn parse_file(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
+    parse_mod_statement(cursor)
+}
+
+fn parse_mod_statement(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
+    let mut access_modifier = None;
+
+    if let Some(am) = cursor.first().kind.is_access_modifier() {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Fun) {
+            return parse_statement(cursor).map(|s| vec![s]);
+        }
+
+        cursor.bump()?; // Consume the access modifier
+        access_modifier = Some(am);
+    }
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Mod) {
+        return parse_statement(cursor).map(|s| vec![s]);
+    }
+
+    cursor.bump()?; // Consume the mod keyword
+
+    let TokenKind::Identifier(module_name) = cursor.first().kind else {
+        return Err(format!(
+            "Expected identifier but found {:?}",
+            cursor.first().kind
+        ));
+    };
+
+    cursor.bump()?; // Consume the identifier
+
+    let mut module_path: Vec<String> = vec![];
+    module_path.push(module_name);
+
+    while cursor.first().kind == TokenKind::DoubleColon {
+        cursor.bump()?; // Consume the ::
+        let TokenKind::Identifier(module_name) = cursor.first().kind else {
+            return Err(format!(
+                "Expected identifier but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        cursor.bump()?; // Consume the identifier
+
+        module_path.push(module_name);
+    }
+
+    cursor.expect(TokenKind::Semicolon)?;
+
+    let module_declaration = Statement::ModuleDeclaration(ModuleDeclaration {
+        access_modifier,
+        module_path,
+    });
+
+    let mut statements = vec![module_declaration];
+
+    while !cursor.is_end_of_file() {
+        statements.push(parse_statement(cursor)?);
+    }
+
+    Ok(statements)
+}
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     match parse_function_declaration_statement(cursor) {
@@ -33,7 +97,7 @@ pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
 fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let mut access_modifier = None;
 
-    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+    if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Fun) {
             return parse_struct_declaration_statement(cursor);
         }
@@ -154,7 +218,7 @@ fn unwrap_parameters_recurse(
 fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let mut access_modifier = None;
 
-    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+    if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Struct) {
             return parse_enum_declaration_statement(cursor);
         }
@@ -208,7 +272,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let mut access_modifier = None;
 
-    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+    if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Enum) {
             return parse_union_declaration_statement(cursor);
         }
@@ -268,7 +332,7 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
 fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let mut access_modifier = None;
 
-    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+    if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
             return parse_expression_map(cursor);
         }
@@ -399,7 +463,7 @@ fn parse_struct_field(
 ) -> Result<StructField, String> {
     let mut access_modifier = None;
 
-    if let TokenKind::Keyword(Keyword::AccessModifier(am)) = cursor.first().kind {
+    if let Some(am) = cursor.first().kind.is_access_modifier() {
         if !allow_access_modifier {
             return Err(format!(
                 "Unexpected access modifier {:?}",

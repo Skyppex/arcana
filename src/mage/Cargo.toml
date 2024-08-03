@@ -10,7 +10,6 @@ clap = { version = "4.5.1", features = ["derive"] }
 dirs = "5.0.1"
 shared = { path = "../shared", features = ["interpreter"]}
 interpreter = { path = "../interpreter"}
-crossterm = "0.28.1"
 
 [[bin]]
 name = "mage"
