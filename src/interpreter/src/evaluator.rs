@@ -28,6 +28,9 @@ pub fn evaluate<'a>(
             environment.borrow_mut().add_module(module_path);
             Ok(Value::Void)
         }
+        TypedStatement::Use { .. } => {
+            todo!("Use statement evaluation")
+        }
         TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
         TypedStatement::EnumDeclaration { .. } => Ok(Value::Void),
         TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),

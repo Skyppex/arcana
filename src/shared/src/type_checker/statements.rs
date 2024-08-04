@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    parser::{self, ModuleDeclaration, Statement, UnionDeclaration},
+    parser::{self, ModuleDeclaration, Statement, UnionDeclaration, Use},
     types::{TypeAnnotation, TypeIdentifier},
 };
 
@@ -24,6 +24,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             Ok(discovered_types)
         }
         Statement::ModuleDeclaration(_) => Ok(vec![]),
+        Statement::Use(_) => Ok(vec![]),
         Statement::StructDeclaration(parser::StructDeclaration {
             access_modifier: _,
             type_identifier,
@@ -114,6 +115,10 @@ pub fn check_type<'a>(
                 .clone()
                 .map(|access_modifier| access_modifier.into()),
             module_path: module_path.clone(),
+            type_: Type::Void,
+        }),
+        Statement::Use(Use { use_item }) => Ok(TypedStatement::Use {
+            use_item: use_item.clone(),
             type_: Type::Void,
         }),
         Statement::StructDeclaration(parser::StructDeclaration {

@@ -170,6 +170,7 @@ pub enum NumericLiteralType {
 pub enum Keyword {
     // Modules & Access modifiers
     Mod,
+    Use,
     Pub,
     Sup,
 

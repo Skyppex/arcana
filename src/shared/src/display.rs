@@ -4,7 +4,7 @@ use crate::{
         EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
         FieldInitializer, FlagsMember, For, FunctionDeclaration, If, Literal, Match, MatchArm,
         Member, ModuleDeclaration, Parameter, Statement, StructDeclaration, StructField, Unary,
-        UnaryOperator, UnionDeclaration, VariableDeclaration, While,
+        UnaryOperator, UnionDeclaration, Use, UseItem, VariableDeclaration, While,
     },
     type_checker::{
         self,
@@ -114,6 +114,21 @@ impl IndentDisplay for Statement {
                         "{}module_path: {}",
                         indent.dash_end(),
                         module_path.join("::")
+                    )
+                    .as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            Statement::Use(Use { use_item }) => {
+                let mut result = String::new();
+                result.push_str("<use statement>\n");
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}use_item: {}",
+                        indent.dash(),
+                        use_item.indent_display(indent)
                     )
                     .as_str(),
                 );
@@ -336,6 +351,47 @@ impl IndentDisplay for Statement {
                 result
             }
             Statement::Expression(e) => e.indent_display(indent),
+        }
+    }
+}
+
+impl IndentDisplay for UseItem {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        match self {
+            UseItem::Item(item) => item.clone(),
+            UseItem::Navigation(item, next) => {
+                let mut result = String::new();
+                result.push_str(format!("<navigation> {}\n", item).as_str());
+                indent.increase();
+                indent.end_current();
+                result.push_str(
+                    format!("{}next: {}", indent.dash_end(), next.indent_display(indent)).as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            UseItem::List(items) => {
+                let mut result = String::new();
+                result.push_str("<list>");
+                indent.increase();
+
+                for (i, item) in items.iter().enumerate() {
+                    if i < items.len() - 1 {
+                        result.push_str(
+                            format!("\n{}{},", indent.dash(), item.indent_display(indent)).as_str(),
+                        );
+                    } else {
+                        indent.end_current();
+                        result.push_str(
+                            format!("\n{}{}", indent.dash_end(), item.indent_display(indent))
+                                .as_str(),
+                        );
+                    }
+                }
+
+                indent.decrease();
+                result
+            }
         }
     }
 }
@@ -1409,6 +1465,21 @@ impl IndentDisplay for TypedStatement {
                 );
                 result.push_str(
                     format!("{}module_path: {}", indent.dash(), module_path.join("::")).as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            TypedStatement::Use { use_item, type_ } => {
+                let mut result = String::new();
+                result.push_str(format!("<use> {}\n", type_).as_str());
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}use_item: {}",
+                        indent.dash(),
+                        use_item.indent_display(indent)
+                    )
+                    .as_str(),
                 );
                 indent.decrease();
                 result

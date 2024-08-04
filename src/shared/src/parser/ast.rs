@@ -10,6 +10,7 @@ use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
 pub enum Statement {
     Program { statements: Vec<Statement> },
     ModuleDeclaration(ModuleDeclaration),
+    Use(Use),
     StructDeclaration(StructDeclaration),
     EnumDeclaration(EnumDeclaration),
     UnionDeclaration(UnionDeclaration),
@@ -66,6 +67,36 @@ impl PrettyPrint for Expression {
 pub struct ModuleDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub module_path: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Use {
+    pub use_item: UseItem,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UseItem {
+    Item(String),
+    Navigation(String, Box<UseItem>),
+    List(Vec<UseItem>),
+}
+
+impl Display for UseItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UseItem::Item(item) => write!(f, "{}", item),
+            UseItem::Navigation(item, next) => write!(f, "{}::{}", item, next),
+            UseItem::List(items) => write!(
+                f,
+                "{{{}}}",
+                items
+                    .iter()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

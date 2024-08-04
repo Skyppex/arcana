@@ -2,7 +2,7 @@ use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
-use crate::parser::Expression;
+use crate::parser::{Expression, UseItem};
 use crate::pretty_print::PrettyPrint;
 use crate::{
     parser,
@@ -26,6 +26,10 @@ pub enum TypedStatement {
     ModuleDeclaration {
         access_modifier: Option<AccessModifier>,
         module_path: Vec<String>,
+        type_: Type,
+    },
+    Use {
+        use_item: UseItem,
         type_: Type,
     },
     StructDeclaration {
@@ -71,6 +75,7 @@ impl Typed for TypedStatement {
             TypedStatement::None => Type::Void,
             TypedStatement::Program { .. } => Type::Void,
             TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::Use { type_, .. } => type_.clone(),
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
@@ -85,6 +90,7 @@ impl Typed for TypedStatement {
             TypedStatement::None => Type::Void,
             TypedStatement::Program { .. } => Type::Void,
             TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::Use { type_, .. } => type_.clone(),
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
@@ -118,6 +124,7 @@ impl Display for TypedStatement {
             TypedStatement::ModuleDeclaration { module_path, .. } => {
                 write!(f, "mod {}", module_path.join("::"))
             }
+            TypedStatement::Use { use_item, .. } => write!(f, "use {}", use_item),
             TypedStatement::StructDeclaration {
                 type_identifier,
                 fields,

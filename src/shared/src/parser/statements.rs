@@ -13,7 +13,7 @@ use super::{
     expressions::{self, parse_expression},
     AccessModifier, Closure, EnumDeclaration, EnumMember, EnumMemberField, Expression,
     FunctionDeclaration, Literal, ModuleDeclaration, Parameter, Statement, StructDeclaration,
-    StructField, UnionDeclaration,
+    StructField, UnionDeclaration, Use, UseItem,
 };
 
 pub fn parse_module_only(
@@ -132,7 +132,7 @@ fn parse_mod_statement(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
 }
 
 pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
-    match parse_function_declaration_statement(cursor) {
+    match parse_use(cursor) {
         Ok(s) => {
             if let TokenKind::Semicolon = cursor.first().kind {
                 cursor.bump()?; // Consume the ;
@@ -142,6 +142,66 @@ pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
             Ok(s)
         }
         Err(e) => Err(e),
+    }
+}
+
+fn parse_use(cursor: &mut Cursor) -> Result<Statement, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Use) {
+        return parse_function_declaration_statement(cursor);
+    }
+
+    cursor.bump()?; // Consume the use keyword
+
+    let use_item = parse_use_item(cursor)?;
+    cursor.expect(TokenKind::Semicolon)?;
+    Ok(Statement::Use(Use { use_item }))
+}
+
+fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, String> {
+    match cursor.first().kind {
+        TokenKind::Identifier(module_name) => {
+            cursor.bump()?; // Consume the identifier
+
+            if cursor.first().kind == TokenKind::DoubleColon {
+                cursor.bump()?; // Consume the ::
+                let use_item = parse_use_item(cursor)?;
+
+                return Ok(UseItem::Navigation(module_name, Box::new(use_item)));
+            }
+
+            return Ok(UseItem::Item(module_name));
+        }
+        TokenKind::OpenBrace => {
+            cursor.bump()?; // Consume the {
+
+            let mut use_items = vec![];
+            let mut has_comma = true;
+
+            while cursor.first().kind != TokenKind::CloseBrace {
+                if !has_comma {
+                    return Err(format!("Expected , but found {:?}", cursor.first().kind));
+                }
+
+                has_comma = true;
+                use_items.push(parse_use_item(cursor)?);
+
+                if cursor.first().kind == TokenKind::Comma {
+                    cursor.bump()?; // Consume the ,
+                } else {
+                    has_comma = false;
+                }
+            }
+
+            cursor.bump()?; // Consume the }
+
+            return Ok(UseItem::List(use_items));
+        }
+        _ => {
+            return Err(format!(
+                "Expected identifier or {{ but found {:?}",
+                cursor.first().kind
+            ));
+        }
     }
 }
 
