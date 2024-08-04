@@ -3,6 +3,7 @@ mod mage_args;
 mod utils;
 
 use clap::Parser;
+use glob::{glob, Paths};
 use utils::get_path;
 
 use std::{cell::RefCell, rc::Rc};
@@ -11,7 +12,7 @@ use crate::mage_args::MageArgs;
 use interpreter::Environment;
 
 use shared::{
-    parser::create_ast,
+    parser::{self, create_ast},
     pretty_print::PrettyPrint,
     type_checker::{create_typed_ast, TypeEnvironment},
 };
@@ -19,8 +20,17 @@ use shared::{
 fn main() {
     let args = crate::mage_args::MageArgs::parse();
 
+    let spell = get_path("spell.toml").map_err(|e| e.to_string()).ok();
+
+    let mut spell_toml = None;
+    let mut project_files = None;
+    if let Some(s) = spell {
+        spell_toml = std::fs::read_to_string(s).ok();
+        project_files = glob("*.ar").ok();
+    }
+
     let result = if let Some(ref source) = args.source {
-        run_source(source, &args)
+        run_source(source, spell_toml, project_files, &args)
     } else {
         crate::interactive::interactive(&args)
     };
@@ -30,7 +40,12 @@ fn main() {
     }
 }
 
-pub fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
+pub fn run_source(
+    source: &String,
+    spell: Option<String>,
+    project_files: Option<Paths>,
+    args: &MageArgs,
+) -> Result<(), String> {
     let source = get_path(source)
         .map_err(|e| e.to_string())?
         .to_str()
@@ -58,6 +73,10 @@ pub fn run_source(source: &String, args: &MageArgs) -> Result<(), String> {
     )));
 
     let environment = Rc::new(RefCell::new(Environment::new()));
+
+    if let (Some(_), Some(project_files)) = (spell, project_files) {
+        register_modules(project_files, type_environment.clone(), environment.clone())?;
+    }
 
     read_input(lib, type_environment.clone(), environment.clone(), args)?;
 
@@ -123,4 +142,29 @@ pub fn read_input(
 
     println!("{}", result);
     Ok(())
+}
+
+pub fn register_modules(
+    project_files: Paths,
+    type_environment: Rc<RefCell<TypeEnvironment>>,
+    environment: Rc<RefCell<Environment>>,
+) -> Result<(), String> {
+    for project_file in project_files {
+        let project_file = project_file.map_err(|e| e.to_string())?;
+
+        let source = std::fs::read_to_string(project_file)
+            .map_err(|error| format!("Failed to read file: {}", error))?;
+
+        let module_info = parser::discover_module(shared::lexer::tokenize(&source)?)?;
+
+        if let Some((_, module_path)) = module_info {
+            type_environment
+                .borrow_mut()
+                .add_module(module_path.clone());
+
+            environment.borrow_mut().add_module(module_path);
+        }
+    }
+
+    todo!()
 }

@@ -42,7 +42,6 @@ fn nested_block_comment_is_block_comment() {
 
     // Assert
     let comment = tokens.nth_token(0);
-    println!("{:?}", tokens);
 
     assert_eq!(tokens.len(), 1);
     assert_eq!(comment.kind, TokenKind::BlockComment);

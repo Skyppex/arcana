@@ -259,7 +259,7 @@ impl Type {
                         enum_name: some_member_ident,
                         discriminant_name: "Some".to_string(),
                         fields: vec![(
-                            "f0".to_string(),
+                            "value".to_string(),
                             Type::Generic(GenericType {
                                 type_name: "T".to_string(),
                             }),
@@ -332,10 +332,6 @@ impl Type {
             "bool" => Some(Type::Bool),
             _ => None,
         }
-    }
-
-    pub fn to_string(&self) -> String {
-        self.full_name()
     }
 
     pub fn from_literal(literal: &parser::Literal) -> Result<Type, String> {
@@ -556,6 +552,52 @@ impl Type {
 
                 Ok(enum_)
             }
+            Type::EnumMember(EnumMember {
+                enum_name,
+                discriminant_name,
+                fields,
+            }) => {
+                println!("Enum member: {:?}", self);
+                let TypeIdentifier::GenericType(name, generics) = enum_name else {
+                    return Err(format!(
+                        "Cannot clone concrete types for enum {}",
+                        self.full_name()
+                    ));
+                };
+
+                let mut type_map = HashMap::new();
+
+                for (ta, gt) in concrete_types.iter().zip(generics) {
+                    type_map.insert(gt, ta);
+                }
+
+                let mut cloned_fields = HashMap::new();
+
+                for (field_name, field_type) in fields.iter() {
+                    let Type::Generic(generic) = field_type else {
+                        cloned_fields.insert(field_name.clone(), field_type.clone());
+                        continue;
+                    };
+
+                    let concrete_type = type_map.get(&generic).ok_or(format!(
+                        "No concrete type found for generic type {}",
+                        generic.type_name
+                    ))?;
+
+                    let concrete_type =
+                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+
+                    cloned_fields.insert(field_name.clone(), concrete_type);
+                }
+
+                let member_type = Type::EnumMember(EnumMember {
+                    enum_name: TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone()),
+                    discriminant_name: discriminant_name.clone(),
+                    fields: cloned_fields,
+                });
+
+                Ok(member_type)
+            }
             _ => Err(format!(
                 "Cannot clone concrete types for type {}",
                 self.full_name()
@@ -607,7 +649,7 @@ impl Into<parser::Literal> for Type {
 
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.to_string().fmt(f)
+        self.full_name().fmt(f)
     }
 }
 

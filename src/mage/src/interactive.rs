@@ -36,12 +36,6 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
             .read_line(&mut input)
             .expect("Failed to read line");
 
-        let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
-            args.behavior.override_types,
-        )));
-
-        let environment = Rc::new(RefCell::new(Environment::new()));
-
         if let "q" | "quit" | "exit" = input.trim() {
             break;
         }
@@ -114,8 +108,12 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
             continue;
         }
 
-        if let Err(message) = read_input(input.clone(), type_environment, environment.clone(), args)
-        {
+        if let Err(message) = read_input(
+            input.clone(),
+            type_environment.clone(),
+            environment.clone(),
+            args,
+        ) {
             println!("Error: {}", message);
             println!();
             println!("{}", input);

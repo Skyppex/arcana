@@ -313,14 +313,15 @@ fn parse_enum_literal(
 ) -> Result<Expression, String> {
     let field_initializers = {
         if cursor.first().kind == TokenKind::OpenBrace {
-            cursor.bump()?; // Consume the (
-            parse_named_enum_member_field_initializers(cursor)?
+            cursor.bump()?; // Consume the {
+            let fields = parse_named_enum_member_field_initializers(cursor)?;
+            cursor.bump()?; // Consume the }
+            fields
         } else {
             EnumMemberFieldInitializers::None
         }
     };
 
-    cursor.bump()?; // Consume the )
     Ok(Expression::Literal(Literal::Enum {
         type_annotation: type_annotation.clone(),
         member: type_annotation

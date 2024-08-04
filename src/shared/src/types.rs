@@ -21,11 +21,15 @@ impl TypeAnnotation {
     }
 
     pub fn is_enum_member(&self) -> bool {
-        let TypeAnnotation::Type(s) = self else {
-            return false;
-        };
+        if let TypeAnnotation::Type(s) = self {
+            return s.contains("::");
+        }
 
-        s.contains("::")
+        if let TypeAnnotation::ConcreteType(s, _) = self {
+            return s.contains("::");
+        }
+
+        return false;
     }
 }
 
@@ -186,6 +190,21 @@ impl TypeIdentifier {
             (Self::Type(name_left), Self::Type(name_right)) => name_left == name_right,
             (Self::GenericType(name_left, _), Self::GenericType(name_right, _)) => {
                 name_left == name_right
+            }
+            (Self::MemberType(type_left, member_left), Self::GenericType(name_right, generics)) => {
+                let split = name_right.split("::").collect::<Vec<&str>>();
+
+                if split.len() < 2 {
+                    return false;
+                }
+
+                let parent_right = split[0];
+                let member_right = split[1];
+
+                type_left.eq_names(&TypeIdentifier::GenericType(
+                    parent_right.to_string(),
+                    generics.clone(),
+                )) && member_left == member_right
             }
             _ => false,
         }
@@ -362,8 +381,12 @@ pub(super) fn parse_type_annotation(
 
             let mut generics = None;
 
-            if cursor.first().kind == TokenKind::Less {
+            if cursor.first().kind == TokenKind::DoubleColon
+                && cursor.second().kind == TokenKind::Less
+            {
+                cursor.bump()?; // Consume the ::
                 cursor.bump()?; // Consume the <
+
                 generics = Some(parse_comma_separated_type_annotations(
                     cursor,
                     |kind| kind != TokenKind::Greater,

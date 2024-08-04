@@ -54,7 +54,7 @@ impl Value {
     }
 }
 
-impl<'a> Display for Value {
+impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Uninitialized => write!(f, "uninitialized"),

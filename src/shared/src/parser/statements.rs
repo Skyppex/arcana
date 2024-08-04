@@ -16,6 +16,57 @@ use super::{
     StructField, UnionDeclaration,
 };
 
+pub fn parse_module_only(
+    cursor: &mut Cursor,
+) -> Result<Option<(Option<AccessModifier>, Vec<String>)>, String> {
+    let mut access_modifier = None;
+
+    if let Some(am) = cursor.first().kind.is_access_modifier() {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Mod) {
+            return Ok(None);
+        }
+
+        cursor.bump()?; // Consume the access modifier
+        access_modifier = Some(am);
+    }
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Mod) {
+        return Ok(None);
+    }
+
+    cursor.bump()?; // Consume the mod keyword
+
+    let TokenKind::Identifier(module_name) = cursor.first().kind else {
+        return Err(format!(
+            "Expected identifier but found {:?}",
+            cursor.first().kind
+        ));
+    };
+
+    cursor.bump()?; // Consume the identifier
+
+    let mut module_path: Vec<String> = vec![];
+    module_path.push(module_name);
+
+    while cursor.first().kind == TokenKind::DoubleColon {
+        cursor.bump()?; // Consume the ::
+        let TokenKind::Identifier(module_name) = cursor.first().kind else {
+            return Err(format!(
+                "Expected identifier but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        cursor.bump()?; // Consume the identifier
+
+        module_path.push(module_name);
+    }
+
+    cursor.expect(TokenKind::Semicolon)?;
+
+    Ok(Some((access_modifier, module_path)))
+}
+
 pub fn parse_file(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
     parse_mod_statement(cursor)
 }
@@ -24,7 +75,7 @@ fn parse_mod_statement(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
     let mut access_modifier = None;
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
-        if cursor.second().kind != TokenKind::Keyword(Keyword::Fun) {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Mod) {
             return parse_statement(cursor).map(|s| vec![s]);
         }
 

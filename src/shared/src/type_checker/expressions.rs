@@ -913,8 +913,6 @@ fn synthesize_type(
                 ));
             };
 
-            println!("For iterable type: {:?}", inner_type.full_name());
-
             for_environment
                 .borrow_mut()
                 .add_variable(identifier.clone(), *inner_type);

@@ -12,6 +12,7 @@ pub type Rcrc<T> = Rc<RefCell<T>>;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
     pub parent: Option<Rcrc<Environment>>,
+    pub modules: Vec<Vec<String>>,
     pub variables: HashMap<String, Rcrc<Variable>>,
     pub functions: HashMap<String, Rcrc<Variable>>,
     pub scopes: Vec<ScopeState>,
@@ -21,6 +22,7 @@ impl Environment {
     pub fn new() -> Self {
         Self {
             parent: None,
+            modules: Vec::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
             scopes: vec![],
@@ -30,6 +32,7 @@ impl Environment {
     pub fn new_parent(parent: Rcrc<Environment>) -> Self {
         Self {
             parent: Some(parent),
+            modules: Vec::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
             scopes: vec![],
@@ -46,6 +49,7 @@ impl Environment {
     ) -> Self {
         Self {
             parent: Some(parent),
+            modules: Vec::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
             scopes: scopes
@@ -98,6 +102,10 @@ impl Environment {
         }
 
         Ok(())
+    }
+
+    pub fn add_module(&mut self, module_path: Vec<String>) {
+        self.modules.push(module_path);
     }
 
     pub fn add_variable(&mut self, identifier: String, value: Value, mutable: bool) {

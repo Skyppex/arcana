@@ -12,6 +12,7 @@ pub type Rcrc<T> = Rc<RefCell<T>>;
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
+    modules: Vec<Vec<String>>,
     types: HashMap<TypeIdentifier, Type>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
@@ -22,6 +23,7 @@ impl TypeEnvironment {
     pub fn new(allow_override_types: bool) -> Self {
         Self {
             parent: None,
+            modules: Vec::new(),
             types: HashMap::from([
                 (TypeIdentifier::Type("void".to_string()), Type::Void),
                 (TypeIdentifier::Type("unit".to_string()), Type::Unit),
@@ -43,6 +45,7 @@ impl TypeEnvironment {
 
         Self {
             parent: Some(parent),
+            modules: Vec::new(),
             types: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
@@ -62,6 +65,7 @@ impl TypeEnvironment {
 
         Self {
             parent: Some(parent),
+            modules: Vec::new(),
             variables: HashMap::new(),
             types: HashMap::new(),
             scopes: scopes
@@ -109,6 +113,10 @@ impl TypeEnvironment {
         }
 
         Ok(())
+    }
+
+    pub fn add_module(&mut self, module_path: Vec<String>) {
+        self.modules.push(module_path)
     }
 
     pub fn add_type(&mut self, type_: Type) -> Result<(), String> {
