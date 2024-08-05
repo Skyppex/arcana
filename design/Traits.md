@@ -16,7 +16,7 @@ trait Name {
 
 ```
 trait Add {
-    fn add(Self left, Self right): Self;
+    fun add(Self left, Self right): Self;
 }
 ```
 
@@ -31,7 +31,7 @@ struct Foo {
 }
 
 impl Add for Foo {
-    fn add(Self left, Self right): Self {
+    fun add(Self left, Self right): Self {
         return Foo { bar: left.bar + right.bar };
     }
 }
@@ -43,9 +43,9 @@ This works because the `int` type already implements the `Add` trait, so we can 
 
 ```
 trait Equals {
-    fn equals(Self left, Self right): bool;
+    fun equals(Self left, Self right): bool;
     
-    fn not_equals(Self left, Self right): bool {
+    fun not_equals(Self left, Self right): bool {
         return !left.equals(right);
     }
 }

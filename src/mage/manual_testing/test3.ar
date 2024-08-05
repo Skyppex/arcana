@@ -1,0 +1,12 @@
+fun with_2(a: fun(int): int): int => a(2)
+fun with_2_3(a: fun(int, int): int): int => a(2, 3)
+
+with_2 -> |x| x + 1
+
+with_2(|x| x  + 1)
+
+with_2_3 -> |x, y| x + y
+
+with_2_3(|x| |y| x + y)
+
+

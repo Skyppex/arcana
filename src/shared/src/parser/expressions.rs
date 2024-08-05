@@ -468,27 +468,7 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the |
 
-    let mut params = vec![];
-
-    while cursor.first().kind != TokenKind::Pipe {
-        let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-            return Err(format!(
-                "Expected identifier but found {:?}",
-                cursor.first().kind
-            ));
-        };
-
-        let type_annotation = parse_optional_type_annotation(cursor, false)?;
-
-        params.push(ClosureParameter {
-            identifier,
-            type_annotation,
-        });
-
-        if cursor.first().kind == TokenKind::Comma {
-            cursor.bump()?; // Consume the ,
-        }
-    }
+    let params = parse_comma_separated_closure_params(cursor)?;
 
     cursor.bump()?; // Consume the |
 
@@ -502,6 +482,36 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
     let body = parse_expression(cursor)?;
 
     unwrap_arguments(params, return_type_annotation, body)
+}
+
+fn parse_comma_separated_closure_params(
+    cursor: &mut Cursor,
+) -> Result<Vec<ClosureParameter>, String> {
+    let mut params = vec![];
+
+    while cursor.first().kind != TokenKind::Pipe {
+        let TokenKind::Identifier(identifier) = cursor.first().kind else {
+            return Err(format!(
+                "Expected identifier but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        cursor.bump()?; // Consume the identifier
+
+        let type_annotation = parse_optional_type_annotation(cursor, false)?;
+
+        params.push(ClosureParameter {
+            identifier,
+            type_annotation,
+        });
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        }
+    }
+
+    Ok(params)
 }
 
 fn unwrap_arguments(
@@ -869,6 +879,16 @@ fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the ->
 
+    let mut params = None;
+
+    if cursor.first().kind == TokenKind::Pipe {
+        cursor.bump()?; // Consume the |
+        params = Some(parse_comma_separated_closure_params(cursor)?);
+        cursor.expect(TokenKind::Pipe)?;
+    }
+
+    cursor.optional_bump(TokenKind::FatArrow)?;
+
     let return_type_annotation = if cursor.first().kind == TokenKind::Colon {
         cursor.bump()?; // Consume the :
         Some(parse_type_annotation(cursor, true)?)
@@ -878,13 +898,24 @@ fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
     let body = parse_expression(cursor)?;
 
+    let Some(params) = params else {
+        return Ok(Expression::Call(Call {
+            callee: Box::new(call),
+            argument: Some(Box::new(Expression::Closure(Closure {
+                param: None,
+                return_type_annotation,
+                body: Box::new(body),
+            }))),
+        }));
+    };
+
     Ok(Expression::Call(Call {
         callee: Box::new(call),
-        argument: Some(Box::new(Expression::Closure(Closure {
-            param: None,
+        argument: Some(Box::new(unwrap_arguments(
+            params,
             return_type_annotation,
-            body: Box::new(body),
-        }))),
+            body,
+        )?)),
     }))
 }
 
