@@ -1,4 +1,5 @@
 use cursor::Cursor;
+use num_lit::parse_float_literal_starting_with_dot;
 use token::{Literal, Token, TokenKind};
 
 use self::{num_lit::parse_numeric_literal, token::Keyword};
@@ -54,6 +55,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
                 cursor.bump();
                 Ok(create_token(TokenKind::DoubleDot, cursor))
             }
+            '0'..='9' => parse_float_literal_starting_with_dot(cursor),
             _ => Ok(create_token(TokenKind::Dot, cursor)),
         },
         '?' => Ok(create_token(TokenKind::QuestionMark, cursor)),

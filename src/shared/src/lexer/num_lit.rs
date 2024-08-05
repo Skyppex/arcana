@@ -3,6 +3,30 @@ use super::{
     token::{IntLiteral, IntLiteralBase, Literal, NumericLiteralType, Token, TokenKind},
 };
 
+pub fn parse_float_literal_starting_with_dot(cursor: &mut Cursor) -> Result<Token, String> {
+    let mut value = String::from(".");
+    cursor.bump(); // consume the dot
+
+    while cursor.first().is_digit(10) {
+        value.push(cursor.first());
+        cursor.bump(); // consume the digit
+    }
+
+    let kind = TokenKind::Literal(Literal::Float(value.parse::<f64>().unwrap()));
+
+    if let Some(suffix) = parse_suffix(cursor) {
+        match suffix {
+            NumericLiteralType::Float => {}
+            _ => return Err("Invalid suffix for float literal".to_string()),
+        }
+    }
+
+    Ok(Token {
+        kind,
+        length: cursor.position_within_token(),
+    })
+}
+
 pub fn parse_numeric_literal(cursor: &mut Cursor) -> Token {
     let base: IntLiteralBase = parse_base_prefix(cursor).unwrap_or(IntLiteralBase::None);
     let value = parse_numeric_literal_value(cursor, base.clone());

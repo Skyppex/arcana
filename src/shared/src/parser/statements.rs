@@ -84,7 +84,13 @@ fn parse_mod_statement(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Mod) {
-        return parse_statement(cursor).map(|s| vec![s]);
+        let mut statements = vec![];
+
+        while !cursor.is_end_of_file() {
+            statements.push(parse_statement(cursor)?);
+        }
+
+        return Ok(statements);
     }
 
     cursor.bump()?; // Consume the mod keyword
