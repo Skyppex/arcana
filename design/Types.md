@@ -4,7 +4,7 @@
 
 Public struct declaration -> Statement
 
-```rs
+```arcana
 public struct Foo { // public struct declaration -> Statement
     public bar: int, // public immutable int bar
     public baz: mutable int, // public mutable int baz
@@ -13,7 +13,7 @@ public struct Foo { // public struct declaration -> Statement
 
 Public mutable struct declaration -> Statement
 
-```rs
+```arcana
 public mutable struct Foo { // declaring the struct as mutable makes all fields mutable (you still have to declare the variable as mutable when you use it)
     public bar: int, // public mutable int bar
     public baz: int, // public mutable int baz
@@ -22,13 +22,13 @@ public mutable struct Foo { // declaring the struct as mutable makes all fields 
 
 Struct literal -> Expression
 
-```rs
+```arcana
 Foo { bar: 5, baz: 10 }
 ```
 
 Private tuple struct declaration with a field of type Foo called foo -> Statement
 
-```rs
+```arcana
 struct Wrapper(foo: Foo);
 ```
 
@@ -36,7 +36,7 @@ struct Wrapper(foo: Foo);
 
 Enum declaration with two variants -> Statement
 
-```rs
+```arcana
 enum Foo { // public enum declaration -> Statement
     Bar(a: int), // Bar variant with a field of type int called a
     Baz(a: int, b: float), // Baz variant with a field of type int called a and a field of type float called b
@@ -45,7 +45,7 @@ enum Foo { // public enum declaration -> Statement
 
 Here we name the fields of each variant explicitly, but you can omit them
 
-```rs
+```arcana
 enum Foo {
     Bar(int),
     Baz(int, float),
@@ -56,7 +56,7 @@ enum Foo {
 
 Enums can have shared fields. Using this constrains each variant to use the same type of syntax for its fields.
 
-```rs
+```arcana
 enum Foo(string) {
     Bar(int),
     Baz(int, float),
@@ -65,7 +65,7 @@ enum Foo(string) {
 
 The shared field is appended to the end of each variant which mean its equivalent to:
 
-```rs
+```arcana
 enum Foo {
     Bar(int, string),
     Baz(int, float, string),
@@ -74,7 +74,7 @@ enum Foo {
 
 If the shared field is named, all fields in variants must be named:
 
-```rs
+```arcana
 enum Foo(name: string, id: uint) { // Multiple shared fields
     Bar(a: int), // Must have a name
     Baz(a: int, b: float), // Must have a name for each field
@@ -83,7 +83,7 @@ enum Foo(name: string, id: uint) { // Multiple shared fields
 
 Using shared fields allows you to access that field without caring about which variant a variable is:
 
-```rs
+```arcana
 enum Foo(string) {
     Bar(int),
     Baz(int, float),
@@ -94,7 +94,7 @@ enum NamedFoo(str_id: string) {
     Baz(a: int, b: float),
 }
 
-fn main() {
+fun main() {
     let foo = Foo::Bar(-5, "bar"); // Note, you have to assign the shared field here.
     let text = foo.0; // 'foo' now has positional fields. '0' accesses the first shared field on the enum.
 
@@ -108,7 +108,7 @@ fn main() {
 Public flags type declaration which uses an uint to hold the flags -> Statement
 Note that the Foo type is not coercible to an uint, so you can't do `uint foo = Foo::First`
 
-```rs
+```arcana
 public flags Foo(uint) {
     First, // default value is 0b0000_0001
     Second, // default value is 0b0000_0010
@@ -147,7 +147,7 @@ Implementation blocks are used to implement traits for types.
 
 ### Syntax
 
-```rs
+```arcana
 imp Trait for Type {
     // Trait function implementations
 }
@@ -157,7 +157,7 @@ imp Trait for Type {
 
 Here the `new` function is implemented for the `Foo` type.
 
-```rs
+```arcana
 struct Foo {
     bar: int,
 }
@@ -175,7 +175,7 @@ Literal type annotation exists to annotate literal types in situations where jus
 
 ### Syntax
 
-```rs
+```arcana
 lit a = #"Hello World";
 
 lit b = #255;
@@ -188,7 +188,7 @@ Note that this example doesn't require the explicit generic annotation because i
 
 Here a union is used as a type constraint. This causes the generic type to only
 allow one of the union's variants at a time.
-```rs
+```arcana
 union Choice { 1, 2, 3 }
 
 struct A<T>
@@ -203,7 +203,7 @@ let a2 = A::<#2> { a: 3 } // This would fail
 
 This is different from allowing any type as a generic parameter and using a
 union as the generic type. In this case, the generic type can be any of the
-```rs
+```arcana
 union Choice { 1, 2, 3 }
 
 struct A<T> {
@@ -221,7 +221,7 @@ Type aliases are considered their own type, so you can't use them interchangeabl
 
 ### Syntax
 
-```rs
+```arcana
 type Name = Type;
 ```
 
@@ -229,7 +229,7 @@ type Name = Type;
 
 Here the `Bar` type is an alias for the `Foo` type.
 
-```rs
+```arcana
 struct Foo {
     bar: int,
 }
@@ -239,7 +239,7 @@ type Bar = Foo;
 
 You can have implementations for type aliases, but they are not inherited by the type they alias.
 
-```rs
+```arcana
 struct Foo {
     bar: int,
 }
@@ -247,12 +247,12 @@ struct Foo {
 type Bar = Foo;
 
 implement Bar {
-    fn new(bar: int): Bar {
+    fun new(bar: int): Bar {
         return Bar { bar: bar };
     }
 }
 
-fn main() {
+fun main() {
     Bar bar = Bar::new(5), // This works
     Foo foo = Foo::new(5), // This doesn't work
 }
@@ -265,7 +265,7 @@ They are similar to generics in other languages.
 
 ### Syntax
 
-```rs
+```arcana
 struct Foo<T> {
     bar: T,
 }
@@ -275,7 +275,7 @@ struct Foo<T> {
 
 Here the `Foo` type has a type parameter `T` which is used as the type of the `bar` field.
 
-```rs
+```arcana
 struct Foo<T> {
     bar: T,
 }
@@ -288,7 +288,7 @@ They are similar to generic constraints in other languages.
 
 ### Syntax
 
-```rs
+```arcana
 struct Foo<T>
 where T is Trait {
     bar: T,
@@ -300,9 +300,9 @@ where T is Trait {
 Here the `Foo` type has a type parameter `T` which is used as the type of the `bar` field. \
 The type parameter `T` must implement the `New` trait.
 
-```rs
+```arcana
 trait Newable {
-    fn new(): Self;
+    fun new(): Self;
 }
 
 struct Foo<T>
@@ -321,7 +321,7 @@ Type arithmetic is performed on type aliases, type parameters and type bounds.
 
 This is only a subset of the possible operations.
 
-```rs
+```arcana
 type Name = Type - Type.Member;
 ```
 
@@ -331,7 +331,7 @@ Here are some examples of how to use type arithmetic.
 
 #### Example 1
 
-```rs
+```arcana
 enum Foo {
     Bar(a: int),
     Baz(a: float),
@@ -339,7 +339,7 @@ enum Foo {
 
 type Exclude<T: enum, ..[U: memberof T]> = T - ..U;
 
-fn main() {
+fun main() {
     Foo foo = Foo.Baz;
     Exclude<Foo, Bar> bazOnly = match foo {
         Bar(a) => Exclude<Foo, Bar>.Baz(float.parse(a)),
@@ -350,7 +350,7 @@ fn main() {
 
 This lowers to the following:
 
-```rs
+```arcana
 enum Foo {
     Bar(a: int),
     Baz(a: float),
@@ -360,7 +360,7 @@ enum Exclude_Foo_Bar {
     Baz(a: float),
 }
 
-fn main() {
+fun main() {
     Foo foo = Foo.Baz;
     Exclude_Foo_Bar bazOnly = match foo {
         Bar(a) => Exclude_Foo_Bar.Baz(float.parse(a)),
@@ -371,7 +371,7 @@ fn main() {
 
 #### Example 2
 
-```rs
+```arcana
 struct Foo {
     bar: int,
     baz: float,
@@ -379,7 +379,7 @@ struct Foo {
 
 type Omit<T: struct, ..[U: memberof T]> = T - ..U;
 
-fn main() {
+fun main() {
     Foo foo = Foo { bar: 5, baz: 10 };
     Omit<Foo, bar> bazOnly = foo;
     // This is equivalent to Omit<Foo, bar> bazOnly = Omit<Foo, bar> { baz: foo.baz };
@@ -393,7 +393,7 @@ type BazOnly = Foo - bar;
 
 This lowers to the following:
 
-```rs
+```arcana
 struct Foo {
     bar: int,
     baz: float,
@@ -403,7 +403,7 @@ struct Omit_Foo_bar {
     bar: int,
 }
 
-fn main() {
+fun main() {
     Foo foo = Foo.Baz;
     Omit_Foo_bar bazOnly = Omit_Foo_bar { baz: foo.baz };
 }
@@ -415,7 +415,7 @@ struct BazOnly {
 
 You can extend types with new fields:
 
-```rs
+```arcana
 struct Foo {
     bar: int,
     baz: float,
@@ -423,7 +423,7 @@ struct Foo {
 
 type Extend<T: struct, ..[U: field]> = T + U;
 
-fn main() {
+fun main() {
     Foo foo = Foo { bar: 5, baz: 10 };
 
     // We have to use the 'with' keyword here since a '+' would
@@ -440,7 +440,7 @@ Here the `Foo` struct has been made `public` along with its fields.
 When declaring the `FooBarBaz` type alias, the new `barBaz` field is also marked as `public`.
 If you didn't do this, the field would be private for the `FooBarBaz` type even though its itself `public`.
 
-```rs
+```arcana
 type Extend<T: struct, ..[U: field]> = T + U;
 
 public struct Foo {
@@ -453,7 +453,7 @@ type FooBarBaz = Extend<Foo, public barBaz: bool>;
 
 ## Easy way to new a Vec
 
-```rs
+```arcana
 struct Vec<T> {
     items: ¤[T], // Boxed slice of Ts
 }
