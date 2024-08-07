@@ -22,6 +22,7 @@ pub fn evaluate<'a>(
     typed_statement: TypedStatement,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
+    println!("Evaluating");
     match typed_statement {
         TypedStatement::None => Ok(Value::Void),
         TypedStatement::ModuleDeclaration { module_path, .. } => {
@@ -56,6 +57,7 @@ fn evaluate_function_declaration(
     param: Option<TypedParameter>,
     body: TypedExpression,
 ) -> Result<Value, String> {
+    println!("Function Declaration");
     let function_environment = Rc::new(RefCell::new(environment.deref().clone().borrow().clone()));
 
     let function = Value::Function {

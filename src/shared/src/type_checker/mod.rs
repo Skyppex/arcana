@@ -764,6 +764,12 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
 
 pub fn type_equals_coerce(left: &Type, right: &Type) -> bool {
     match (left, right) {
+        (Type::UInt, Type::Literal { name, type_ }) if matches!(**type_, Type::Int) => {
+            name.parse::<u64>().is_ok()
+        }
+        (Type::Int, Type::Literal { name, type_ }) if matches!(**type_, Type::UInt) => {
+            name.parse::<i64>().is_ok()
+        }
         (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
             type_equals(type_, type_2)
         }

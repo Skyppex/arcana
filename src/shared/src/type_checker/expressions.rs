@@ -23,6 +23,7 @@ pub fn check_type<'a>(
     type_environment: Rc<RefCell<TypeEnvironment>>,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
+    println!("Checking Expression");
     match expression {
         // Expression::None => Ok(TypedExpression::None),
         Expression::Break(e) => match e {
@@ -259,6 +260,7 @@ fn synthesize_type(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
 ) -> Result<TypedExpression, String> {
+    println!("Synthesizing Expression");
     match expression {
         // Expression::None => Ok(TypedExpression::None),
         Expression::VariableDeclaration(VariableDeclaration {
@@ -736,7 +738,7 @@ fn synthesize_type(
                 operator,
                 BinaryOperator::Range | BinaryOperator::RangeInclusive
             ) {
-                if !type_equals_coerce(&left.get_type(), &right.get_type()) {
+                if !type_equals_coerce(&right.get_type(), &left.get_type()) {
                     return Err(format!(
                         "Range operator requires both sides to be of the same type, found {} and {}",
                         left.get_type(),
@@ -753,18 +755,22 @@ fn synthesize_type(
             })
         }
         Expression::Block(statements) => {
-            let mut statements_: Vec<TypedStatement> = vec![];
+            println!("Block");
+            let mut typed_statements: Vec<TypedStatement> = vec![];
 
             for statement in statements {
-                statements_.push(statements::check_type(
+                println!("Body: {:?}", statement);
+                typed_statements.push(statements::check_type(
                     statement,
                     discovered_types,
                     type_environment.clone(),
                 )?);
+                println!("Body end");
             }
 
+            println!("Block end");
             let mut type_ = Type::Void;
-            for statement in statements_.clone() {
+            for statement in typed_statements.clone() {
                 match statement {
                     TypedStatement::Expression(e) => {
                         type_ = e.get_deep_type();
@@ -774,7 +780,7 @@ fn synthesize_type(
             }
 
             Ok(TypedExpression::Block(Block {
-                statements: statements_,
+                statements: typed_statements,
                 type_,
             }))
         }
@@ -891,6 +897,7 @@ fn synthesize_type(
             body,
             else_body,
         }) => {
+            println!("For loop");
             let for_and_else_environment =
                 Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment)));
 
@@ -1321,6 +1328,16 @@ fn get_binop_type(
         (Type::Int, BinaryOperator::Range, Type::Int) => Ok(Type::Array(Box::new(Type::Int))),
         (Type::UInt, BinaryOperator::Range, Type::UInt) => Ok(Type::Array(Box::new(Type::UInt))),
         (Type::Char, BinaryOperator::Range, Type::Char) => Ok(Type::Array(Box::new(Type::Char))),
+        (Type::Literal { type_, name }, BinaryOperator::Range, Type::UInt)
+            if **type_ == Type::Int && name.parse::<u64>().is_ok() =>
+        {
+            Ok(Type::Array(Box::new(Type::UInt)))
+        }
+        (Type::Literal { type_, name }, BinaryOperator::Range, Type::Int)
+            if **type_ == Type::UInt && name.parse::<i64>().is_ok() =>
+        {
+            Ok(Type::Array(Box::new(Type::Int)))
+        }
         (Type::Int, BinaryOperator::RangeInclusive, Type::Int) => {
             Ok(Type::Array(Box::new(Type::Int)))
         }
@@ -1329,6 +1346,16 @@ fn get_binop_type(
         }
         (Type::Char, BinaryOperator::RangeInclusive, Type::Char) => {
             Ok(Type::Array(Box::new(Type::Char)))
+        }
+        (Type::Literal { type_, name }, BinaryOperator::RangeInclusive, Type::Int)
+            if **type_ == Type::UInt && name.parse::<i64>().is_ok() =>
+        {
+            Ok(Type::Array(Box::new(Type::Int)))
+        }
+        (Type::Literal { type_, name }, BinaryOperator::RangeInclusive, Type::UInt)
+            if **type_ == Type::Int && name.parse::<u64>().is_ok() =>
+        {
+            Ok(Type::Array(Box::new(Type::UInt)))
         }
         (Type::Literal { type_, .. }, operator, right_type) => {
             get_binop_type(type_, operator, right_type)
