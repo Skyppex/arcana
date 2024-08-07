@@ -1,3 +1,1 @@
-fun things(a: fun(int, int): int): int => a(1, 2)
-
-things -> |x, y| => x + y
+type Number = int | uint | float;
