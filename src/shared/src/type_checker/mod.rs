@@ -153,6 +153,32 @@ impl FullName for Union {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct TypeAlias {
+    pub type_identifier: TypeIdentifier,
+    pub types: Vec<Type>,
+}
+
+impl TypeAlias {
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        TypeAnnotation::from(self.type_identifier.clone())
+    }
+}
+
+impl FullName for TypeAlias {
+    fn full_name(&self) -> String {
+        format!(
+            "{} = {}",
+            self.type_identifier.to_string(),
+            self.types
+                .iter()
+                .map(|l| l.to_string())
+                .collect::<Vec<String>>()
+                .join(" | ")
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Trait {
     pub type_identifier: TypeIdentifier,
     pub associated_types: HashMap<String, Type>,
@@ -224,6 +250,7 @@ pub enum Type {
     Enum(Enum),
     EnumMember(EnumMember),
     Union(Union),
+    TypeAlias(TypeAlias),
     Trait(Trait),
     Function(Function),
     Literal {
@@ -386,6 +413,7 @@ impl Type {
                 um.discriminant_name.clone(),
             ),
             Type::Union(u) => u.type_identifier.clone(),
+            Type::TypeAlias(u) => u.type_identifier.clone(),
             Type::Function(f) => f
                 .identifier
                 .clone()
@@ -410,6 +438,7 @@ impl Type {
             Type::Enum(e) => e.type_annotation(),
             Type::EnumMember(em) => em.type_annotation(),
             Type::Union(u) => u.type_annotation(),
+            Type::TypeAlias(u) => u.type_annotation(),
             Type::Function(f) => f
                 .type_annotation()
                 .unwrap_or_else(|| panic!("Closure has no type annotation")),
@@ -624,6 +653,7 @@ impl FullName for Type {
             Type::Enum(u) => u.full_name(),
             Type::EnumMember(um) => um.full_name(),
             Type::Union(u) => u.full_name(),
+            Type::TypeAlias(t) => t.full_name(),
             Type::Function(f) => f.full_name(),
             Type::Literal { name, type_ } => format!("#{}: {}", type_.full_name(), name),
             Type::Trait(t) => t.full_name(),
@@ -689,6 +719,24 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 type_: type_2,
             },
         ) => name == name_2 && type_equals(type_, type_2),
+        (
+            Type::TypeAlias(TypeAlias { types: left, .. }),
+            Type::TypeAlias(TypeAlias { types: right, .. }),
+        ) => {
+            for r in right {
+                if !left.iter().any(|l| type_equals(l, r)) {
+                    return false;
+                }
+            }
+
+            true
+        }
+        (Type::TypeAlias(TypeAlias { types, .. }), other) => {
+            types.iter().any(|t| type_equals(t, other))
+        }
+        (other, Type::TypeAlias(TypeAlias { types, .. })) => {
+            types.iter().all(|t| type_equals(other, t))
+        }
         (other, Type::Literal { type_, .. }) => type_equals(other, type_),
         (Type::Function(fl), Type::Function(fr)) => {
             type_equals(fl.return_type.as_ref(), fr.return_type.as_ref())

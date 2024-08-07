@@ -75,6 +75,7 @@ impl From<Type> for TypeAnnotation {
             Type::Enum(_) => todo!(),
             Type::EnumMember(_) => todo!(),
             Type::Union(_) => todo!(),
+            Type::TypeAlias(_) => todo!(),
             Type::Trait(_) => todo!(),
             Type::Literal { .. } => todo!(),
         }

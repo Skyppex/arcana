@@ -49,6 +49,11 @@ pub enum TypedStatement {
         literals: Vec<TypeAnnotation>,
         type_: Type,
     },
+    TypeAliasDeclaration {
+        type_identifier: TypeIdentifier,
+        type_annotations: Vec<TypeAnnotation>,
+        type_: Type,
+    },
     FunctionDeclaration {
         identifier: TypeIdentifier,
         param: Option<TypedParameter>,
@@ -79,6 +84,7 @@ impl Typed for TypedStatement {
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::TypeAliasDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Semi { .. } => Type::Void,
             TypedStatement::Expression(e) => e.get_type(),
@@ -94,6 +100,7 @@ impl Typed for TypedStatement {
             TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::TypeAliasDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Semi(e) => e.get_deep_type(),
             TypedStatement::Expression(e) => e.get_deep_type(),
@@ -166,6 +173,20 @@ impl Display for TypedStatement {
                     .map(|l| l.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
+            ),
+            TypedStatement::TypeAliasDeclaration {
+                type_identifier,
+                type_annotations,
+                ..
+            } => write!(
+                f,
+                "type {} = {}",
+                type_identifier,
+                type_annotations
+                    .iter()
+                    .map(|l| l.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" | ")
             ),
             TypedStatement::FunctionDeclaration {
                 identifier,

@@ -11,7 +11,7 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    type_equals, Enum, EnumMember, Function, Parameter, Rcrc, Struct, Type, Union,
+    type_equals, Enum, EnumMember, Function, Parameter, Rcrc, Struct, Type, TypeAlias, Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -72,6 +72,14 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .iter()
                 .map(|literal| TypeAnnotation::Literal(Box::new(literal.clone())))
                 .collect(),
+        )]),
+        Statement::TypeAliasDeclaration(parser::TypeAliasDeclaration {
+            access_modifier: _,
+            type_identifier,
+            type_annotations,
+        }) => Ok(vec![DiscoveredType::TypeAlias(
+            type_identifier.clone(),
+            type_annotations.clone(),
         )]),
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
@@ -362,6 +370,47 @@ pub fn check_type<'a>(
                 type_,
             })
         }
+        Statement::TypeAliasDeclaration(parser::TypeAliasDeclaration {
+            access_modifier: _,
+            type_identifier,
+            type_annotations,
+        }) => {
+            let type_decl_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
+                type_environment.clone(),
+            )));
+
+            if let TypeIdentifier::GenericType(_, generics) = type_identifier {
+                for generic in generics {
+                    type_decl_type_environment
+                        .borrow_mut()
+                        .add_type(Type::Generic(generic.clone()))?;
+                }
+            }
+
+            let types = type_annotations
+                .iter()
+                .map(|type_annotation| {
+                    check_type_annotation(
+                        type_annotation,
+                        discovered_types,
+                        type_decl_type_environment.clone(),
+                    )
+                })
+                .collect::<Result<Vec<Type>, String>>()?;
+
+            let type_ = Type::TypeAlias(TypeAlias {
+                type_identifier: type_identifier.clone(),
+                types,
+            });
+
+            type_environment.borrow_mut().add_type(type_.clone())?;
+
+            Ok(TypedStatement::TypeAliasDeclaration {
+                type_identifier: type_identifier.clone(),
+                type_annotations: type_annotations.clone(),
+                type_,
+            })
+        }
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             identifier,
@@ -483,6 +532,7 @@ fn check_type_identifier(
             DiscoveredType::Struct(name, ..) => name == type_identifier,
             DiscoveredType::Enum(name, ..) => name == type_identifier,
             DiscoveredType::Union(name, ..) => name == type_identifier,
+            DiscoveredType::TypeAlias(name, ..) => name == type_identifier,
             DiscoveredType::Function {
                 type_identifier: name,
                 ..
@@ -589,6 +639,23 @@ fn check_type_identifier(
                 literals: literal_types,
             }))
         }
+        Some(DiscoveredType::TypeAlias(type_identifier, type_annotations)) => {
+            let types = type_annotations
+                .iter()
+                .map(|type_annotation| {
+                    check_type_annotation(
+                        type_annotation,
+                        discovered_types,
+                        type_environment.clone(),
+                    )
+                })
+                .collect::<Result<Vec<Type>, String>>()?;
+
+            Ok(Type::TypeAlias(TypeAlias {
+                type_identifier: type_identifier.clone(),
+                types,
+            }))
+        }
         Some(DiscoveredType::Function {
             type_identifier,
             param,
@@ -643,6 +710,9 @@ pub fn check_type_annotation(
                 type_identifier.name() == type_annotation.name()
             }
             DiscoveredType::Union(type_identifier, ..) => {
+                type_identifier.name() == type_annotation.name()
+            }
+            DiscoveredType::TypeAlias(type_identifier, ..) => {
                 type_identifier.name() == type_annotation.name()
             }
             DiscoveredType::Function {
@@ -748,6 +818,19 @@ pub fn check_type_annotation(
                 type_identifier: type_identifier.clone(),
                 literal_type: Box::new(literal_type.clone()),
                 literals: literal_types,
+            }))
+        }
+        Some(DiscoveredType::TypeAlias(type_identifier, type_annotations)) => {
+            let types = type_annotations
+                .iter()
+                .map(|literal| {
+                    check_type_annotation(literal, discovered_types, type_environment.clone())
+                })
+                .collect::<Result<Vec<Type>, String>>()?;
+
+            Ok(Type::TypeAlias(TypeAlias {
+                type_identifier: type_identifier.clone(),
+                types,
             }))
         }
         Some(DiscoveredType::Function {

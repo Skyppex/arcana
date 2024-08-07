@@ -5,8 +5,8 @@ pub struct Map<TIterator, TFunc> {
     mapper: TFunc
 }
 
-impl<TFrom, TTo> Iterator<Self::Item = TFrom> {
-    pub func map(self, mapper: (TFrom): TTo): Map<Self, TFrom, TTo> {
+imp<TFrom, TTo> Iterator<Self::Item = TFrom> {
+    pub fun map(self, mapper: (TFrom): TTo): Map<Self, TFrom, TTo> {
         Map { self, mapper }
     }
 }
@@ -23,7 +23,7 @@ impl<T, TIterator, TFunc> Iterator for Map<TIterator, TFunc> {
 }
 
 // Other Spell
-pub mod iteratorExtensions;
+pub mod iterator_extensions;
 
 pub struct Closest<TIterator, TType, TOperand> {
     iterator: TIterator,
@@ -31,8 +31,8 @@ pub struct Closest<TIterator, TType, TOperand> {
     comparer: (TOperand, TOperand): Ordering
 }
 
-extend impl<TType, TOperand> Iterator<Self::Item = TType> {
-    pub func closest(
+extend imp<TType, TOperand> Iterator<Self::Item = TType> {
+    pub fun closest(
         self,
         selector: (TType): TOperand,
         comparer: (TOperand, TOperand): Ordering): Closest<Self, TType, TOperand> {
@@ -40,10 +40,10 @@ extend impl<TType, TOperand> Iterator<Self::Item = TType> {
     }
 }
 
-impl<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOperand> {
+imp<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOperand> {
     type Item = T;
 
-    func next(&mut self) -> Option<Self::Item> {
+    fun next(&mut self) -> Option<Self::Item> {
         let mut closest = None;
 
         for item in self.iterator {

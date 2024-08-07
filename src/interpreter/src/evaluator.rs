@@ -34,6 +34,7 @@ pub fn evaluate<'a>(
         TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
         TypedStatement::EnumDeclaration { .. } => Ok(Value::Void),
         TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::TypeAliasDeclaration { .. } => Ok(Value::Void),
         TypedStatement::Program { statements } => evaluate_program(statements, environment),
         TypedStatement::FunctionDeclaration {
             identifier,

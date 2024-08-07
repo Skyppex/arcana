@@ -13,7 +13,7 @@ use super::{
     expressions::{self, parse_expression},
     AccessModifier, Closure, EnumDeclaration, EnumMember, EnumMemberField, Expression,
     FunctionDeclaration, Literal, ModuleDeclaration, Parameter, Statement, StructDeclaration,
-    StructField, UnionDeclaration, Use, UseItem,
+    StructField, TypeAliasDeclaration, UnionDeclaration, Use, UseItem,
 };
 
 pub fn parse_module_only(
@@ -451,7 +451,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
-            return parse_expression_map(cursor);
+            return parse_type_alias_declaration(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -459,7 +459,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
-        return parse_expression_map(cursor);
+        return parse_type_alias_declaration(cursor);
     }
 
     cursor.bump()?; // Consume the union keyword
@@ -507,6 +507,47 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         access_modifier,
         type_identifier: TypeIdentifier::Type(type_name),
         literals: literals?,
+    }))
+}
+
+fn parse_type_alias_declaration(cursor: &mut Cursor) -> Result<Statement, String> {
+    let mut access_modifier = None;
+
+    if let Some(am) = cursor.first().kind.is_access_modifier() {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Type) {
+            return parse_expression_map(cursor);
+        }
+
+        cursor.bump()?; // Consume the access modifier
+        access_modifier = Some(am);
+    }
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Type) {
+        return parse_expression_map(cursor);
+    }
+
+    cursor.bump()?; // Consume the type keyword
+
+    let type_identifier = parse_type_identifier(cursor, false)?;
+
+    let TokenKind::Equal = cursor.bump()?.kind else {
+        return Err(format!("Expected = but found {:?}", cursor.first().kind));
+    };
+
+    let mut type_annotations = vec![parse_type_annotation(cursor, false)?];
+
+    while cursor.first().kind == TokenKind::Pipe {
+        cursor.bump()?; // Consume the |
+
+        type_annotations.push(parse_type_annotation(cursor, false)?);
+    }
+
+    cursor.expect(TokenKind::Semicolon)?;
+
+    Ok(Statement::TypeAliasDeclaration(TypeAliasDeclaration {
+        access_modifier,
+        type_identifier,
+        type_annotations,
     }))
 }
 

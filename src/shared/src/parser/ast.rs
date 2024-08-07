@@ -14,6 +14,7 @@ pub enum Statement {
     StructDeclaration(StructDeclaration),
     EnumDeclaration(EnumDeclaration),
     UnionDeclaration(UnionDeclaration),
+    TypeAliasDeclaration(TypeAliasDeclaration),
     FunctionDeclaration(FunctionDeclaration),
     Semi(Box<Statement>),
     Expression(Expression),
@@ -120,6 +121,13 @@ pub struct UnionDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
     pub literals: Vec<Literal>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeAliasDeclaration {
+    pub access_modifier: Option<AccessModifier>,
+    pub type_identifier: TypeIdentifier,
+    pub type_annotations: Vec<TypeAnnotation>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

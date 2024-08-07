@@ -3,8 +3,9 @@ use crate::{
         AccessModifier, Assignment, Binary, BinaryOperator, Call, ClosureParameter,
         EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
         FieldInitializer, FlagsMember, For, FunctionDeclaration, If, Literal, Match, MatchArm,
-        Member, ModuleDeclaration, Parameter, Statement, StructDeclaration, StructField, Unary,
-        UnaryOperator, UnionDeclaration, Use, UseItem, VariableDeclaration, While,
+        Member, ModuleDeclaration, Parameter, Statement, StructDeclaration, StructField,
+        TypeAliasDeclaration, Unary, UnaryOperator, UnionDeclaration, Use, UseItem,
+        VariableDeclaration, While,
     },
     type_checker::{
         self,
@@ -331,6 +332,49 @@ impl IndentDisplay for Statement {
             //     indent.decrease();
             //     result
             // },
+            Statement::TypeAliasDeclaration(TypeAliasDeclaration {
+                access_modifier,
+                type_identifier,
+                type_annotations,
+            }) => {
+                let mut result = String::new();
+                result.push_str("<type declaration>\n");
+                indent.increase();
+
+                result.push_str(
+                    format!(
+                        "{}type_name: {}\n",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}access_modifier: {}\n",
+                        indent.dash(),
+                        access_modifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "{}{}",
+                        indent.dash(),
+                        indent_display_vec(
+                            type_annotations,
+                            "type_annotations",
+                            "type_annotation",
+                            indent
+                        )
+                    )
+                    .as_str(),
+                );
+
+                indent.decrease();
+                result
+            }
             Statement::FunctionDeclaration(function_declaration) => {
                 function_declaration.indent_display(indent)
             }
@@ -1623,6 +1667,41 @@ impl IndentDisplay for TypedStatement {
                         );
                     }
                 }
+
+                indent.decrease();
+                result
+            }
+            TypedStatement::TypeAliasDeclaration {
+                type_identifier,
+                type_annotations,
+                type_,
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<union declaration> {}\n", type_).as_str());
+                indent.increase();
+
+                result.push_str(
+                    format!(
+                        "{}type_name: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "{}{}",
+                        indent.dash(),
+                        indent_display_vec(
+                            type_annotations,
+                            "type annotations",
+                            "type annotation",
+                            indent
+                        )
+                    )
+                    .as_str(),
+                );
 
                 indent.decrease();
                 result
