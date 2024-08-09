@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Display};
 use crate::display::{Indent, IndentDisplay};
 use crate::pretty_print::PrettyPrint;
 use crate::type_checker::decision_tree::Pattern;
-use crate::types::{GenericConstraint, TypeAnnotation, TypeIdentifier};
+use crate::types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -298,25 +298,59 @@ pub enum AccessModifier {
 pub enum Member {
     Identifier {
         symbol: String,
+        generics: Option<Vec<GenericType>>,
     },
     MemberAccess {
         object: Box<Expression>,
         member: Box<Member>,
         symbol: String,
+        generics: Option<Vec<GenericType>>,
     },
     ParamPropagation {
         object: Box<Expression>,
         member: Box<Member>,
         symbol: String,
+        generics: Option<Vec<GenericType>>,
     },
 }
 
 impl Member {
     pub fn get_symbol(&self) -> String {
         match self {
-            Member::Identifier { symbol } => symbol.clone(),
+            Member::Identifier { symbol, .. } => symbol.clone(),
             Member::MemberAccess { symbol, .. } => symbol.clone(),
             Member::ParamPropagation { symbol, .. } => symbol.clone(),
+        }
+    }
+
+    pub fn with_generics(self, generics: Vec<GenericType>) -> Self {
+        match self {
+            Member::Identifier { symbol, .. } => Member::Identifier {
+                symbol,
+                generics: Some(generics),
+            },
+            Member::MemberAccess {
+                object,
+                member,
+                symbol,
+                ..
+            } => Member::MemberAccess {
+                object,
+                member,
+                symbol,
+                generics: Some(generics),
+            },
+            Member::ParamPropagation {
+                object,
+                member,
+                symbol,
+                ..
+            } => Member::ParamPropagation {
+                object,
+                member,
+                symbol,
+                generics: Some(generics),
+            },
         }
     }
 }

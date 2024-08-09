@@ -420,16 +420,30 @@ pub fn check_type<'a>(
             body,
         }) => {
             println!("Checking function declaration");
+            let function_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
+                type_environment.clone(),
+            )));
+
+            if let TypeIdentifier::GenericType(_, generics) = identifier {
+                println!("Adding generics");
+                println!("{:?}", generics);
+                for generic in generics {
+                    function_type_environment
+                        .borrow_mut()
+                        .add_type(Type::Generic(generic.clone()))?;
+                }
+            }
+
             let return_type = check_type_annotation(
                 &return_type_annotation
                     .clone()
                     .unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
                 &discovered_types,
-                type_environment.clone(),
+                function_type_environment.clone(),
             )?;
 
             let body_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
-                type_environment.clone(),
+                function_type_environment.clone(),
                 ScopeType::Return,
             )));
 
@@ -441,7 +455,7 @@ pub fn check_type<'a>(
                     let param_type = match check_type_annotation(
                         &param_type_annotation,
                         &discovered_types,
-                        type_environment.clone(),
+                        function_type_environment.clone(),
                     ) {
                         Ok(t) => {
                             body_environment

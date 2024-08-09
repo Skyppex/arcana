@@ -913,15 +913,32 @@ impl IndentDisplay for Expression {
 impl IndentDisplay for Member {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            Member::Identifier { symbol } => {
+            Member::Identifier { symbol, generics } => {
                 let mut result = String::new();
                 result.push_str(format!("<identifier> {}", symbol).as_str());
+
+                match generics {
+                    Some(generics) => result.push_str(
+                        format!(
+                            "<{}>",
+                            generics
+                                .into_iter()
+                                .map(|g| g.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                        .as_str(),
+                    ),
+                    None => {}
+                }
+
                 result
             }
             Member::MemberAccess {
                 object,
                 member,
                 symbol,
+                generics,
             } => {
                 let mut result = String::new();
                 result.push_str("<member access>\n");
@@ -934,6 +951,7 @@ impl IndentDisplay for Member {
                     )
                     .as_str(),
                 );
+
                 result.push_str(
                     format!(
                         "{}member: {}\n",
@@ -942,8 +960,24 @@ impl IndentDisplay for Member {
                     )
                     .as_str(),
                 );
+
+                result.push_str(format!("{}symbol: {}\n", indent.dash(), symbol).as_str());
+
                 indent.end_current();
-                result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
+
+                if let Some(generics) = generics {
+                    result.push_str(
+                        format!(
+                            "\n{}generics: {}",
+                            indent.dash_end(),
+                            indent_display_vec(generics, "generics", "generic", indent)
+                        )
+                        .as_str(),
+                    );
+                } else {
+                    result.push_str(format!("\n{}generics: None", indent.dash_end()).as_str());
+                }
+
                 indent.decrease();
                 result
             }
@@ -951,6 +985,7 @@ impl IndentDisplay for Member {
                 object,
                 member,
                 symbol,
+                generics: _,
             } => {
                 let mut result = String::new();
                 result.push_str("<param propagation>\n");

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     lexer::token::{self, Keyword, TokenKind},
     type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
-    types::{parse_optional_type_annotation, TypeAnnotation},
+    types::{parse_generics_in_type_name, parse_optional_type_annotation, TypeAnnotation},
 };
 
 use super::{
@@ -922,6 +922,17 @@ fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut expression = parse_member_access(cursor)?;
 
+    if cursor.first().kind == TokenKind::DoubleColon && cursor.second().kind == TokenKind::Less {
+        cursor.bump()?; // Consume the ::
+        let generics = parse_generics_in_type_name(cursor)?;
+
+        let Expression::Member(member) = expression.clone() else {
+            return Err(format!("Expected member but found {:?}", expression));
+        };
+
+        expression = Expression::Member(member.with_generics(generics));
+    }
+
     loop {
         match cursor.first().kind {
             // Call expression
@@ -950,6 +961,7 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
                     object: Box::new(expression),
                     member: Box::new(member),
                     symbol: identifier,
+                    generics: None,
                 });
             }
             _ => break,
@@ -1030,6 +1042,7 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             object: Box::new(object),
             member: Box::new(member),
             symbol: identifier,
+            generics: None,
         });
     }
 
@@ -1054,6 +1067,7 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             object: Box::new(object),
             member: Box::new(member),
             symbol: identifier,
+            generics: None,
         });
     }
 
@@ -1078,6 +1092,7 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             object: Box::new(object),
             member: Box::new(member),
             symbol: identifier,
+            generics: None,
         });
     }
 
@@ -1099,6 +1114,7 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
             cursor.bump()?; // Consume the identifier
             Ok(Expression::Member(Member::Identifier {
                 symbol: identifier,
+                generics: None,
             }))
         }
         TokenKind::OpenParen => {

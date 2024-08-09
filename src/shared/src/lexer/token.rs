@@ -192,6 +192,7 @@ pub enum Keyword {
     Where,
     Is,
     And,
+    Or,
 
     // Control flow
     If,

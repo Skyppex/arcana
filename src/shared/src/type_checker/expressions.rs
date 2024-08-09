@@ -515,7 +515,7 @@ fn synthesize_type(
             })
         }
         Expression::Member(member) => match member {
-            crate::parser::Member::Identifier { symbol } => {
+            crate::parser::Member::Identifier { symbol, .. } => {
                 let type_ = type_environment
                     .borrow()
                     .get_variable(symbol)
@@ -1039,7 +1039,7 @@ fn check_type_member_access_recurse(
 ) -> Result<TypedExpression, String> {
     match object_type {
         Type::Struct(struct_) => match *member.clone() {
-            parser::Member::Identifier { symbol } => {
+            parser::Member::Identifier { symbol, .. } => {
                 let field_type = struct_.fields.get(&symbol).ok_or(format!(
                     "Struct '{}' does not have a field called '{}'",
                     struct_.type_identifier, symbol
@@ -1065,17 +1065,19 @@ fn check_type_member_access_recurse(
                 object,
                 member,
                 symbol: _,
+                generics: _,
             } => check_type_member_access(&object, discovered_types, type_environment, &member),
             parser::Member::ParamPropagation {
                 object,
                 member,
                 symbol: _,
+                generics: _,
             } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
         },
         Type::EnumMember(EnumMember {
             enum_name, fields, ..
         }) => match *member.clone() {
-            parser::Member::Identifier { symbol } => {
+            parser::Member::Identifier { symbol, .. } => {
                 let field_type = fields.get(&symbol).ok_or(format!(
                     "EnumMember '{}' does not have a field called '{}'",
                     enum_name, symbol
@@ -1101,11 +1103,13 @@ fn check_type_member_access_recurse(
                 object,
                 member,
                 symbol: _,
+                generics: _,
             } => check_type_member_access(&object, discovered_types, type_environment, &member),
             parser::Member::ParamPropagation {
                 object,
                 member,
                 symbol: _,
+                generics: _,
             } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
         },
         Type::Enum(Enum {
@@ -1113,7 +1117,7 @@ fn check_type_member_access_recurse(
             shared_fields,
             ..
         }) => match *member.clone() {
-            parser::Member::Identifier { symbol } => {
+            parser::Member::Identifier { symbol, .. } => {
                 let field_type = shared_fields.get(&symbol).ok_or(format!(
                     "Enum '{}' does not have a shared field called '{}'",
                     type_identifier, symbol
@@ -1139,11 +1143,13 @@ fn check_type_member_access_recurse(
                 object,
                 member,
                 symbol: _,
+                generics: _,
             } => check_type_member_access(&object, discovered_types, type_environment, &member),
             parser::Member::ParamPropagation {
                 object,
                 member,
                 symbol: _,
+                generics: _,
             } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
         },
         other => Err(format!(
@@ -1177,7 +1183,7 @@ fn check_type_param_propagation_recurse(
     object_typed_expression: TypedExpression,
 ) -> Result<TypedExpression, String> {
     match *member.clone() {
-        parser::Member::Identifier { symbol } => {
+        parser::Member::Identifier { symbol, .. } => {
             let type_ = type_environment
                 .borrow()
                 .get_variable(&symbol)

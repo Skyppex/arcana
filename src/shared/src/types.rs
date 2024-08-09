@@ -557,7 +557,7 @@ pub(super) fn parse_type_identifier(
     }
 }
 
-fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericType>, String> {
+pub fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericType>, String> {
     let mut types = Vec::new();
 
     while cursor.first().kind != TokenKind::Greater {

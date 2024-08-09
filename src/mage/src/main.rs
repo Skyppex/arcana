@@ -6,7 +6,7 @@ use clap::Parser;
 use glob::{glob, Paths};
 use utils::get_path;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, thread};
 
 use crate::mage_args::MageArgs;
 use interpreter::Environment;
@@ -17,7 +17,18 @@ use shared::{
     type_checker::{create_typed_ast, TypeEnvironment},
 };
 
-fn main() {
+const STACK_SIZE: usize = 4 * 1024 * 1024;
+
+fn main() -> std::io::Result<()> {
+    // Spawn thread with explicit stack size
+    let child = thread::Builder::new().stack_size(STACK_SIZE).spawn(run)?;
+
+    // Wait for thread to join
+    child.join().unwrap();
+    Ok(())
+}
+
+fn run() {
     let args = crate::mage_args::MageArgs::parse();
 
     let spell = get_path("spell.toml").map_err(|e| e.to_string()).ok();

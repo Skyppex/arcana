@@ -355,6 +355,7 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "where" => Some(TokenKind::Keyword(Keyword::Where)),
         "is" => Some(TokenKind::Keyword(Keyword::Is)),
         "and" => Some(TokenKind::Keyword(Keyword::And)),
+        "or" => Some(TokenKind::Keyword(Keyword::Or)),
 
         // Control flow
         "if" => Some(TokenKind::Keyword(Keyword::If)),

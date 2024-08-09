@@ -536,8 +536,8 @@ fn parse_type_alias_declaration(cursor: &mut Cursor) -> Result<Statement, String
 
     let mut type_annotations = vec![parse_type_annotation(cursor, false)?];
 
-    while cursor.first().kind == TokenKind::Pipe {
-        cursor.bump()?; // Consume the |
+    while cursor.first().kind == TokenKind::Keyword(Keyword::Or) {
+        cursor.bump()?; // Consume the 'or'
 
         type_annotations.push(parse_type_annotation(cursor, false)?);
     }

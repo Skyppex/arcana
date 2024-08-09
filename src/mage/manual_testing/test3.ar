@@ -1,11 +1,1 @@
-fun add(x: int, y: int): int => x + y
-
-fun repeat(n: uint, s: int, a: fun(int, int): int, f: fun(): int): int => {
-    let mut r = s;
-
-    for i in 0..n => {
-        1 + 1
-    }
-
-    r
-}
+fun identity<T>(a: T): T => a
