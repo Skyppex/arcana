@@ -225,6 +225,18 @@ fn evaluate_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
         },
         (Value::Char(left), Value::Char(right)) => Ok(Value::Bool(left == right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left == right)),
+        (
+            Value::Enum {
+                enum_member: left_enum_member,
+                fields: left_fields,
+            },
+            Value::Enum {
+                enum_member: right_enum_member,
+                fields: right_fields,
+            },
+        ) => Ok(Value::Bool(
+            left_enum_member == right_enum_member && left_fields == right_fields,
+        )),
         (left, right) => Err(format!("Cannot equal {:?} and {:?}", left, right)),
     }
 }

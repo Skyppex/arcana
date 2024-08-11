@@ -89,7 +89,7 @@ pub struct EnumMember {
 
 impl EnumMember {
     pub fn type_annotation(&self) -> TypeAnnotation {
-        TypeAnnotation::from(self.enum_name.clone())
+        TypeAnnotation::Type(self.discriminant_name.clone())
     }
 }
 

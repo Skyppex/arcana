@@ -1,51 +1,11 @@
-struct A {
-    a: int
+enum Enum {
+    A,
+    B {
+        a: i32,
+        b: i32,
+    },
 }
 
-struct B {
-    a: A
-}
+let a = Enum::B { a: 1, b: 2 };
 
-struct C {
-    b: B
-}
-
-let a = A { a: 2 };
-let b = B { a: a };
-let c = C { b: b };
-
-// v match
-// | A { a: 1 } => 100,
-// | A { a } => a + 10,
-
-// v match
-// | A { a } => a match
-//     | 1 => 100,
-//     | a => a + 10,
-// | _ => {} // Error
-
-// b match
-// | B { a: A { a: 1 } } => 100,
-// | B { a: A { a } } => a + 10,
-
-// b match
-// | B { a } => a match
-//     | A { a } => a match
-//         | 1 => 100,
-//         | a => a + 10,
-//     | _ => {}, // Error
-// | _ => {} // Error
-
-c match
-| C { b: B { a: A { a: 1 } } } => 100,
-| C { b: B { a: A { a } } } => a + 10,
-
-c match
-| C { b } => b match
-    | B { a } => a match
-        | A { a } => a match
-            | 1 => 100,
-            | a => a + 10,
-        | _ => {}, // Error
-    | _ => {}, // Error
-| _ => {} // Error
+a match B { a: 1, b: 2 } => 100

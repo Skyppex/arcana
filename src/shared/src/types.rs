@@ -1,7 +1,7 @@
 use std::{fmt::Display, hash::Hash, ops::Deref};
 
 use crate::{
-    lexer::token::{self, IntLiteral, Keyword, TokenKind},
+    lexer::token::{self, IdentifierType, IntLiteral, Keyword, TokenKind},
     parser::{cursor::Cursor, Literal},
     type_checker::{Function, Type},
 };
@@ -79,6 +79,12 @@ impl From<Type> for TypeAnnotation {
             Type::Trait(_) => todo!(),
             Type::Literal { .. } => todo!(),
         }
+    }
+}
+
+impl From<&str> for TypeAnnotation {
+    fn from(s: &str) -> Self {
+        TypeAnnotation::Type(s.to_string())
     }
 }
 
@@ -380,6 +386,10 @@ pub(super) fn parse_type_annotation(
         TokenKind::Identifier(type_name) => {
             cursor.bump()?; // Consume the type identifier
 
+            if !type_name.is_type_identifier_name() {
+                return Err(format!("Invalid type name: {}", type_name));
+            }
+
             let mut generics = None;
 
             if cursor.first().kind == TokenKind::DoubleColon
@@ -406,6 +416,10 @@ pub(super) fn parse_type_annotation(
                         cursor.first().kind
                     ));
                 };
+
+                if !variant_name.is_type_identifier_name() {
+                    return Err(format!("Invalid variant name: {}", variant_name));
+                }
 
                 let type_name = format!("{}::{}", type_name, variant_name);
 

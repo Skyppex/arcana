@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use regex;
+
 use num_traits::int::PrimInt;
 
 use crate::{parser::AccessModifier, pretty_print::PrettyPrint};
@@ -212,4 +214,89 @@ pub enum Keyword {
 
     #[cfg(feature = "interpreter")]
     Print,
+}
+
+pub trait IdentifierType {
+    fn is_type_identifier_name(&self) -> bool;
+    fn is_generic_type_identifier_name(&self) -> bool;
+    fn is_function_identifier_name(&self) -> bool;
+    fn is_variable_identifier_name(&self) -> bool;
+    fn is_module_identifier_name(&self) -> bool;
+}
+
+impl IdentifierType for str {
+    fn is_type_identifier_name(&self) -> bool {
+        let builtins = vec![
+            "void", "unit", "bool", "int", "uint", "float", "char", "string",
+        ];
+
+        if builtins.contains(&self) {
+            return true;
+        }
+
+        let regex = regex::Regex::new(r"[A-Z]\w*");
+
+        match regex {
+            Ok(re) => re.is_match(self),
+            Err(_) => false,
+        }
+    }
+
+    fn is_generic_type_identifier_name(&self) -> bool {
+        let regex = regex::Regex::new(r"T\w*");
+
+        match regex {
+            Ok(re) => re.is_match(self),
+            Err(_) => false,
+        }
+    }
+
+    fn is_function_identifier_name(&self) -> bool {
+        let regex = regex::Regex::new(r"[_a-z][_a-z\d]*");
+
+        match regex {
+            Ok(re) => re.is_match(self),
+            Err(_) => false,
+        }
+    }
+
+    fn is_variable_identifier_name(&self) -> bool {
+        let regex = regex::Regex::new(r"[_a-z][_a-z\d]*");
+
+        match regex {
+            Ok(re) => re.is_match(self),
+            Err(_) => false,
+        }
+    }
+
+    fn is_module_identifier_name(&self) -> bool {
+        let regex = regex::Regex::new(r"[_a-z][_a-z\d]*");
+
+        match regex {
+            Ok(re) => re.is_match(self),
+            Err(_) => false,
+        }
+    }
+}
+
+impl IdentifierType for String {
+    fn is_type_identifier_name(&self) -> bool {
+        self.as_str().is_type_identifier_name()
+    }
+
+    fn is_generic_type_identifier_name(&self) -> bool {
+        self.as_str().is_generic_type_identifier_name()
+    }
+
+    fn is_function_identifier_name(&self) -> bool {
+        self.as_str().is_function_identifier_name()
+    }
+
+    fn is_variable_identifier_name(&self) -> bool {
+        self.as_str().is_variable_identifier_name()
+    }
+
+    fn is_module_identifier_name(&self) -> bool {
+        self.as_str().is_module_identifier_name()
+    }
 }

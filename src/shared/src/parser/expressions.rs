@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    lexer::token::{self, Keyword, TokenKind},
+    lexer::token::{self, IdentifierType, Keyword, TokenKind},
     type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
     types::{parse_generics_in_type_name, parse_optional_type_annotation, TypeAnnotation},
 };
@@ -580,6 +580,30 @@ fn parse_match(cursor: &mut Cursor) -> Result<Expression, String> {
 
     let mut arms = vec![];
 
+    if cursor.first().kind == TokenKind::Pipe {
+        cursor.bump()?; // Consume the |
+    }
+
+    loop {
+        let pattern = parse_pattern(cursor)?;
+        cursor.expect(TokenKind::FatArrow)?; // Consume the =>
+        let body = parse_expression(cursor)?;
+
+        arms.push(MatchArm {
+            pattern,
+            expression: Box::new(body),
+        });
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        }
+
+        if cursor.first().kind != TokenKind::Pipe {
+            break;
+        }
+
+        cursor.expect(TokenKind::Pipe)?; // Consume the |
+    }
     while cursor.first().kind == TokenKind::Pipe {
         cursor.bump()?; // Consume the arm keyword
         let pattern = parse_pattern(cursor)?;
@@ -769,6 +793,10 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
     };
 
     cursor.bump()?; // Consume the identifier
+
+    if !identifier.is_variable_identifier_name() {
+        return Err(format!("Invalid variable name: {}", identifier));
+    }
 
     let type_annotation = parse_optional_type_annotation(cursor, false)?;
 
@@ -1155,43 +1183,51 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
-    match (cursor.first().kind, cursor.second().kind) {
-        (TokenKind::Underscore, _) => {
+    match cursor.first().kind {
+        TokenKind::Underscore => {
             cursor.bump()?; // Consume the _
             Ok(Pattern::Wildcard)
         }
-        (TokenKind::Literal(token::Literal::Unit), _) => {
+        TokenKind::Literal(token::Literal::Unit) => {
             cursor.bump()?; // Consume the ()
             Ok(Pattern::Unit)
         }
-        (TokenKind::Literal(token::Literal::Bool(v)), _) => {
+        TokenKind::Literal(token::Literal::Bool(v)) => {
             cursor.bump()?; // Consume the ()
             Ok(Pattern::Bool(v))
         }
-        (TokenKind::Literal(token::Literal::Int(v)), _) => {
+        TokenKind::Literal(token::Literal::Int(v)) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::Int(v.value))
         }
-        (TokenKind::Literal(token::Literal::UInt(v)), _) => {
+        TokenKind::Literal(token::Literal::UInt(v)) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::UInt(v.value))
         }
-        (TokenKind::Literal(token::Literal::Float(v)), _) => {
+        TokenKind::Literal(token::Literal::Float(v)) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::Float(v))
         }
-        (TokenKind::Literal(token::Literal::Char(v)), _) => {
+        TokenKind::Literal(token::Literal::Char(v)) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::Char(
                 v.parse::<char>().expect("Failed to parse char literal"),
             ))
         }
-        (TokenKind::Literal(token::Literal::String(v)), _) => {
+        TokenKind::Literal(token::Literal::String(v)) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::String(v))
         }
-        (TokenKind::Identifier(_), TokenKind::OpenBrace) => {
+        TokenKind::Identifier(ident) if ident.is_type_identifier_name() => {
             let type_annotation = parse_type_annotation(cursor, false)?;
+
+            if cursor.first().kind != TokenKind::OpenBrace {
+                return Ok(Pattern::Constructor(Constructor::Struct {
+                    type_annotation,
+                    field_patterns: vec![],
+                }));
+            }
+
             cursor.bump()?; // Consume the {
 
             let mut fields = vec![];
@@ -1235,7 +1271,7 @@ fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
                 field_patterns: fields,
             }))
         }
-        (TokenKind::Identifier(identifier), _) => {
+        TokenKind::Identifier(identifier) if identifier.is_variable_identifier_name() => {
             cursor.bump()?; // Consume the identifier
 
             Ok(Pattern::Variable(identifier))

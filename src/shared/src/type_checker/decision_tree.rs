@@ -4,9 +4,9 @@ use crate::{
     type_checker::{
         ast::{BinaryOperator, Member, Typed},
         expressions::check_type,
-        type_annotation_equals, type_equals, type_equals_coerce, Struct, Type,
+        type_annotation_equals, type_equals, type_equals_coerce, Enum, EnumMember, Struct, Type,
     },
-    types::TypeAnnotation,
+    types::{TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
@@ -573,10 +573,46 @@ pub fn create_decision_tree(
             type_annotation,
             field_patterns,
         }) => {
-            if !type_annotation_equals(
-                &matchee.get_type().type_annotation(),
-                &type_annotation.clone(),
-            ) {
+            let matchee_type = matchee.get_type();
+            println!("matchee_type: {:?}", matchee_type);
+
+            let mut is_enum_member = false;
+
+            match &matchee_type {
+                Type::Enum(Enum { members, .. }) => {
+                    for (_, member_type) in members {
+                        println!("member_type: {:?}", member_type.type_annotation());
+                        println!("type_annotation: {:?}", type_annotation);
+
+                        if type_annotation_equals(&type_annotation, &member_type.type_annotation())
+                        {
+                            is_enum_member = true;
+                            break;
+                        }
+                    }
+                }
+                Type::EnumMember(EnumMember {
+                    discriminant_name, ..
+                }) => {
+                    println!("discriminant_name: {:?}", discriminant_name);
+                    println!("type_annotation: {:?}", type_annotation);
+
+                    if type_annotation_equals(
+                        &type_annotation,
+                        &TypeAnnotation::Type(discriminant_name.clone()),
+                    ) {
+                        is_enum_member = true;
+                    }
+                }
+                _ => {}
+            }
+
+            if !is_enum_member
+                && !type_annotation_equals(
+                    &matchee.get_type().type_annotation(),
+                    &type_annotation.clone(),
+                )
+            {
                 return Err(format!(
                     "Expected type annotation {} but got {}",
                     matchee.get_type().type_annotation(),
@@ -586,17 +622,124 @@ pub fn create_decision_tree(
 
             let expression = &arm.expression;
             let type_environment = arm.type_environment.clone();
-            let matchee_type = matchee.get_type();
 
             println!("struct_matchee: {:?}", matchee);
-            println!("matchee_type: {:?}", matchee_type);
 
-            let Type::Struct(Struct { fields, .. }) = matchee_type.clone() else {
-                return Err(format!(
-                    "Expected struct but got {:?}",
-                    matchee_type.clone()
-                ));
+            let fields = match matchee_type.clone() {
+                Type::Struct(Struct { fields, .. }) => {
+                    for field in fields.iter() {
+                        println!("field_ident: {:?}", field.0);
+                        println!("field_type: {:?}", field.1);
+                    }
+
+                    fields
+                }
+                Type::EnumMember(EnumMember { fields, .. }) => {
+                    for field in fields.iter() {
+                        println!("field_ident: {:?}", field.0);
+                        println!("field_type: {:?}", field.1);
+                    }
+
+                    fields
+                }
+                Type::Enum(Enum {
+                    shared_fields,
+                    members,
+                    ..
+                }) => {
+                    let member = members.get(&type_annotation.name()).expect(
+                        "Already checked if the constructor name exists in the member list",
+                    );
+
+                    let Type::EnumMember(EnumMember { fields, .. }) = member.clone() else {
+                        return Err(format!("Expected enum member but got {:?}", member.clone()));
+                    };
+
+                    for field in fields.iter() {
+                        println!("field_ident: {:?}", field.0);
+                        println!("field_type: {:?}", field.1);
+                    }
+
+                    fields
+                        .into_iter()
+                        .chain(shared_fields.into_iter())
+                        .collect()
+                }
+                _ => {
+                    return Err(format!(
+                        "Expected struct, enum or enum member but got {:?}",
+                        matchee_type.clone()
+                    ));
+                }
             };
+
+            if fields.len() == 0 {
+                let expression =
+                    check_type(expression, discovered_types, type_environment.clone(), None)?;
+
+                let type_ = body_type.unwrap_or_else(|| expression.get_type());
+
+                let alternative = create_decision_tree(
+                    matchee.clone(),
+                    arms.into_iter().skip(1).collect(),
+                    discovered_types,
+                    Some(type_.clone()),
+                )?;
+
+                let condition = if is_enum_member {
+                    let Type::Enum(Enum {
+                        type_identifier, ..
+                    }) = &matchee_type
+                    else {
+                        return Err("Expected matchee to be an enum type".to_owned());
+                    };
+
+                    Box::new(TypedExpression::Binary {
+                        left: Box::new(matchee),
+                        operator: BinaryOperator::Equal,
+                        right: Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Enum {
+                                type_annotation: TypeAnnotation::from(
+                                    format!(
+                                        "{}::{}",
+                                        type_identifier.name(),
+                                        type_annotation.name()
+                                    )
+                                    .as_str(),
+                                ),
+                                field_initializers:
+                                    crate::type_checker::ast::EnumMemberFieldInitializers::None,
+                                member: type_annotation.name(),
+                                type_: matchee_type.clone(),
+                            },
+                        )),
+                        type_: Type::Bool,
+                    })
+                } else {
+                    Box::new(TypedExpression::Binary {
+                        left: Box::new(matchee),
+                        operator: BinaryOperator::Equal,
+                        right: Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Struct {
+                                type_annotation: type_annotation.clone(),
+                                field_initializers: vec![],
+                                type_: matchee_type.clone(),
+                            },
+                        )),
+                        type_: Type::Bool,
+                    })
+                };
+
+                return Ok(Decision::Guard {
+                    condition,
+                    consequence: Box::new(Decision::Success {
+                        expression: Box::new(expression),
+                        type_: type_.clone(),
+                    }),
+                    alternative: Box::new(alternative),
+                    type_,
+                });
+            }
 
             for field in fields.iter() {
                 println!("field_ident: {:?}", field.0);

@@ -1,7 +1,7 @@
 use std::vec;
 
 use crate::{
-    lexer::token::{Keyword, TokenKind},
+    lexer::token::{IdentifierType, Keyword, TokenKind},
     types::{
         can_be_type_annotation, parse_type_annotation, parse_type_identifier, GenericConstraint,
         GenericType, TypeAnnotation, TypeIdentifier,
@@ -44,6 +44,10 @@ pub fn parse_module_only(
     };
 
     cursor.bump()?; // Consume the identifier
+
+    if !module_name.is_module_identifier_name() {
+        return Err(format!("Invalid module name: {}", module_name));
+    }
 
     let mut module_path: Vec<String> = vec![];
     module_path.push(module_name);
@@ -103,6 +107,10 @@ fn parse_mod_statement(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
     };
 
     cursor.bump()?; // Consume the identifier
+
+    if !module_name.is_module_identifier_name() {
+        return Err(format!("Invalid module name: {}", module_name));
+    }
 
     let mut module_path: Vec<String> = vec![];
     module_path.push(module_name);
@@ -168,6 +176,10 @@ fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, String> {
         TokenKind::Identifier(module_name) => {
             cursor.bump()?; // Consume the identifier
 
+            if !module_name.is_module_identifier_name() {
+                return Err(format!("Invalid module name: {}", module_name));
+            }
+
             if cursor.first().kind == TokenKind::DoubleColon {
                 cursor.bump()?; // Consume the ::
                 let use_item = parse_use_item(cursor)?;
@@ -230,6 +242,10 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     cursor.bump()?; // Consume the func keyword
 
     let type_identifier = parse_type_identifier(cursor, false)?;
+
+    if !type_identifier.name().is_function_identifier_name() {
+        return Err(format!("Invalid function name: {}", type_identifier.name()));
+    }
 
     let TokenKind::OpenParen = cursor.bump()?.kind else {
         return Err(format!("Expected ( but found {:?}", cursor.first().kind));
@@ -352,11 +368,22 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     let type_identifier = parse_type_identifier(cursor, false)?;
 
+    if !type_identifier.name().is_type_identifier_name() {
+        return Err(format!("Invalid type name: {}", type_identifier.name()));
+    }
+
     let where_clause = parse_where_clause(cursor)?;
 
-    let TokenKind::OpenBrace = cursor.bump()?.kind else {
-        return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
+    let TokenKind::OpenBrace = cursor.first().kind else {
+        return Ok(Statement::StructDeclaration(StructDeclaration {
+            access_modifier,
+            type_identifier,
+            where_clause,
+            fields: vec![],
+        }));
     };
+
+    cursor.bump()?; // Consume the {
 
     let mut fields = vec![];
     let mut has_comma = true;
@@ -405,6 +432,10 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
     cursor.bump()?; // Consume the enum keyword
 
     let type_name = parse_type_identifier(cursor, false)?;
+
+    if !type_name.name().is_type_identifier_name() {
+        return Err(format!("Invalid type name: {}", type_name.name()));
+    }
 
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
@@ -471,6 +502,10 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         ));
     };
 
+    if !type_name.is_type_identifier_name() {
+        return Err(format!("Invalid type name: {}", type_name));
+    }
+
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.prev().kind));
     };
@@ -529,6 +564,10 @@ fn parse_type_alias_declaration(cursor: &mut Cursor) -> Result<Statement, String
     cursor.bump()?; // Consume the type keyword
 
     let type_identifier = parse_type_identifier(cursor, false)?;
+
+    if !type_identifier.name().is_type_identifier_name() {
+        return Err(format!("Invalid type name: {}", type_identifier.name()));
+    }
 
     let TokenKind::Equal = cursor.bump()?.kind else {
         return Err(format!("Expected = but found {:?}", cursor.first().kind));
@@ -596,6 +635,10 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
         ));
     };
 
+    if !identifier.is_variable_identifier_name() {
+        return Err(format!("Invalid variable name: {}", identifier));
+    }
+
     let TokenKind::Colon = cursor.bump()?.kind else {
         return Err(format!("Expected : but found {:?}", cursor.first().kind));
     };
@@ -642,6 +685,10 @@ fn parse_struct_field(
 
     cursor.bump()?; // Consume the identifier
 
+    if !identifier.is_variable_identifier_name() {
+        return Err(format!("Invalid field name: {}", identifier));
+    }
+
     let TokenKind::Colon = cursor.bump()?.kind else {
         return Err(format!("Expected : but found {:?}", cursor.first().kind));
     };
@@ -681,6 +728,10 @@ fn parse_enum_member(
             cursor.first().kind
         ));
     };
+
+    if !identifier.is_type_identifier_name() {
+        return Err(format!("Invalid type name: {}", identifier));
+    }
 
     match cursor.first().kind {
         TokenKind::OpenBrace => {
@@ -732,12 +783,16 @@ fn parse_enum_member(
 }
 
 fn parse_enum_field(cursor: &mut Cursor) -> Result<EnumMemberField, String> {
-    let TokenKind::Identifier(first_ident) = cursor.bump()?.kind else {
+    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
         return Err(format!(
             "Expected identifier but found {:?}",
             cursor.first().kind
         ));
     };
+
+    if !identifier.is_variable_identifier_name() {
+        return Err(format!("Invalid field name: {}", identifier));
+    }
 
     let TokenKind::Colon = cursor.bump()?.kind else {
         return Err(format!("Expected : but found {:?}", cursor.first().kind));
@@ -753,7 +808,7 @@ fn parse_enum_field(cursor: &mut Cursor) -> Result<EnumMemberField, String> {
     let type_annotation = parse_type_annotation(cursor, false)?;
 
     Ok(EnumMemberField {
-        identifier: first_ident,
+        identifier,
         type_annotation,
     })
 }
@@ -794,6 +849,10 @@ fn parse_generic_constraint(cursor: &mut Cursor) -> Result<GenericConstraint, St
             generic
         ));
     };
+
+    if !generic_name.is_generic_type_identifier_name() {
+        return Err(format!("Invalid field name: {}", generic_name));
+    }
 
     let TokenKind::Keyword(Keyword::Is) = cursor.bump()?.kind else {
         return Err(format!("Expected 'is' but found {:?}", cursor.first().kind));
