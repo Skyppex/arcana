@@ -555,10 +555,9 @@ fn unwrap_arguments_recurse(
                 body: Box::new(body),
             });
 
-            let new_return_type_annotation = Some(TypeAnnotation::Function(
-                last.type_annotation.map(Box::new),
-                return_type_annotation.clone().map(Box::new),
-            ));
+            let new_return_type_annotation = return_type_annotation.map(|rta| {
+                TypeAnnotation::Function(last.type_annotation.map(Box::new), Some(Box::new(rta)))
+            });
 
             unwrap_arguments_recurse(
                 params.into_iter().rev().skip(1).rev().collect(),

@@ -72,21 +72,6 @@ pub fn check_type<'a>(
             let return_type_annotation = closure.return_type_annotation.clone();
             let body = closure.body.clone();
 
-            let mut return_type = match return_type_annotation.clone() {
-                Some(rta) => {
-                    let type_ = type_environment.borrow().get_type_from_annotation(&rta)?;
-
-                    type_
-                }
-                None => {
-                    if let Some(Type::Function(Function { return_type, .. })) = context.clone() {
-                        *return_type
-                    } else {
-                        Type::Void
-                    }
-                }
-            };
-
             let param = match param {
                 Some(param) => {
                     let type_ = &param
@@ -96,13 +81,9 @@ pub fn check_type<'a>(
                         .transpose()?;
 
                     let type_ = type_.clone().or_else(|| {
-                        if let Some(Type::Function(Function {
-                            param: Some(t),
-                            return_type: rt,
-                            ..
-                        })) = context.clone()
+                        if let Some(Type::Function(Function { param: Some(t), .. })) =
+                            context.clone()
                         {
-                            return_type = *rt;
                             return Some(*t.type_);
                         } else {
                             return None;
@@ -129,7 +110,7 @@ pub fn check_type<'a>(
                 None => None,
             };
 
-            let context = match context {
+            let new_context = match context.clone() {
                 Some(Type::Function(Function { return_type, .. })) => Some(*return_type),
                 _ => None,
             };
@@ -138,8 +119,27 @@ pub fn check_type<'a>(
                 &body,
                 discovered_types,
                 closure_environment.clone(),
-                context,
+                new_context.clone(),
             )?;
+
+            let return_type = match return_type_annotation.clone() {
+                Some(rta) => {
+                    println!("From annotation {:?}", rta);
+                    type_environment.borrow().get_type_from_annotation(&rta)?
+                }
+                None => {
+                    if let Some(Type::Function(Function { return_type, .. })) = context.clone() {
+                        println!("Context: {:?}", context);
+                        *return_type
+                    } else if let Some(return_type) = new_context {
+                        println!("New Context: {:?}", return_type);
+                        return_type
+                    } else {
+                        println!("Body: {:?}", body.get_type());
+                        body.get_type()
+                    }
+                }
+            };
 
             let type_ = Type::Function(Function {
                 identifier: None,
