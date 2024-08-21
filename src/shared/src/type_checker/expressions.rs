@@ -14,7 +14,7 @@ use super::{
     decision_tree::create_decision_tree,
     scope::ScopeType,
     statements, type_equals, type_equals_coerce, DiscoveredType, Enum, EnumMember, FullName,
-    Function, Rcrc, Struct, Type, TypeEnvironment, Union,
+    Function, Rcrc, Struct, Type, TypeAlias, TypeEnvironment, Union,
 };
 
 pub fn check_type<'a>(
@@ -1275,6 +1275,10 @@ fn get_binop_type(
     operator: &BinaryOperator,
     right_type: &Type,
 ) -> Result<Type, String> {
+    println!(
+        "Left: {:?}, Operator: {:?}, Right: {:?}",
+        left_type, operator, right_type
+    );
     match (left_type, operator, right_type) {
         (Type::Int, BinaryOperator::Add, Type::Int) => Ok(Type::Int),
         (Type::UInt, BinaryOperator::Add, Type::UInt) => Ok(Type::UInt),
@@ -1334,34 +1338,104 @@ fn get_binop_type(
         (Type::Int, BinaryOperator::Range, Type::Int) => Ok(Type::Array(Box::new(Type::Int))),
         (Type::UInt, BinaryOperator::Range, Type::UInt) => Ok(Type::Array(Box::new(Type::UInt))),
         (Type::Char, BinaryOperator::Range, Type::Char) => Ok(Type::Array(Box::new(Type::Char))),
-        (Type::Literal { type_, name }, BinaryOperator::Range, Type::UInt)
-            if **type_ == Type::Int && name.parse::<u64>().is_ok() =>
-        {
-            Ok(Type::Array(Box::new(Type::UInt)))
+        (Type::TypeAlias(TypeAlias { types, .. }), operator, right_type) => {
+            let mut acc = Type::Unknown;
+
+            for type_ in types {
+                let t = get_binop_type(&type_, operator, right_type)?;
+
+                if acc == Type::Unknown {
+                    acc = t;
+                    continue;
+                }
+
+                if !type_equals(&acc, &t) {
+                    return Err(format!(
+                        "Binary operator {:?} is not supported for types {:?} and {:?}",
+                        operator, acc, t
+                    ));
+                }
+            }
+
+            Ok(acc)
         }
-        (Type::Literal { type_, name }, BinaryOperator::Range, Type::Int)
-            if **type_ == Type::UInt && name.parse::<i64>().is_ok() =>
-        {
-            Ok(Type::Array(Box::new(Type::Int)))
+        (left_type, operator, Type::TypeAlias(TypeAlias { types, .. })) => {
+            let mut acc = Type::Unknown;
+
+            for type_ in types {
+                let t = get_binop_type(left_type, operator, &type_)?;
+
+                if acc == Type::Unknown {
+                    acc = t;
+                    continue;
+                }
+
+                if !type_equals(&acc, &t) {
+                    return Err(format!(
+                        "Binary operator {:?} is not supported for types {:?} and {:?}",
+                        operator, acc, t
+                    ));
+                }
+            }
+
+            Ok(acc)
         }
-        (Type::Int, BinaryOperator::RangeInclusive, Type::Int) => {
-            Ok(Type::Array(Box::new(Type::Int)))
+        // (Type::Literal { type_, name }, BinaryOperator::Range, Type::UInt)
+        //     if **type_ == Type::Int && name.parse::<u64>().is_ok() =>
+        // {
+        //     Ok(Type::Array(Box::new(Type::UInt)))
+        // }
+        // (Type::Literal { type_, name }, BinaryOperator::Range, Type::Int)
+        //     if **type_ == Type::UInt && name.parse::<i64>().is_ok() =>
+        // {
+        //     Ok(Type::Array(Box::new(Type::Int)))
+        // }
+        // (Type::Int, BinaryOperator::RangeInclusive, Type::Int) => {
+        //     Ok(Type::Array(Box::new(Type::Int)))
+        // }
+        // (Type::UInt, BinaryOperator::RangeInclusive, Type::UInt) => {
+        //     Ok(Type::Array(Box::new(Type::UInt)))
+        // }
+        // (Type::Char, BinaryOperator::RangeInclusive, Type::Char) => {
+        //     Ok(Type::Array(Box::new(Type::Char)))
+        // }
+        // (Type::Literal { type_, name }, BinaryOperator::RangeInclusive, Type::Int)
+        //     if **type_ == Type::UInt && name.parse::<i64>().is_ok() =>
+        // {
+        //     Ok(Type::Array(Box::new(Type::Int)))
+        // }
+        // (Type::Literal { type_, name }, BinaryOperator::RangeInclusive, Type::UInt)
+        //     if **type_ == Type::Int && name.parse::<u64>().is_ok() =>
+        // {
+        //     Ok(Type::Array(Box::new(Type::UInt)))
+        // }
+        (Type::Literal { name, type_ }, operator, Type::Int) if **type_ == Type::UInt => {
+            if name.parse::<i64>().is_ok() {
+                get_binop_type(&Type::Int, operator, &Type::Int)
+            } else {
+                Err(format!("{} is not a valid uint", name))
+            }
         }
-        (Type::UInt, BinaryOperator::RangeInclusive, Type::UInt) => {
-            Ok(Type::Array(Box::new(Type::UInt)))
+        (Type::Literal { name, type_ }, operator, Type::UInt) if **type_ == Type::Int => {
+            if name.parse::<u64>().is_ok() {
+                get_binop_type(&Type::UInt, operator, &Type::UInt)
+            } else {
+                Err(format!("{} is not a valid int", name))
+            }
         }
-        (Type::Char, BinaryOperator::RangeInclusive, Type::Char) => {
-            Ok(Type::Array(Box::new(Type::Char)))
+        (Type::Int, operator, Type::Literal { name, type_ }) if **type_ == Type::UInt => {
+            if name.parse::<i64>().is_ok() {
+                get_binop_type(&Type::Int, operator, &Type::Int)
+            } else {
+                Err(format!("{} is not a valid uint", name))
+            }
         }
-        (Type::Literal { type_, name }, BinaryOperator::RangeInclusive, Type::Int)
-            if **type_ == Type::UInt && name.parse::<i64>().is_ok() =>
-        {
-            Ok(Type::Array(Box::new(Type::Int)))
-        }
-        (Type::Literal { type_, name }, BinaryOperator::RangeInclusive, Type::UInt)
-            if **type_ == Type::Int && name.parse::<u64>().is_ok() =>
-        {
-            Ok(Type::Array(Box::new(Type::UInt)))
+        (Type::UInt, operator, Type::Literal { name, type_ }) if **type_ == Type::Int => {
+            if name.parse::<u64>().is_ok() {
+                get_binop_type(&Type::UInt, operator, &Type::UInt)
+            } else {
+                Err(format!("{} is not a valid int", name))
+            }
         }
         (Type::Literal { type_, .. }, operator, right_type) => {
             get_binop_type(type_, operator, right_type)

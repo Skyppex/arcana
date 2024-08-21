@@ -1,11 +1,6 @@
-enum Enum {
-    A,
-    B {
-        a: i32,
-        b: i32,
-    },
-}
+type UserId = uint;
 
-let a = Enum::B { a: 1, b: 2 };
+fun is_valid(user_id: UserId): bool => user_id != 0;
 
-a match B { a: 1, b: 2 } => 100
+let user1: UserId = 100;
+let user2: UserId = 0;
