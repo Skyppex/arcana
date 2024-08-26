@@ -437,6 +437,16 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
         return Err(format!("Invalid type name: {}", type_name.name()));
     }
 
+    if cursor.first().kind == TokenKind::Semicolon {
+        cursor.bump()?; // Consume the ;
+        return Ok(Statement::EnumDeclaration(EnumDeclaration {
+            access_modifier,
+            type_identifier: type_name,
+            shared_fields: vec![],
+            members: vec![],
+        }));
+    }
+
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
     };

@@ -6,7 +6,7 @@ use clap::Parser;
 use glob::{glob, Paths};
 use utils::get_path;
 
-use std::{cell::RefCell, rc::Rc, thread};
+use std::{cell::RefCell, fs, rc::Rc, thread};
 
 use crate::mage_args::MageArgs;
 use interpreter::Environment;
@@ -64,20 +64,32 @@ pub fn run_source(
         .to_string();
 
     if !source.trim().ends_with(".ar") {
-        return Err("Mage cannot cast a spell yet, it can only interperet arcana.".to_string());
+        return Err("Mage cannot cast a spell yet, it can only interpret arcana.".to_string());
     }
 
     let source = std::fs::read_to_string(source)
         .map_err(|error| format!("Failed to read file: {}", error))?;
 
-    let lib = get_path("lib/lib.ar")
+    let exe = std::env::current_exe()
+        .and_then(fs::canonicalize)
+        .expect("Failed to get current executable")
+        .parent()
+        .expect("Failed to get parent directory of executable")
+        .parent()
+        .expect("Failed to get parent directory of executable")
+        .parent()
+        .expect("Failed to get parent directory of executable")
+        .to_str()
+        .expect("Failed to convert path to string")
+        .to_string();
+
+    let lib_path = format!("{}\\lib\\lib.ar", exe).replace("\\", "/");
+
+    let lib = get_path(&lib_path)
         .map_err(|e| e.to_string())?
         .to_str()
         .ok_or_else(|| "Failed to convert path to string".to_string())?
         .to_string();
-
-    let lib =
-        std::fs::read_to_string(lib).map_err(|error| format!("Failed to read file: {}", error))?;
 
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
@@ -89,7 +101,10 @@ pub fn run_source(
         register_modules(project_files, type_environment.clone(), environment.clone())?;
     }
 
-    read_input(lib, type_environment.clone(), environment.clone(), args)?;
+    match std::fs::read_to_string(lib) {
+        Ok(lib) => read_input(lib, type_environment.clone(), environment.clone(), args)?,
+        Err(_) => {}
+    }
 
     let result = read_input(source, type_environment.clone(), environment.clone(), args);
 

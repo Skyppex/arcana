@@ -23,7 +23,6 @@ pub fn check_type<'a>(
     type_environment: Rc<RefCell<TypeEnvironment>>,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
-    println!("Checking Expression");
     match expression {
         // Expression::None => Ok(TypedExpression::None),
         Expression::Break(e) => match e {
@@ -260,7 +259,6 @@ fn synthesize_type(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
 ) -> Result<TypedExpression, String> {
-    println!("Synthesizing Expression");
     match expression {
         // Expression::None => Ok(TypedExpression::None),
         Expression::VariableDeclaration(VariableDeclaration {

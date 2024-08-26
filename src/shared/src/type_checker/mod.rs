@@ -586,7 +586,6 @@ impl Type {
                 discriminant_name,
                 fields,
             }) => {
-                println!("Enum member: {:?}", self);
                 let TypeIdentifier::GenericType(name, generics) = enum_name else {
                     return Err(format!(
                         "Cannot clone concrete types for enum {}",

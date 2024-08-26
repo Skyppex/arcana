@@ -104,7 +104,6 @@ pub fn check_type<'a>(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<TypedStatement, String> {
-    println!("Checking statement");
     match statement {
         Statement::Program { statements } => {
             let statements: Result<Vec<TypedStatement>, String> = statements
@@ -419,7 +418,6 @@ pub fn check_type<'a>(
             return_type_annotation,
             body,
         }) => {
-            println!("Checking function declaration");
             let function_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));

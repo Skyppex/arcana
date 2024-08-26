@@ -12,14 +12,26 @@ use interpreter::Environment;
 use shared::type_checker::{Type, TypeEnvironment};
 
 pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
-    let lib = get_path("lib/lib.ar")
+    let exe = std::env::current_exe()
+        .and_then(fs::canonicalize)
+        .expect("Failed to get current executable")
+        .parent()
+        .expect("Failed to get parent directory of executable")
+        .parent()
+        .expect("Failed to get parent directory of executable")
+        .parent()
+        .expect("Failed to get parent directory of executable")
+        .to_str()
+        .expect("Failed to convert path to string")
+        .to_string();
+
+    let lib_path = format!("{}\\lib\\lib.ar", exe).replace("\\", "/");
+
+    let lib = get_path(&lib_path)
         .map_err(|e| e.to_string())?
         .to_str()
         .ok_or_else(|| "Failed to convert path to string".to_string())?
         .to_string();
-
-    let lib =
-        std::fs::read_to_string(lib).map_err(|error| format!("Failed to read file: {}", error))?;
 
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
@@ -27,7 +39,10 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
 
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    read_input(lib, type_environment.clone(), environment.clone(), args)?;
+    match std::fs::read_to_string(lib) {
+        Ok(lib) => read_input(lib, type_environment.clone(), environment.clone(), args)?,
+        Err(e) => panic!("Failed to read lib: {}", e),
+    }
 
     loop {
         let _ = io::stdout().flush();

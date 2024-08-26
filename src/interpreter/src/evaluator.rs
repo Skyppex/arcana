@@ -22,7 +22,6 @@ pub fn evaluate<'a>(
     typed_statement: TypedStatement,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
-    println!("Evaluating");
     match typed_statement {
         TypedStatement::None => Ok(Value::Void),
         TypedStatement::ModuleDeclaration { module_path, .. } => {

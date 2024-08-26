@@ -1,6 +1,6 @@
-type UserId = uint;
-
-fun is_valid(user_id: UserId): bool => user_id != 0;
-
-let user1: UserId = 100;
-let user2: UserId = 0;
+enum S {
+    first_name: string,
+    last_name: string,
+    A,
+    B { value: int },
+}

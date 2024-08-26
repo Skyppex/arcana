@@ -4,6 +4,12 @@ use std::{
 };
 
 pub fn get_path(path: &str) -> Result<PathBuf> {
+    let path = if path.starts_with("\\\\?\\") || path.starts_with("//?/") {
+        &path[4..]
+    } else {
+        path
+    };
+
     let path = match path {
         p if p.starts_with("~") => dirs::home_dir()
             .ok_or(std::io::Error::from(ErrorKind::NotFound))?
@@ -25,7 +31,13 @@ pub fn get_path(path: &str) -> Result<PathBuf> {
 
             current_dir.join(path)
         }
-        p if p.starts_with(".") => std::env::current_dir()?.join(&p[2..]),
+        p if p.starts_with(".") => {
+            if p == "." || p == "./" {
+                std::env::current_dir()?
+            } else {
+                std::env::current_dir()?.join(&p[2..])
+            }
+        }
         p => Path::new(&p).to_path_buf(),
     };
 
