@@ -1,29 +1,29 @@
-# Traits
+# Protocols
 
-Traits are a way to add functionality to a class without inheritance. \
+Protocols are a way to add functionality to a class without inheritance. \
 They are similar to interfaces in other languages, but with the added functionality of having default implementations.
-Some traits are also bound to operators, which allows you to implement operators for your own types.
+Some protocols are also bound to operators, which allows you to implement operators for your own types.
 
 ## Syntax
 
 ```
-trait Name {
-    // Trait body
+proto Name {
+    // Protocol body
 }
 ```
 
 ## Example
 
 ```
-trait Add {
+proto Add {
     fun add(Self left, Self right): Self;
 }
 ```
 
-In this example, we define a trait called `Add` which has a function called `add` which takes two arguments of the same type as the trait and returns a value of the same type as the trait.
-The `Self` keyword is a special keyword which refers to the type which implements the trait.
+In this example, we define a protocol called `Add` which has a function called `add` which takes two arguments of the same type as the protocol and returns a value of the same type as the protocol.
+The `Self` keyword is a special keyword which refers to the type which implements the protocol.
 
-## Implementing a Trait
+## Implementing a Protocol
 
 ```
 struct Foo {
@@ -37,12 +37,12 @@ impl Add for Foo {
 }
 ```
 
-This works because the `int` type already implements the `Add` trait, so we can use it to implement the trait for our own type.
+This works because the `int` type already implements the `Add` protocol, so we can use it to implement the protocol for our own type.
 
 ## Default Implementations
 
 ```
-trait Equals {
+proto Equals {
     fun equals(Self left, Self right): bool;
     
     fun not_equals(Self left, Self right): bool {
@@ -51,24 +51,24 @@ trait Equals {
 }
 ```
 
-In this example, we define a trait called `Equals` which has a function called `equals` which takes two arguments of the same type as the trait and returns a value of type `bool`.
+In this example, we define a protocol called `Equals` which has a function called `equals` which takes two arguments of the same type as the protocol and returns a value of type `bool`.
 We also define a default implementation for the `not_equals` function which returns the opposite of the result of `equals`.
 This means that if you implement `equals` for your own type, you get `not_equals` for free.
-Implementors of the trait can still override the default implementation if they want to.
+Implementors of the protocol can still override the default implementation if they want to.
 
-## Full Example of the Newable trait
+## Full Example of the Newable protocol
 
-Defining the `Newable` trait is quite trivial. We want the trait be implemented only once for each type to avoid ambiguity when calling the new function.
+Defining the `Newable` protocol is quite trivial. We want the protocol be implemented only once for each type to avoid ambiguity when calling the new function.
 
 ```rs
-trait Newable<[..T: param]> {
+proto Newable<[..T: param]> {
     type Return;
 
     func new([..T]) -> Self::Return;
 }
 ```
 
-This defines the `Newable` trait as a generic trait which takes any number of possibly different generic types which must all be `param` types.
+This defines the `Newable` protocol as a generic protocol which takes any number of possibly different generic types which must all be `param` types.
 
 > The *possibly different* part of it from the `..` syntax.
 > If it was omitted it would take any number of the **same** generic type. 
@@ -77,7 +77,7 @@ This defines the `Newable` trait as a generic trait which takes any number of po
 
 These generic parameters are then use in the function signature for `new()` which allows the new function to take any amount of different arguments when implemented, but only those exact arguments when called.
 
-When implementing the `Newable` trait you have to specify the parameters as generic types. Note that you can have zero of them.
+When implementing the `Newable` protocol you have to specify the parameters as generic types. Note that you can have zero of them.
 
 ```rs
 struct MyStruct {

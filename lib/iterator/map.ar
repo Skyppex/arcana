@@ -5,20 +5,20 @@ pub struct Map<TIterator, TFunc> {
     mapper: TFunc
 }
 
-imp<TFrom, TTo> Iterator<Self::Item = TFrom> {
-    pub fun map(self, mapper: (TFrom): TTo): Map<Self, TFrom, TTo> {
-        Map { self, mapper }
-    }
+pub fun map<TIter, TFrom, TTo>(
+    self: TIter,
+    mapper: fun(TFrom): TTo): Map<Self, TFrom, TTo>
+where TIter: Iterator<Self::Item = TFrom> => {
+    Map { self: self, mapper: mapper  }
 }
 
-impl<T, TIterator, TFunc> Iterator for Map<TIterator, TFunc> {
+imp<T, TIterator, TFunc> Iterator for Map<TIterator, TFunc> {
     type Item = T;
 
-    func next(&mut self) -> Option<Self::Item> {
-        match self.iterator.next() {
-            Some(item) => Some(self.mapper(item)),
-            None => None
-        }
+    fun next(&mut self): Option<Self::Item> => {
+        self.iterator.next() match
+        | Some(item) => Some(self.mapper(item)),
+        | None => None
     }
 }
 
@@ -27,17 +27,16 @@ pub mod iterator_extensions;
 
 pub struct Closest<TIterator, TType, TOperand> {
     iterator: TIterator,
-    selector: (TType): TOperand
-    comparer: (TOperand, TOperand): Ordering
+    selector: fun(TType): TOperand,
+    comparer: fun(TOperand, TOperand): Ordering,
 }
 
-extend imp<TType, TOperand> Iterator<Self::Item = TType> {
-    pub fun closest(
-        self,
-        selector: (TType): TOperand,
-        comparer: (TOperand, TOperand): Ordering): Closest<Self, TType, TOperand> {
-        Closest { self, selector, comparer }
-    }
+pub fun closest<TIter, TType, TOperand>(
+    self: TIter,
+    selector: fun(TType): TOperand,
+    comparer: fun(TOperand, TOperand): Ordering): Closest<Self, TType, TOperand>
+where TIter: Iterator<Self::Item = TType> {
+    Closest { self: self, selector: selector, comparer: comparer  }
 }
 
 imp<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOperand> {
@@ -47,7 +46,7 @@ imp<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOpera
         let mut closest = None;
 
         for item in self.iterator {
-            let closestOperand = match closest {
+            let closest_operand = match closest {
                 Some(item) => self.selector(item),
                 None => {
                     closest = Some(item);
@@ -56,7 +55,7 @@ imp<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOpera
             };
 
             let operand = self.selector(item);
-            let ordering = self.comparer(operand, closestOperand);
+            let ordering = self.comparer(operand, closest_operand);
 
             if ordering == Ordering::Less {
                 closest = Some(item);

@@ -1,11 +1,11 @@
 pub mod lib::iterator;
 
-pub trait Iterator {
+pub proto Iterator {
     type Item;
     fun next(&mut self) -> Option<Self::Item>;
 }
 
-pub trait DoubleSidedIterator 
+pub proto DoubleSidedIterator 
 where imp is Iterator {
     fun prev(&mut self) -> Option<Self::Item>;
 }
