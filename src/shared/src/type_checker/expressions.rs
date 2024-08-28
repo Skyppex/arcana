@@ -122,19 +122,13 @@ pub fn check_type<'a>(
             )?;
 
             let return_type = match return_type_annotation.clone() {
-                Some(rta) => {
-                    println!("From annotation {:?}", rta);
-                    type_environment.borrow().get_type_from_annotation(&rta)?
-                }
+                Some(rta) => type_environment.borrow().get_type_from_annotation(&rta)?,
                 None => {
                     if let Some(Type::Function(Function { return_type, .. })) = context.clone() {
-                        println!("Context: {:?}", context);
                         *return_type
                     } else if let Some(return_type) = new_context {
-                        println!("New Context: {:?}", return_type);
                         return_type
                     } else {
-                        println!("Body: {:?}", body.get_type());
                         body.get_type()
                     }
                 }
@@ -753,20 +747,16 @@ fn synthesize_type(
             })
         }
         Expression::Block(statements) => {
-            println!("Block");
             let mut typed_statements: Vec<TypedStatement> = vec![];
 
             for statement in statements {
-                println!("Body: {:?}", statement);
                 typed_statements.push(statements::check_type(
                     statement,
                     discovered_types,
                     type_environment.clone(),
                 )?);
-                println!("Body end");
             }
 
-            println!("Block end");
             let mut type_ = Type::Void;
             for statement in typed_statements.clone() {
                 match statement {
@@ -1273,10 +1263,6 @@ fn get_binop_type(
     operator: &BinaryOperator,
     right_type: &Type,
 ) -> Result<Type, String> {
-    println!(
-        "Left: {:?}, Operator: {:?}, Right: {:?}",
-        left_type, operator, right_type
-    );
     match (left_type, operator, right_type) {
         (Type::Int, BinaryOperator::Add, Type::Int) => Ok(Type::Int),
         (Type::UInt, BinaryOperator::Add, Type::UInt) => Ok(Type::UInt),

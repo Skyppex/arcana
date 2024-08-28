@@ -102,11 +102,23 @@ pub fn run_source(
     }
 
     match std::fs::read_to_string(lib) {
-        Ok(lib) => read_input(lib, type_environment.clone(), environment.clone(), args)?,
+        Ok(lib) => read_input(
+            lib,
+            type_environment.clone(),
+            environment.clone(),
+            args,
+            false,
+        )?,
         Err(_) => {}
     }
 
-    let result = read_input(source, type_environment.clone(), environment.clone(), args);
+    let result = read_input(
+        source,
+        type_environment.clone(),
+        environment.clone(),
+        args,
+        true,
+    );
 
     if args.variables {
         if args.label {
@@ -140,6 +152,7 @@ pub fn read_input(
     type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>,
     args: &MageArgs,
+    print_result: bool,
 ) -> Result<(), String> {
     let print_tokens = args.logging.log_flags.tokens;
     let print_parser_ast = args.logging.log_flags.ast;
@@ -166,7 +179,10 @@ pub fn read_input(
         eprintln!("{}", input);
     }
 
-    println!("{}", result);
+    if print_result {
+        println!("{}", result);
+    }
+
     Ok(())
 }
 

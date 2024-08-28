@@ -40,7 +40,13 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
     let environment = Rc::new(RefCell::new(Environment::new()));
 
     match std::fs::read_to_string(lib) {
-        Ok(lib) => read_input(lib, type_environment.clone(), environment.clone(), args)?,
+        Ok(lib) => read_input(
+            lib,
+            type_environment.clone(),
+            environment.clone(),
+            args,
+            false,
+        )?,
         Err(e) => panic!("Failed to read lib: {}", e),
     }
 
@@ -128,6 +134,7 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
             type_environment.clone(),
             environment.clone(),
             args,
+            true,
         ) {
             println!("Error: {}", message);
             println!();
