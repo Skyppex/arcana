@@ -16,7 +16,7 @@ proto Name {
 
 ```arcana
 proto Add {
-    fun add(Self left, Self right): Self;
+    fun add(left: Self, right: Self): Self;
 }
 ```
 
@@ -27,7 +27,7 @@ The `Self` keyword is a special keyword which refers to the type which implement
 
 ```arcana
 struct Foo {
-    int bar;
+    bar: int,
 }
 
 imp Add for Foo {

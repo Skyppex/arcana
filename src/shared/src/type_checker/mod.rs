@@ -179,13 +179,12 @@ impl FullName for TypeAlias {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Trait {
+pub struct Protocol {
     pub type_identifier: TypeIdentifier,
-    pub associated_types: HashMap<String, Type>,
     pub functions: Vec<TypeIdentifier>,
 }
 
-impl FullName for Trait {
+impl FullName for Protocol {
     fn full_name(&self) -> String {
         self.type_identifier.to_string()
     }
@@ -251,7 +250,7 @@ pub enum Type {
     EnumMember(EnumMember),
     Union(Union),
     TypeAlias(TypeAlias),
-    Trait(Trait),
+    Protocol(Protocol),
     Function(Function),
     Literal {
         name: String, // String representation of the literal
@@ -655,7 +654,7 @@ impl FullName for Type {
             Type::TypeAlias(t) => t.full_name(),
             Type::Function(f) => f.full_name(),
             Type::Literal { name, type_ } => format!("#{}: {}", type_.full_name(), name),
-            Type::Trait(t) => t.full_name(),
+            Type::Protocol(t) => t.full_name(),
         }
     }
 }

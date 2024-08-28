@@ -55,9 +55,11 @@ impl From<Type> for TypeAnnotation {
     fn from(t: Type) -> Self {
         match t {
             Type::Unknown => panic!("Cannot convert unknown type to type annotation"),
+            Type::Generic(g) => TypeAnnotation::Type(g.type_name),
             Type::Void => TypeAnnotation::Type("void".to_string()),
             Type::Unit => TypeAnnotation::Type("unit".to_string()),
             Type::Int => TypeAnnotation::Type("int".to_string()),
+            Type::UInt => TypeAnnotation::Type("uint".to_string()),
             Type::Float => TypeAnnotation::Type("float".to_string()),
             Type::String => TypeAnnotation::Type("string".to_string()),
             Type::Char => TypeAnnotation::Type("char".to_string()),
@@ -69,14 +71,12 @@ impl From<Type> for TypeAnnotation {
                 param.map(|p| Box::new(p.type_.deref().clone().into())),
                 Some(Box::new(return_type.deref().clone().into())),
             ),
-            Type::Generic(g) => TypeAnnotation::Type(g.type_name),
-            Type::UInt => TypeAnnotation::Type("uint".to_string()),
             Type::Struct(_) => todo!(),
             Type::Enum(_) => todo!(),
             Type::EnumMember(_) => todo!(),
             Type::Union(_) => todo!(),
             Type::TypeAlias(_) => todo!(),
-            Type::Trait(_) => todo!(),
+            Type::Protocol(_) => todo!(),
             Type::Literal { .. } => todo!(),
         }
     }

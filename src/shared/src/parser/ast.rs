@@ -15,6 +15,7 @@ pub enum Statement {
     EnumDeclaration(EnumDeclaration),
     UnionDeclaration(UnionDeclaration),
     TypeAliasDeclaration(TypeAliasDeclaration),
+    ProtocolDeclaration(ProtocolDeclaration),
     FunctionDeclaration(FunctionDeclaration),
     Semi(Box<Statement>),
     Expression(Expression),
@@ -131,12 +132,33 @@ pub struct TypeAliasDeclaration {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ProtocolDeclaration {
+    pub access_modifier: Option<AccessModifier>,
+    pub type_identifier: TypeIdentifier,
+    pub associated_types: Vec<AssociatedType>,
+    pub functions: Vec<FunctionDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AssociatedType {
+    pub type_identifier: TypeIdentifier,
+    pub default_type_annotation: Option<TypeAnnotation>,
+}
+
+impl Display for AssociatedType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.type_identifier)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub identifier: TypeIdentifier,
+    pub type_identifier: TypeIdentifier,
     pub param: Option<Parameter>,
     pub return_type_annotation: Option<TypeAnnotation>,
     pub body: Expression,
+    pub signature_only: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

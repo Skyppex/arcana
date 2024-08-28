@@ -17,6 +17,11 @@ pub enum DiscoveredType {
     ),
     Union(TypeIdentifier, Vec<TypeAnnotation>),
     TypeAlias(TypeIdentifier, Vec<TypeAnnotation>),
+    Protocol {
+        type_identifier: TypeIdentifier,
+        associated_types: Vec<TypeIdentifier>,
+        function_identifiers: Vec<TypeIdentifier>,
+    },
     Function {
         type_identifier: TypeIdentifier,
         param: Option<Parameter>,

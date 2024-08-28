@@ -2,7 +2,7 @@ use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
-use crate::parser::{Expression, UseItem};
+use crate::parser::{AssociatedType, Expression, UseItem};
 use crate::pretty_print::PrettyPrint;
 use crate::{
     parser,
@@ -54,6 +54,12 @@ pub enum TypedStatement {
         type_annotations: Vec<TypeAnnotation>,
         type_: Type,
     },
+    ProtocolDeclaration {
+        type_identifier: TypeIdentifier,
+        associated_types: Vec<AssociatedType>,
+        functions: Vec<TypedStatement>,
+        type_: Type,
+    },
     FunctionDeclaration {
         identifier: TypeIdentifier,
         param: Option<TypedParameter>,
@@ -85,6 +91,7 @@ impl Typed for TypedStatement {
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::TypeAliasDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::ProtocolDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Semi { .. } => Type::Void,
             TypedStatement::Expression(e) => e.get_type(),
@@ -101,6 +108,7 @@ impl Typed for TypedStatement {
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::TypeAliasDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::ProtocolDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Semi(e) => e.get_deep_type(),
             TypedStatement::Expression(e) => e.get_deep_type(),
@@ -171,6 +179,26 @@ impl Display for TypedStatement {
                 literals
                     .iter()
                     .map(|l| l.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            TypedStatement::ProtocolDeclaration {
+                type_identifier,
+                associated_types,
+                functions,
+                type_: _,
+            } => write!(
+                f,
+                "protocol {} {{ associated types: {}, functions: {} }}",
+                type_identifier,
+                associated_types
+                    .iter()
+                    .map(|a| a.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                functions
+                    .iter()
+                    .map(|f| f.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),

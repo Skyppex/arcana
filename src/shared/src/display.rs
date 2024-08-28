@@ -1,10 +1,10 @@
 use crate::{
     parser::{
-        AccessModifier, Assignment, Binary, BinaryOperator, Call, ClosureParameter,
+        AccessModifier, Assignment, AssociatedType, Binary, BinaryOperator, Call, ClosureParameter,
         EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
         FieldInitializer, FlagsMember, For, FunctionDeclaration, If, Literal, Match, MatchArm,
-        Member, ModuleDeclaration, Parameter, Statement, StructDeclaration, StructField,
-        TypeAliasDeclaration, Unary, UnaryOperator, UnionDeclaration, Use, UseItem,
+        Member, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructDeclaration,
+        StructField, TypeAliasDeclaration, Unary, UnaryOperator, UnionDeclaration, Use, UseItem,
         VariableDeclaration, While,
     },
     type_checker::{
@@ -370,6 +370,62 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
+            Statement::ProtocolDeclaration(ProtocolDeclaration {
+                access_modifier,
+                type_identifier,
+                associated_types,
+                functions,
+            }) => {
+                let mut result = String::new();
+                result.push_str("<protocol declaration>");
+                indent.increase();
+
+                result.push_str(
+                    format!(
+                        "\n{}access_modifier: {}",
+                        indent.dash(),
+                        access_modifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "\n{}type_name: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash(),
+                        indent_display_vec(
+                            associated_types,
+                            "associated_types",
+                            "associated_type",
+                            indent
+                        )
+                    )
+                    .as_str(),
+                );
+
+                indent.end_current();
+
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash_end(),
+                        indent_display_vec(functions, "functions", "function", indent)
+                    )
+                    .as_str(),
+                );
+
+                indent.decrease();
+                result
+            }
             Statement::FunctionDeclaration(function_declaration) => {
                 function_declaration.indent_display(indent)
             }
@@ -391,6 +447,26 @@ impl IndentDisplay for Statement {
             }
             Statement::Expression(e) => e.indent_display(indent),
         }
+    }
+}
+
+impl IndentDisplay for AssociatedType {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<associated type>\n");
+        indent.increase();
+        result.push_str(format!("{}name: {}\n", indent.dash(), self.type_identifier).as_str());
+        indent.end_current();
+        result.push_str(
+            format!(
+                "{}type_annotation: {}",
+                indent.dash_end(),
+                self.default_type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
+        indent.decrease();
+        result
     }
 }
 
@@ -437,7 +513,7 @@ impl IndentDisplay for UseItem {
 
 impl IndentDisplay for FunctionDeclaration {
     fn indent_display(&self, indent: &mut Indent) -> String {
-        let identifier = &self.identifier;
+        let identifier = &self.type_identifier;
         let access_modifier = &self.access_modifier;
         let param = &self.param;
         let return_type_annotation = &self.return_type_annotation;
@@ -1687,6 +1763,53 @@ impl IndentDisplay for TypedStatement {
                 indent.decrease();
                 result
             }
+            TypedStatement::ProtocolDeclaration {
+                type_identifier,
+                associated_types,
+                functions,
+                type_,
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<protocol declaration> {}\n", type_).as_str());
+                indent.increase();
+
+                result.push_str(
+                    format!(
+                        "{}type_name: {}\n",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "{}{}\n",
+                        indent.dash(),
+                        indent_display_vec(
+                            associated_types,
+                            "associated_types",
+                            "associated_type",
+                            indent
+                        )
+                    )
+                    .as_str(),
+                );
+
+                indent.end_current();
+
+                result.push_str(
+                    format!(
+                        "{}{}\n",
+                        indent.dash_end(),
+                        indent_display_vec(functions, "functions", "function", indent)
+                    )
+                    .as_str(),
+                );
+
+                indent.decrease();
+                result
+            }
             TypedStatement::TypeAliasDeclaration {
                 type_identifier,
                 type_annotations,
@@ -1712,8 +1835,8 @@ impl IndentDisplay for TypedStatement {
                         indent.dash_end(),
                         indent_display_vec(
                             type_annotations,
-                            "type annotations",
-                            "type annotation",
+                            "type_annotations",
+                            "type_annotation",
                             indent
                         )
                     )

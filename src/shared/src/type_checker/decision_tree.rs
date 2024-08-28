@@ -6,7 +6,7 @@ use crate::{
         expressions::check_type,
         type_annotation_equals, type_equals, type_equals_coerce, Enum, EnumMember, Struct, Type,
     },
-    types::{TypeAnnotation, TypeIdentifier},
+    types::TypeAnnotation,
 };
 
 use super::{

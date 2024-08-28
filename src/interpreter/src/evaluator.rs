@@ -24,6 +24,7 @@ pub fn evaluate<'a>(
 ) -> Result<Value, String> {
     match typed_statement {
         TypedStatement::None => Ok(Value::Void),
+        TypedStatement::Program { statements } => evaluate_program(statements, environment),
         TypedStatement::ModuleDeclaration { module_path, .. } => {
             environment.borrow_mut().add_module(module_path);
             Ok(Value::Void)
@@ -35,7 +36,7 @@ pub fn evaluate<'a>(
         TypedStatement::EnumDeclaration { .. } => Ok(Value::Void),
         TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
         TypedStatement::TypeAliasDeclaration { .. } => Ok(Value::Void),
-        TypedStatement::Program { statements } => evaluate_program(statements, environment),
+        TypedStatement::ProtocolDeclaration { .. } => Ok(Value::Void),
         TypedStatement::FunctionDeclaration {
             identifier,
             param,

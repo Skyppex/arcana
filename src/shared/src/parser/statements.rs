@@ -2,6 +2,7 @@ use std::vec;
 
 use crate::{
     lexer::token::{IdentifierType, Keyword, TokenKind},
+    parser::AssociatedType,
     types::{
         can_be_type_annotation, parse_type_annotation, parse_type_identifier, GenericConstraint,
         GenericType, TypeAnnotation, TypeIdentifier,
@@ -12,8 +13,8 @@ use super::{
     cursor::Cursor,
     expressions::{self, parse_expression},
     AccessModifier, Closure, EnumDeclaration, EnumMember, EnumMemberField, Expression,
-    FunctionDeclaration, Literal, ModuleDeclaration, Parameter, Statement, StructDeclaration,
-    StructField, TypeAliasDeclaration, UnionDeclaration, Use, UseItem,
+    FunctionDeclaration, Literal, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement,
+    StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration, Use, UseItem,
 };
 
 pub fn parse_module_only(
@@ -225,7 +226,7 @@ fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, String> {
 
 fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let mut access_modifier = None;
-
+    println!("1");
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Fun) {
             return parse_struct_declaration_statement(cursor);
@@ -235,30 +236,36 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         access_modifier = Some(am);
     }
 
+    println!("2");
     if cursor.first().kind != TokenKind::Keyword(Keyword::Fun) {
         return parse_struct_declaration_statement(cursor);
     }
 
-    cursor.bump()?; // Consume the func keyword
+    cursor.bump()?; // Consume the fun keyword
 
+    println!("3");
     let type_identifier = parse_type_identifier(cursor, false)?;
 
     if !type_identifier.name().is_function_identifier_name() {
         return Err(format!("Invalid function name: {}", type_identifier.name()));
     }
 
+    println!("4");
     let TokenKind::OpenParen = cursor.bump()?.kind else {
         return Err(format!("Expected ( but found {:?}", cursor.first().kind));
     };
 
+    println!("5");
     let params = parse_parameters(cursor)?;
 
+    println!("6");
     let TokenKind::CloseParen = cursor.bump()?.kind else {
         return Err(format!("Expected ) but found {:?}", cursor.first().kind));
     };
 
     let mut return_type_annotation = None;
 
+    println!("7");
     if cursor.first().kind == TokenKind::Colon {
         cursor.bump()?; // Consume the :
 
@@ -270,6 +277,20 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         }
 
         return_type_annotation = Some(parse_type_annotation(cursor, true)?);
+    }
+
+    println!("KAJKHSJD");
+    if cursor.first().kind == TokenKind::Semicolon {
+        println!("akljsdkajh");
+        cursor.bump()?; // Consume the ;
+        return Ok(Statement::FunctionDeclaration(FunctionDeclaration {
+            access_modifier,
+            type_identifier,
+            param: None,
+            return_type_annotation,
+            body: Expression::Block(vec![]),
+            signature_only: true,
+        }));
     }
 
     let TokenKind::FatArrow = cursor.bump()?.kind else {
@@ -298,10 +319,11 @@ fn unwrap_parameters(
     match params.first().cloned() {
         None => Ok(Statement::FunctionDeclaration(FunctionDeclaration {
             access_modifier,
-            identifier: type_identifier,
+            type_identifier,
             param: None,
             return_type_annotation,
             body,
+            signature_only: false,
         })),
         Some(first) => {
             let (new_body, new_return_type_annotation) = unwrap_parameters_recurse(
@@ -312,10 +334,11 @@ fn unwrap_parameters(
 
             Ok(Statement::FunctionDeclaration(FunctionDeclaration {
                 access_modifier,
-                identifier: type_identifier,
+                type_identifier,
                 param: Some(first),
                 return_type_annotation: new_return_type_annotation,
                 body: new_body,
+                signature_only: false,
             }))
         }
     }
@@ -557,10 +580,9 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
 fn parse_type_alias_declaration(cursor: &mut Cursor) -> Result<Statement, String> {
     let mut access_modifier = None;
-
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Type) {
-            return parse_expression_map(cursor);
+            return parse_protocol_declaration(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -568,7 +590,7 @@ fn parse_type_alias_declaration(cursor: &mut Cursor) -> Result<Statement, String
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Type) {
-        return parse_expression_map(cursor);
+        return parse_protocol_declaration(cursor);
     }
 
     cursor.bump()?; // Consume the type keyword
@@ -597,6 +619,112 @@ fn parse_type_alias_declaration(cursor: &mut Cursor) -> Result<Statement, String
         access_modifier,
         type_identifier,
         type_annotations,
+    }))
+}
+
+fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> {
+    let mut access_modifier = None;
+
+    if let Some(am) = cursor.first().kind.is_access_modifier() {
+        if cursor.second().kind != TokenKind::Keyword(Keyword::Proto) {
+            return parse_expression_map(cursor);
+        }
+
+        cursor.bump()?; // Consume the access modifier
+        access_modifier = Some(am);
+    }
+
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Proto) {
+        return parse_expression_map(cursor);
+    }
+
+    cursor.bump()?; // Consume the proto keyword
+
+    let type_identifier = parse_type_identifier(cursor, false)?;
+
+    if !type_identifier.name().is_type_identifier_name() {
+        return Err(format!("Invalid type name: {}", type_identifier.name()));
+    }
+
+    if cursor.first().kind == TokenKind::Semicolon {
+        cursor.bump()?; // Consume the ;
+
+        return Ok(Statement::ProtocolDeclaration(ProtocolDeclaration {
+            access_modifier,
+            type_identifier,
+            associated_types: vec![],
+            functions: vec![],
+        }));
+    }
+
+    cursor.expect(TokenKind::OpenBrace)?;
+
+    let mut associated_types = vec![];
+
+    while cursor.first().kind == TokenKind::Keyword(Keyword::Type) {
+        cursor.bump()?; // Consume the type keyword
+
+        let associated_type = parse_type_identifier(cursor, false)?;
+
+        if !associated_type.name().is_generic_type_identifier_name() {
+            return Err(format!(
+                "Invalid associated type name: {}",
+                associated_type.name()
+            ));
+        }
+
+        if cursor.first().kind == TokenKind::Equal {
+            cursor.bump()?; // Consume the :
+
+            if !can_be_type_annotation(cursor) {
+                return Err(format!(
+                    "Expected type identifier but found {:?}",
+                    cursor.first().kind
+                ));
+            }
+
+            let type_annotation = parse_type_annotation(cursor, false)?;
+
+            cursor.expect(TokenKind::Semicolon)?;
+
+            associated_types.push(AssociatedType {
+                type_identifier: associated_type,
+                default_type_annotation: Some(type_annotation),
+            });
+
+            continue;
+        }
+
+        cursor.expect(TokenKind::Semicolon)?;
+
+        associated_types.push(AssociatedType {
+            type_identifier: associated_type,
+            default_type_annotation: None,
+        });
+    }
+
+    let mut functions = vec![];
+
+    while cursor.first().kind == TokenKind::Keyword(Keyword::Fun) {
+        let Statement::FunctionDeclaration(function) =
+            parse_function_declaration_statement(cursor)?
+        else {
+            return Err(format!(
+                "Expected function declaration but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        functions.push(function);
+    }
+
+    cursor.expect(TokenKind::CloseBrace)?;
+
+    Ok(Statement::ProtocolDeclaration(ProtocolDeclaration {
+        access_modifier,
+        type_identifier,
+        associated_types,
+        functions,
     }))
 }
 
