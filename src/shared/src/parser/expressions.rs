@@ -98,7 +98,7 @@ fn parse_continue(cursor: &mut Cursor) -> Result<Expression, String> {
 
 fn parse_return(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Return) {
-        return parse_loop(cursor);
+        return parse_trailing_closure(cursor);
     }
 
     cursor.bump()?; // Consume the return
@@ -111,6 +111,56 @@ fn parse_return(cursor: &mut Cursor) -> Result<Expression, String> {
     };
 
     Ok(Expression::Return(expression.map(Box::new)))
+}
+
+fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
+    let mut expression = parse_loop(cursor)?;
+
+    while cursor.first().kind == TokenKind::Arrow {
+        cursor.bump()?; // Consume the ->
+
+        let mut params = None;
+
+        if cursor.first().kind == TokenKind::Pipe {
+            cursor.bump()?; // Consume the |
+            params = Some(parse_comma_separated_closure_params(cursor)?);
+            cursor.expect(TokenKind::Pipe)?;
+        }
+
+        cursor.optional_bump(TokenKind::FatArrow)?;
+
+        let return_type_annotation = if cursor.first().kind == TokenKind::Colon {
+            cursor.bump()?; // Consume the :
+            Some(parse_type_annotation(cursor, true)?)
+        } else {
+            None
+        };
+
+        let body = parse_loop(cursor)?;
+
+        let Some(params) = params else {
+            expression = Expression::Call(Call {
+                callee: Box::new(expression),
+                argument: Some(Box::new(Expression::Closure(Closure {
+                    param: None,
+                    return_type_annotation,
+                    body: Box::new(body),
+                }))),
+            });
+            continue;
+        };
+
+        expression = Expression::Call(Call {
+            callee: Box::new(expression),
+            argument: Some(Box::new(unwrap_arguments(
+                params,
+                return_type_annotation,
+                body,
+            )?)),
+        });
+    }
+
+    Ok(expression)
 }
 
 pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -894,56 +944,7 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
         }));
     }
 
-    parse_trailing_closure(cursor)
-}
-
-fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
-    let call = parse_call_or_param_propagation(cursor)?;
-
-    if cursor.first().kind != TokenKind::Arrow {
-        return Ok(call);
-    }
-
-    cursor.bump()?; // Consume the ->
-
-    let mut params = None;
-
-    if cursor.first().kind == TokenKind::Pipe {
-        cursor.bump()?; // Consume the |
-        params = Some(parse_comma_separated_closure_params(cursor)?);
-        cursor.expect(TokenKind::Pipe)?;
-    }
-
-    cursor.optional_bump(TokenKind::FatArrow)?;
-
-    let return_type_annotation = if cursor.first().kind == TokenKind::Colon {
-        cursor.bump()?; // Consume the :
-        Some(parse_type_annotation(cursor, true)?)
-    } else {
-        None
-    };
-
-    let body = parse_expression(cursor)?;
-
-    let Some(params) = params else {
-        return Ok(Expression::Call(Call {
-            callee: Box::new(call),
-            argument: Some(Box::new(Expression::Closure(Closure {
-                param: None,
-                return_type_annotation,
-                body: Box::new(body),
-            }))),
-        }));
-    };
-
-    Ok(Expression::Call(Call {
-        callee: Box::new(call),
-        argument: Some(Box::new(unwrap_arguments(
-            params,
-            return_type_annotation,
-            body,
-        )?)),
-    }))
+    parse_call_or_param_propagation(cursor)
 }
 
 fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, String> {

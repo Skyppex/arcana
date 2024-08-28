@@ -6,7 +6,7 @@ Some protocols are also bound to operators, which allows you to implement operat
 
 ## Syntax
 
-```
+```arcana
 proto Name {
     // Protocol body
 }
@@ -14,7 +14,7 @@ proto Name {
 
 ## Example
 
-```
+```arcana
 proto Add {
     fun add(Self left, Self right): Self;
 }
@@ -25,13 +25,13 @@ The `Self` keyword is a special keyword which refers to the type which implement
 
 ## Implementing a Protocol
 
-```
+```arcana
 struct Foo {
     int bar;
 }
 
-impl Add for Foo {
-    fun add(Self left, Self right): Self {
+imp Add for Foo {
+    fun add(Self left, Self right): Self => {
         return Foo { bar: left.bar + right.bar };
     }
 }
@@ -41,11 +41,11 @@ This works because the `int` type already implements the `Add` protocol, so we c
 
 ## Default Implementations
 
-```
+```arcana
 proto Equals {
     fun equals(Self left, Self right): bool;
     
-    fun not_equals(Self left, Self right): bool {
+    fun not_equals(Self left, Self right): bool => {
         return !left.equals(right);
     }
 }
@@ -60,11 +60,11 @@ Implementors of the protocol can still override the default implementation if th
 
 Defining the `Newable` protocol is quite trivial. We want the protocol be implemented only once for each type to avoid ambiguity when calling the new function.
 
-```rs
+```arcana
 proto Newable<[..T: param]> {
     type Return;
 
-    func new([..T]) -> Self::Return;
+    fun new([..T]): Self::Return;
 }
 ```
 
@@ -79,35 +79,36 @@ These generic parameters are then use in the function signature for `new()` whic
 
 When implementing the `Newable` protocol you have to specify the parameters as generic types. Note that you can have zero of them.
 
-```rs
+```arcana
 struct MyStruct {
     a: int,
     b: string,
 }
 
 // Would be nice to avoid defining the parameters twice using type inference somehow
-impl Newable<[..a: int, b: string]> for MyStruct {
+imp Newable<[..a: int, b: string]> for MyStruct {
     type Return = MyStruct;
 
-    func new(a: int, b: string): Self::Return {
-        MyStruct { a, b }
+    fun new(a: int, b: string): Self::Return => {
+        MyStruct { a: a, b: b }
     }
 }
 
 // Here's how you would define it with no input parameters
-impl Newable<[..]> for MyStruct {
+imp Newable<[..]> for MyStruct {
     type Return = MyStruct;
 
-    func new(): Self::Return {
-        MyStruct { 0, "" }
+    func new(): Self::Return => {
+        MyStruct { a: 0, b: "" }
     }
 }
 ```
 
 Here's how you would constrain your function to take a generic type which has en empty constructor:
 
-```rs
-func create_with_extra_logic<T is Newable<[..]>(): T {
+```arcana
+fun create_with_extra_logic<T>(): T
+where T: Newable<[..]> => {
     T::new()
     // Extra logic
 }

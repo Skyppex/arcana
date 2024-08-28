@@ -1,5 +1,7 @@
 pub mod lib::iterator;
 
+use lib::compare::{iterator::{Iterator}};
+
 pub struct Map<TIterator, TFunc> {
     iterator: TIterator,
     mapper: TFunc
@@ -42,24 +44,21 @@ where TIter: Iterator<Self::Item = TType> {
 imp<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOperand> {
     type Item = T;
 
-    fun next(&mut self) -> Option<Self::Item> {
+    fun next(self: &mut Self): Option<Self::Item> => {
         let mut closest = None;
 
-        for item in self.iterator {
-            let closest_operand = match closest {
-                Some(item) => self.selector(item),
-                None => {
-                    closest = Some(item);
-                    continue;
-                }
+        for item in self.iterator => {
+            let closest_operand = closest match 
+            | Some { item: item } => self.selector(item),
+            | None => {
+                closest = Some(item);
+                continue;
             };
 
             let operand = self.selector(item);
             let ordering = self.comparer(operand, closest_operand);
 
-            if ordering == Ordering::Less {
-                closest = Some(item);
-            }
+            if ordering == Ordering::Less => closest = Some(item); 
         }
 
         closest

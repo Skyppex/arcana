@@ -2,10 +2,10 @@ pub mod lib::iterator;
 
 pub proto Iterator {
     type Item;
-    fun next(&mut self) -> Option<Self::Item>;
+    fun next(self: Self): Option<Self::Item>;
 }
 
 pub proto DoubleSidedIterator 
-where imp is Iterator {
-    fun prev(&mut self) -> Option<Self::Item>;
+where imp: Iterator {
+    fun prev(self: Self): Option<Self::Item>;
 }

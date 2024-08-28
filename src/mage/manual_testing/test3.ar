@@ -1,1 +1,3 @@
-fun identity<T>(a: T): T => a
+fun stuff(left: fun(): int, right: fun(): int): int => left() + right()
+
+stuff -> 1 -> 2

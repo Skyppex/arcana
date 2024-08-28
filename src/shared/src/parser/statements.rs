@@ -864,8 +864,8 @@ fn parse_generic_constraint(cursor: &mut Cursor) -> Result<GenericConstraint, St
         return Err(format!("Invalid field name: {}", generic_name));
     }
 
-    let TokenKind::Keyword(Keyword::Is) = cursor.bump()?.kind else {
-        return Err(format!("Expected 'is' but found {:?}", cursor.first().kind));
+    let TokenKind::Colon = cursor.bump()?.kind else {
+        return Err(format!("Expected ':' but found {:?}", cursor.first().kind));
     };
 
     let mut constraints = vec![];
