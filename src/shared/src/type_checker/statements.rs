@@ -1,7 +1,10 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    parser::{self, ModuleDeclaration, ProtocolDeclaration, Statement, UnionDeclaration, Use},
+    parser::{
+        self, ImplementationDeclaration, ModuleDeclaration, ProtocolDeclaration, Statement,
+        UnionDeclaration, Use,
+    },
     types::{TypeAnnotation, TypeIdentifier},
 };
 
@@ -100,6 +103,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .map(|f| f.type_identifier)
                 .collect(),
         }]),
+        Statement::ImplementationDeclaration(ImplementationDeclaration { .. }) => Ok(vec![]),
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
             type_identifier,
@@ -459,6 +463,31 @@ pub fn check_type<'a>(
                 functions: functions?,
                 type_: Type::Void,
             })
+        }
+        Statement::ImplementationDeclaration(ImplementationDeclaration {
+            scoped_generics,
+            protocol_identifier,
+            type_identifier,
+            associated_types,
+            functions,
+        }) => {
+            let implementation_type_environment = Rc::new(RefCell::new(
+                TypeEnvironment::new_parent(type_environment.clone()),
+            ));
+
+            for generic in scoped_generics {
+                implementation_type_environment
+                    .borrow_mut()
+                    .add_type(Type::Generic(generic.clone()))?;
+            }
+
+            if let TypeIdentifier::GenericType(_, generics) = type_identifier {
+                for generic in generics {
+                    implementation_type_environment
+                        .borrow_mut()
+                        .add_type(Type::Generic(generic.clone()))?;
+                }
+            }
         }
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,

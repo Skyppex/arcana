@@ -2,10 +2,10 @@ use crate::{
     parser::{
         AccessModifier, Assignment, AssociatedType, Binary, BinaryOperator, Call, ClosureParameter,
         EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
-        FieldInitializer, FlagsMember, For, FunctionDeclaration, If, Literal, Match, MatchArm,
-        Member, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructDeclaration,
-        StructField, TypeAliasDeclaration, Unary, UnaryOperator, UnionDeclaration, Use, UseItem,
-        VariableDeclaration, While,
+        FieldInitializer, FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration,
+        Literal, Match, MatchArm, Member, ModuleDeclaration, Parameter, ProtocolDeclaration,
+        Statement, StructDeclaration, StructField, TypeAliasDeclaration, Unary, UnaryOperator,
+        UnionDeclaration, Use, UseItem, VariableDeclaration, While,
     },
     type_checker::{
         self,
@@ -392,6 +392,77 @@ impl IndentDisplay for Statement {
                 result.push_str(
                     format!(
                         "\n{}type_name: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash(),
+                        indent_display_vec(
+                            associated_types,
+                            "associated_types",
+                            "associated_type",
+                            indent
+                        )
+                    )
+                    .as_str(),
+                );
+
+                indent.end_current();
+
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash_end(),
+                        indent_display_vec(functions, "functions", "function", indent)
+                    )
+                    .as_str(),
+                );
+
+                indent.decrease();
+                result
+            }
+            Statement::ImplementationDeclaration(ImplementationDeclaration {
+                scoped_generics,
+                protocol_identifier,
+                type_identifier,
+                associated_types,
+                functions,
+            }) => {
+                let mut result = String::new();
+                result.push_str("<implementation declaration>");
+                indent.increase();
+
+                result.push_str(
+                    format!(
+                        "\n{}scoped_generics: {}",
+                        indent.dash(),
+                        indent_display_vec(
+                            scoped_generics,
+                            "scoped_generics",
+                            "scoped_generic",
+                            indent
+                        )
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "\n{}protocol_identifier: {}",
+                        indent.dash(),
+                        protocol_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "\n{}type_identifier: {}",
                         indent.dash(),
                         type_identifier.indent_display(indent)
                     )

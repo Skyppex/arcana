@@ -1,11 +1,11 @@
-use std::vec;
+use std::{env::vars, vec};
 
 use crate::{
     lexer::token::{IdentifierType, Keyword, TokenKind},
     parser::AssociatedType,
     types::{
-        can_be_type_annotation, parse_type_annotation, parse_type_identifier, GenericConstraint,
-        GenericType, TypeAnnotation, TypeIdentifier,
+        can_be_type_annotation, parse_generic_type_parameters, parse_type_annotation,
+        parse_type_identifier, GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier,
     },
 };
 
@@ -13,8 +13,9 @@ use super::{
     cursor::Cursor,
     expressions::{self, parse_expression},
     AccessModifier, Closure, EnumDeclaration, EnumMember, EnumMemberField, Expression,
-    FunctionDeclaration, Literal, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement,
-    StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration, Use, UseItem,
+    FunctionDeclaration, ImplementationDeclaration, Literal, ModuleDeclaration, Parameter,
+    ProtocolDeclaration, Statement, StructDeclaration, StructField, TypeAliasDeclaration,
+    UnionDeclaration, Use, UseItem,
 };
 
 pub fn parse_module_only(
@@ -627,7 +628,7 @@ fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> 
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Proto) {
-            return parse_expression_map(cursor);
+            return parse_implementation_declaration(cursor);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -635,7 +636,7 @@ fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> 
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Proto) {
-        return parse_expression_map(cursor);
+        return parse_implementation_declaration(cursor);
     }
 
     cursor.bump()?; // Consume the proto keyword
@@ -726,6 +727,109 @@ fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> 
         associated_types,
         functions,
     }))
+}
+
+fn parse_implementation_declaration(cursor: &mut Cursor) -> Result<Statement, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Imp) {
+        return parse_expression_map(cursor);
+    }
+
+    cursor.bump()?; // Consume the imp keyword
+
+    let scoped_generics = if cursor.first().kind == TokenKind::Less {
+        parse_generic_type_parameters(cursor)?
+    } else {
+        vec![]
+    };
+
+    let protocol_identifier = parse_type_identifier(cursor, false)?;
+
+    if !protocol_identifier.name().is_type_identifier_name() {
+        return Err(format!("Invalid type name: {}", protocol_identifier.name()));
+    }
+
+    let TokenKind::Keyword(Keyword::For) = cursor.bump()?.kind else {
+        return Err(format!("Expected for but found {:?}", cursor.first().kind));
+    };
+
+    let type_identifier = parse_type_identifier(cursor, false)?;
+
+    if !type_identifier.name().is_type_identifier_name() {
+        return Err(format!("Invalid protocol name: {}", type_identifier.name()));
+    }
+
+    cursor.expect(TokenKind::OpenBrace)?;
+
+    let mut associated_types = vec![];
+
+    while cursor.first().kind == TokenKind::Keyword(Keyword::Type) {
+        cursor.bump()?; // Consume the type keyword
+
+        let associated_type = parse_type_identifier(cursor, false)?;
+
+        if !associated_type.name().is_generic_type_identifier_name() {
+            return Err(format!(
+                "Invalid associated type name: {}",
+                associated_type.name()
+            ));
+        }
+
+        if cursor.first().kind == TokenKind::Equal {
+            cursor.bump()?; // Consume the :
+
+            if !can_be_type_annotation(cursor) {
+                return Err(format!(
+                    "Expected type identifier but found {:?}",
+                    cursor.first().kind
+                ));
+            }
+
+            let type_annotation = parse_type_annotation(cursor, false)?;
+
+            cursor.expect(TokenKind::Semicolon)?;
+
+            associated_types.push(AssociatedType {
+                type_identifier: associated_type,
+                default_type_annotation: Some(type_annotation),
+            });
+
+            continue;
+        }
+
+        cursor.expect(TokenKind::Semicolon)?;
+
+        associated_types.push(AssociatedType {
+            type_identifier: associated_type,
+            default_type_annotation: None,
+        });
+    }
+
+    let mut functions = vec![];
+
+    while cursor.first().kind == TokenKind::Keyword(Keyword::Fun) {
+        let Statement::FunctionDeclaration(function) =
+            parse_function_declaration_statement(cursor)?
+        else {
+            return Err(format!(
+                "Expected function declaration but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        functions.push(function);
+    }
+
+    cursor.expect(TokenKind::CloseBrace)?;
+
+    Ok(Statement::ImplementationDeclaration(
+        ImplementationDeclaration {
+            scoped_generics,
+            protocol_identifier,
+            type_identifier,
+            associated_types,
+            functions,
+        },
+    ))
 }
 
 fn parse_expression_map(cursor: &mut Cursor) -> Result<Statement, String> {

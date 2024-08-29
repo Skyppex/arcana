@@ -186,7 +186,7 @@ pub enum Keyword {
     Enum,
     Union,
     // Flags,
-    // Imp,
+    Imp,
     Proto,
     Type,
 

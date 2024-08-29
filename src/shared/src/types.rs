@@ -571,6 +571,29 @@ pub(super) fn parse_type_identifier(
     }
 }
 
+pub fn parse_generic_type_parameters(cursor: &mut Cursor) -> Result<Vec<GenericType>, String> {
+    cursor.expect(TokenKind::Less)?;
+    let mut generics = Vec::new();
+
+    while cursor.first().kind != TokenKind::Greater {
+        let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
+            return Err(format!(
+                "Expected type identifier but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        generics.push(GenericType { type_name });
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        }
+    }
+    cursor.expect(TokenKind::Greater)?;
+
+    Ok(generics)
+}
+
 pub fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericType>, String> {
     let mut types = Vec::new();
 

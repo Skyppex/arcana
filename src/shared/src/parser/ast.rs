@@ -16,6 +16,7 @@ pub enum Statement {
     UnionDeclaration(UnionDeclaration),
     TypeAliasDeclaration(TypeAliasDeclaration),
     ProtocolDeclaration(ProtocolDeclaration),
+    ImplementationDeclaration(ImplementationDeclaration),
     FunctionDeclaration(FunctionDeclaration),
     Semi(Box<Statement>),
     Expression(Expression),
@@ -134,6 +135,15 @@ pub struct TypeAliasDeclaration {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProtocolDeclaration {
     pub access_modifier: Option<AccessModifier>,
+    pub type_identifier: TypeIdentifier,
+    pub associated_types: Vec<AssociatedType>,
+    pub functions: Vec<FunctionDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImplementationDeclaration {
+    pub scoped_generics: Vec<GenericType>,
+    pub protocol_identifier: TypeIdentifier,
     pub type_identifier: TypeIdentifier,
     pub associated_types: Vec<AssociatedType>,
     pub functions: Vec<FunctionDeclaration>,
