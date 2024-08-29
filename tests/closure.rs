@@ -179,3 +179,19 @@ fn closure_voids_body_if_return_type_is_void() {
     // Assert
     assert_eq!(value, Value::Void);
 }
+
+#[test]
+fn trailing_closres_can_be_chained() {
+    // Arrange
+    // lang=arcana
+    let input = r#"
+        fun add(left: fun(): int, right: fun(): int): int => left() + right()
+        add -> 1 -> 2
+    "#;
+
+    // Act
+    let value = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Number(Number::Int(3)));
+}
