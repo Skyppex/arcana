@@ -488,6 +488,8 @@ pub fn check_type<'a>(
                         .add_type(Type::Generic(generic.clone()))?;
                 }
             }
+
+            todo!()
         }
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,

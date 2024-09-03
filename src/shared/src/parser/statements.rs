@@ -1,5 +1,3 @@
-use std::{env::vars, vec};
-
 use crate::{
     lexer::token::{IdentifierType, Keyword, TokenKind},
     parser::AssociatedType,
@@ -227,7 +225,7 @@ fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, String> {
 
 fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     let mut access_modifier = None;
-    println!("1");
+
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Fun) {
             return parse_struct_declaration_statement(cursor);
@@ -237,36 +235,30 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         access_modifier = Some(am);
     }
 
-    println!("2");
     if cursor.first().kind != TokenKind::Keyword(Keyword::Fun) {
         return parse_struct_declaration_statement(cursor);
     }
 
     cursor.bump()?; // Consume the fun keyword
 
-    println!("3");
     let type_identifier = parse_type_identifier(cursor, false)?;
 
     if !type_identifier.name().is_function_identifier_name() {
         return Err(format!("Invalid function name: {}", type_identifier.name()));
     }
 
-    println!("4");
     let TokenKind::OpenParen = cursor.bump()?.kind else {
         return Err(format!("Expected ( but found {:?}", cursor.first().kind));
     };
 
-    println!("5");
     let params = parse_parameters(cursor)?;
 
-    println!("6");
     let TokenKind::CloseParen = cursor.bump()?.kind else {
         return Err(format!("Expected ) but found {:?}", cursor.first().kind));
     };
 
     let mut return_type_annotation = None;
 
-    println!("7");
     if cursor.first().kind == TokenKind::Colon {
         cursor.bump()?; // Consume the :
 
@@ -280,9 +272,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         return_type_annotation = Some(parse_type_annotation(cursor, true)?);
     }
 
-    println!("KAJKHSJD");
     if cursor.first().kind == TokenKind::Semicolon {
-        println!("akljsdkajh");
         cursor.bump()?; // Consume the ;
         return Ok(Statement::FunctionDeclaration(FunctionDeclaration {
             access_modifier,

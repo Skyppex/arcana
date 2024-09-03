@@ -1,3 +1,13 @@
-fun stuff(left: fun(): int, right: fun(): int): int => left() + right()
+fun map(x: [int], mapper: fun(int): int): [int] => {
+  let mut result: [int] = [];
 
-stuff -> 1 -> 2
+  for i in x => {
+    result += mapper(i);
+  }
+
+  result
+}
+
+let nums = [1, 2, 3, 4, 5];
+
+let doubled = nums:map(|x| x*2)

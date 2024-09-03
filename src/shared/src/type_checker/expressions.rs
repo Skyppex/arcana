@@ -63,6 +63,7 @@ pub fn check_type<'a>(
             }
         },
         Expression::Closure(closure) => {
+            println!("CLOSURE__CONTEXT: {:?}", context);
             let closure_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
@@ -155,7 +156,7 @@ pub fn check_type<'a>(
                 &call.callee,
                 discovered_types,
                 type_environment.clone(),
-                context,
+                context.clone(),
             )?;
 
             let callee_type = callee.get_type();
@@ -244,17 +245,6 @@ pub fn check_type<'a>(
                 type_: return_type,
             })
         }
-        other => synthesize_type(other, discovered_types, type_environment),
-    }
-}
-
-fn synthesize_type(
-    expression: &Expression,
-    discovered_types: &Vec<DiscoveredType>,
-    type_environment: Rc<RefCell<TypeEnvironment>>,
-) -> Result<TypedExpression, String> {
-    match expression {
-        // Expression::None => Ok(TypedExpression::None),
         Expression::VariableDeclaration(VariableDeclaration {
             mutable,
             type_annotation,
@@ -520,11 +510,23 @@ fn synthesize_type(
                     type_,
                 }))
             }
-            crate::parser::Member::MemberAccess { object, member, .. } => {
-                check_type_member_access(object, discovered_types, type_environment, member)
-            }
+            crate::parser::Member::MemberAccess { object, member, .. } => check_type_member_access(
+                object,
+                discovered_types,
+                type_environment,
+                member,
+                context,
+            ),
             crate::parser::Member::ParamPropagation { object, member, .. } => {
-                check_type_param_propagation(object, discovered_types, type_environment, member)
+                println!("KASHDLKJASHD: {:?}", context);
+
+                check_type_param_propagation(
+                    object,
+                    member,
+                    discovered_types,
+                    type_environment,
+                    context,
+                )
             }
         },
         Expression::Literal(l) => match l {
@@ -535,14 +537,15 @@ fn synthesize_type(
             parser::Literal::String(v) => Ok(TypedExpression::Literal(Literal::String(v.clone()))),
             parser::Literal::Char(v) => Ok(TypedExpression::Literal(Literal::Char(*v))),
             parser::Literal::Bool(v) => Ok(TypedExpression::Literal(Literal::Bool(*v))),
-            parser::Literal::Array(v) => {
+            parser::Literal::Array(values) => {
                 let v: Result<(Vec<TypedExpression>, Type), String> = {
                     let mut v_: Vec<TypedExpression> = vec![];
                     let mut previous_type = Type::Void;
 
-                    for e in v {
+                    for value in values {
                         let value =
-                            check_type(&e, discovered_types, type_environment.clone(), None)?;
+                            check_type(&value, discovered_types, type_environment.clone(), None)?;
+
                         let type_ = value.get_deep_type();
 
                         if !type_equals(&previous_type, &Type::Void)
@@ -562,9 +565,17 @@ fn synthesize_type(
                 };
 
                 let v = v?;
+                let mut target_type = v.1.clone();
+
+                if type_equals(&v.1, &Type::Void) {
+                    if let Some(Type::Array(inner)) = context {
+                        target_type = *inner;
+                    }
+                }
+
                 Ok(TypedExpression::Literal(Literal::Array {
                     values: v.0,
-                    type_: v.1,
+                    type_: target_type,
                 }))
             }
             parser::Literal::Struct {
@@ -885,7 +896,6 @@ fn synthesize_type(
             body,
             else_body,
         }) => {
-            println!("For loop");
             let for_and_else_environment =
                 Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment)));
 
@@ -959,7 +969,6 @@ fn synthesize_type(
                 type_: type_.clone(),
             })
         }
-        _ => Err(format!("Unexpected expression: {:?}", expression)),
     }
 }
 
@@ -1005,6 +1014,7 @@ fn check_type_member_access(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     member: &Box<parser::Member>,
+    context: Option<Type>,
 ) -> Result<TypedExpression, String> {
     let object_type_expression =
         check_type(object, discovered_types, type_environment.clone(), None)?;
@@ -1015,6 +1025,7 @@ fn check_type_member_access(
         type_environment,
         object_type_expression,
         discovered_types,
+        context,
     )
 }
 
@@ -1024,10 +1035,12 @@ fn check_type_member_access_recurse(
     type_environment: Rcrc<TypeEnvironment>,
     object_typed_expression: TypedExpression,
     discovered_types: &Vec<DiscoveredType>,
+    context: Option<Type>,
 ) -> Result<TypedExpression, String> {
-    match object_type {
-        Type::Struct(struct_) => match *member.clone() {
-            parser::Member::Identifier { symbol, .. } => {
+    println!("MEMBER_ACCESS");
+    return match *member.clone() {
+        parser::Member::Identifier { symbol, .. } => match object_type {
+            Type::Struct(struct_) => {
                 let field_type = struct_.fields.get(&symbol).ok_or(format!(
                     "Struct '{}' does not have a field called '{}'",
                     struct_.type_identifier, symbol
@@ -1049,23 +1062,9 @@ fn check_type_member_access_recurse(
                     type_: field_type.clone(),
                 }))
             }
-            parser::Member::MemberAccess {
-                object,
-                member,
-                symbol: _,
-                generics: _,
-            } => check_type_member_access(&object, discovered_types, type_environment, &member),
-            parser::Member::ParamPropagation {
-                object,
-                member,
-                symbol: _,
-                generics: _,
-            } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
-        },
-        Type::EnumMember(EnumMember {
-            enum_name, fields, ..
-        }) => match *member.clone() {
-            parser::Member::Identifier { symbol, .. } => {
+            Type::EnumMember(EnumMember {
+                enum_name, fields, ..
+            }) => {
                 let field_type = fields.get(&symbol).ok_or(format!(
                     "EnumMember '{}' does not have a field called '{}'",
                     enum_name, symbol
@@ -1087,25 +1086,11 @@ fn check_type_member_access_recurse(
                     type_: field_type.clone(),
                 }))
             }
-            parser::Member::MemberAccess {
-                object,
-                member,
-                symbol: _,
-                generics: _,
-            } => check_type_member_access(&object, discovered_types, type_environment, &member),
-            parser::Member::ParamPropagation {
-                object,
-                member,
-                symbol: _,
-                generics: _,
-            } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
-        },
-        Type::Enum(Enum {
-            type_identifier,
-            shared_fields,
-            ..
-        }) => match *member.clone() {
-            parser::Member::Identifier { symbol, .. } => {
+            Type::Enum(Enum {
+                type_identifier,
+                shared_fields,
+                ..
+            }) => {
                 let field_type = shared_fields.get(&symbol).ok_or(format!(
                     "Enum '{}' does not have a shared field called '{}'",
                     type_identifier, symbol
@@ -1127,35 +1112,60 @@ fn check_type_member_access_recurse(
                     type_: field_type.clone(),
                 }))
             }
-            parser::Member::MemberAccess {
-                object,
-                member,
-                symbol: _,
-                generics: _,
-            } => check_type_member_access(&object, discovered_types, type_environment, &member),
-            parser::Member::ParamPropagation {
-                object,
-                member,
-                symbol: _,
-                generics: _,
-            } => check_type_param_propagation(&object, discovered_types, type_environment, &member),
+            _ => Err(format!(
+                "Unexpected member access: {} on type {}",
+                symbol,
+                object_type.full_name()
+            )),
         },
-        other => Err(format!(
-            "Member access is not supported on type: {}",
-            other.full_name()
-        )),
-    }
+        parser::Member::MemberAccess { object, member, .. } => check_type_member_access(
+            &object,
+            discovered_types,
+            type_environment,
+            &member,
+            context,
+        ),
+        parser::Member::ParamPropagation { object, member, .. } => check_type_param_propagation(
+            &object,
+            &member,
+            discovered_types,
+            type_environment,
+            context,
+        ),
+    };
 }
 
 fn check_type_param_propagation(
     object: &Box<Expression>,
+    member: &Box<parser::Member>,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-    member: &Box<parser::Member>,
+    context: Option<Type>,
 ) -> Result<TypedExpression, String> {
-    let object_type_expression =
-        check_type(object, discovered_types, type_environment.clone(), None)?;
+    let member_type_expression = check_type_member_access(
+        object,
+        discovered_types,
+        type_environment.clone(),
+        member,
+        context.clone(),
+    )?;
+
+    let Type::Function(Function { param, .. }) = member_type_expression.get_type() else {
+        return Err(format!(
+            "{} is not a function",
+            member_type_expression.get_type()
+        ));
+    };
+
+    let object_type_expression = check_type(
+        object,
+        discovered_types,
+        type_environment.clone(),
+        param.map(|p| *p.type_),
+    )?;
+
     let object_type = object_type_expression.get_type();
+
     check_type_param_propagation_recurse(
         object_type.clone(),
         member,
@@ -1184,10 +1194,7 @@ fn check_type_param_propagation_recurse(
                     )
                 })?;
 
-            let Type::Function(Function {
-                param, return_type, ..
-            }) = type_.clone()
-            else {
+            let Type::Function(Function { param, .. }) = type_.clone() else {
                 return Err(format!("{} is not a function", symbol));
             };
 
@@ -1205,22 +1212,13 @@ fn check_type_param_propagation_recurse(
                 ))?
             }
 
-            Ok(TypedExpression::Closure {
-                param: None,
-                return_type: *return_type.clone(),
-                body: Box::new(TypedExpression::Call {
-                    callee: Box::new(TypedExpression::Member(Member::Identifier {
-                        symbol: symbol.clone(),
-                        type_: type_.clone(),
-                    })),
-                    argument: Some(Box::new(object_typed_expression)),
+            Ok(TypedExpression::Call {
+                callee: Box::new(TypedExpression::Member(Member::Identifier {
+                    symbol: symbol.clone(),
                     type_: type_.clone(),
-                }),
-                type_: Type::Function(Function {
-                    identifier: None,
-                    param: None,
-                    return_type,
-                }),
+                })),
+                argument: Some(Box::new(object_typed_expression)),
+                type_: type_.clone(),
             })
         }
         parser::Member::MemberAccess { .. } => todo!("Member access"),
@@ -1432,6 +1430,14 @@ fn get_binop_type(
         }
         (left_type, operator, Type::Union(Union { literal_type, .. })) => {
             get_binop_type(left_type, operator, literal_type)
+        }
+        (Type::Array(left), BinaryOperator::Add, Type::Array(right))
+            if type_equals(left, right) =>
+        {
+            Ok(Type::Array(left.clone()))
+        }
+        (Type::Array(left), BinaryOperator::Add, right) if type_equals(left, right) => {
+            Ok(Type::Array(left.clone()))
         }
         _ => Err(format!(
             "Unexpected binary operator {:?} for types {:?} and {:?}",

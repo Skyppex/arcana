@@ -44,6 +44,12 @@ fn evaluate_add<'a>(left: Value, right: Value) -> Result<Value, String> {
             (left, right) => Err(format!("Cannot add {:?} and {:?}", left, right)),
         },
         (Value::String(left), Value::String(right)) => Ok(Value::String(left + &right)),
+        (Value::Array(left), Value::Array(right)) => {
+            Ok(Value::Array(left.into_iter().chain(right).collect()))
+        }
+        (Value::Array(left), right) => Ok(Value::Array(
+            left.into_iter().chain(std::iter::once(right)).collect(),
+        )),
         (left, right) => Err(format!("Cannot add {:?} and {:?}", left, right)),
     }
 }
