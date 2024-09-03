@@ -1037,7 +1037,6 @@ fn check_type_member_access_recurse(
     discovered_types: &Vec<DiscoveredType>,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
-    println!("MEMBER_ACCESS");
     return match *member.clone() {
         parser::Member::Identifier { symbol, .. } => match object_type {
             Type::Struct(struct_) => {
@@ -1142,26 +1141,31 @@ fn check_type_param_propagation(
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
-    let member_type_expression = check_type_member_access(
-        object,
-        discovered_types,
-        type_environment.clone(),
-        member,
-        context.clone(),
-    )?;
+    let parser::Member::Identifier { symbol, .. } = *member.clone() else {
+        return Err("Param propagation must be followed by a member access".to_string());
+    };
 
-    let Type::Function(Function { param, .. }) = member_type_expression.get_type() else {
-        return Err(format!(
-            "{} is not a function",
-            member_type_expression.get_type()
-        ));
+    let member_type = type_environment.borrow_mut().get_type_from_str(&symbol);
+
+    let Some(member_type) = member_type else {
+        return Err(format!("{} is not a type", symbol));
+    };
+
+    let Type::Function(Function { return_type, .. }) = member_type.clone() else {
+        return Err(format!("{} is not a function", symbol));
+    };
+
+    let param = if let Type::Function(Function { param, .. }) = *return_type.clone() {
+        param
+    } else {
+        None
     };
 
     let object_type_expression = check_type(
         object,
         discovered_types,
         type_environment.clone(),
-        param.map(|p| *p.type_),
+        param.map(|p| *p.type_).or(context),
     )?;
 
     let object_type = object_type_expression.get_type();
@@ -1212,13 +1216,17 @@ fn check_type_param_propagation_recurse(
                 ))?
             }
 
+            let Type::Function(Function { return_type, .. }) = type_.clone() else {
+                return Err(format!("{} is not a function", symbol));
+            };
+
             Ok(TypedExpression::Call {
                 callee: Box::new(TypedExpression::Member(Member::Identifier {
                     symbol: symbol.clone(),
                     type_: type_.clone(),
                 })),
                 argument: Some(Box::new(object_typed_expression)),
-                type_: type_.clone(),
+                type_: *return_type,
             })
         }
         parser::Member::MemberAccess { .. } => todo!("Member access"),
