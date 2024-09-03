@@ -428,8 +428,8 @@ impl IndentDisplay for Statement {
             }
             Statement::ImplementationDeclaration(ImplementationDeclaration {
                 scoped_generics,
-                protocol_identifier,
-                type_identifier,
+                protocol_annotation,
+                type_annotation,
                 associated_types,
                 functions,
             }) => {
@@ -455,7 +455,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "\n{}protocol_identifier: {}",
                         indent.dash(),
-                        protocol_identifier.indent_display(indent)
+                        protocol_annotation.indent_display(indent)
                     )
                     .as_str(),
                 );
@@ -464,7 +464,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "\n{}type_identifier: {}",
                         indent.dash(),
-                        type_identifier.indent_display(indent)
+                        type_annotation.indent_display(indent)
                     )
                     .as_str(),
                 );

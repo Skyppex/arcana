@@ -143,8 +143,8 @@ pub struct ProtocolDeclaration {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ImplementationDeclaration {
     pub scoped_generics: Vec<GenericType>,
-    pub protocol_identifier: TypeIdentifier,
-    pub type_identifier: TypeIdentifier,
+    pub protocol_annotation: TypeAnnotation,
+    pub type_annotation: TypeAnnotation,
     pub associated_types: Vec<AssociatedType>,
     pub functions: Vec<FunctionDeclaration>,
 }

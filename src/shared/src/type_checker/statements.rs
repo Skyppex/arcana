@@ -466,8 +466,8 @@ pub fn check_type<'a>(
         }
         Statement::ImplementationDeclaration(ImplementationDeclaration {
             scoped_generics,
-            protocol_identifier,
-            type_identifier,
+            protocol_annotation,
+            type_annotation,
             associated_types,
             functions,
         }) => {
@@ -475,17 +475,42 @@ pub fn check_type<'a>(
                 TypeEnvironment::new_parent(type_environment.clone()),
             ));
 
+            // add generics to type environment
             for generic in scoped_generics {
                 implementation_type_environment
                     .borrow_mut()
                     .add_type(Type::Generic(generic.clone()))?;
             }
 
-            if let TypeIdentifier::GenericType(_, generics) = type_identifier {
+            // check generics in protocol_annotation
+            if let TypeAnnotation::ConcreteType(_, generics) = protocol_annotation {
                 for generic in generics {
-                    implementation_type_environment
-                        .borrow_mut()
-                        .add_type(Type::Generic(generic.clone()))?;
+                    let generic_type = check_type_annotation(
+                        generic,
+                        discovered_types,
+                        implementation_type_environment.clone(),
+                    )?;
+
+                    if !implementation_type_environment
+                        .borrow()
+                        .lookup_type(&generic_type)
+                    {}
+                }
+            }
+
+            // check generics in type_annotation
+            if let TypeAnnotation::ConcreteType(_, generics) = type_annotation {
+                for generic in generics {
+                    let generic_type = check_type_annotation(
+                        generic,
+                        discovered_types,
+                        implementation_type_environment.clone(),
+                    )?;
+
+                    if !implementation_type_environment
+                        .borrow()
+                        .lookup_type(&generic_type)
+                    {}
                 }
             }
 

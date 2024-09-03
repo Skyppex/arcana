@@ -732,20 +732,20 @@ fn parse_implementation_declaration(cursor: &mut Cursor) -> Result<Statement, St
         vec![]
     };
 
-    let protocol_identifier = parse_type_identifier(cursor, false)?;
+    let protocol_annotation = parse_type_annotation(cursor, false)?;
 
-    if !protocol_identifier.name().is_type_identifier_name() {
-        return Err(format!("Invalid type name: {}", protocol_identifier.name()));
+    if !protocol_annotation.name().is_type_identifier_name() {
+        return Err(format!("Invalid type name: {}", protocol_annotation.name()));
     }
 
     let TokenKind::Keyword(Keyword::For) = cursor.bump()?.kind else {
         return Err(format!("Expected for but found {:?}", cursor.first().kind));
     };
 
-    let type_identifier = parse_type_identifier(cursor, false)?;
+    let type_annotation = parse_type_annotation(cursor, false)?;
 
-    if !type_identifier.name().is_type_identifier_name() {
-        return Err(format!("Invalid protocol name: {}", type_identifier.name()));
+    if !type_annotation.name().is_type_identifier_name() {
+        return Err(format!("Invalid protocol name: {}", type_annotation.name()));
     }
 
     cursor.expect(TokenKind::OpenBrace)?;
@@ -814,8 +814,8 @@ fn parse_implementation_declaration(cursor: &mut Cursor) -> Result<Statement, St
     Ok(Statement::ImplementationDeclaration(
         ImplementationDeclaration {
             scoped_generics,
-            protocol_identifier,
-            type_identifier,
+            protocol_annotation,
+            type_annotation,
             associated_types,
             functions,
         },
