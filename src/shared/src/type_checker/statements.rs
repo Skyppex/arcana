@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use crate::{
     parser::{
@@ -457,18 +457,34 @@ pub fn check_type<'a>(
                 })
                 .collect();
 
+            let functions = functions?;
+            let function_identifiers = functions
+                .iter()
+                .map(|f| match f {
+                    TypedStatement::FunctionDeclaration { identifier, .. } => identifier.clone(),
+                    _ => unreachable!("Expected function declaration, found {}", f),
+                })
+                .collect();
+
+            let type_ = Type::Protocol(Protocol {
+                type_identifier: type_identifier.clone(),
+                functions: function_identifiers,
+            });
+
+            type_environment.borrow_mut().add_type(type_.clone())?;
+
             Ok(TypedStatement::ProtocolDeclaration {
                 type_identifier: type_identifier.clone(),
                 associated_types: associated_types.clone(),
-                functions: functions?,
-                type_: Type::Void,
+                functions,
+                type_,
             })
         }
         Statement::ImplementationDeclaration(ImplementationDeclaration {
             scoped_generics,
             protocol_annotation,
             type_annotation,
-            associated_types,
+            associated_types: _,
             functions,
         }) => {
             let implementation_type_environment = Rc::new(RefCell::new(
@@ -514,7 +530,56 @@ pub fn check_type<'a>(
                 }
             }
 
-            todo!()
+            let protocol_type = implementation_type_environment
+                .borrow()
+                .get_type_from_annotation(protocol_annotation)?;
+
+            let Type::Protocol(Protocol {
+                functions: protocol_functions,
+                ..
+            }) = protocol_type
+            else {
+                return Err(format!("Expected protocol, found {}", protocol_type));
+            };
+
+            let mut typed_functions = vec![];
+
+            for protocol_function in protocol_functions {
+                let function = functions
+                    .into_iter()
+                    .find(|f| f.type_identifier == protocol_function);
+
+                let Some(function) = function else {
+                    return Err(format!(
+                        "Protocol function '{}' not implemented",
+                        protocol_function
+                    ));
+                };
+
+                if function.body.is_none() {
+                    return Err(format!(
+                        "Protocol function '{}' must have a body",
+                        protocol_function
+                    ));
+                };
+
+                let typed_function = check_type(
+                    &Statement::FunctionDeclaration(function.clone()),
+                    discovered_types,
+                    implementation_type_environment.clone(),
+                )?;
+
+                typed_functions.push(typed_function);
+            }
+
+            Ok(TypedStatement::ImplementationDeclaration {
+                scoped_generics: scoped_generics.clone(),
+                protocol_annotation: protocol_annotation.clone(),
+                type_annotation: type_annotation.clone(),
+                associated_types: vec![],
+                functions: typed_functions,
+                type_: Type::Void,
+            })
         }
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
             access_modifier: _,
@@ -583,8 +648,12 @@ pub fn check_type<'a>(
                 None => None,
             };
 
-            let body_typed_expression: TypedExpression =
-                expressions::check_type(body, discovered_types, body_environment.clone(), None)?;
+            let body_typed_expression: Option<TypedExpression> = body
+                .as_ref()
+                .map(|body| {
+                    expressions::check_type(body, discovered_types, body_environment.clone(), None)
+                })
+                .transpose()?;
 
             if *signature_only {
                 let type_ = Type::Function(Function {
@@ -610,6 +679,26 @@ pub fn check_type<'a>(
 
             let return_scope = body_environment.borrow().get_scope(&ScopeType::Return);
 
+            let type_ = Type::Function(Function {
+                identifier: Some(type_identifier.clone()),
+                param: param.clone(),
+                return_type: Box::new(return_type.clone()),
+            });
+
+            let Some(body_typed_expression) = body_typed_expression else {
+                return Ok(TypedStatement::FunctionDeclaration {
+                    identifier: type_identifier.clone(),
+                    param: param.map(|p| TypedParameter {
+                        identifier: p.identifier,
+                        type_annotation: p.type_.type_annotation(),
+                        type_: p.type_,
+                    }),
+                    return_type,
+                    body: None,
+                    type_,
+                });
+            };
+
             let body_type = return_scope
                 .map(|s| s.fold())
                 .unwrap_or_else(|| Ok(body_typed_expression.get_deep_type()))?;
@@ -621,12 +710,6 @@ pub fn check_type<'a>(
                 ));
             }
 
-            let type_ = Type::Function(Function {
-                identifier: Some(type_identifier.clone()),
-                param: param.clone(),
-                return_type: Box::new(return_type.clone()),
-            });
-
             type_environment.borrow_mut().add_type(type_.clone())?;
 
             Ok(TypedStatement::FunctionDeclaration {
@@ -637,7 +720,7 @@ pub fn check_type<'a>(
                     type_: p.type_,
                 }),
                 return_type,
-                body: body_typed_expression,
+                body: Some(body_typed_expression),
                 type_,
             })
         }

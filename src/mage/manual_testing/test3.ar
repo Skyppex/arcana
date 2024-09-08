@@ -8,6 +8,20 @@ fun map(x: [int], mapper: fun(int): int): [int] => {
   result
 }
 
+fun filter(x: [int], filter: fun(int): bool): [int] => {
+  let mut result: [int] = [];
+
+  for i in x => {
+    if filter(i) => {
+      result += i;
+    }
+  }
+
+  result
+}
+
 let nums = [1, 2, 3, 4, 5];
 
-let doubled = nums:map(|x| x*2)
+let doubled = nums
+  :filter(|x| x % 2 == 0)
+  :map(|x| x * 2)

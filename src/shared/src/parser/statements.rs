@@ -279,7 +279,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
             type_identifier,
             param: None,
             return_type_annotation,
-            body: Expression::Block(vec![]),
+            body: None,
             signature_only: true,
         }));
     }
@@ -313,7 +313,7 @@ fn unwrap_parameters(
             type_identifier,
             param: None,
             return_type_annotation,
-            body,
+            body: Some(body),
             signature_only: false,
         })),
         Some(first) => {
@@ -328,7 +328,7 @@ fn unwrap_parameters(
                 type_identifier,
                 param: Some(first),
                 return_type_annotation: new_return_type_annotation,
-                body: new_body,
+                body: Some(new_body),
                 signature_only: false,
             }))
         }
@@ -882,11 +882,11 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
         ));
     }
 
-    let type_anntation = parse_type_annotation(cursor, false)?;
+    let type_annotation = parse_type_annotation(cursor, false)?;
 
     Ok(Parameter {
         identifier,
-        type_annotation: type_anntation,
+        type_annotation,
     })
 }
 

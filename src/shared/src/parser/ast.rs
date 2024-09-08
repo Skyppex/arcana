@@ -167,7 +167,7 @@ pub struct FunctionDeclaration {
     pub type_identifier: TypeIdentifier,
     pub param: Option<Parameter>,
     pub return_type_annotation: Option<TypeAnnotation>,
-    pub body: Expression,
+    pub body: Option<Expression>,
     pub signature_only: bool,
 }
 

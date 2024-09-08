@@ -413,6 +413,7 @@ impl Type {
             ),
             Type::Union(u) => u.type_identifier.clone(),
             Type::TypeAlias(u) => u.type_identifier.clone(),
+            Type::Protocol(u) => u.type_identifier.clone(),
             Type::Function(f) => f
                 .identifier
                 .clone()

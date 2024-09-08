@@ -1,6 +1,13 @@
-enum S {
-    first_name: string,
-    last_name: string,
-    A,
-    B { value: int },
+proto P {
+    fun do();
+}
+
+struct S {
+    f: fun()
+}
+
+imp P for S {
+    fun do() => {
+        f();
+    }
 }

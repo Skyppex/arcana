@@ -1881,6 +1881,77 @@ impl IndentDisplay for TypedStatement {
                 indent.decrease();
                 result
             }
+            TypedStatement::ImplementationDeclaration {
+                scoped_generics,
+                protocol_annotation,
+                type_annotation,
+                associated_types,
+                functions,
+                type_,
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<implementation declaration> {}\n", type_).as_str());
+                indent.increase();
+
+                result.push_str(
+                    format!(
+                        "{}scoped_generics: {}\n",
+                        indent.dash(),
+                        indent_display_vec(
+                            scoped_generics,
+                            "scoped_generics",
+                            "scoped_generic",
+                            indent
+                        )
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "{}protocol_annotation: {}\n",
+                        indent.dash(),
+                        protocol_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "{}type_annotation: {}\n",
+                        indent.dash(),
+                        type_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "{}associated_types: {}\n",
+                        indent.dash(),
+                        indent_display_vec(
+                            associated_types,
+                            "associated_types",
+                            "associated_type",
+                            indent
+                        )
+                    )
+                    .as_str(),
+                );
+
+                indent.end_current();
+                result.push_str(
+                    format!(
+                        "{}functions: {}",
+                        indent.dash_end(),
+                        indent_display_vec(functions, "functions", "function", indent)
+                    )
+                    .as_str(),
+                );
+
+                indent.decrease();
+                result
+            }
             TypedStatement::TypeAliasDeclaration {
                 type_identifier,
                 type_annotations,

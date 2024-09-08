@@ -37,6 +37,7 @@ pub fn evaluate<'a>(
         TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
         TypedStatement::TypeAliasDeclaration { .. } => Ok(Value::Void),
         TypedStatement::ProtocolDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::ImplementationDeclaration { .. } => Ok(Value::Void),
         TypedStatement::FunctionDeclaration {
             identifier,
             param,
@@ -55,8 +56,12 @@ fn evaluate_function_declaration(
     environment: Rc<RefCell<Environment>>,
     identifier: TypeIdentifier,
     param: Option<TypedParameter>,
-    body: TypedExpression,
+    body: Option<TypedExpression>,
 ) -> Result<Value, String> {
+    let Some(body) = body else {
+        return Err(format!("Function '{}' must have a body", identifier));
+    };
+
     let function_environment = Rc::new(RefCell::new(environment.deref().clone().borrow().clone()));
 
     let function = Value::Function {
