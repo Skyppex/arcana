@@ -21,3 +21,7 @@ A single package or library
 ## Grimoire
 
 Documentation page
+
+## Runesmith
+
+Language Server Protocol
