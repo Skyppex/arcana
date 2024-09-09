@@ -1,13 +1,12 @@
-proto P {
-    fun do();
+enum E {
+    A { value: bool, },
+    B { value: int, },
 }
 
-struct S {
-    f: fun()
+fun get_value(a: E::A): bool => {
+    a.value
 }
 
-imp P for S {
-    fun do() => {
-        f();
-    }
-}
+let a: E::A { value: true };
+
+get_value(a)

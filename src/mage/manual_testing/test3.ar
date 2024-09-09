@@ -1,27 +1,21 @@
-fun map(x: [int], mapper: fun(int): int): [int] => {
-  let mut result: [int] = [];
-
-  for i in x => {
-    result += mapper(i);
-  }
-
-  result
+proto P {
+    fun f(): string;
+    fun m(self: Self): string;
 }
 
-fun filter(x: [int], filter: fun(int): bool): [int] => {
-  let mut result: [int] = [];
+struct S;
 
-  for i in x => {
-    if filter(i) => {
-      result += i;
+imp P for S {
+    fun f(): string => {
+        "Hello, world!"
     }
-  }
 
-  result
+    fun m(self: Self): string => {
+        "Hello, world!"
+    }
 }
 
-let nums = [1, 2, 3, 4, 5];
+print(S::f());
+// let s = S {};
 
-let doubled = nums
-  :filter(|x| x % 2 == 0)
-  :map(|x| x * 2)
+// print(s:m());

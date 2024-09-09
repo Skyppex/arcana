@@ -46,17 +46,37 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             type_identifier,
             shared_fields,
             members,
-        }) => Ok(vec![DiscoveredType::Enum(
-            type_identifier.clone(),
-            shared_fields
-                .iter()
-                .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
-                .collect(),
-            members
-                .iter()
+        }) => {
+            let enum_ = DiscoveredType::Enum(
+                type_identifier.clone(),
+                shared_fields
+                    .iter()
+                    .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
+                    .collect(),
+                members
+                    .iter()
+                    .map(|member| {
+                        (
+                            member.identifier.clone(),
+                            member
+                                .fields
+                                .iter()
+                                .map(|field| {
+                                    (field.identifier.clone(), field.type_annotation.clone())
+                                })
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            );
+
+            let enum_members: Vec<DiscoveredType> = members
+                .into_iter()
                 .map(|member| {
-                    (
-                        member.identifier.clone(),
+                    DiscoveredType::EnumMember(
+                        TypeIdentifier::Type(
+                            vec![type_identifier.name(), &member.identifier].join("::"),
+                        ),
                         member
                             .fields
                             .iter()
@@ -64,8 +84,10 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                             .collect(),
                     )
                 })
-                .collect(),
-        )]),
+                .collect();
+
+            Ok(enum_members.into_iter().chain(Some(enum_)).collect())
+        }
         Statement::UnionDeclaration(parser::UnionDeclaration {
             access_modifier: _,
             type_identifier,
@@ -445,6 +467,13 @@ pub fn check_type<'a>(
                 type_environment.clone(),
             )));
 
+            protocol_type_environment
+                .borrow_mut()
+                .add_type(Type::TypeAlias(TypeAlias {
+                    type_identifier: TypeIdentifier::Type("Self".to_owned()),
+                    types: vec![Type::Unknown],
+                }));
+
             let functions: Result<Vec<TypedStatement>, String> = functions
                 .clone()
                 .into_iter()
@@ -529,6 +558,17 @@ pub fn check_type<'a>(
                     {}
                 }
             }
+
+            let imp_type = implementation_type_environment
+                .borrow()
+                .get_type_from_annotation(type_annotation)?;
+
+            implementation_type_environment
+                .borrow_mut()
+                .add_type(Type::TypeAlias(TypeAlias {
+                    type_identifier: TypeIdentifier::Type("Self".to_owned()),
+                    types: vec![imp_type],
+                }));
 
             let protocol_type = implementation_type_environment
                 .borrow()
@@ -756,6 +796,7 @@ fn check_type_identifier(
         .find(|discovered_type| match discovered_type {
             DiscoveredType::Struct(name, ..) => name == type_identifier,
             DiscoveredType::Enum(name, ..) => name == type_identifier,
+            DiscoveredType::EnumMember(name, ..) => name == type_identifier,
             DiscoveredType::Union(name, ..) => name == type_identifier,
             DiscoveredType::TypeAlias(name, ..) => name == type_identifier,
             DiscoveredType::Protocol {
@@ -840,6 +881,29 @@ fn check_type_identifier(
                 },
             }))
         }
+        Some(DiscoveredType::EnumMember(type_identifier, fields)) => {
+            let Some((enum_name, member_name)) = type_identifier.name().split_once("::") else {
+                return Err(format!(
+                    "Invalid enum member type identifier {}",
+                    type_identifier
+                ));
+            };
+
+            let mut field_types = HashMap::new();
+
+            for field in fields {
+                field_types.insert(
+                    field.0.clone(),
+                    check_type_annotation(field.1, discovered_types, type_environment.clone())?,
+                );
+            }
+
+            Ok(Type::EnumMember(EnumMember {
+                enum_name: TypeIdentifier::Type(enum_name.to_owned()),
+                discriminant_name: member_name.to_owned(),
+                fields: field_types,
+            }))
+        }
         Some(DiscoveredType::Union(type_identifier, literals)) => {
             let literal_types = literals
                 .iter()
@@ -910,7 +974,7 @@ fn check_type_identifier(
                 None => None,
             };
 
-            return Ok(Type::Function(Function {
+            Ok(Type::Function(Function {
                 identifier: Some(type_identifier.clone()),
                 param,
                 return_type: Box::new(check_type_annotation(
@@ -918,7 +982,7 @@ fn check_type_identifier(
                     discovered_types,
                     type_environment,
                 )?),
-            }));
+            }))
         }
         None => Type::from_string(&type_identifier.to_string())
             .ok_or(format!("Unknown type {}", type_identifier)),
@@ -944,6 +1008,9 @@ pub fn check_type_annotation(
                 type_identifier.name() == type_annotation.name()
             }
             DiscoveredType::Enum(type_identifier, ..) => {
+                type_identifier.name() == type_annotation.name()
+            }
+            DiscoveredType::EnumMember(type_identifier, ..) => {
                 type_identifier.name() == type_annotation.name()
             }
             DiscoveredType::Union(type_identifier, ..) => {
@@ -1030,6 +1097,29 @@ pub fn check_type_annotation(
                         })
                         .collect()
                 },
+            }))
+        }
+        Some(DiscoveredType::EnumMember(type_identifier, fields)) => {
+            let Some((enum_name, member_name)) = type_identifier.name().split_once("::") else {
+                return Err(format!(
+                    "Invalid enum member type identifier {}",
+                    type_identifier
+                ));
+            };
+
+            let mut field_types = HashMap::new();
+
+            for field in fields {
+                field_types.insert(
+                    field.0.clone(),
+                    check_type_annotation(field.1, discovered_types, type_environment.clone())?,
+                );
+            }
+
+            Ok(Type::EnumMember(EnumMember {
+                enum_name: TypeIdentifier::Type(enum_name.to_owned()),
+                discriminant_name: member_name.to_owned(),
+                fields: field_types,
             }))
         }
         Some(DiscoveredType::Union(type_identifier, literals)) => {

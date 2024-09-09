@@ -302,9 +302,14 @@ fn parse_struct_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
 ) -> Result<Expression, String> {
-    if cursor.bump()?.kind != TokenKind::OpenBrace {
-        return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
+    if cursor.first().kind != TokenKind::OpenBrace {
+        return Ok(Expression::Literal(Literal::Struct {
+            type_annotation,
+            field_initializers: vec![],
+        }));
     }
+
+    cursor.bump()?; // Consume the {
 
     let mut field_initializers = vec![];
     let mut has_comma = true;
@@ -325,6 +330,7 @@ fn parse_struct_literal(
     }
 
     cursor.bump()?; // Consume the }
+
     Ok(Expression::Literal(Literal::Struct {
         type_annotation,
         field_initializers,

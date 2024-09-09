@@ -15,6 +15,7 @@ pub enum DiscoveredType {
         HashMap<String, TypeAnnotation>,
         HashMap<String, HashMap<String, TypeAnnotation>>,
     ),
+    EnumMember(TypeIdentifier, HashMap<String, TypeAnnotation>),
     Union(TypeIdentifier, Vec<TypeAnnotation>),
     TypeAlias(TypeIdentifier, Vec<TypeAnnotation>),
     Protocol {
