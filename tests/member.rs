@@ -14,7 +14,7 @@ use crate::common::create_env;
 fn identifier_is_identifier() {
     // Arrange
     let input = r#"
-        let a: int = 1;
+        let a: Int = 1;
         a
     "#;
 
@@ -37,7 +37,7 @@ fn identifier_is_identifier() {
 fn member_access_is_member_access() {
     // Arrange
     let input = r#"
-        struct A { a: int }
+        struct A { a: Int }
         let a: A = A { a: 1 };
         a.a
     "#;
@@ -61,7 +61,7 @@ fn member_access_is_member_access() {
 fn identifier_has_correct_type() {
     // Arrange
     let input = r#"
-        let a: int = 1;
+        let a: Int = 1;
         a
     "#;
 
@@ -81,7 +81,7 @@ fn identifier_has_correct_type() {
 fn member_access_has_correct_type() {
     // Arrange
     let input = r#"
-        struct A { a: int }
+        struct A { a: Int }
         let a: A = A { a: 1 };
         a.a
     "#;
@@ -102,7 +102,7 @@ fn member_access_has_correct_type() {
 fn identifier_returns_correct_value() {
     // Arrange
     let input = r#"
-        let a: int = 1;
+        let a: Int = 1;
         a
     "#;
 
@@ -117,7 +117,7 @@ fn identifier_returns_correct_value() {
 fn member_access_returns_correct_value() {
     // Arrange
     let input = r#"
-        struct A { a: int }
+        struct A { a: Int }
         let a: A = A { a: 1 };
         a.a
     "#;

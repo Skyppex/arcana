@@ -226,14 +226,6 @@ pub trait IdentifierType {
 
 impl IdentifierType for str {
     fn is_type_identifier_name(&self) -> bool {
-        let builtins = vec![
-            "void", "unit", "bool", "int", "uint", "float", "char", "string",
-        ];
-
-        if builtins.contains(&self) {
-            return true;
-        }
-
         let regex = regex::Regex::new(r"[A-Z]\w*");
 
         match regex {

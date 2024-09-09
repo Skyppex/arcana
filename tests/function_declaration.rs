@@ -51,7 +51,7 @@ pub fn function_declaration_has_correct_type() {
 #[test]
 pub fn function_declaration_has_correct_type_with_param_and_return() {
     // Arrange
-    let input = "fun foo(x: int): int => x";
+    let input = "fun foo(x: Int): Int => x";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -75,7 +75,7 @@ pub fn function_declaration_has_correct_type_with_param_and_return() {
 #[test]
 pub fn function_declaration_with_two_params_has_correct_type() {
     // Arrange
-    let input = "fun foo(x: int, y: int): int => x";
+    let input = "fun foo(x: Int, y: Int): Int => x";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -94,7 +94,7 @@ pub fn function_declaration_with_two_params_has_correct_type() {
             return_type: Box::new(Type::Function(Function {
                 identifier: None,
                 param: Some(Parameter {
-                    identifier: "int".to_string(),
+                    identifier: "Int".to_string(),
                     type_: Box::new(Type::Int),
                 }),
                 return_type: Box::new(Type::Int),
@@ -107,7 +107,7 @@ pub fn function_declaration_with_two_params_has_correct_type() {
 #[test]
 pub fn function_declaration_with_multiple_params_has_correct_type() {
     // Arrange
-    let input = "fun foo(x: int, y: int, z: int): int => x + y + z";
+    let input = "fun foo(x: Int, y: Int, z: Int): Int => x + y + z";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -126,13 +126,13 @@ pub fn function_declaration_with_multiple_params_has_correct_type() {
             return_type: Box::new(Type::Function(Function {
                 identifier: None,
                 param: Some(Parameter {
-                    identifier: "int".to_string(),
+                    identifier: "Int".to_string(),
                     type_: Box::new(Type::Int),
                 }),
                 return_type: Box::new(Type::Function(Function {
                     identifier: None,
                     param: Some(Parameter {
-                        identifier: "int".to_string(),
+                        identifier: "Int".to_string(),
                         type_: Box::new(Type::Int),
                     }),
                     return_type: Box::new(Type::Int),

@@ -1,12 +1,12 @@
 enum E {
-    A { value: bool, },
-    B { value: int, },
+    A { value: Bool, },
+    B { value: Int, },
 }
 
-fun get_value(a: E::A): bool => {
+fun get_value(a: E::A): Bool => {
     a.value
 }
 
-let a: E::A { value: true };
+let a = E::A { value: false };
 
 get_value(a)

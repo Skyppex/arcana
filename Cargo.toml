@@ -7,6 +7,10 @@ edition = "2021"
 name = "mage"
 path = "src/mage/src/main.rs"
 
+[[bin]]
+name = "runesmith"
+path = "src/runesmith/src/main.rs"
+
 [workspace]
 members = [
     "src/shared",

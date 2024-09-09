@@ -20,7 +20,7 @@ impl TypeAnnotation {
         TypeAnnotation::Type("void".to_string())
     }
 
-    pub fn is_enum_member(&self) -> bool {
+    pub fn has_double_colon(&self) -> bool {
         if let TypeAnnotation::Type(s) = self {
             return s.contains("::");
         }
@@ -56,14 +56,14 @@ impl From<Type> for TypeAnnotation {
         match t {
             Type::Unknown => panic!("Cannot convert unknown type to type annotation"),
             Type::Generic(g) => TypeAnnotation::Type(g.type_name),
-            Type::Void => TypeAnnotation::Type("void".to_string()),
-            Type::Unit => TypeAnnotation::Type("unit".to_string()),
-            Type::Int => TypeAnnotation::Type("int".to_string()),
-            Type::UInt => TypeAnnotation::Type("uint".to_string()),
-            Type::Float => TypeAnnotation::Type("float".to_string()),
-            Type::String => TypeAnnotation::Type("string".to_string()),
-            Type::Char => TypeAnnotation::Type("char".to_string()),
-            Type::Bool => TypeAnnotation::Type("bool".to_string()),
+            Type::Void => TypeAnnotation::Type("Void".to_string()),
+            Type::Unit => TypeAnnotation::Type("Unit".to_string()),
+            Type::Int => TypeAnnotation::Type("Int".to_string()),
+            Type::UInt => TypeAnnotation::Type("UInt".to_string()),
+            Type::Float => TypeAnnotation::Type("Float".to_string()),
+            Type::String => TypeAnnotation::Type("String".to_string()),
+            Type::Char => TypeAnnotation::Type("Char".to_string()),
+            Type::Bool => TypeAnnotation::Type("Bool".to_string()),
             Type::Array(t) => TypeAnnotation::Array(Box::new(t.deref().clone().into())),
             Type::Function(Function {
                 param, return_type, ..

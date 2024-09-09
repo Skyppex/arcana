@@ -7,11 +7,11 @@
 // This is a struct
 struct Struct {
     // This is a field
-    field: string,
+    field: String,
     // This is also a field
-    field_2: int,
+    field_2: Int,
     // This is also a field
-    field_3: float,
+    field_3: Float,
     // This comment should be allowed
 }
 
@@ -25,12 +25,12 @@ enum Enum {
     // This is an enum variant with a field
     A {
         // This is a field
-        field: string,
-        field_2: int,
+        field: String,
+        field_2: Int,
         // This comment should be allowed
     },
     // This is an enum variant with multiple fields of different types
-    B { field_1: string, field_2: int },
+    B { field_1: String, field_2: Int },
     // This is an enum variant without fields
     C,
     // This comment should be allowed
@@ -52,10 +52,10 @@ union HeaderLevel {
     // This comment should be allowed
 }
 
-type Number = int | uint | float | unit;
+type Number = Int or UInt or Float or Unit;
 
 // This is a function declaration
-fun to_string(x: HeaderLevel): string => {
+fun to_string(x: HeaderLevel): String => {
     // This is an if expression
     if x == 1 => {
         // This is a return statement
@@ -75,7 +75,7 @@ fun to_string(x: HeaderLevel): string => {
 
 // Here's another function declaration
 // It has a closure as its last parameter
-fun header(level: HeaderLevel, header: string, append: fun(): string): string => {
+fun header(level: HeaderLevel, header: String, append: fun(): String): String => {
     // This is a variable declaration with an initializer
     let mut text = "\n";
 
@@ -94,7 +94,7 @@ fun header(level: HeaderLevel, header: string, append: fun(): string): string =>
     text += append()
 }
 
-fun text(append: fun(): string): string => "\n" + append()
+fun text(append: fun(): String): String => "\n" + append()
 
 header(4, "Title") -> {
     text -> { "This is a bit of text" }
@@ -115,7 +115,7 @@ for i in let x = 0..20 => {
     x
 }
 
-let x = |x: int, y: int|: int => x + y
+let x = |x: Int, y: Int|: Int => x + y
 
 // This is a for loop where the blocks are removed
 let range = 0..20
@@ -169,6 +169,6 @@ for x in [1, 2, 3,] => {
     print(x)
 }
 
-A::<int> { value: 5 }
+A::<Int> { value: 5 }
 
-Option::<string>::Some { value: "Hello" }
+Option::<String>::Some { value: "Hello" }

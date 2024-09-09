@@ -72,8 +72,8 @@ fn call_has_return_type() {
 fn call_adds_variables_to_called_function() {
     // Arrange
     let input = r#"
-        fun a(x: int): int => x
-        let y: int = 5;
+        fun a(x: Int): Int => x
+        let y: Int = 5;
         a(y)
     "#;
 
@@ -89,8 +89,8 @@ fn call_adds_variables_to_called_function() {
 fn call_doesnt_use_external_environment_inside_function_which_is_called() {
     // Arrange
     let input = r#"
-        fun a(x: int): int => x
-        let x: int = 5;
+        fun a(x: Int): Int => x
+        let x: Int = 5;
         a()
     "#;
 
@@ -102,8 +102,8 @@ fn call_doesnt_use_external_environment_inside_function_which_is_called() {
 fn call_takes_caller_variable_as_first_argument_using_function_propagation() {
     // Arrange
     let input = r#"
-        fun a(x: int): int => x
-        let y: int = 5;
+        fun a(x: Int): Int => x
+        let y: Int = 5;
         y:a()
     "#;
 
@@ -118,8 +118,8 @@ fn call_takes_caller_variable_as_first_argument_using_function_propagation() {
 fn function_propagation_works_with_multiple_arguments() {
     // Arrange
     let input = r#"
-        fun a(x: int, y: int): int => x + y
-        let y: int = 5;
+        fun a(x: Int, y: Int): Int => x + y
+        let y: Int = 5;
         y:a(3)
     "#;
 
@@ -134,8 +134,8 @@ fn function_propagation_works_with_multiple_arguments() {
 fn function_propagation_can_be_chained() {
     // Arrange
     let input = r#"
-        fun a(x: int): int => x
-        let y: int = 5;
+        fun a(x: Int): Int => x
+        let y: Int = 5;
         y:a():a()
     "#;
 
@@ -150,8 +150,8 @@ fn function_propagation_can_be_chained() {
 fn function_propagation_can_be_chained_using_function_with_multiple_arguments() {
     // Arrange
     let input = r#"
-        fun a(x: int, y: int): int => x + y
-        let y: int = 5;
+        fun a(x: Int, y: Int): Int => x + y
+        let y: Int = 5;
         y:a(3):a(2)
     "#;
 
@@ -166,8 +166,8 @@ fn function_propagation_can_be_chained_using_function_with_multiple_arguments() 
 fn function_propagation_has_correct_type_using_function_with_multiple_arguments() {
     // Arrange
     let input = r#"
-        fun a(x: int, y: int): int => x + y
-        let y: int = 5;
+        fun a(x: Int, y: Int): Int => x + y
+        let y: Int = 5;
         y:a(3)
     "#;
 
@@ -187,7 +187,7 @@ fn function_propagation_has_correct_type_using_function_with_multiple_arguments(
 fn call_takes_caller_expression_as_first_argument() {
     // Arrange
     let input = r#"
-        fun a(x: int): int => x
+        fun a(x: Int): Int => x
         8:a()
     "#;
 
@@ -202,8 +202,8 @@ fn call_takes_caller_expression_as_first_argument() {
 fn trailing_closure_call() {
     // Arrange
     let input = r#"
-        fun a(op: fun(): int): int => op()
-        a -> :int 8
+        fun a(op: fun(): Int): Int => op()
+        a -> :Int 8
     "#;
 
     // Act
@@ -217,7 +217,7 @@ fn trailing_closure_call() {
 fn trailing_closure_call_return_type_is_inferred() {
     // Arrange
     let input = r#"
-        fun a(op: fun(): int): int => op()
+        fun a(op: fun(): Int): Int => op()
         a -> 5
     "#;
 
@@ -232,7 +232,7 @@ fn trailing_closure_call_return_type_is_inferred() {
 fn call_with_multiple_params_expects_args_in_correct_order() {
     // Arrange
     let input = r#"
-        fun a(x: string, y: int, z: float): int => 1
+        fun a(x: String, y: Int, z: Float): Int => 1
         a("String", 5, 0.5)
     "#;
 

@@ -289,9 +289,15 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_range(cursor);
     };
 
+    if let TokenKind::Identifier(name) = cursor.third().kind {
+        if cursor.second().kind == TokenKind::DoubleColon && name.is_function_identifier_name() {
+            return parse_member_access(cursor);
+        }
+    }
+
     let type_annotation = parse_type_annotation(cursor, false)?;
 
-    if type_annotation.is_enum_member() {
+    if type_annotation.has_double_colon() {
         parse_enum_literal(cursor, type_annotation)
     } else {
         parse_struct_literal(cursor, type_annotation)

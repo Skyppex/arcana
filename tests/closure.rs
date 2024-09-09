@@ -52,7 +52,7 @@ fn closure_has_correct_type() {
 #[test]
 fn closure_has_correct_type_with_param_and_return() {
     // Arrange
-    let input = "|x: int|: int x";
+    let input = "|x: Int|: Int x";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -77,9 +77,9 @@ fn closure_has_correct_type_with_param_and_return() {
 }
 
 #[test]
-fn closure_evalutes_correctly() {
+fn closure_evaluates_correctly() {
     // Arrange
-    let input = "(|x: int|: int x)(1)";
+    let input = "(|x: Int|: Int x)(1)";
 
     // Act
     let value = evaluate_expression(input, create_env(), false);
@@ -92,8 +92,8 @@ fn closure_evalutes_correctly() {
 fn closure_captures_environment() {
     // Arrange
     let input = r#"
-        let x: int = 1;
-        (||: int x)()
+        let x: Int = 1;
+        (||: Int x)()
     "#;
 
     // Act
@@ -107,8 +107,8 @@ fn closure_captures_environment() {
 fn closure_captures_function_environment() {
     // Arrange
     let input = r#"
-        fun add(x: int): fun(int): int => {
-            |y: int|: int x + y
+        fun add(x: Int): fun(Int): Int => {
+            |y: Int|: Int x + y
         }
 
         add(1)(2)
@@ -122,10 +122,10 @@ fn closure_captures_function_environment() {
 }
 
 #[test]
-fn closure_with_multiple_params_evalutes_correctly() {
+fn closure_with_multiple_params_evaluates_correctly() {
     // Arrange
     let input = r#"
-        (|x: int, y: int, z: int|: int x + y + z)(1, 2, 3)
+        (|x: Int, y: Int, z: Int|: Int x + y + z)(1, 2, 3)
     "#;
 
     // Act
@@ -139,7 +139,7 @@ fn closure_with_multiple_params_evalutes_correctly() {
 fn closure_return_type_is_inferred() {
     // Arrange
     let input = r#"
-        fun a(op: fun(): int): int => op()
+        fun a(op: fun(): Int): Int => op()
         a(|| 5)
     "#;
 
@@ -154,7 +154,7 @@ fn closure_return_type_is_inferred() {
 fn closure_param_type_is_inferred() {
     // Arrange
     let input = r#"
-        fun a(op: fun(int): int): int => op(8)
+        fun a(op: fun(Int): Int): Int => op(8)
         a(|x| x)
     "#;
 
@@ -169,7 +169,7 @@ fn closure_param_type_is_inferred() {
 fn closure_voids_body_if_return_type_is_void() {
     // Arrange
     let input = r#"
-        fun a(op: fun(int)) => op(0)
+        fun a(op: fun(Int)) => op(0)
         a(|x| x)
     "#;
 
@@ -181,11 +181,11 @@ fn closure_voids_body_if_return_type_is_void() {
 }
 
 #[test]
-fn trailing_closres_can_be_chained() {
+fn trailing_closures_can_be_chained() {
     // Arrange
     // lang=arcana
     let input = r#"
-        fun add(left: fun(): int, right: fun(): int): int => left() + right()
+        fun add(left: fun(): Int, right: fun(): Int): Int => left() + right()
         add -> 1 -> 2
     "#;
 

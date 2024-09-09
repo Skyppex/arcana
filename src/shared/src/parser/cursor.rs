@@ -51,31 +51,51 @@ impl Cursor {
     pub(crate) fn second(&self) -> Token {
         let mut clone = self.tokens.clone();
 
-        loop {
-            let current = clone.pop().unwrap_or(END_OF_FILE_TOKEN);
+        for i in 0..2 {
+            loop {
+                let current = clone.pop().unwrap_or(END_OF_FILE_TOKEN);
 
-            if matches!(
-                current.kind,
-                TokenKind::WhiteSpace | TokenKind::LineComment | TokenKind::BlockComment
-            ) {
-                continue;
+                if matches!(
+                    current.kind,
+                    TokenKind::WhiteSpace | TokenKind::LineComment | TokenKind::BlockComment
+                ) {
+                    continue;
+                }
+
+                if i == 1 {
+                    return current;
+                }
+
+                break;
             }
-
-            break;
         }
 
-        loop {
-            let current = clone.pop().unwrap_or(END_OF_FILE_TOKEN);
+        unreachable!()
+    }
 
-            if matches!(
-                current.kind,
-                TokenKind::WhiteSpace | TokenKind::LineComment | TokenKind::BlockComment
-            ) {
-                continue;
+    pub(crate) fn third(&self) -> Token {
+        let mut clone = self.tokens.clone();
+
+        for i in 0..3 {
+            loop {
+                let current = clone.pop().unwrap_or(END_OF_FILE_TOKEN);
+
+                if matches!(
+                    current.kind,
+                    TokenKind::WhiteSpace | TokenKind::LineComment | TokenKind::BlockComment
+                ) {
+                    continue;
+                }
+
+                if i == 2 {
+                    return current;
+                }
+
+                break;
             }
-
-            return current;
         }
+
+        unreachable!()
     }
 
     pub(crate) fn is_end_of_file(&self) -> bool {

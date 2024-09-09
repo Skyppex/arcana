@@ -15,7 +15,7 @@ fn enum_variant_can_be_used_as_a_type() {
     // Arrange
     let input = r#"
         enum O {
-            S { x: int },
+            S { x: Int },
             N
         }
 
@@ -48,7 +48,7 @@ fn enum_variant_can_be_assigned_to_variable_with_variant_type() {
     // Arrange
     let input = r#"
         enum O {
-            S(x: int),
+            S(x: Int),
             N
         }
 

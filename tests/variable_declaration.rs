@@ -11,7 +11,7 @@ use shared::type_checker::{
 #[test]
 fn variable_declaration_is_immutable() {
     // Arrange
-    let input = "let x: bool;";
+    let input = "let x: Bool;";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -37,7 +37,7 @@ fn variable_declaration_is_immutable() {
 #[test]
 fn variable_declaration_is_mutable() {
     // Arrange
-    let input = "let mut x: bool;";
+    let input = "let mut x: Bool;";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -63,7 +63,7 @@ fn variable_declaration_is_mutable() {
 #[test]
 fn variable_declaration_has_correct_identifier() {
     // Arrange
-    let input = "let x: bool;";
+    let input = "let x: Bool;";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -89,7 +89,7 @@ fn variable_declaration_has_correct_identifier() {
 #[test]
 fn variable_declaration_has_correct_type() {
     // Arrange
-    let input = "let x: bool;";
+    let input = "let x: Bool;";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -107,7 +107,7 @@ fn variable_declaration_has_correct_type() {
 #[test]
 fn variable_declaration_has_no_initializer() {
     // Arrange
-    let input = "let x: bool;";
+    let input = "let x: Bool;";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -133,7 +133,7 @@ fn variable_declaration_has_no_initializer() {
 #[test]
 fn variable_declaration_has_value() {
     // Arrange
-    let input = "let x: bool = true;";
+    let input = "let x: Bool = true;";
 
     // Act
     let typed_ast = create_typed_ast(input);
@@ -162,7 +162,7 @@ fn variable_declaration_has_value() {
 #[test]
 fn variable_declaration_adds_variable_to_environment() {
     // Arrange
-    let input = "let x: bool;";
+    let input = "let x: Bool;";
     let environment = create_env();
 
     // Act
@@ -240,7 +240,7 @@ fn variable_declaration_type_is_deferred() {
 fn variable_declaration_function_type_is_used_to_infer_closure_parameter_types() {
     // Arrange
     let input = r#"
-        let f: fun(int, float, string, uint): int = |i, f, s, u| i
+        let f: fun(Int, Float, String, UInt): Int = |i, f, s, u| i
     "#;
 
     // Act
@@ -257,25 +257,25 @@ fn variable_declaration_function_type_is_used_to_infer_closure_parameter_types()
         Type::Function(shared::type_checker::Function {
             identifier: None,
             param: Some(shared::type_checker::Parameter {
-                identifier: "int".to_string(),
+                identifier: "Int".to_string(),
                 type_: Box::new(Type::Int)
             }),
             return_type: Box::new(Type::Function(shared::type_checker::Function {
                 identifier: None,
                 param: Some(shared::type_checker::Parameter {
-                    identifier: "float".to_string(),
+                    identifier: "Float".to_string(),
                     type_: Box::new(Type::Float)
                 }),
                 return_type: Box::new(Type::Function(shared::type_checker::Function {
                     identifier: None,
                     param: Some(shared::type_checker::Parameter {
-                        identifier: "string".to_string(),
+                        identifier: "String".to_string(),
                         type_: Box::new(Type::String)
                     }),
                     return_type: Box::new(Type::Function(shared::type_checker::Function {
                         identifier: None,
                         param: Some(shared::type_checker::Parameter {
-                            identifier: "uint".to_string(),
+                            identifier: "UInt".to_string(),
                             type_: Box::new(Type::UInt)
                         }),
                         return_type: Box::new(Type::Int)

@@ -14,7 +14,7 @@ use crate::common::create_env;
 fn assignment_is_assignment() {
     // Arrange
     let input = r#"
-        let x: int;
+        let x: Int;
         x = 1
     "#;
 
@@ -47,7 +47,7 @@ fn assignment_is_assignment() {
 fn assignment_has_correct_type() {
     // Arrange
     let input = r#"
-        let x: int;
+        let x: Int;
         x = 1
     "#;
 
@@ -81,7 +81,7 @@ fn assignment_has_correct_type() {
 fn assignment_returns_assigned_value() {
     // Arrange
     let input = r#"
-        let x: int;
+        let x: Int;
         x = 1
     "#;
 
