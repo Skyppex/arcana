@@ -573,7 +573,7 @@ pub fn create_decision_tree(
             type_annotation,
             field_patterns,
         }) => {
-            let matchee_type = matchee.get_type();
+            let matchee_type = matchee.get_type().unsubstitute();
             println!("matchee_type: {:?}", matchee_type);
 
             let mut is_enum_member = false;
@@ -609,7 +609,7 @@ pub fn create_decision_tree(
 
             if !is_enum_member
                 && !type_annotation_equals(
-                    &matchee.get_type().type_annotation(),
+                    &matchee_type.type_annotation(),
                     &type_annotation.clone(),
                 )
             {

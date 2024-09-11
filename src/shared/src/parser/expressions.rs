@@ -287,7 +287,10 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
     };
 
     println!("2");
-    if !matches!(cursor.second().kind, TokenKind::OpenBrace | TokenKind::Less) {
+    if !matches!(
+        cursor.second().kind,
+        TokenKind::OpenBrace | TokenKind::DoubleColon | TokenKind::Less
+    ) {
         return parse_range(cursor);
     };
 

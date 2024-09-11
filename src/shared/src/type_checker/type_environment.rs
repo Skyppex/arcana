@@ -14,6 +14,7 @@ pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
     modules: Vec<Vec<String>>,
     types: HashMap<TypeIdentifier, Type>,
+    static_members: HashMap<TypeAnnotation, HashMap<String, Type>>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
     allow_override_types: bool,
@@ -34,6 +35,7 @@ impl TypeEnvironment {
                 (TypeIdentifier::Type("Char".to_string()), Type::Char),
                 (TypeIdentifier::Type("String".to_string()), Type::String),
             ]),
+            static_members: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
             allow_override_types,
@@ -47,6 +49,7 @@ impl TypeEnvironment {
             parent: Some(parent),
             modules: Vec::new(),
             types: HashMap::new(),
+            static_members: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
             allow_override_types,
@@ -68,6 +71,7 @@ impl TypeEnvironment {
             modules: Vec::new(),
             variables: HashMap::new(),
             types: HashMap::new(),
+            static_members: HashMap::new(),
             scopes: scopes
                 .into_iter()
                 .map(|scope| scope.into())
@@ -138,16 +142,22 @@ impl TypeEnvironment {
         name: String,
         member_type: Type,
     ) -> Result<(), String> {
-        let type_ = self.get_type_from_annotation(&type_annotation).unwrap();
-
-        match type_ {
-            Type::Struct(mut s) => {
-                s.static_members.insert(name, member_type);
-                self.add_type(Type::Struct(s))?;
-                Ok(())
+        if let Some(members) = self.static_members.get_mut(&type_annotation) {
+            if !self.allow_override_types && members.contains_key(&name) {
+                return Err(format!(
+                    "Static member {} already exists in type {}",
+                    name, type_annotation
+                ));
             }
-            _ => Err(format!("Type {} is not a struct", type_.full_name())),
+
+            members.insert(name, member_type);
+        } else {
+            let mut members = HashMap::new();
+            members.insert(name, member_type);
+            self.static_members.insert(type_annotation, members);
         }
+
+        Ok(())
     }
 
     pub fn get_type_from_str(&self, type_str: &str) -> Option<Type> {
@@ -258,6 +268,21 @@ impl TypeEnvironment {
         &self.variables
     }
 
+    pub fn get_static_member(
+        &self,
+        type_annotation: TypeAnnotation,
+        member_name: &str,
+    ) -> Option<Type> {
+        self.static_members
+            .get(&type_annotation)
+            .and_then(|members| members.get(member_name))
+            .cloned()
+            .or_else(|| {
+                self.parent
+                    .as_ref()
+                    .and_then(|p| p.borrow().get_static_member(type_annotation, member_name))
+            })
+    }
     pub fn lookup_type(&self, type_: &Type) -> bool {
         self.types.values().into_iter().any(|t| t == type_)
             || self

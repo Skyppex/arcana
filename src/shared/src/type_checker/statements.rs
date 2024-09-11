@@ -233,7 +233,6 @@ pub fn check_type<'a>(
 
             let type_ = Type::Struct(Struct {
                 type_identifier: type_identifier.clone(),
-                static_members: HashMap::new(),
                 fields: field_types?,
             });
 
@@ -313,7 +312,6 @@ pub fn check_type<'a>(
 
                     let enum_member = Type::EnumMember(EnumMember {
                         enum_name: type_identifier.clone(),
-                        static_members: HashMap::new(),
                         discriminant_name: member.identifier.clone(),
                         fields: field_types?,
                     });
@@ -333,7 +331,6 @@ pub fn check_type<'a>(
 
             let enum_type = Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
-                static_members: HashMap::new(),
                 shared_fields: shared_fields
                     .clone()?
                     .iter()
@@ -472,10 +469,10 @@ pub fn check_type<'a>(
 
             protocol_type_environment
                 .borrow_mut()
-                .add_type(Type::TypeAlias(TypeAlias {
+                .add_type(Type::Substitution {
                     type_identifier: TypeIdentifier::Type("Self".to_owned()),
-                    types: vec![Type::Unknown],
-                }));
+                    actual_type: Box::new(Type::Unknown),
+                });
 
             let functions: Result<Vec<TypedStatement>, String> = functions
                 .clone()
@@ -568,10 +565,10 @@ pub fn check_type<'a>(
 
             implementation_type_environment
                 .borrow_mut()
-                .add_type(Type::TypeAlias(TypeAlias {
+                .add_type(Type::Substitution {
                     type_identifier: TypeIdentifier::Type("Self".to_owned()),
-                    types: vec![imp_type],
-                }))?;
+                    actual_type: Box::new(imp_type),
+                })?;
 
             let protocol_type = implementation_type_environment
                 .borrow()
@@ -828,7 +825,6 @@ fn check_type_identifier(
         }) {
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
-            static_members: HashMap::new(),
             fields: {
                 let mut map = HashMap::new();
 
@@ -849,7 +845,6 @@ fn check_type_identifier(
         Some(DiscoveredType::Enum(type_identifier, shared_fields, members)) => {
             Ok(Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
-                static_members: HashMap::new(),
                 shared_fields: {
                     let mut map = HashMap::new();
 
@@ -892,7 +887,6 @@ fn check_type_identifier(
                                 k.clone(),
                                 Type::EnumMember(EnumMember {
                                     enum_name: type_identifier.clone(),
-                                    static_members: HashMap::new(),
                                     discriminant_name: k.clone(),
                                     fields: v.clone(),
                                 }),
@@ -921,7 +915,6 @@ fn check_type_identifier(
 
             Ok(Type::EnumMember(EnumMember {
                 enum_name: TypeIdentifier::Type(enum_name.to_owned()),
-                static_members: HashMap::new(),
                 discriminant_name: member_name.to_owned(),
                 fields: field_types,
             }))
@@ -1050,7 +1043,6 @@ pub fn check_type_annotation(
         }) {
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
-            static_members: HashMap::new(),
             fields: {
                 let mut map = HashMap::new();
 
@@ -1071,7 +1063,6 @@ pub fn check_type_annotation(
         Some(DiscoveredType::Enum(type_identifier, shared_fields, members)) => {
             Ok(Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
-                static_members: HashMap::new(),
                 shared_fields: {
                     let mut map = HashMap::new();
 
@@ -1114,7 +1105,6 @@ pub fn check_type_annotation(
                                 k.clone(),
                                 Type::EnumMember(EnumMember {
                                     enum_name: type_identifier.clone(),
-                                    static_members: HashMap::new(),
                                     discriminant_name: k.clone(),
                                     fields: v.clone(),
                                 }),
@@ -1143,7 +1133,6 @@ pub fn check_type_annotation(
 
             Ok(Type::EnumMember(EnumMember {
                 enum_name: TypeIdentifier::Type(enum_name.to_owned()),
-                static_members: HashMap::new(),
                 discriminant_name: member_name.to_owned(),
                 fields: field_types,
             }))

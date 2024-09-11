@@ -146,6 +146,12 @@ pub struct EnumMember {
     pub member_name: String,
 }
 
+impl EnumMember {
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        TypeAnnotation::Type(self.enum_name.name())
+    }
+}
+
 impl Display for EnumMember {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.enum_name)

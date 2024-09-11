@@ -991,7 +991,6 @@ fn is_option(type_: &Option<Type>) -> bool {
 
     let Type::Enum(Enum {
         type_identifier,
-        static_members: _,
         shared_fields,
         members,
     }) = type_
@@ -1035,10 +1034,15 @@ fn check_type_static_member_access(
     return match *member.clone() {
         parser::Member::Identifier { symbol, .. } => match object_type {
             Type::Struct(struct_) => {
-                let static_member_type = struct_.static_members.get(&symbol).ok_or(format!(
-                    "Struct '{}' does not have a static member called '{}'",
-                    struct_.type_identifier, symbol
-                ))?;
+                let Some(static_member_type) = type_environment
+                    .borrow()
+                    .get_static_member(struct_.type_annotation(), &symbol)
+                else {
+                    return Err(format!(
+                        "Struct '{}' does not have a static member called '{}'",
+                        struct_.type_identifier, symbol
+                    ));
+                };
 
                 let identifier_type = static_member_type.clone();
 
@@ -1052,17 +1056,17 @@ fn check_type_static_member_access(
                     type_: static_member_type.clone(),
                 }))
             }
-            Type::EnumMember(EnumMember {
-                enum_name,
-                static_members,
-                ..
-            }) => {
-                let static_member_type = static_members.get(&symbol).ok_or(format!(
-                    "EnumMember '{}' does not have a field called '{}'",
-                    enum_name, symbol
-                ))?;
+            Type::EnumMember(enum_member) => {
+                let Some(static_member_type) = type_environment
+                    .borrow()
+                    .get_static_member(enum_member.type_annotation(), &symbol)
+                else {
+                    return Err(format!(
+                        "EnumMember '{}' does not have a static member called '{}'",
+                        enum_member.enum_name, symbol
+                    ));
+                };
 
-                println!("STATIC_MEMBER_TYPE ENUM_MEMBER: {:?}", static_member_type);
                 if !type_environment.borrow().lookup_type(&static_member_type) {
                     return Err(format!(
                         "Unexpected type: {}",
@@ -1082,17 +1086,17 @@ fn check_type_static_member_access(
                     type_: static_member_type.clone(),
                 }))
             }
-            Type::Enum(Enum {
-                type_identifier,
-                static_members,
-                ..
-            }) => {
-                let static_member_type = static_members.get(&symbol).ok_or(format!(
-                    "Enum '{}' does not have a shared field called '{}'",
-                    type_identifier, symbol
-                ))?;
+            Type::Enum(enum_) => {
+                let Some(static_member_type) = type_environment
+                    .borrow()
+                    .get_static_member(enum_.type_annotation(), &symbol)
+                else {
+                    return Err(format!(
+                        "EnumMember '{}' does not have a static member called '{}'",
+                        enum_.type_identifier, symbol
+                    ));
+                };
 
-                println!("STATIC_MEMBER_TYPE ENUM: {:?}", static_member_type);
                 if !type_environment.borrow().lookup_type(&static_member_type) {
                     return Err(format!(
                         "Unexpected type: {}",
@@ -1293,30 +1297,37 @@ fn check_type_param_propagation(
         return Err("Param propagation must be followed by a member access".to_string());
     };
 
-    let member_type = type_environment.borrow_mut().get_type_from_str(&symbol);
+    let object_type_expression =
+        check_type(object, discovered_types, type_environment.clone(), context)?;
 
-    let Some(member_type) = member_type else {
-        return Err(format!("{} is not a type", symbol));
-    };
+    let object_type = object_type_expression.get_type();
 
-    let Type::Function(Function { return_type, .. }) = member_type.clone() else {
+    let member_type = type_environment
+        .borrow()
+        .get_type_from_str(&symbol)
+        .or_else(|| {
+            type_environment
+                .borrow()
+                .get_static_member(object_type.type_annotation(), &symbol)
+        });
+
+    let Some(Type::Function(Function { param, .. })) = member_type else {
         return Err(format!("{} is not a function", symbol));
     };
 
-    let param = if let Type::Function(Function { param, .. }) = *return_type.clone() {
-        param
-    } else {
-        None
+    let Some(param) = param else {
+        Err(format!(
+            "Function {} must have at least one parameter",
+            symbol
+        ))?
     };
 
-    let object_type_expression = check_type(
-        object,
-        discovered_types,
-        type_environment.clone(),
-        param.map(|p| *p.type_).or(context),
-    )?;
-
-    let object_type = object_type_expression.get_type();
+    if !type_equals(&param.type_, &object_type) {
+        Err(format!(
+            "Function '{}' must be called on type {}. Found {}",
+            symbol, param.type_, object_type
+        ))?
+    }
 
     check_type_param_propagation_recurse(
         object_type.clone(),
@@ -1338,6 +1349,11 @@ fn check_type_param_propagation_recurse(
                 .borrow()
                 .get_variable(&symbol)
                 .or_else(|| type_environment.borrow().get_type_from_str(&symbol))
+                .or_else(|| {
+                    type_environment
+                        .borrow()
+                        .get_static_member(object_type.type_annotation(), &symbol)
+                })
                 .ok_or_else(|| {
                     format!(
                         "Unexpected member access: {} on type {}",

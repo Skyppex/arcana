@@ -3,19 +3,25 @@ proto P {
     fun m(self: Self): String;
 }
 
-struct S;
+enum E {
+    A { value: String },
+    B,
+}
 
-imp P for S {
+imp P for E {
     fun f(): String => {
         "Hello, world!"
     }
 
     fun m(self: Self): String => {
-        "Hello, there!"
+        self match
+        | A { value } => value,
+        | B => "Hello, B!",
     }
 }
 
+// S::f()
 // print(S::f());
-let s = S {};
+let s: E = E::A { value: "Hello, A"};
 
-S::m(s)
+s:m

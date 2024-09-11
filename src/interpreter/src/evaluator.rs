@@ -4,7 +4,7 @@ use shared::{
     type_checker::{
         ast::{Block, *},
         decision_tree::{Accessor, Constructor, Decision, FieldPattern, Pattern},
-        Type,
+        type_annotation_equals, Type,
     },
     types::{TypeAnnotation, TypeIdentifier},
 };
@@ -457,7 +457,26 @@ fn evaluate_pattern(
 
                     fields
                 }
-                _ => return Err(format!("Expected struct, found '{}'", value)),
+                Value::Enum {
+                    enum_member,
+                    fields,
+                } => {
+                    let member_type_annotation =
+                        TypeAnnotation::Type(enum_member.member_name.clone());
+
+                    if !type_annotation_equals(&member_type_annotation, &type_annotation) {
+                        return Err(format!(
+                            "Expected enum '{}', found '{}'",
+                            type_annotation, enum_member
+                        ));
+                    }
+
+                    match fields {
+                        EnumFields::None => return Ok(Some(Vec::new())),
+                        EnumFields::Named(fields) => fields,
+                    }
+                }
+                _ => return Err(format!("Expected enum, found '{}'", value)),
             };
 
             let mut bindings = Vec::new();

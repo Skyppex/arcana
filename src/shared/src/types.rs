@@ -54,6 +54,7 @@ impl From<TypeIdentifier> for TypeAnnotation {
 impl From<Type> for TypeAnnotation {
     fn from(t: Type) -> Self {
         match t {
+            Type::Substitution { actual_type, .. } => (*actual_type).into(),
             Type::Unknown => panic!("Cannot convert unknown type to type annotation"),
             Type::Generic(g) => TypeAnnotation::Type(g.type_name),
             Type::Void => TypeAnnotation::Type("Void".to_string()),
