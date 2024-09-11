@@ -155,7 +155,7 @@ impl ToString for IntLiteralBase {
             IntLiteralBase::None => "".to_string(),
             IntLiteralBase::Binary => "0b".to_string(),
             IntLiteralBase::Octal => "0o".to_string(),
-            IntLiteralBase::Decimal => "".to_string(),
+            IntLiteralBase::Decimal => "0d".to_string(),
             IntLiteralBase::Hexadecimal => "0x".to_string(),
         }
     }
