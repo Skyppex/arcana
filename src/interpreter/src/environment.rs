@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use shared::type_checker::ast::Member;
+use shared::{type_checker::ast::Member, types::TypeAnnotation};
 
 use super::{
     scope::{Scope, ScopeState, ScopeType},
@@ -15,6 +15,7 @@ pub struct Environment {
     pub modules: Vec<Vec<String>>,
     pub variables: HashMap<String, Rcrc<Variable>>,
     pub functions: HashMap<String, Rcrc<Variable>>,
+    pub static_members: HashMap<TypeAnnotation, HashMap<String, Rcrc<Variable>>>,
     pub scopes: Vec<ScopeState>,
 }
 
@@ -25,6 +26,7 @@ impl Environment {
             modules: Vec::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
+            static_members: HashMap::new(),
             scopes: vec![],
         }
     }
@@ -35,6 +37,7 @@ impl Environment {
             modules: Vec::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
+            static_members: HashMap::new(),
             scopes: vec![],
         }
     }
@@ -52,6 +55,7 @@ impl Environment {
             modules: Vec::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
+            static_members: HashMap::new(),
             scopes: scopes
                 .into_iter()
                 .map(|scope| scope.into())
@@ -122,6 +126,26 @@ impl Environment {
         );
     }
 
+    pub fn add_static_member(
+        &mut self,
+        type_annotation: &TypeAnnotation,
+        member_name: String,
+        variable: Rcrc<Variable>,
+    ) {
+        match self.static_members.get_mut(type_annotation) {
+            Some(static_members) => {
+                static_members.insert(member_name, variable);
+            }
+            None => {
+                let mut static_members = HashMap::new();
+                static_members.insert(member_name, variable);
+
+                self.static_members
+                    .insert(type_annotation.clone(), static_members);
+            }
+        }
+    }
+
     pub fn get_variable(&self, identifier: &str) -> Option<Rcrc<Variable>> {
         self.resolve(identifier)
     }
@@ -152,6 +176,22 @@ impl Environment {
         current_funcs.into_iter().chain(parent_funcs).collect()
     }
 
+    pub fn get_static_member(
+        &self,
+        type_annotation: &TypeAnnotation,
+        member_name: &str,
+    ) -> Option<Rcrc<Variable>> {
+        if let Some(static_members) = self.static_members.get(type_annotation) {
+            static_members.get(member_name).cloned()
+        } else if let Some(parent) = &self.parent {
+            parent
+                .borrow()
+                .get_static_member(type_annotation, member_name)
+        } else {
+            None
+        }
+    }
+
     pub fn set_variable(&mut self, member: Member, value: Value) -> Result<Value, String> {
         match member {
             Member::Identifier { symbol, type_: _ } => {
@@ -169,11 +209,12 @@ impl Environment {
                 variable.borrow_mut().value = value.clone();
                 return Ok(value);
             }
+            Member::StaticMemberAccess { .. } => {
+                return Err("Cannot assign to static member".to_owned());
+            }
             Member::MemberAccess { member, .. } => {
                 self.set_variable(*member.clone(), value.clone())
-            } // Member::MemberFunctionAccess { member, .. } => {
-              //     self.set_variable(*member.clone(), value.clone())
-              // }
+            }
         }
     }
 

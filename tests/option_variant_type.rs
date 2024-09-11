@@ -36,6 +36,7 @@ fn enum_variant_can_be_used_as_a_type() {
         expression.get_type(),
         Type::EnumMember(EnumMember {
             enum_name: TypeIdentifier::Type("O".to_owned()),
+            static_members: HashMap::new(),
             discriminant_name: "S".to_owned(),
             fields: HashMap::from([("x".to_owned(), Type::Int)])
         })

@@ -1081,6 +1081,53 @@ impl IndentDisplay for Member {
 
                 result
             }
+            Member::StaticMemberAccess {
+                type_annotation,
+                member,
+                symbol,
+                generics,
+            } => {
+                let mut result = String::new();
+                result.push_str("<static member access>\n");
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}object: {}\n",
+                        indent.dash(),
+                        type_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "{}member: {}\n",
+                        indent.dash(),
+                        member.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(format!("{}symbol: {}\n", indent.dash(), symbol).as_str());
+
+                indent.end_current();
+
+                if let Some(generics) = generics {
+                    result.push_str(
+                        format!(
+                            "\n{}generics: {}",
+                            indent.dash_end(),
+                            indent_display_vec(generics, "generics", "generic", indent)
+                        )
+                        .as_str(),
+                    );
+                } else {
+                    result.push_str(format!("\n{}generics: None", indent.dash_end()).as_str());
+                }
+
+                indent.decrease();
+                result
+            }
             Member::MemberAccess {
                 object,
                 member,
@@ -1944,7 +1991,12 @@ impl IndentDisplay for TypedStatement {
                     format!(
                         "{}functions: {}",
                         indent.dash_end(),
-                        indent_display_vec(functions, "functions", "function", indent)
+                        indent_display_vec(
+                            &functions.clone().into_iter().map(|f| f.1).collect(),
+                            "functions",
+                            "function",
+                            indent
+                        )
                     )
                     .as_str(),
                 );
@@ -2577,6 +2629,36 @@ impl IndentDisplay for type_checker::ast::Member {
                 result.push_str(format!("<identifier> {}: {}", symbol, type_).as_str());
                 result
             }
+            type_checker::ast::Member::StaticMemberAccess {
+                type_annotation,
+                member,
+                symbol,
+                type_,
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<static member access>: {}\n", type_).as_str());
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}object: {}\n",
+                        indent.dash(),
+                        type_annotation.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!(
+                        "{}member: {}\n",
+                        indent.dash(),
+                        member.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                indent.end_current();
+                result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
+                indent.decrease();
+                result
+            }
             type_checker::ast::Member::MemberAccess {
                 object,
                 member,
@@ -2606,36 +2688,7 @@ impl IndentDisplay for type_checker::ast::Member {
                 result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
                 indent.decrease();
                 result
-            } // type_checker::ast::Member::MemberFunctionAccess {
-              //     object,
-              //     member,
-              //     symbol,
-              //     type_,
-              // } => {
-              //     let mut result = String::new();
-              //     result.push_str(format!("<member function access>: {}\n", type_).as_str());
-              //     indent.increase();
-              //     result.push_str(
-              //         format!(
-              //             "{}object: {}\n",
-              //             indent.dash(),
-              //             object.indent_display(indent)
-              //         )
-              //         .as_str(),
-              //     );
-              //     result.push_str(
-              //         format!(
-              //             "{}member: {}\n",
-              //             indent.dash(),
-              //             member.indent_display(indent)
-              //         )
-              //         .as_str(),
-              //     );
-              //     indent.end_current();
-              //     result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
-              //     indent.decrease();
-              //     result
-              // }
+            }
         }
     }
 }

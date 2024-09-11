@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use crate::{
     lexer::token::{self, IdentifierType, Keyword, TokenKind},
-    type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
+    type_checker::{
+        decision_tree::{Constructor, FieldPattern, Pattern},
+        Type,
+    },
     types::{parse_generics_in_type_name, parse_optional_type_annotation, TypeAnnotation},
 };
 
@@ -278,23 +281,24 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
 }
 
 fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
+    println!("1");
     let TokenKind::Identifier(_) = cursor.first().kind else {
         return parse_range(cursor);
     };
 
-    if !matches!(
-        cursor.second().kind,
-        TokenKind::OpenBrace | TokenKind::DoubleColon
-    ) {
+    println!("2");
+    if !matches!(cursor.second().kind, TokenKind::OpenBrace | TokenKind::Less) {
         return parse_range(cursor);
     };
 
+    println!("3");
     if let TokenKind::Identifier(name) = cursor.third().kind {
         if cursor.second().kind == TokenKind::DoubleColon && name.is_function_identifier_name() {
             return parse_member_access(cursor);
         }
     }
 
+    println!("ADSLKH {:?}", cursor.first());
     let type_annotation = parse_type_annotation(cursor, false)?;
 
     if type_annotation.has_double_colon() {
@@ -1062,15 +1066,45 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
     let mut object = parse_literal(cursor)?;
 
     while let TokenKind::DoubleColon = cursor.first().kind {
-        cursor.bump()?; // Consume the ::
+        let Expression::Member(Member::Identifier { symbol, generics }) = &object else {
+            break;
+        };
 
-        let TokenKind::Identifier(identifier) = cursor.first().kind else {
+        if !symbol.is_type_identifier_name() {
+            break;
+        }
+
+        let type_annotation = match generics {
+            Some(generics) => TypeAnnotation::ConcreteType(
+                symbol.clone(),
+                generics
+                    .clone()
+                    .into_iter()
+                    .map(|g| g.type_annotation())
+                    .collect(),
+            ),
+            None => TypeAnnotation::Type(symbol.clone()),
+        };
+
+        println!("aksdjshalksjhsd");
+        println!("1");
+
+        let TokenKind::Identifier(identifier) = cursor.second().kind else {
             return Err(format!(
                 "Expected identifier but found {:?}",
                 cursor.first().kind
             ));
         };
 
+        println!("{:?}", identifier);
+        println!("2");
+        if !identifier.is_function_identifier_name() {
+            return Ok(object);
+        }
+
+        cursor.bump()?; // Consume the ::
+
+        println!("5");
         let Expression::Member(member) = parse_literal(cursor)? else {
             return Err(format!(
                 "Expected member but found {:?}",
@@ -1078,8 +1112,9 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             ));
         };
 
-        object = Expression::Member(Member::MemberAccess {
-            object: Box::new(object),
+        println!("6");
+        object = Expression::Member(Member::StaticMemberAccess {
+            type_annotation,
             member: Box::new(member),
             symbol: identifier,
             generics: None,

@@ -1,21 +1,21 @@
 proto P {
-    fun f(): string;
-    fun m(self: Self): string;
+    fun f(): String;
+    fun m(self: Self): String;
 }
 
 struct S;
 
 imp P for S {
-    fun f(): string => {
+    fun f(): String => {
         "Hello, world!"
     }
 
-    fun m(self: Self): string => {
-        "Hello, world!"
+    fun m(self: Self): String => {
+        "Hello, there!"
     }
 }
 
-print(S::f());
-// let s = S {};
+// print(S::f());
+let s = S {};
 
-// print(s:m());
+S::m(s)

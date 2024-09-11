@@ -233,6 +233,7 @@ pub fn check_type<'a>(
 
             let type_ = Type::Struct(Struct {
                 type_identifier: type_identifier.clone(),
+                static_members: HashMap::new(),
                 fields: field_types?,
             });
 
@@ -312,6 +313,7 @@ pub fn check_type<'a>(
 
                     let enum_member = Type::EnumMember(EnumMember {
                         enum_name: type_identifier.clone(),
+                        static_members: HashMap::new(),
                         discriminant_name: member.identifier.clone(),
                         fields: field_types?,
                     });
@@ -331,6 +333,7 @@ pub fn check_type<'a>(
 
             let enum_type = Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
+                static_members: HashMap::new(),
                 shared_fields: shared_fields
                     .clone()?
                     .iter()
@@ -568,7 +571,7 @@ pub fn check_type<'a>(
                 .add_type(Type::TypeAlias(TypeAlias {
                     type_identifier: TypeIdentifier::Type("Self".to_owned()),
                     types: vec![imp_type],
-                }));
+                }))?;
 
             let protocol_type = implementation_type_environment
                 .borrow()
@@ -609,7 +612,22 @@ pub fn check_type<'a>(
                     implementation_type_environment.clone(),
                 )?;
 
-                typed_functions.push(typed_function);
+                println!(
+                    "{:?} | {:?} | {:?}",
+                    type_annotation,
+                    protocol_function.name(),
+                    typed_function.get_type()
+                );
+
+                let function_name = protocol_function.name().to_owned();
+
+                type_environment.borrow_mut().add_static_member(
+                    type_annotation.clone(),
+                    function_name.clone(),
+                    typed_function.get_type(),
+                )?;
+
+                typed_functions.push((function_name, typed_function));
             }
 
             Ok(TypedStatement::ImplementationDeclaration {
@@ -743,7 +761,7 @@ pub fn check_type<'a>(
                 .map(|s| s.fold())
                 .unwrap_or_else(|| Ok(body_typed_expression.get_deep_type()))?;
 
-            if !type_equals(&return_type, &body_type) {
+            if !type_equals(&return_type, &Type::Void) && !type_equals(&return_type, &body_type) {
                 return Err(format!(
                     "Function body's return type {} does not match function return type {}",
                     body_type, return_type
@@ -810,6 +828,7 @@ fn check_type_identifier(
         }) {
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
+            static_members: HashMap::new(),
             fields: {
                 let mut map = HashMap::new();
 
@@ -830,6 +849,7 @@ fn check_type_identifier(
         Some(DiscoveredType::Enum(type_identifier, shared_fields, members)) => {
             Ok(Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
+                static_members: HashMap::new(),
                 shared_fields: {
                     let mut map = HashMap::new();
 
@@ -872,6 +892,7 @@ fn check_type_identifier(
                                 k.clone(),
                                 Type::EnumMember(EnumMember {
                                     enum_name: type_identifier.clone(),
+                                    static_members: HashMap::new(),
                                     discriminant_name: k.clone(),
                                     fields: v.clone(),
                                 }),
@@ -900,6 +921,7 @@ fn check_type_identifier(
 
             Ok(Type::EnumMember(EnumMember {
                 enum_name: TypeIdentifier::Type(enum_name.to_owned()),
+                static_members: HashMap::new(),
                 discriminant_name: member_name.to_owned(),
                 fields: field_types,
             }))
@@ -1028,6 +1050,7 @@ pub fn check_type_annotation(
         }) {
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
+            static_members: HashMap::new(),
             fields: {
                 let mut map = HashMap::new();
 
@@ -1048,6 +1071,7 @@ pub fn check_type_annotation(
         Some(DiscoveredType::Enum(type_identifier, shared_fields, members)) => {
             Ok(Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
+                static_members: HashMap::new(),
                 shared_fields: {
                     let mut map = HashMap::new();
 
@@ -1090,6 +1114,7 @@ pub fn check_type_annotation(
                                 k.clone(),
                                 Type::EnumMember(EnumMember {
                                     enum_name: type_identifier.clone(),
+                                    static_members: HashMap::new(),
                                     discriminant_name: k.clone(),
                                     fields: v.clone(),
                                 }),
@@ -1118,6 +1143,7 @@ pub fn check_type_annotation(
 
             Ok(Type::EnumMember(EnumMember {
                 enum_name: TypeIdentifier::Type(enum_name.to_owned()),
+                static_members: HashMap::new(),
                 discriminant_name: member_name.to_owned(),
                 fields: field_types,
             }))

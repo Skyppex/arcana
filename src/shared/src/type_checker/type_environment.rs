@@ -132,6 +132,24 @@ impl TypeEnvironment {
         self.variables.insert(name, type_);
     }
 
+    pub fn add_static_member(
+        &mut self,
+        type_annotation: TypeAnnotation,
+        name: String,
+        member_type: Type,
+    ) -> Result<(), String> {
+        let type_ = self.get_type_from_annotation(&type_annotation).unwrap();
+
+        match type_ {
+            Type::Struct(mut s) => {
+                s.static_members.insert(name, member_type);
+                self.add_type(Type::Struct(s))?;
+                Ok(())
+            }
+            _ => Err(format!("Type {} is not a struct", type_.full_name())),
+        }
+    }
+
     pub fn get_type_from_str(&self, type_str: &str) -> Option<Type> {
         self.types
             .get(&TypeIdentifier::Type(type_str.to_string()))

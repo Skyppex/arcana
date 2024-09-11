@@ -66,7 +66,7 @@ pub enum TypedStatement {
         protocol_annotation: TypeAnnotation,
         type_annotation: TypeAnnotation,
         associated_types: Vec<AssociatedType>,
-        functions: Vec<TypedStatement>,
+        functions: Vec<(String, TypedStatement)>,
         type_: Type,
     },
     FunctionDeclaration {
@@ -241,7 +241,7 @@ impl Display for TypedStatement {
                     .join(", "),
                 functions
                     .iter()
-                    .map(|f| f.to_string())
+                    .map(|f| f.clone().0)
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -920,24 +920,25 @@ pub enum Member {
         symbol: String,
         type_: Type,
     },
+    StaticMemberAccess {
+        type_annotation: TypeAnnotation,
+        member: Box<Member>,
+        symbol: String,
+        type_: Type,
+    },
     MemberAccess {
         object: Box<TypedExpression>,
         member: Box<Member>,
         symbol: String,
         type_: Type,
     },
-    // MemberFunctionAccess {
-    //     object: Box<TypedExpression>,
-    //     member: Box<Member>,
-    //     symbol: String,
-    //     type_: Type,
-    // },
 }
 
 impl Member {
     pub fn get_symbol(&self) -> &str {
         match self {
             Member::Identifier { symbol, .. } => symbol,
+            Member::StaticMemberAccess { symbol, .. } => symbol,
             Member::MemberAccess { symbol, .. } => symbol,
             // Member::MemberFunctionAccess { symbol, .. } => symbol,
         }
@@ -948,6 +949,7 @@ impl Typed for Member {
     fn get_type(&self) -> Type {
         match self {
             Member::Identifier { type_, .. } => type_.clone(),
+            Member::StaticMemberAccess { type_, .. } => type_.clone(),
             Member::MemberAccess { type_, .. } => type_.clone(),
             // Member::MemberFunctionAccess { type_, .. } => type_.clone(),
         }
@@ -956,6 +958,7 @@ impl Typed for Member {
     fn get_deep_type(&self) -> Type {
         match self {
             Member::Identifier { type_, .. } => type_.clone(),
+            Member::StaticMemberAccess { member, .. } => member.get_deep_type(),
             Member::MemberAccess { member, .. } => member.get_deep_type(),
             // Member::MemberFunctionAccess { member, .. } => member.get_deep_type(),
         }
@@ -966,6 +969,11 @@ impl Display for Member {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Member::Identifier { symbol, .. } => write!(f, "{}", symbol),
+            Member::StaticMemberAccess {
+                type_annotation,
+                member,
+                ..
+            } => write!(f, "{}.{}", type_annotation, member),
             Member::MemberAccess { object, member, .. } => write!(f, "{}.{}", object, member),
             // Member::MemberFunctionAccess { object, member, .. } => {
             //     write!(f, "{}.{}", object, member)

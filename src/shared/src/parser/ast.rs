@@ -332,6 +332,12 @@ pub enum Member {
         symbol: String,
         generics: Option<Vec<GenericType>>,
     },
+    StaticMemberAccess {
+        type_annotation: TypeAnnotation,
+        member: Box<Member>,
+        symbol: String,
+        generics: Option<Vec<GenericType>>,
+    },
     MemberAccess {
         object: Box<Expression>,
         member: Box<Member>,
@@ -350,6 +356,7 @@ impl Member {
     pub fn get_symbol(&self) -> String {
         match self {
             Member::Identifier { symbol, .. } => symbol.clone(),
+            Member::StaticMemberAccess { symbol, .. } => symbol.clone(),
             Member::MemberAccess { symbol, .. } => symbol.clone(),
             Member::ParamPropagation { symbol, .. } => symbol.clone(),
         }
@@ -358,6 +365,17 @@ impl Member {
     pub fn with_generics(self, generics: Vec<GenericType>) -> Self {
         match self {
             Member::Identifier { symbol, .. } => Member::Identifier {
+                symbol,
+                generics: Some(generics),
+            },
+            Member::StaticMemberAccess {
+                type_annotation,
+                member,
+                symbol,
+                ..
+            } => Member::StaticMemberAccess {
+                type_annotation,
+                member,
                 symbol,
                 generics: Some(generics),
             },

@@ -6,7 +6,7 @@ use shared::{
         decision_tree::{Accessor, Constructor, Decision, FieldPattern, Pattern},
         Type,
     },
-    types::TypeIdentifier,
+    types::{TypeAnnotation, TypeIdentifier},
 };
 
 use crate::scope::Scope;
@@ -37,7 +37,11 @@ pub fn evaluate<'a>(
         TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
         TypedStatement::TypeAliasDeclaration { .. } => Ok(Value::Void),
         TypedStatement::ProtocolDeclaration { .. } => Ok(Value::Void),
-        TypedStatement::ImplementationDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::ImplementationDeclaration {
+            type_annotation,
+            functions,
+            ..
+        } => evaluate_implementation_declaration(environment, type_annotation, functions),
         TypedStatement::FunctionDeclaration {
             identifier,
             param,
@@ -50,6 +54,28 @@ pub fn evaluate<'a>(
         }
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
     }
+}
+
+fn evaluate_implementation_declaration(
+    environment: Rc<RefCell<Environment>>,
+    type_annotation: TypeAnnotation,
+    functions: Vec<(String, TypedStatement)>,
+) -> Result<Value, String> {
+    for (function_name, function) in functions {
+        evaluate(function, environment.clone())?;
+
+        let variable = environment
+            .borrow()
+            .get_function(&function_name)
+            .ok_or(format!("Function '{}' not found", function_name))?
+            .clone();
+
+        environment
+            .borrow_mut()
+            .add_static_member(&type_annotation, function_name, variable);
+    }
+
+    Ok(Value::Void)
 }
 
 fn evaluate_function_declaration(
@@ -493,12 +519,32 @@ fn evaluate_member<'a>(member: Member, environment: Rcrc<Environment>) -> Result
             .borrow()
             .value
             .clone()),
+        Member::StaticMemberAccess {
+            type_annotation,
+            member,
+            ..
+        } => evaluate_static_member_access(type_annotation, environment, member),
         Member::MemberAccess { object, member, .. } => {
             evaluate_member_access(object, environment, member)
-        } // Member::MemberFunctionAccess { object, member, .. } => {
-          //     evaluate_member_function_access(object, environment, member)
-          // }
+        }
     }
+}
+
+fn evaluate_static_member_access<'a>(
+    type_annotation: TypeAnnotation,
+    environment: Rcrc<Environment>,
+    member: Box<Member>,
+) -> Result<Value, String> {
+    Ok(environment
+        .borrow()
+        .get_static_member(&type_annotation, member.get_symbol())
+        .ok_or(format!(
+            "Static member '{}' not found in struct '{}'",
+            member, type_annotation
+        ))?
+        .borrow()
+        .value
+        .clone())
 }
 
 fn evaluate_member_access<'a>(
@@ -521,11 +567,13 @@ fn evaluate_member_access<'a>(
 
                 Ok(field_value.clone())
             }
+            Member::StaticMemberAccess { .. } => Err(format!(
+                "Cannot access static member on an instance of a struct '{}'",
+                struct_name
+            )),
             Member::MemberAccess { object, member, .. } => {
                 evaluate_member_access(object, environment, member)
-            } // Member::MemberFunctionAccess { object, member, .. } => {
-              //     evaluate_member_function_access(object, environment, member)
-              // }
+            }
         },
         Value::Enum {
             enum_member,
@@ -539,11 +587,13 @@ fn evaluate_member_access<'a>(
 
                 Ok(field_value.clone())
             }
+            Member::StaticMemberAccess { .. } => Err(format!(
+                "Cannot access static member on an instance of a enum '{}'",
+                enum_member
+            )),
             Member::MemberAccess { object, member, .. } => {
                 evaluate_member_access(object, environment, member)
-            } // Member::MemberFunctionAccess { object, member, .. } => {
-              //     evaluate_member_function_access(object, environment, member)
-              // }
+            }
         },
         _ => Err(format!("Cannot access member value: '{}'", value)),
     }

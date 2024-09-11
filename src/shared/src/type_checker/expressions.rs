@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{
     parser::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
     type_checker::ast::Literal,
-    types::TypeIdentifier,
+    types::{TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
@@ -13,8 +13,9 @@ use super::{
     },
     decision_tree::create_decision_tree,
     scope::ScopeType,
-    statements, type_equals, type_equals_coerce, DiscoveredType, Enum, EnumMember, FullName,
-    Function, Rcrc, Struct, Type, TypeAlias, TypeEnvironment, Union,
+    statements::{self, check_type_annotation},
+    type_equals, type_equals_coerce, DiscoveredType, Enum, EnumMember, FullName, Function, Rcrc,
+    Struct, Type, TypeAlias, TypeEnvironment, Union,
 };
 
 pub fn check_type<'a>(
@@ -510,6 +511,17 @@ pub fn check_type<'a>(
                     type_,
                 }))
             }
+            crate::parser::Member::StaticMemberAccess {
+                type_annotation,
+                member,
+                ..
+            } => check_type_static_member_access(
+                type_annotation,
+                discovered_types,
+                type_environment,
+                member,
+                context,
+            ),
             crate::parser::Member::MemberAccess { object, member, .. } => check_type_member_access(
                 object,
                 discovered_types,
@@ -979,6 +991,7 @@ fn is_option(type_: &Option<Type>) -> bool {
 
     let Type::Enum(Enum {
         type_identifier,
+        static_members: _,
         shared_fields,
         members,
     }) = type_
@@ -1007,6 +1020,130 @@ fn is_option(type_: &Option<Type>) -> bool {
             return true;
         });
     });
+}
+
+fn check_type_static_member_access(
+    type_annotation: &TypeAnnotation,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+    member: &Box<parser::Member>,
+    context: Option<Type>,
+) -> Result<TypedExpression, String> {
+    let object_type =
+        check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
+
+    return match *member.clone() {
+        parser::Member::Identifier { symbol, .. } => match object_type {
+            Type::Struct(struct_) => {
+                let static_member_type = struct_.static_members.get(&symbol).ok_or(format!(
+                    "Struct '{}' does not have a static member called '{}'",
+                    struct_.type_identifier, symbol
+                ))?;
+
+                let identifier_type = static_member_type.clone();
+
+                Ok(TypedExpression::Member(Member::StaticMemberAccess {
+                    type_annotation: type_annotation.clone(),
+                    member: Box::new(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: identifier_type.clone(),
+                    }),
+                    symbol: symbol.clone(),
+                    type_: static_member_type.clone(),
+                }))
+            }
+            Type::EnumMember(EnumMember {
+                enum_name,
+                static_members,
+                ..
+            }) => {
+                let static_member_type = static_members.get(&symbol).ok_or(format!(
+                    "EnumMember '{}' does not have a field called '{}'",
+                    enum_name, symbol
+                ))?;
+
+                println!("STATIC_MEMBER_TYPE ENUM_MEMBER: {:?}", static_member_type);
+                if !type_environment.borrow().lookup_type(&static_member_type) {
+                    return Err(format!(
+                        "Unexpected type: {}",
+                        static_member_type.full_name()
+                    ));
+                }
+
+                let identifier_type = static_member_type.clone();
+
+                Ok(TypedExpression::Member(Member::StaticMemberAccess {
+                    type_annotation: type_annotation.clone(),
+                    member: Box::new(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: identifier_type.clone(),
+                    }),
+                    symbol: symbol.clone(),
+                    type_: static_member_type.clone(),
+                }))
+            }
+            Type::Enum(Enum {
+                type_identifier,
+                static_members,
+                ..
+            }) => {
+                let static_member_type = static_members.get(&symbol).ok_or(format!(
+                    "Enum '{}' does not have a shared field called '{}'",
+                    type_identifier, symbol
+                ))?;
+
+                println!("STATIC_MEMBER_TYPE ENUM: {:?}", static_member_type);
+                if !type_environment.borrow().lookup_type(&static_member_type) {
+                    return Err(format!(
+                        "Unexpected type: {}",
+                        static_member_type.full_name()
+                    ));
+                }
+
+                let identifier_type = static_member_type.clone();
+
+                Ok(TypedExpression::Member(Member::StaticMemberAccess {
+                    type_annotation: type_annotation.clone(),
+                    member: Box::new(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: identifier_type.clone(),
+                    }),
+                    symbol: symbol.clone(),
+                    type_: static_member_type.clone(),
+                }))
+            }
+            _ => Err(format!(
+                "Unexpected member access: {} on type {}",
+                symbol,
+                object_type.full_name()
+            )),
+        },
+        parser::Member::StaticMemberAccess {
+            type_annotation,
+            member,
+            ..
+        } => check_type_static_member_access(
+            &type_annotation,
+            discovered_types,
+            type_environment,
+            &member,
+            context,
+        ),
+        parser::Member::MemberAccess { object, member, .. } => check_type_member_access(
+            &object,
+            discovered_types,
+            type_environment,
+            &member,
+            context,
+        ),
+        parser::Member::ParamPropagation { object, member, .. } => check_type_param_propagation(
+            &object,
+            &member,
+            discovered_types,
+            type_environment,
+            context,
+        ),
+    };
 }
 
 fn check_type_member_access(
@@ -1117,6 +1254,17 @@ fn check_type_member_access_recurse(
                 object_type.full_name()
             )),
         },
+        parser::Member::StaticMemberAccess {
+            type_annotation,
+            member,
+            ..
+        } => check_type_static_member_access(
+            &type_annotation,
+            discovered_types,
+            type_environment,
+            &member,
+            context,
+        ),
         parser::Member::MemberAccess { object, member, .. } => check_type_member_access(
             &object,
             discovered_types,
@@ -1229,6 +1377,7 @@ fn check_type_param_propagation_recurse(
                 type_: *return_type,
             })
         }
+        parser::Member::StaticMemberAccess { .. } => todo!("Static member access"),
         parser::Member::MemberAccess { .. } => todo!("Member access"),
         parser::Member::ParamPropagation { .. } => todo!("Param propagation"),
     }

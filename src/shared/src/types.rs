@@ -143,6 +143,21 @@ impl Display for TypeAnnotation {
                     return write!(f, "{}", type_name);
                 }
 
+                if type_name.contains("::") {
+                    let mut parts = type_name.split("::");
+                    return write!(
+                        f,
+                        "{}<{}>::{}",
+                        parts.next().unwrap(),
+                        generics
+                            .iter()
+                            .map(|g| g.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", "),
+                        parts.next().unwrap(),
+                    );
+                }
+
                 write!(
                     f,
                     "{}<{}>",
@@ -342,15 +357,6 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
     }
 }
 
-// pub(super) fn parse_type_annotation_from_str(
-//     type_str: &str,
-//     allow_void: bool,
-// ) -> Result<TypeAnnotation, String> {
-//     let tokens = crate::lexer::tokenize(type_str)?;
-//     let mut cursor = Cursor::new(tokens);
-//     parse_type_annotation(&mut cursor, allow_void)
-// }
-
 pub(super) fn parse_type_annotation(
     cursor: &mut Cursor,
     allow_void: bool,
@@ -392,10 +398,7 @@ pub(super) fn parse_type_annotation(
 
             let mut generics = None;
 
-            if cursor.first().kind == TokenKind::DoubleColon
-                && cursor.second().kind == TokenKind::Less
-            {
-                cursor.bump()?; // Consume the ::
+            if cursor.first().kind == TokenKind::Less {
                 cursor.bump()?; // Consume the <
 
                 generics = Some(parse_comma_separated_type_annotations(

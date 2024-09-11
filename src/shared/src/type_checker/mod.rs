@@ -24,6 +24,7 @@ use self::statements::check_type_annotation;
 #[derive(Debug, Clone)]
 pub struct Struct {
     pub type_identifier: TypeIdentifier,
+    pub static_members: HashMap<String, Type>,
     pub fields: HashMap<String, Type>,
 }
 
@@ -64,6 +65,7 @@ impl FullName for StructField {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Enum {
     pub type_identifier: TypeIdentifier,
+    pub static_members: HashMap<String, Type>,
     pub shared_fields: HashMap<String, Type>,
     pub members: HashMap<String, Type>,
 }
@@ -83,6 +85,7 @@ impl FullName for Enum {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumMember {
     pub enum_name: TypeIdentifier,
+    pub static_members: HashMap<String, Type>,
     pub discriminant_name: String,
     pub fields: HashMap<String, Type>,
 }
@@ -277,12 +280,14 @@ impl Type {
 
         Type::Enum(Enum {
             type_identifier: option_ident,
+            static_members: HashMap::new(),
             shared_fields: HashMap::new(),
             members: vec![
                 (
                     "Some".to_string(),
                     Type::EnumMember(EnumMember {
                         enum_name: some_member_ident,
+                        static_members: HashMap::new(),
                         discriminant_name: "Some".to_string(),
                         fields: vec![(
                             "value".to_string(),
@@ -298,6 +303,7 @@ impl Type {
                     "None".to_string(),
                     Type::EnumMember(EnumMember {
                         enum_name: none_member_ident,
+                        static_members: HashMap::new(),
                         discriminant_name: "None".to_string(),
                         fields: HashMap::new(),
                     }),
@@ -314,6 +320,7 @@ impl Type {
                 "Option".to_string(),
                 vec![concrete.type_annotation()],
             ),
+            static_members: HashMap::new(),
             shared_fields: HashMap::new(),
             members: vec![
                 (
@@ -323,6 +330,7 @@ impl Type {
                             "Option".to_string(),
                             vec![concrete.type_annotation()],
                         ),
+                        static_members: HashMap::new(),
                         discriminant_name: "Some".to_string(),
                         fields: vec![("f0".to_string(), concrete.clone())]
                             .into_iter()
@@ -336,6 +344,7 @@ impl Type {
                             "Option".to_string(),
                             vec![concrete.type_annotation()],
                         ),
+                        static_members: HashMap::new(),
                         discriminant_name: "None".to_string(),
                         fields: HashMap::new(),
                     }),
@@ -469,6 +478,26 @@ impl Type {
                     type_map.insert(gt, ta);
                 }
 
+                let mut static_members = HashMap::new();
+
+                for (static_member_name, static_member_type) in s.static_members.iter() {
+                    let Type::Generic(generic) = static_member_type.clone() else {
+                        static_members
+                            .insert(static_member_name.clone(), static_member_type.clone());
+                        continue;
+                    };
+
+                    let concrete_type = type_map.get(&generic).ok_or(format!(
+                        "No concrete type found for generic type {}",
+                        generic.type_name
+                    ))?;
+
+                    let concrete_type =
+                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+
+                    static_members.insert(static_member_name.clone(), concrete_type);
+                }
+
                 let mut fields = HashMap::new();
 
                 for (field_name, field_type) in s.fields.iter() {
@@ -490,6 +519,7 @@ impl Type {
 
                 Ok(Type::Struct(Struct {
                     type_identifier: TypeIdentifier::ConcreteType(name, concrete_types),
+                    static_members,
                     fields,
                 }))
             }
@@ -509,6 +539,26 @@ impl Type {
 
                 let type_identifier =
                     TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone());
+
+                let mut static_members = HashMap::new();
+
+                for (static_member_name, static_member_type) in u.static_members.iter() {
+                    let Type::Generic(generic) = static_member_type.clone() else {
+                        static_members
+                            .insert(static_member_name.clone(), static_member_type.clone());
+                        continue;
+                    };
+
+                    let concrete_type = type_map.get(&generic).ok_or(format!(
+                        "No concrete type found for generic type {}",
+                        generic.type_name
+                    ))?;
+
+                    let concrete_type =
+                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+
+                    static_members.insert(static_member_name.clone(), concrete_type);
+                }
 
                 let mut shared_fields = HashMap::new();
 
@@ -539,6 +589,29 @@ impl Type {
                         ));
                     };
 
+                    let mut static_members = HashMap::new();
+
+                    for (static_member_name, static_member_type) in u.static_members.iter() {
+                        let Type::Generic(generic) = static_member_type.clone() else {
+                            static_members
+                                .insert(static_member_name.clone(), static_member_type.clone());
+                            continue;
+                        };
+
+                        let concrete_type = type_map.get(&generic).ok_or(format!(
+                            "No concrete type found for generic type {}",
+                            generic.type_name
+                        ))?;
+
+                        let concrete_type = check_type_annotation(
+                            &concrete_type,
+                            &vec![],
+                            type_environment.clone(),
+                        )?;
+
+                        static_members.insert(static_member_name.clone(), concrete_type);
+                    }
+
                     let mut fields = HashMap::new();
 
                     for (field_name, field_type) in u.fields.iter() {
@@ -566,6 +639,7 @@ impl Type {
                             name.clone(),
                             concrete_types.clone(),
                         ),
+                        static_members,
                         discriminant_name: member_name.clone(),
                         fields,
                     });
@@ -575,18 +649,15 @@ impl Type {
 
                 let enum_ = Type::Enum(Enum {
                     type_identifier,
+                    static_members,
                     shared_fields,
                     members,
                 });
 
                 Ok(enum_)
             }
-            Type::EnumMember(EnumMember {
-                enum_name,
-                discriminant_name,
-                fields,
-            }) => {
-                let TypeIdentifier::GenericType(name, generics) = enum_name else {
+            Type::EnumMember(em) => {
+                let TypeIdentifier::GenericType(name, generics) = em.enum_name.clone() else {
                     return Err(format!(
                         "Cannot clone concrete types for enum {}",
                         self.full_name()
@@ -599,9 +670,29 @@ impl Type {
                     type_map.insert(gt, ta);
                 }
 
+                let mut static_members = HashMap::new();
+
+                for (static_member_name, static_member_type) in em.static_members.iter() {
+                    let Type::Generic(generic) = static_member_type.clone() else {
+                        static_members
+                            .insert(static_member_name.clone(), static_member_type.clone());
+                        continue;
+                    };
+
+                    let concrete_type = type_map.get(&generic).ok_or(format!(
+                        "No concrete type found for generic type {}",
+                        generic.type_name
+                    ))?;
+
+                    let concrete_type =
+                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+
+                    static_members.insert(static_member_name.clone(), concrete_type);
+                }
+
                 let mut cloned_fields = HashMap::new();
 
-                for (field_name, field_type) in fields.iter() {
+                for (field_name, field_type) in em.fields.iter() {
                     let Type::Generic(generic) = field_type else {
                         cloned_fields.insert(field_name.clone(), field_type.clone());
                         continue;
@@ -620,7 +711,8 @@ impl Type {
 
                 let member_type = Type::EnumMember(EnumMember {
                     enum_name: TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone()),
-                    discriminant_name: discriminant_name.clone(),
+                    static_members,
+                    discriminant_name: em.discriminant_name.clone(),
                     fields: cloned_fields,
                 });
 
