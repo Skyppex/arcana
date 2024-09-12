@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     lexer::token::{self, IdentifierType, Keyword, TokenKind},
-    type_checker::{
-        decision_tree::{Constructor, FieldPattern, Pattern},
-        Type,
-    },
+    type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
     types::{parse_generics_in_type_name, parse_optional_type_annotation, TypeAnnotation},
 };
 
@@ -14,6 +11,7 @@ use super::{
     ClosureParameter, EnumMemberFieldInitializers, Expression, FieldInitializer, For, If, Literal,
     Match, MatchArm, Member, Statement, Unary, UnaryOperator, VariableDeclaration, While,
 };
+
 use crate::types::parse_type_annotation;
 
 pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
