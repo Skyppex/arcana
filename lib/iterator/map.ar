@@ -10,16 +10,16 @@ pub struct Map<TIterator, TFunc> {
 pub fun map<TIter, TFrom, TTo>(
     self: TIter,
     mapper: fun(TFrom): TTo): Map<Self, TFrom, TTo>
-where TIter: Iterator<Self::Item = TFrom> => {
+where TIter: Iterator<Item = TFrom> => {
     Map { self: self, mapper: mapper  }
 }
 
 imp<T, TIterator, TFunc> Iterator for Map<TIterator, TFunc> {
     type Item = T;
 
-    fun next(&mut self): Option<Self::Item> => {
+    fun next(self: Self): Option<Item> => {
         self.iterator.next() match
-        | Some(item) => Some(self.mapper(item)),
+        | Some { value } => Some(self.mapper(value)),
         | None => None
     }
 }
