@@ -274,15 +274,22 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
+
+        let (param, return_type_annotation) =
+            unwrap_parameters_only(params, return_type_annotation)?;
+
         return Ok(Statement::FunctionDeclaration(FunctionDeclaration {
             access_modifier,
             type_identifier,
-            param: None,
+            param,
             return_type_annotation,
+            where_clause: None,
             body: None,
             signature_only: true,
         }));
     }
+
+    let where_clause = parse_where_clause(cursor)?;
 
     let TokenKind::FatArrow = cursor.bump()?.kind else {
         return Err(format!("Expected => but found {:?}", cursor.first().kind));
@@ -294,10 +301,34 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         type_identifier,
         params,
         return_type_annotation.clone(),
+        where_clause,
         body,
     )?;
 
     Ok(body)
+}
+
+fn unwrap_parameters_only(
+    params: Vec<Parameter>,
+    return_type_annotation: Option<TypeAnnotation>,
+) -> Result<(Option<Parameter>, Option<TypeAnnotation>), String> {
+    match params.last().cloned() {
+        None => Ok((None, return_type_annotation)),
+        Some(last) => {
+            if params.len() == 1 {
+                return Ok((Some(last), return_type_annotation));
+            }
+
+            let new_return_type_annotation = return_type_annotation.map(|r| {
+                TypeAnnotation::Function(Some(Box::new(last.type_annotation)), Some(Box::new(r)))
+            });
+
+            unwrap_parameters_only(
+                params.into_iter().rev().skip(1).rev().collect(),
+                new_return_type_annotation,
+            )
+        }
+    }
 }
 
 fn unwrap_parameters(
@@ -305,6 +336,7 @@ fn unwrap_parameters(
     type_identifier: TypeIdentifier,
     params: Vec<Parameter>,
     return_type_annotation: Option<TypeAnnotation>,
+    where_clause: Option<Vec<GenericConstraint>>,
     body: Expression,
 ) -> Result<Statement, String> {
     match params.first().cloned() {
@@ -313,6 +345,7 @@ fn unwrap_parameters(
             type_identifier,
             param: None,
             return_type_annotation,
+            where_clause,
             body: Some(body),
             signature_only: false,
         })),
@@ -328,6 +361,7 @@ fn unwrap_parameters(
                 type_identifier,
                 param: Some(first),
                 return_type_annotation: new_return_type_annotation,
+                where_clause,
                 body: Some(new_body),
                 signature_only: false,
             }))
@@ -451,11 +485,14 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
         return Err(format!("Invalid type name: {}", type_name.name()));
     }
 
+    let where_clause = parse_where_clause(cursor)?;
+
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
         return Ok(Statement::EnumDeclaration(EnumDeclaration {
             access_modifier,
             type_identifier: type_name,
+            where_clause: None,
             shared_fields: vec![],
             members: vec![],
         }));
@@ -496,6 +533,7 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
     Ok(Statement::EnumDeclaration(EnumDeclaration {
         access_modifier,
         type_identifier: type_name,
+        where_clause,
         shared_fields,
         members,
     }))
@@ -710,6 +748,10 @@ fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> 
     }
 
     cursor.expect(TokenKind::CloseBrace)?;
+
+    for function in functions.iter() {
+        println!("FUNFUN: {:?}", function.param);
+    }
 
     Ok(Statement::ProtocolDeclaration(ProtocolDeclaration {
         access_modifier,
@@ -1065,7 +1107,7 @@ fn parse_where_clause(cursor: &mut Cursor) -> Result<Option<Vec<GenericConstrain
 
     let mut constraints = vec![];
 
-    while !matches!(cursor.first().kind, TokenKind::Comma | TokenKind::OpenBrace) {
+    while !matches!(cursor.first().kind, TokenKind::Comma | TokenKind::FatArrow) {
         constraints.push(parse_generic_constraint(cursor)?);
     }
 
@@ -1099,8 +1141,8 @@ fn parse_generic_constraint(cursor: &mut Cursor) -> Result<GenericConstraint, St
             break;
         }
 
-        let type_identifier = parse_type_identifier(cursor, false)?;
-        constraints.push(type_identifier);
+        let type_annotation = parse_type_annotation(cursor, false)?;
+        constraints.push(type_annotation);
 
         if cursor.first().kind == TokenKind::Keyword(Keyword::And) {
             cursor.bump()?; // Consume the and

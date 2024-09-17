@@ -114,6 +114,7 @@ pub struct StructDeclaration {
 pub struct EnumDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
+    pub where_clause: Option<Vec<GenericConstraint>>,
     pub shared_fields: Vec<StructField>,
     pub members: Vec<EnumMember>,
 }
@@ -167,6 +168,7 @@ pub struct FunctionDeclaration {
     pub type_identifier: TypeIdentifier,
     pub param: Option<Parameter>,
     pub return_type_annotation: Option<TypeAnnotation>,
+    pub where_clause: Option<Vec<GenericConstraint>>,
     pub body: Option<Expression>,
     pub signature_only: bool,
 }

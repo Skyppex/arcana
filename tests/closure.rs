@@ -10,7 +10,7 @@ use shared::type_checker::{
 #[test]
 fn closure_is_closure() {
     // Arrange
-
+    // lang=arcana
     let input = "|| {}";
 
     // Act
@@ -28,6 +28,7 @@ fn closure_is_closure() {
 #[test]
 fn closure_has_correct_type() {
     // Arrange
+    // lang=arcana
     let input = "|| {}";
 
     // Act
@@ -52,6 +53,7 @@ fn closure_has_correct_type() {
 #[test]
 fn closure_has_correct_type_with_param_and_return() {
     // Arrange
+    // lang=arcana
     let input = "|x: Int|: Int x";
 
     // Act
@@ -79,6 +81,7 @@ fn closure_has_correct_type_with_param_and_return() {
 #[test]
 fn closure_evaluates_correctly() {
     // Arrange
+    // lang=arcana
     let input = "(|x: Int|: Int x)(1)";
 
     // Act
@@ -91,6 +94,7 @@ fn closure_evaluates_correctly() {
 #[test]
 fn closure_captures_environment() {
     // Arrange
+    // lang=arcana
     let input = r#"
         let x: Int = 1;
         (||: Int x)()
@@ -106,6 +110,7 @@ fn closure_captures_environment() {
 #[test]
 fn closure_captures_function_environment() {
     // Arrange
+    // lang=arcana
     let input = r#"
         fun add(x: Int): fun(Int): Int => {
             |y: Int|: Int x + y
@@ -124,6 +129,7 @@ fn closure_captures_function_environment() {
 #[test]
 fn closure_with_multiple_params_evaluates_correctly() {
     // Arrange
+    // lang=arcana
     let input = r#"
         (|x: Int, y: Int, z: Int|: Int x + y + z)(1, 2, 3)
     "#;
@@ -138,6 +144,7 @@ fn closure_with_multiple_params_evaluates_correctly() {
 #[test]
 fn closure_return_type_is_inferred() {
     // Arrange
+    // lang=arcana
     let input = r#"
         fun a(op: fun(): Int): Int => op()
         a(|| 5)
@@ -153,6 +160,7 @@ fn closure_return_type_is_inferred() {
 #[test]
 fn closure_param_type_is_inferred() {
     // Arrange
+    // lang=arcana
     let input = r#"
         fun a(op: fun(Int): Int): Int => op(8)
         a(|x| x)
@@ -168,6 +176,7 @@ fn closure_param_type_is_inferred() {
 #[test]
 fn closure_voids_body_if_return_type_is_void() {
     // Arrange
+    // lang=arcana
     let input = r#"
         fun a(op: fun(Int)) => op(0)
         a(|x| x)

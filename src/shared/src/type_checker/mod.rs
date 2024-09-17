@@ -89,7 +89,7 @@ pub struct EnumMember {
 
 impl EnumMember {
     pub fn type_annotation(&self) -> TypeAnnotation {
-        TypeAnnotation::Type(self.discriminant_name.clone())
+        TypeAnnotation::Type(format!("{}::{}", self.enum_name, self.discriminant_name))
     }
 }
 
@@ -181,7 +181,7 @@ impl FullName for TypeAlias {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Protocol {
     pub type_identifier: TypeIdentifier,
-    pub functions: Vec<TypeIdentifier>,
+    pub functions: Vec<(TypeIdentifier, Type)>,
 }
 
 impl FullName for Protocol {
@@ -439,6 +439,8 @@ impl Type {
 
     pub fn type_annotation(&self) -> TypeAnnotation {
         match self {
+            // NOTE: Uncomment this line if you want to see the underlying errors related to unknown types in protocols.
+            // Type::Unknown => TypeAnnotation::Type("{unknown}".to_string())
             Type::Substitution { actual_type, .. } => actual_type.type_annotation(),
             Type::Generic(name) => TypeAnnotation::Type(name.type_name.clone()),
             Type::Void => TypeAnnotation::Type("Void".to_string()),

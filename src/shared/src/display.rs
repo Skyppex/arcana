@@ -201,6 +201,7 @@ impl IndentDisplay for Statement {
             Statement::EnumDeclaration(EnumDeclaration {
                 access_modifier,
                 type_identifier,
+                where_clause,
                 shared_fields,
                 members,
             }) => {
@@ -221,6 +222,15 @@ impl IndentDisplay for Statement {
                         "{}access_modifier: {}",
                         indent.dash(),
                         access_modifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "\n{}where_clause: {}",
+                        indent.dash(),
+                        where_clause.indent_display(indent)
                     )
                     .as_str(),
                 );
@@ -1652,6 +1662,62 @@ impl IndentDisplay for Pattern {
 
                 indent.decrease();
 
+                result
+            }
+            Pattern::LessThan(v) => {
+                let mut result = String::new();
+                result.push_str("<less than pattern>");
+                indent.increase();
+                result.push_str(
+                    format!("\n{}value: {}", indent.dash(), v.indent_display(indent)).as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            Pattern::GreaterThan(v) => {
+                let mut result = String::new();
+                result.push_str("<greater than pattern>");
+                indent.increase();
+                result.push_str(
+                    format!("\n{}value: {}", indent.dash(), v.indent_display(indent)).as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            Pattern::LessThanOrEqual(v) => {
+                let mut result = String::new();
+                result.push_str("<less than or equal pattern>");
+                indent.increase();
+                result.push_str(
+                    format!("\n{}value: {}", indent.dash(), v.indent_display(indent)).as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            Pattern::GreaterThanOrEqual(v) => {
+                let mut result = String::new();
+                result.push_str("<greater than or equal pattern>");
+                indent.increase();
+                result.push_str(
+                    format!("\n{}value: {}", indent.dash(), v.indent_display(indent)).as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            Pattern::Range(left, right, inclusive) => {
+                let mut result = String::new();
+                result.push_str("<range pattern>");
+                indent.increase();
+                result.push_str(
+                    format!("\n{}left: {}", indent.dash(), left.indent_display(indent)).as_str(),
+                );
+                result.push_str(
+                    format!("\n{}right: {}", indent.dash(), right.indent_display(indent)).as_str(),
+                );
+                indent.end_current();
+                result
+                    .push_str(format!("\n{}inclusive: {}", indent.dash_end(), inclusive).as_str());
+                indent.decrease();
                 result
             }
         }
@@ -3425,6 +3491,12 @@ impl<T: IndentDisplay> IndentDisplay for Box<T> {
 impl<T: IndentDisplay> IndentDisplay for &T {
     fn indent_display(&self, indent: &mut Indent) -> String {
         (*self).indent_display(indent)
+    }
+}
+
+impl<T: IndentDisplay> IndentDisplay for Vec<T> {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        indent_display_vec(self, "vec", "item", indent)
     }
 }
 

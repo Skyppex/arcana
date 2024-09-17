@@ -1231,6 +1231,36 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
+    let pattern = get_pattern(cursor)?;
+
+    println!("Parsing pattern");
+
+    if cursor.first().kind == TokenKind::DoubleDot {
+        cursor.bump()?; // Consume the ..
+
+        println!("Parsing range");
+
+        let inclusive = cursor.first().kind == TokenKind::Equal;
+
+        if inclusive {
+            cursor.bump()?; // Consume the =
+
+            println!("Inclusive range");
+        }
+
+        let right = parse_pattern(cursor)?;
+
+        return Ok(Pattern::Range(
+            Box::new(pattern),
+            Box::new(right),
+            inclusive,
+        ));
+    }
+
+    Ok(pattern)
+}
+
+fn get_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
     match cursor.first().kind {
         TokenKind::Underscore => {
             cursor.bump()?; // Consume the _
@@ -1323,6 +1353,26 @@ fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
             cursor.bump()?; // Consume the identifier
 
             Ok(Pattern::Variable(identifier))
+        }
+        TokenKind::Less => {
+            cursor.bump()?; // Consume the <
+            let pattern = parse_pattern(cursor)?;
+            Ok(Pattern::LessThan(Box::new(pattern)))
+        }
+        TokenKind::Greater => {
+            cursor.bump()?; // Consume the >
+            let pattern = parse_pattern(cursor)?;
+            Ok(Pattern::GreaterThan(Box::new(pattern)))
+        }
+        TokenKind::LessEqual => {
+            cursor.bump()?; // Consume the <=
+            let pattern = parse_pattern(cursor)?;
+            Ok(Pattern::LessThanOrEqual(Box::new(pattern)))
+        }
+        TokenKind::GreaterEqual => {
+            cursor.bump()?; // Consume the >=
+            let pattern = parse_pattern(cursor)?;
+            Ok(Pattern::GreaterThanOrEqual(Box::new(pattern)))
         }
         _ => Err(format!(
             "Unknown start of pattern: {:?}",

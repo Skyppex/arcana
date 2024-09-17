@@ -491,6 +491,7 @@ impl Typed for TypedExpression {
             TypedExpression::Continue => Type::Void,
             TypedExpression::Return(_) => Type::Void,
         }
+        .unsubstitute()
     }
 
     fn get_deep_type(&self) -> Type {
@@ -517,6 +518,7 @@ impl Typed for TypedExpression {
             TypedExpression::Continue => Type::Void,
             TypedExpression::Return(_) => Type::Void,
         }
+        .unsubstitute()
     }
 }
 

@@ -349,7 +349,7 @@ fn evaluate_decision_tree(
                     }
                 }
 
-                if let Some(bindings) = evaluate_pattern(pattern, &value)? {
+                if let Some(bindings) = evaluate_pattern(pattern, &value, environment.clone())? {
                     for (identifier, value) in bindings {
                         println!("Adding variable: {} = {:?}", identifier, value);
 
@@ -370,6 +370,7 @@ fn evaluate_decision_tree(
 fn evaluate_pattern(
     pattern: Pattern,
     value: &Value,
+    environment: Rcrc<Environment>,
 ) -> Result<Option<Vec<(String, Value)>>, String> {
     match pattern {
         Pattern::Wildcard => Ok(Some(Vec::new())),
@@ -495,7 +496,7 @@ fn evaluate_pattern(
                 println!("Recurse");
                 println!("Field Pattern: {:?}", pattern);
 
-                match evaluate_pattern(pattern, field_value)? {
+                match evaluate_pattern(pattern, field_value, environment.clone())? {
                     Some(mut bindings_) => {
                         println!("Uncurse");
                         for b in bindings_.iter() {
@@ -512,6 +513,394 @@ fn evaluate_pattern(
             }
 
             Ok(Some(bindings))
+        }
+        Pattern::LessThan(v) => match (*v, value) {
+            (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
+                if *v2 < v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::Int(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 < v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
+                if *v2 < v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::UInt(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 < v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
+                if *v2 < v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::Float(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 < v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            other => Err(format!("Unexpected pattern: '{:?}'", other)),
+        },
+        Pattern::GreaterThan(v) => match (*v, value) {
+            (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
+                if *v2 > v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::Int(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 > v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
+                if *v2 > v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::UInt(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 > v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
+                if *v2 > v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::Float(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 > v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            other => Err(format!("Unexpected pattern: '{:?}'", other)),
+        },
+        Pattern::LessThanOrEqual(v) => match (*v, value) {
+            (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
+                if *v2 <= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::Int(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 <= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
+                if *v2 <= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::UInt(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 <= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
+                if *v2 <= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::Float(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 <= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            other => Err(format!("Unexpected pattern: '{:?}'", other)),
+        },
+        Pattern::GreaterThanOrEqual(v) => match (*v, value) {
+            (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
+                if *v2 >= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::Int(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 >= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
+                if *v2 >= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::UInt(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 >= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
+                if *v2 >= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
+                let Some(variable) = environment.borrow().get_variable(&v) else {
+                    return Err(format!("Variable '{}' not found", v));
+                };
+
+                let Value::Number(Number::Float(v)) = variable.borrow().value.clone() else {
+                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
+                };
+
+                if *v2 >= v {
+                    Ok(Some(Vec::new()))
+                } else {
+                    Ok(None)
+                }
+            }
+            other => Err(format!("Unexpected pattern: '{:?}'", other)),
+        },
+        Pattern::Range(left, right, inclusive) => {
+            let left = match *left {
+                Pattern::Int(v) => Value::Number(Number::Int(v)),
+                Pattern::UInt(v) => Value::Number(Number::UInt(v)),
+                Pattern::Float(v) => Value::Number(Number::Float(v)),
+                Pattern::Variable(v) => {
+                    let variable = environment
+                        .borrow()
+                        .get_variable(&v)
+                        .ok_or(format!("Variable '{}' not found in env", v))?;
+
+                    let value = variable.borrow().value.clone();
+
+                    if !matches!(value, Value::Number(_)) {
+                        return Err(format!("Expected number, found '{}'", value));
+                    }
+
+                    value
+                }
+                other => return Err(format!("Unexpected pattern: '{:?}'", other)),
+            };
+
+            let right = match *right {
+                Pattern::Int(v) => Value::Number(Number::Int(v)),
+                Pattern::UInt(v) => Value::Number(Number::UInt(v)),
+                Pattern::Float(v) => Value::Number(Number::Float(v)),
+                Pattern::Variable(v) => {
+                    let variable = environment
+                        .borrow()
+                        .get_variable(&v)
+                        .ok_or(format!("Variable '{}' not found in env", v))?;
+
+                    let value = variable.borrow().value.clone();
+
+                    if !matches!(value, Value::Number(_)) {
+                        return Err(format!("Expected number, found '{}'", value));
+                    }
+
+                    value
+                }
+                other => return Err(format!("Unexpected pattern: '{:?}'", other)),
+            };
+
+            println!("ALKSJHDLKAJSHDLKJAHSD");
+            println!("Left: {:?}", left);
+            println!("Right: {:?}", right);
+            println!("Value: {:?}", value);
+
+            match (left, value, right) {
+                (
+                    Value::Number(Number::Int(left)),
+                    Value::Number(Number::Int(v)),
+                    Value::Number(Number::Int(right)),
+                ) => {
+                    if inclusive {
+                        if *v >= left && *v <= right {
+                            Ok(Some(Vec::new()))
+                        } else {
+                            Ok(None)
+                        }
+                    } else {
+                        if *v >= left && *v < right {
+                            Ok(Some(Vec::new()))
+                        } else {
+                            Ok(None)
+                        }
+                    }
+                }
+                (
+                    Value::Number(Number::UInt(left)),
+                    Value::Number(Number::UInt(v)),
+                    Value::Number(Number::UInt(right)),
+                ) => {
+                    if inclusive {
+                        if *v >= left && *v <= right {
+                            Ok(Some(Vec::new()))
+                        } else {
+                            Ok(None)
+                        }
+                    } else {
+                        if *v >= left && *v < right {
+                            Ok(Some(Vec::new()))
+                        } else {
+                            Ok(None)
+                        }
+                    }
+                }
+                (
+                    Value::Number(Number::Float(left)),
+                    Value::Number(Number::Float(v)),
+                    Value::Number(Number::Float(right)),
+                ) => {
+                    if inclusive {
+                        if *v >= left && *v <= right {
+                            Ok(Some(Vec::new()))
+                        } else {
+                            Ok(None)
+                        }
+                    } else {
+                        if *v >= left && *v < right {
+                            Ok(Some(Vec::new()))
+                        } else {
+                            Ok(None)
+                        }
+                    }
+                }
+                other => Err(format!(
+                    "Expected number, found '{}', '{}', '{}'",
+                    other.0, other.1, other.2
+                )),
+            }
         }
     }
 }

@@ -1,6 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::types::{TypeAnnotation, TypeIdentifier};
+use crate::{
+    type_checker::Protocol,
+    types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
+};
 
 use super::{
     scope::{Scope, ScopeType},
@@ -160,6 +163,37 @@ impl TypeEnvironment {
         Ok(())
     }
 
+    pub fn add_generic_constraint(&mut self, constraint: &GenericConstraint) -> Result<(), String> {
+        let GenericConstraint {
+            generic: GenericType { type_name },
+            constraints,
+        } = constraint;
+
+        for constraint in constraints {
+            let constraint_type = self.get_type_from_annotation(constraint)?;
+            let Some(generic_type) = self.get_type_from_str(type_name) else {
+                return Err(format!("Type {} not found", type_name));
+            };
+
+            let generic_annotation = generic_type.type_annotation();
+
+            if let Type::Protocol(Protocol { functions, .. }) = constraint_type {
+                for (function_identifier, function_type) in functions {
+                    println!("Function Type: {:?}", function_type);
+                    let name = function_identifier.name();
+
+                    self.add_static_member(
+                        generic_annotation.clone(),
+                        name.to_owned(),
+                        function_type,
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn get_type_from_str(&self, type_str: &str) -> Option<Type> {
         self.types
             .get(&TypeIdentifier::Type(type_str.to_string()))
@@ -278,9 +312,20 @@ impl TypeEnvironment {
             .and_then(|members| members.get(member_name))
             .cloned()
             .or_else(|| {
-                self.parent
-                    .as_ref()
-                    .and_then(|p| p.borrow().get_static_member(type_annotation, member_name))
+                if type_annotation.has_double_colon() {
+                    let type_annotation_name = &type_annotation.to_string();
+                    let parts = type_annotation_name.split("::").collect::<Vec<_>>();
+                    let type_name = parts[0];
+
+                    self.static_members
+                        .get(&TypeAnnotation::Type(type_name.to_owned()))
+                        .and_then(|members| members.get(member_name))
+                        .cloned()
+                } else {
+                    self.parent
+                        .as_ref()
+                        .and_then(|p| p.borrow().get_static_member(type_annotation, member_name))
+                }
             })
     }
     pub fn lookup_type(&self, type_: &Type) -> bool {

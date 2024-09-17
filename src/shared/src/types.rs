@@ -318,7 +318,7 @@ impl Display for GenericType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GenericConstraint {
     pub generic: GenericType,
-    pub constraints: Vec<TypeIdentifier>,
+    pub constraints: Vec<TypeAnnotation>,
 }
 
 pub(super) fn parse_optional_type_annotation(

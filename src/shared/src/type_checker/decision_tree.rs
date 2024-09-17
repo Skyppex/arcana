@@ -34,6 +34,11 @@ pub enum Pattern {
     String(String),
     Variable(String),
     Constructor(Constructor),
+    LessThan(Box<Pattern>),
+    GreaterThan(Box<Pattern>),
+    LessThanOrEqual(Box<Pattern>),
+    GreaterThanOrEqual(Box<Pattern>),
+    Range(Box<Pattern>, Box<Pattern>, bool),
 }
 
 impl Display for Pattern {
@@ -60,6 +65,13 @@ impl Display for Pattern {
                     write!(f, "{}", field_pattern)?;
                 }
                 write!(f, " }}")
+            }
+            Pattern::LessThan(p) => write!(f, "<{}", p),
+            Pattern::GreaterThan(p) => write!(f, ">{}", p),
+            Pattern::LessThanOrEqual(p) => write!(f, "<={}", p),
+            Pattern::GreaterThanOrEqual(p) => write!(f, ">={}", p),
+            Pattern::Range(p1, p2, inclusive) => {
+                write!(f, "{}..{}{}", p1, p2, if *inclusive { "=" } else { "" })
             }
         }
     }
@@ -573,7 +585,7 @@ pub fn create_decision_tree(
             type_annotation,
             field_patterns,
         }) => {
-            let matchee_type = matchee.get_type().unsubstitute();
+            let matchee_type = matchee.get_type();
             println!("matchee_type: {:?}", matchee_type);
 
             let mut is_enum_member = false;
@@ -804,6 +816,398 @@ pub fn create_decision_tree(
                 fallback: Box::new(fallback),
                 type_: field_type.clone(),
             })
+        }
+        Pattern::LessThan(value) => {
+            if !matches!(
+                *value,
+                Pattern::Int(_) | Pattern::UInt(_) | Pattern::Float(_) | Pattern::Variable(_)
+            ) {
+                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
+            }
+
+            let expression = &arm.expression;
+            let type_environment = &arm.type_environment;
+            let expression =
+                check_type(expression, discovered_types, type_environment.clone(), None)?;
+
+            let type_ = expression.get_type();
+
+            if let Some(body_type) = body_type {
+                if !type_equals_coerce(&body_type, &type_) {
+                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
+                }
+            }
+
+            let alternative = create_decision_tree(
+                matchee.clone(),
+                arms.clone().into_iter().skip(1).collect(),
+                discovered_types,
+                Some(type_.clone()),
+            )?;
+
+            let decision = Decision::Guard {
+                condition: Box::new(TypedExpression::Binary {
+                    left: Box::new(matchee),
+                    operator: BinaryOperator::LessThan,
+                    right: match *value {
+                        Pattern::Int(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Int(v),
+                        )),
+                        Pattern::UInt(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::UInt(v),
+                        )),
+                        Pattern::Float(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Float(v),
+                        )),
+                        Pattern::Variable(v) => {
+                            let variable_type = type_environment
+                                .borrow()
+                                .get_variable(&v)
+                                .expect("testing matches");
+
+                            Box::new(TypedExpression::Member(Member::Identifier {
+                                symbol: v.clone(),
+                                type_: variable_type.clone(),
+                            }))
+                        }
+                        _ => unreachable!(
+                            "Already checked if the value is Int, UInt, Float or Identifier"
+                        ),
+                    },
+                    type_: Type::Bool,
+                }),
+                consequence: Box::new(Decision::Success {
+                    expression: Box::new(expression),
+                    type_: type_.clone(),
+                }),
+                alternative: Box::new(alternative),
+                type_,
+            };
+
+            Ok(decision)
+        }
+        Pattern::GreaterThan(value) => {
+            if !matches!(
+                *value,
+                Pattern::Int(_) | Pattern::UInt(_) | Pattern::Float(_) | Pattern::Variable(_)
+            ) {
+                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
+            }
+
+            let expression = &arm.expression;
+            let type_environment = &arm.type_environment;
+            let expression =
+                check_type(expression, discovered_types, type_environment.clone(), None)?;
+
+            let type_ = expression.get_type();
+
+            if let Some(body_type) = body_type {
+                if !type_equals_coerce(&body_type, &type_) {
+                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
+                }
+            }
+
+            let alternative = create_decision_tree(
+                matchee.clone(),
+                arms.clone().into_iter().skip(1).collect(),
+                discovered_types,
+                Some(type_.clone()),
+            )?;
+
+            let decision = Decision::Guard {
+                condition: Box::new(TypedExpression::Binary {
+                    left: Box::new(matchee),
+                    operator: BinaryOperator::GreaterThan,
+                    right: match *value {
+                        Pattern::Int(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Int(v),
+                        )),
+                        Pattern::UInt(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::UInt(v),
+                        )),
+                        Pattern::Float(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Float(v),
+                        )),
+                        Pattern::Variable(v) => {
+                            let variable_type = type_environment
+                                .borrow()
+                                .get_variable(&v)
+                                .expect("testing matches");
+
+                            Box::new(TypedExpression::Member(Member::Identifier {
+                                symbol: v.clone(),
+                                type_: variable_type.clone(),
+                            }))
+                        }
+                        _ => unreachable!(
+                            "Already checked if the value is Int, UInt, Float or Identifier"
+                        ),
+                    },
+                    type_: Type::Bool,
+                }),
+                consequence: Box::new(Decision::Success {
+                    expression: Box::new(expression),
+                    type_: type_.clone(),
+                }),
+                alternative: Box::new(alternative),
+                type_,
+            };
+
+            Ok(decision)
+        }
+        Pattern::LessThanOrEqual(value) => {
+            if !matches!(
+                *value,
+                Pattern::Int(_) | Pattern::UInt(_) | Pattern::Float(_) | Pattern::Variable(_)
+            ) {
+                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
+            }
+
+            let expression = &arm.expression;
+            let type_environment = &arm.type_environment;
+            let expression =
+                check_type(expression, discovered_types, type_environment.clone(), None)?;
+
+            let type_ = expression.get_type();
+
+            if let Some(body_type) = body_type {
+                if !type_equals_coerce(&body_type, &type_) {
+                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
+                }
+            }
+
+            let alternative = create_decision_tree(
+                matchee.clone(),
+                arms.clone().into_iter().skip(1).collect(),
+                discovered_types,
+                Some(type_.clone()),
+            )?;
+
+            let decision = Decision::Guard {
+                condition: Box::new(TypedExpression::Binary {
+                    left: Box::new(matchee),
+                    operator: BinaryOperator::LessThanOrEqual,
+                    right: match *value {
+                        Pattern::Int(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Int(v),
+                        )),
+                        Pattern::UInt(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::UInt(v),
+                        )),
+                        Pattern::Float(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Float(v),
+                        )),
+                        Pattern::Variable(v) => {
+                            let variable_type = type_environment
+                                .borrow()
+                                .get_variable(&v)
+                                .expect("testing matches");
+
+                            Box::new(TypedExpression::Member(Member::Identifier {
+                                symbol: v.clone(),
+                                type_: variable_type.clone(),
+                            }))
+                        }
+                        _ => unreachable!(
+                            "Already checked if the value is Int, UInt, Float or Identifier"
+                        ),
+                    },
+                    type_: Type::Bool,
+                }),
+                consequence: Box::new(Decision::Success {
+                    expression: Box::new(expression),
+                    type_: type_.clone(),
+                }),
+                alternative: Box::new(alternative),
+                type_,
+            };
+
+            Ok(decision)
+        }
+        Pattern::GreaterThanOrEqual(value) => {
+            if !matches!(
+                *value,
+                Pattern::Int(_) | Pattern::UInt(_) | Pattern::Float(_) | Pattern::Variable(_)
+            ) {
+                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
+            }
+
+            let expression = &arm.expression;
+            let type_environment = &arm.type_environment;
+            let expression =
+                check_type(expression, discovered_types, type_environment.clone(), None)?;
+
+            let type_ = expression.get_type();
+
+            if let Some(body_type) = body_type {
+                if !type_equals_coerce(&body_type, &type_) {
+                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
+                }
+            }
+
+            let alternative = create_decision_tree(
+                matchee.clone(),
+                arms.clone().into_iter().skip(1).collect(),
+                discovered_types,
+                Some(type_.clone()),
+            )?;
+
+            let decision = Decision::Guard {
+                condition: Box::new(TypedExpression::Binary {
+                    left: Box::new(matchee),
+                    operator: BinaryOperator::GreaterThanOrEqual,
+                    right: match *value {
+                        Pattern::Int(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Int(v),
+                        )),
+                        Pattern::UInt(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::UInt(v),
+                        )),
+                        Pattern::Float(v) => Box::new(TypedExpression::Literal(
+                            crate::type_checker::ast::Literal::Float(v),
+                        )),
+                        Pattern::Variable(v) => {
+                            let variable_type = type_environment
+                                .borrow()
+                                .get_variable(&v)
+                                .expect("testing matches");
+
+                            Box::new(TypedExpression::Member(Member::Identifier {
+                                symbol: v.clone(),
+                                type_: variable_type.clone(),
+                            }))
+                        }
+                        _ => unreachable!(
+                            "Already checked if the value is Int, UInt, Float or Identifier"
+                        ),
+                    },
+                    type_: Type::Bool,
+                }),
+                consequence: Box::new(Decision::Success {
+                    expression: Box::new(expression),
+                    type_: type_.clone(),
+                }),
+                alternative: Box::new(alternative),
+                type_,
+            };
+
+            Ok(decision)
+        }
+        Pattern::Range(left, right, inclusive) => {
+            if !matches!(
+                (*left.clone(), *right.clone()),
+                (Pattern::Int(_), Pattern::Int(_))
+                    | (Pattern::Variable(_), Pattern::Int(_))
+                    | (Pattern::Int(_), Pattern::Variable(_))
+                    | (Pattern::UInt(_), Pattern::UInt(_))
+                    | (Pattern::Variable(_), Pattern::UInt(_))
+                    | (Pattern::UInt(_), Pattern::Variable(_))
+                    | (Pattern::Float(_), Pattern::Float(_))
+                    | (Pattern::Variable(_), Pattern::Float(_))
+                    | (Pattern::Float(_), Pattern::Variable(_))
+                    | (Pattern::Variable(_), Pattern::Variable(_))
+            ) {
+                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
+            }
+
+            let expression = &arm.expression;
+            let type_environment = &arm.type_environment;
+            let expression =
+                check_type(expression, discovered_types, type_environment.clone(), None)?;
+
+            let type_ = expression.get_type();
+
+            if let Some(body_type) = body_type {
+                if !type_equals_coerce(&body_type, &type_) {
+                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
+                }
+            }
+
+            let alternative = create_decision_tree(
+                matchee.clone(),
+                arms.clone().into_iter().skip(1).collect(),
+                discovered_types,
+                Some(type_.clone()),
+            )?;
+
+            let decision = Decision::Guard {
+                condition: Box::new(TypedExpression::Binary {
+                    left: Box::new(TypedExpression::Binary {
+                        left: Box::new(matchee.clone()),
+                        operator: BinaryOperator::GreaterThanOrEqual,
+                        right: match *left {
+                            Pattern::Int(v) => Box::new(TypedExpression::Literal(
+                                crate::type_checker::ast::Literal::Int(v),
+                            )),
+                            Pattern::UInt(v) => Box::new(TypedExpression::Literal(
+                                crate::type_checker::ast::Literal::UInt(v),
+                            )),
+                            Pattern::Float(v) => Box::new(TypedExpression::Literal(
+                                crate::type_checker::ast::Literal::Float(v),
+                            )),
+                            Pattern::Variable(v) => {
+                                let variable_type = type_environment
+                                    .borrow()
+                                    .get_variable(&v)
+                                    .expect("testing matches");
+
+                                Box::new(TypedExpression::Member(Member::Identifier {
+                                    symbol: v.clone(),
+                                    type_: variable_type.clone(),
+                                }))
+                            }
+                            _ => unreachable!(
+                                "Already checked if the value is Int, UInt, Float or Identifier"
+                            ),
+                        },
+                        type_: Type::Bool,
+                    }),
+                    operator: BinaryOperator::LogicalAnd,
+                    right: Box::new(TypedExpression::Binary {
+                        left: Box::new(matchee),
+                        operator: if inclusive {
+                            BinaryOperator::LessThanOrEqual
+                        } else {
+                            BinaryOperator::LessThan
+                        },
+                        right: match *right {
+                            Pattern::Int(v) => Box::new(TypedExpression::Literal(
+                                crate::type_checker::ast::Literal::Int(v),
+                            )),
+                            Pattern::UInt(v) => Box::new(TypedExpression::Literal(
+                                crate::type_checker::ast::Literal::UInt(v),
+                            )),
+                            Pattern::Float(v) => Box::new(TypedExpression::Literal(
+                                crate::type_checker::ast::Literal::Float(v),
+                            )),
+                            Pattern::Variable(v) => {
+                                let variable_type = type_environment
+                                    .borrow()
+                                    .get_variable(&v)
+                                    .expect("testing matches");
+
+                                Box::new(TypedExpression::Member(Member::Identifier {
+                                    symbol: v.clone(),
+                                    type_: variable_type.clone(),
+                                }))
+                            }
+                            _ => unreachable!(
+                                "Already checked if the value is Int, UInt, Float or Identifier"
+                            ),
+                        },
+                        type_: Type::Bool,
+                    }),
+                    type_: Type::Bool,
+                }),
+                consequence: Box::new(Decision::Success {
+                    expression: Box::new(expression),
+                    type_: type_.clone(),
+                }),
+                alternative: Box::new(alternative),
+                type_,
+            };
+
+            Ok(decision)
         }
     };
 

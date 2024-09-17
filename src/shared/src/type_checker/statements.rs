@@ -30,10 +30,9 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         Statement::ModuleDeclaration(_) => Ok(vec![]),
         Statement::Use(_) => Ok(vec![]),
         Statement::StructDeclaration(parser::StructDeclaration {
-            access_modifier: _,
             type_identifier,
-            where_clause: _,
             fields,
+            ..
         }) => Ok(vec![DiscoveredType::Struct(
             type_identifier.clone(),
             fields
@@ -42,10 +41,10 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .collect(),
         )]),
         Statement::EnumDeclaration(parser::EnumDeclaration {
-            access_modifier: _,
             type_identifier,
             shared_fields,
             members,
+            ..
         }) => {
             let enum_ = DiscoveredType::Enum(
                 type_identifier.clone(),
@@ -127,12 +126,10 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         }]),
         Statement::ImplementationDeclaration(ImplementationDeclaration { .. }) => Ok(vec![]),
         Statement::FunctionDeclaration(parser::FunctionDeclaration {
-            access_modifier: _,
             type_identifier,
             param,
             return_type_annotation,
-            body: _,
-            signature_only: _,
+            ..
         }) => Ok(vec![DiscoveredType::Function {
             type_identifier: type_identifier.clone(),
             param: param.clone(),
@@ -248,6 +245,7 @@ pub fn check_type<'a>(
         Statement::EnumDeclaration(parser::EnumDeclaration {
             access_modifier: _,
             type_identifier,
+            where_clause,
             shared_fields,
             members,
         }) => {
@@ -260,6 +258,20 @@ pub fn check_type<'a>(
                     enum_type_environment
                         .borrow_mut()
                         .add_type(Type::Generic(generic.clone()))?;
+                }
+            }
+
+            if let Some(where_clause) = where_clause {
+                for constraint in where_clause {
+                    if !enum_type_environment
+                        .borrow()
+                        .lookup_type_str(&constraint.generic.type_name)
+                    {
+                        return Err(format!(
+                            "Generic type {} not found in struct declaration",
+                            constraint.generic.type_name
+                        ));
+                    }
                 }
             }
 
@@ -463,16 +475,24 @@ pub fn check_type<'a>(
             associated_types,
             functions,
         }) => {
+            for function in functions {
+                println!("PARAM0: {:?}", function.param);
+            }
+
             let protocol_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
+
+            println!("HHHHHDHHDH");
 
             protocol_type_environment
                 .borrow_mut()
                 .add_type(Type::Substitution {
                     type_identifier: TypeIdentifier::Type("Self".to_owned()),
                     actual_type: Box::new(Type::Unknown),
-                });
+                })?;
+
+            println!("YYYYYYYDAJKHSD");
 
             let functions: Result<Vec<TypedStatement>, String> = functions
                 .clone()
@@ -486,21 +506,48 @@ pub fn check_type<'a>(
                 })
                 .collect();
 
+            println!("IIIIIIIKAJHSDLKJAHd");
+
             let functions = functions?;
-            let function_identifiers = functions
+            let function_tuples = functions
                 .iter()
                 .map(|f| match f {
-                    TypedStatement::FunctionDeclaration { identifier, .. } => identifier.clone(),
+                    TypedStatement::FunctionDeclaration {
+                        identifier,
+                        param,
+                        return_type,
+                        ..
+                    } => {
+                        println!("PARAM: {:?}", param);
+                        let type_ = Type::Function(Function {
+                            identifier: Some(identifier.clone()),
+                            param: param.clone().map(|p| Parameter {
+                                identifier: p.identifier,
+                                type_: p.type_,
+                            }),
+                            return_type: Box::new(return_type.clone()),
+                        });
+
+                        println!("FT: {:?}", type_);
+
+                        (identifier.clone(), type_)
+                    }
                     _ => unreachable!("Expected function declaration, found {}", f),
                 })
                 .collect();
 
+            println!("JJJJHALKSJDH");
+
             let type_ = Type::Protocol(Protocol {
                 type_identifier: type_identifier.clone(),
-                functions: function_identifiers,
+                functions: function_tuples,
             });
 
+            println!("OOOAKSJD");
+
             type_environment.borrow_mut().add_type(type_.clone())?;
+
+            println!("RRRRLKAJSHD");
 
             Ok(TypedStatement::ProtocolDeclaration {
                 type_identifier: type_identifier.clone(),
@@ -584,22 +631,22 @@ pub fn check_type<'a>(
 
             let mut typed_functions = vec![];
 
-            for protocol_function in protocol_functions {
+            for (protocol_function_identifier, _) in protocol_functions {
                 let function = functions
                     .into_iter()
-                    .find(|f| f.type_identifier == protocol_function);
+                    .find(|f| f.type_identifier == protocol_function_identifier);
 
                 let Some(function) = function else {
                     return Err(format!(
                         "Protocol function '{}' not implemented",
-                        protocol_function
+                        protocol_function_identifier
                     ));
                 };
 
                 if function.body.is_none() {
                     return Err(format!(
                         "Protocol function '{}' must have a body",
-                        protocol_function
+                        protocol_function_identifier
                     ));
                 };
 
@@ -612,11 +659,11 @@ pub fn check_type<'a>(
                 println!(
                     "{:?} | {:?} | {:?}",
                     type_annotation,
-                    protocol_function.name(),
+                    protocol_function_identifier.name(),
                     typed_function.get_type()
                 );
 
-                let function_name = protocol_function.name().to_owned();
+                let function_name = protocol_function_identifier.name().to_owned();
 
                 type_environment.borrow_mut().add_static_member(
                     type_annotation.clone(),
@@ -641,12 +688,16 @@ pub fn check_type<'a>(
             type_identifier,
             param,
             return_type_annotation,
+            where_clause,
             body,
             signature_only,
         }) => {
+            println!("FFFFFFFFASDKLJH");
             let function_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
+
+            println!("FFFF2");
 
             if let TypeIdentifier::GenericType(_, generics) = type_identifier {
                 println!("Adding generics");
@@ -658,6 +709,28 @@ pub fn check_type<'a>(
                 }
             }
 
+            println!("FFFF3");
+
+            if let Some(where_clause) = where_clause {
+                for constraint in where_clause {
+                    if !function_type_environment
+                        .borrow()
+                        .lookup_type_str(&constraint.generic.type_name)
+                    {
+                        return Err(format!(
+                            "Generic type {} not found in struct declaration",
+                            constraint.generic.type_name
+                        ));
+                    }
+
+                    function_type_environment
+                        .borrow_mut()
+                        .add_generic_constraint(constraint)?;
+                }
+            }
+
+            println!("FFFF4");
+
             let return_type = check_type_annotation(
                 &return_type_annotation
                     .clone()
@@ -666,10 +739,14 @@ pub fn check_type<'a>(
                 function_type_environment.clone(),
             )?;
 
+            println!("FFFF5");
+
             let body_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
                 function_type_environment.clone(),
                 ScopeType::Return,
             )));
+
+            println!("FFFF6");
 
             let param: Option<Parameter> = match param {
                 Some(param) => {
@@ -703,6 +780,8 @@ pub fn check_type<'a>(
                 None => None,
             };
 
+            println!("FFFF7");
+
             let body_typed_expression: Option<TypedExpression> = body
                 .as_ref()
                 .map(|body| {
@@ -710,14 +789,22 @@ pub fn check_type<'a>(
                 })
                 .transpose()?;
 
+            println!("FFFF8");
+
             if *signature_only {
+                println!("FFFF81");
+
                 let type_ = Type::Function(Function {
                     identifier: Some(type_identifier.clone()),
                     param: param.clone(),
                     return_type: Box::new(return_type.clone()),
                 });
 
+                println!("FFFF82");
+
                 type_environment.borrow_mut().add_type(type_.clone())?;
+
+                println!("FFFF83");
 
                 return Ok(TypedStatement::FunctionDeclaration {
                     identifier: type_identifier.clone(),
@@ -732,13 +819,19 @@ pub fn check_type<'a>(
                 });
             }
 
+            println!("FFFF9");
+
             let return_scope = body_environment.borrow().get_scope(&ScopeType::Return);
+
+            println!("FFFF10");
 
             let type_ = Type::Function(Function {
                 identifier: Some(type_identifier.clone()),
                 param: param.clone(),
                 return_type: Box::new(return_type.clone()),
             });
+
+            println!("FFFF11");
 
             let Some(body_typed_expression) = body_typed_expression else {
                 return Ok(TypedStatement::FunctionDeclaration {
@@ -754,9 +847,13 @@ pub fn check_type<'a>(
                 });
             };
 
+            println!("FFFF12");
+
             let body_type = return_scope
                 .map(|s| s.fold())
                 .unwrap_or_else(|| Ok(body_typed_expression.get_deep_type()))?;
+
+            println!("FFFF13");
 
             if !type_equals(&return_type, &Type::Void) && !type_equals(&return_type, &body_type) {
                 return Err(format!(
@@ -765,7 +862,11 @@ pub fn check_type<'a>(
                 ));
             }
 
+            println!("FFFF14");
+
             type_environment.borrow_mut().add_type(type_.clone())?;
+
+            println!("FFFF15");
 
             Ok(TypedStatement::FunctionDeclaration {
                 identifier: type_identifier.clone(),
@@ -970,7 +1071,18 @@ fn check_type_identifier(
             function_identifiers,
         }) => Ok(Type::Protocol(Protocol {
             type_identifier: type_identifier.clone(),
-            functions: function_identifiers.clone(),
+            functions: function_identifiers
+                .into_iter()
+                .map(|f| {
+                    (
+                        f.clone(),
+                        type_environment
+                            .borrow()
+                            .get_type_from_identifier(&f)
+                            .unwrap(),
+                    )
+                })
+                .collect(),
         })),
         Some(DiscoveredType::Function {
             type_identifier,
@@ -1184,7 +1296,18 @@ pub fn check_type_annotation(
             function_identifiers,
         }) => Ok(Type::Protocol(Protocol {
             type_identifier: type_identifier.clone(),
-            functions: function_identifiers.clone(),
+            functions: function_identifiers
+                .into_iter()
+                .map(|f| {
+                    (
+                        f.clone(),
+                        type_environment
+                            .borrow()
+                            .get_type_from_identifier(&f)
+                            .unwrap(),
+                    )
+                })
+                .collect(),
         })),
         Some(DiscoveredType::Function {
             type_identifier,

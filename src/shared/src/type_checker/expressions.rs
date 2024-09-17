@@ -1311,6 +1311,8 @@ fn check_type_param_propagation(
                 .get_static_member(object_type.type_annotation(), &symbol)
         });
 
+    println!("MEMBER TYPE: {:?}", member_type);
+
     let Some(Type::Function(Function { param, .. })) = member_type else {
         return Err(format!("{} is not a function", symbol));
     };
