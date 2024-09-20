@@ -115,10 +115,10 @@ fn evaluate_expression<'a>(
         // TypedExpression::None => Ok(Value::Void),
         TypedExpression::VariableDeclaration {
             mutable,
-            identifier,
+            pattern,
             initializer,
             ..
-        } => evaluate_variable_declaration(mutable, identifier, initializer, environment),
+        } => evaluate_variable_declaration(mutable, pattern, initializer, environment),
         TypedExpression::If {
             condition,
             true_expression,
@@ -206,7 +206,7 @@ fn evaluate_program<'a>(
 
 fn evaluate_variable_declaration<'a>(
     mutable: bool,
-    identifier: String,
+    pattern: Pattern,
     initializer: Option<Box<TypedExpression>>,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
@@ -214,9 +214,15 @@ fn evaluate_variable_declaration<'a>(
         Some(initializer) => evaluate_expression(*initializer, environment.clone())?,
         None => Value::Uninitialized,
     };
-    environment
-        .borrow_mut()
-        .add_variable(identifier, value.clone(), mutable);
+
+    if let Some(bindings) = evaluate_pattern(pattern, &value, environment.clone())? {
+        for (identifier, value) in bindings {
+            environment
+                .borrow_mut()
+                .add_variable(identifier, value, mutable);
+        }
+    }
+
     Ok(value)
 }
 

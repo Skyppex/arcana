@@ -13,7 +13,7 @@ pub enum DiscoveredType {
     Enum(
         TypeIdentifier,
         HashMap<String, TypeAnnotation>,
-        HashMap<String, HashMap<String, TypeAnnotation>>,
+        HashMap<String, Vec<(String, TypeAnnotation)>>,
     ),
     EnumMember(TypeIdentifier, HashMap<String, TypeAnnotation>),
     Union(TypeIdentifier, Vec<TypeAnnotation>),

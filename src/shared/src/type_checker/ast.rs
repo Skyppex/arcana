@@ -384,7 +384,7 @@ pub enum TypedExpression {
     // None, // For testing purposes
     VariableDeclaration {
         mutable: bool,
-        identifier: String,
+        pattern: Pattern,
         initializer: Option<Box<TypedExpression>>,
         type_: Type,
     },
@@ -535,7 +535,7 @@ impl Display for TypedExpression {
             // TypedExpression::None => write!(f, "None"),
             TypedExpression::VariableDeclaration {
                 mutable,
-                identifier,
+                pattern,
                 initializer,
                 ..
             } => {
@@ -544,11 +544,11 @@ impl Display for TypedExpression {
                         f,
                         "{}{} = {}",
                         if *mutable { "mut " } else { "" },
-                        identifier,
+                        pattern,
                         initializer
                     )
                 } else {
-                    write!(f, "{}{}", if *mutable { "mut " } else { "" }, identifier)
+                    write!(f, "{}{}", if *mutable { "mut " } else { "" }, pattern)
                 }
             }
             TypedExpression::If {

@@ -643,13 +643,21 @@ impl IndentDisplay for Expression {
             Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
                 type_annotation,
-                identifier,
+                pattern,
                 initializer,
             }) => {
                 let mut result = String::new();
-                result.push_str(format!("<variable declaration> {}\n", identifier).as_str());
+                result.push_str(format!("<variable declaration>\n").as_str());
                 indent.increase();
                 result.push_str(format!("{}mutable: {}\n", indent.dash(), mutable).as_str());
+                result.push_str(
+                    format!(
+                        "{}pattern: {}\n",
+                        indent.dash(),
+                        pattern.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 result.push_str(
                     format!(
                         "{}type_annotation: {}\n",
@@ -2161,16 +2169,22 @@ impl IndentDisplay for TypedExpression {
             // TypedExpression::None => String::new(),
             TypedExpression::VariableDeclaration {
                 mutable,
-                identifier,
+                pattern,
                 initializer,
                 type_,
             } => {
                 let mut result = String::new();
-                result.push_str(
-                    format!("<variable declaration> {}: {}\n", identifier, type_).as_str(),
-                );
+                result.push_str(format!("<variable declaration>: {}\n", type_).as_str());
                 indent.increase();
                 result.push_str(format!("{}mutable: {}\n", indent.dash(), mutable).as_str());
+                result.push_str(
+                    format!(
+                        "{}pattern: {}\n",
+                        indent.dash(),
+                        pattern.indent_display(indent)
+                    )
+                    .as_str(),
+                );
                 indent.end_current();
 
                 if let Some(initializer) = initializer {

@@ -6,7 +6,7 @@ use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, Ve
 
 use interpreter::{value::EnumFields, Value};
 use shared::{
-    type_checker::{ast::Typed, EnumMember, Type},
+    type_checker::{ast::Typed, EnumMember, StructField, Type},
     types::TypeIdentifier,
 };
 
@@ -37,7 +37,14 @@ fn enum_variant_can_be_used_as_a_type() {
         Type::EnumMember(EnumMember {
             enum_name: TypeIdentifier::Type("O".to_owned()),
             discriminant_name: "S".to_owned(),
-            fields: HashMap::from([("x".to_owned(), Type::Int)])
+            fields: vec![StructField {
+                struct_name: TypeIdentifier::MemberType(
+                    Box::new(TypeIdentifier::Type("O".to_owned())),
+                    "S".to_owned()
+                ),
+                field_name: "x".to_owned(),
+                field_type: Type::Int
+            }]
         })
     )
 }

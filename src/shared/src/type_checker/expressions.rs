@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     parser::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
-    type_checker::ast::Literal,
+    type_checker::{ast::Literal, type_annotation_equals, StructField},
     types::{TypeAnnotation, TypeIdentifier},
 };
 
@@ -11,7 +11,8 @@ use super::{
         BinaryOperator, Block, EnumMemberFieldInitializers, FieldInitializer, Member, Typed,
         TypedClosureParameter, TypedExpression, TypedMatchArm, TypedStatement, UnaryOperator,
     },
-    decision_tree::create_decision_tree,
+    decision_tree::{create_decision_tree, Constructor, Pattern},
+    get_field_by_name,
     scope::ScopeType,
     statements::{self, check_type_annotation},
     type_equals, type_equals_coerce, DiscoveredType, Enum, EnumMember, FullName, Function, Rcrc,
@@ -249,7 +250,7 @@ pub fn check_type<'a>(
         Expression::VariableDeclaration(VariableDeclaration {
             mutable,
             type_annotation,
-            identifier,
+            pattern,
             initializer,
         }) => {
             let mut type_ = Type::Unknown;
@@ -311,13 +312,17 @@ pub fn check_type<'a>(
                 }
             }
 
-            type_environment
-                .borrow_mut()
-                .add_variable(identifier.clone(), type_.clone());
+            check_type_pattern(
+                pattern,
+                &initializer,
+                discovered_types,
+                type_environment.clone(),
+                Some(type_.clone()),
+            )?;
 
             Ok(TypedExpression::VariableDeclaration {
                 mutable: *mutable,
-                identifier: identifier.clone(),
+                pattern: pattern.clone(),
                 initializer: initializer.map(|i| Box::new(i)),
                 type_,
             })
@@ -622,10 +627,10 @@ pub fn check_type<'a>(
                 let field_initializers = field_initializers?;
 
                 for (field, initializer) in fields.iter().zip(field_initializers.iter()) {
-                    let field_type = field.1;
+                    let field_type = field.field_type.clone();
                     let initializer_type = initializer.initializer.get_type();
 
-                    if !type_equals(field_type, &initializer_type) {
+                    if !type_equals(&field_type, &initializer_type) {
                         return Err(format!(
                             "Field type {} does not match initializer type {}",
                             field_type, initializer_type
@@ -688,10 +693,13 @@ pub fn check_type<'a>(
                 match field_initializers {
                     EnumMemberFieldInitializers::None => (),
                     EnumMemberFieldInitializers::Named(ref field_initializers) => {
-                        for ((field_name, field_type), (initializer_field_name, initializer)) in
+                        for (struct_field, (initializer_field_name, initializer)) in
                             fields.iter().zip(field_initializers.iter())
                         {
-                            if field_name != initializer_field_name {
+                            let field_name = struct_field.field_name.clone();
+                            let field_type = struct_field.field_type.clone();
+
+                            if &field_name != initializer_field_name {
                                 return Err(format!(
                                     "Field '{}' does not match initializer field '{}'",
                                     field_name, initializer_field_name
@@ -700,7 +708,7 @@ pub fn check_type<'a>(
 
                             let initializer_type = initializer.get_type();
 
-                            if !type_equals(field_type, &initializer_type) {
+                            if !type_equals(&field_type, &initializer_type) {
                                 return Err(format!(
                                     "Field type {} does not match initializer type {}",
                                     field_type, initializer_type
@@ -1015,7 +1023,7 @@ fn is_option(type_: &Option<Type>) -> bool {
             return false;
         };
 
-        return fields.get("f0").map_or(false, |_| {
+        return get_field_by_name(fields, "f0").map_or(false, |_| {
             return true;
         });
     });
@@ -1181,10 +1189,13 @@ fn check_type_member_access_recurse(
     return match *member.clone() {
         parser::Member::Identifier { symbol, .. } => match object_type {
             Type::Struct(struct_) => {
-                let field_type = struct_.fields.get(&symbol).ok_or(format!(
-                    "Struct '{}' does not have a field called '{}'",
-                    struct_.type_identifier, symbol
-                ))?;
+                let field_type = get_field_by_name(&struct_.fields, &symbol)
+                    .ok_or(format!(
+                        "Struct '{}' does not have a field called '{}'",
+                        struct_.type_identifier, symbol
+                    ))?
+                    .field_type
+                    .clone();
 
                 if !type_environment.borrow().lookup_type(&field_type) {
                     return Err(format!("Unexpected type: {}", field_type.full_name()));
@@ -1205,10 +1216,13 @@ fn check_type_member_access_recurse(
             Type::EnumMember(EnumMember {
                 enum_name, fields, ..
             }) => {
-                let field_type = fields.get(&symbol).ok_or(format!(
-                    "EnumMember '{}' does not have a field called '{}'",
-                    enum_name, symbol
-                ))?;
+                let field_type = get_field_by_name(&fields, &symbol)
+                    .ok_or(format!(
+                        "EnumMember '{}' does not have a field called '{}'",
+                        enum_name, symbol
+                    ))?
+                    .field_type
+                    .clone();
 
                 if !type_environment.borrow().lookup_type(&field_type) {
                     return Err(format!("Unexpected type: {}", field_type.full_name()));
@@ -1231,10 +1245,13 @@ fn check_type_member_access_recurse(
                 shared_fields,
                 ..
             }) => {
-                let field_type = shared_fields.get(&symbol).ok_or(format!(
-                    "Enum '{}' does not have a shared field called '{}'",
-                    type_identifier, symbol
-                ))?;
+                let field_type = get_field_by_name(&shared_fields, &symbol)
+                    .ok_or(format!(
+                        "Enum '{}' does not have a shared field called '{}'",
+                        type_identifier, symbol
+                    ))?
+                    .field_type
+                    .clone();
 
                 if !type_environment.borrow().lookup_type(&field_type) {
                     return Err(format!("Unexpected type: {}", field_type.full_name()));
@@ -1398,6 +1415,169 @@ fn check_type_param_propagation_recurse(
         parser::Member::StaticMemberAccess { .. } => todo!("Static member access"),
         parser::Member::MemberAccess { .. } => todo!("Member access"),
         parser::Member::ParamPropagation { .. } => todo!("Param propagation"),
+    }
+}
+
+fn check_type_pattern(
+    pattern: &Pattern,
+    initializer: &Option<TypedExpression>,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+    context: Option<Type>,
+) -> Result<(), String> {
+    match pattern {
+        Pattern::Wildcard => Ok(()),
+        Pattern::Unit => Ok(()),
+        Pattern::Variable(identifier) => {
+            if let Some(initializer) = initializer {
+                let initializer_type = initializer.get_type();
+
+                type_environment
+                    .borrow_mut()
+                    .add_variable(identifier.clone(), initializer_type.clone());
+
+                return Ok(());
+            }
+
+            type_environment
+                .borrow_mut()
+                .add_variable(identifier.clone(), Type::Unknown);
+
+            Ok(())
+        }
+        Pattern::Constructor(Constructor::Struct {
+            type_annotation,
+            field_patterns,
+        }) => {
+            let Some(initializer) = initializer else {
+                return Err("Expected initializer for constructor pattern".to_string());
+            };
+
+            let initializer_type = initializer.get_type();
+            let mut is_enum_member = false;
+
+            match &initializer_type {
+                Type::Enum(Enum { members, .. }) => {
+                    for (_, member_type) in members {
+                        println!("member_type: {:?}", member_type.type_annotation());
+                        println!("type_annotation: {:?}", type_annotation);
+
+                        if type_annotation_equals(&type_annotation, &member_type.type_annotation())
+                        {
+                            is_enum_member = true;
+                            break;
+                        }
+                    }
+                }
+                Type::EnumMember(EnumMember {
+                    discriminant_name, ..
+                }) => {
+                    println!("discriminant_name: {:?}", discriminant_name);
+                    println!("type_annotation: {:?}", type_annotation);
+
+                    if type_annotation_equals(
+                        &type_annotation,
+                        &TypeAnnotation::Type(discriminant_name.clone()),
+                    ) {
+                        is_enum_member = true;
+                    }
+                }
+                _ => {}
+            }
+
+            if !is_enum_member
+                && !type_annotation_equals(
+                    &initializer_type.type_annotation(),
+                    &type_annotation.clone(),
+                )
+            {
+                return Err(format!(
+                    "Expected type annotation {} but got {}",
+                    initializer_type.type_annotation(),
+                    type_annotation,
+                ));
+            }
+
+            let fields = match initializer_type.clone() {
+                Type::Struct(Struct { fields, .. }) => fields,
+                Type::EnumMember(EnumMember { fields, .. }) => fields,
+                Type::Enum(Enum {
+                    shared_fields,
+                    members,
+                    ..
+                }) => {
+                    let member = members.get(&type_annotation.name()).expect(
+                        "Already checked if the constructor name exists in the member list",
+                    );
+
+                    let Type::EnumMember(EnumMember { fields, .. }) = member.clone() else {
+                        return Err(format!("Expected enum member but got {:?}", member.clone()));
+                    };
+
+                    for field in fields.iter() {
+                        println!("field_ident: {:?}", field.field_name);
+                        println!("field_type: {:?}", field.field_type);
+                    }
+
+                    fields
+                        .into_iter()
+                        .chain(shared_fields.into_iter())
+                        .collect()
+                }
+                _ => {
+                    return Err(format!(
+                        "Expected struct, enum or enum member but got {:?}",
+                        initializer_type.clone()
+                    ));
+                }
+            };
+
+            for StructField {
+                field_name,
+                field_type,
+                ..
+            } in fields
+            {
+                let field_pattern = field_patterns
+                    .iter()
+                    .find(|field_pattern| field_pattern.identifier == field_name)
+                    .ok_or_else(|| {
+                        format!(
+                            "Field {} not found in constructor pattern",
+                            field_name.clone()
+                        )
+                    })?;
+
+                check_type_pattern(
+                    &field_pattern.pattern,
+                    &Some(TypedExpression::Member(Member::MemberAccess {
+                        object: Box::new(initializer.clone()),
+                        member: Box::new(Member::Identifier {
+                            symbol: field_name.clone(),
+                            type_: field_type.clone(),
+                        }),
+                        symbol: field_name.clone(),
+                        type_: field_type.clone(),
+                    })),
+                    discovered_types,
+                    type_environment.clone(),
+                    context.clone(),
+                )?;
+            }
+
+            Ok(())
+        }
+        Pattern::Bool(_)
+        | Pattern::Int(_)
+        | Pattern::UInt(_)
+        | Pattern::Float(_)
+        | Pattern::Char(_)
+        | Pattern::String(_)
+        | Pattern::LessThan(_)
+        | Pattern::GreaterThan(_)
+        | Pattern::LessThanOrEqual(_)
+        | Pattern::GreaterThanOrEqual(_)
+        | Pattern::Range(_, _, _) => Err("Refutable pattern".to_string()),
     }
 }
 

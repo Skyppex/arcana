@@ -1,0 +1,9 @@
+enum E {
+    A { a: Int, b: Int },
+    B { a: String, b: String },
+}
+
+let a = E::A { a: 10, b: 20 };
+let a = E::B { a: "aaa", b: "bbb" };
+
+let A { a, b } = a

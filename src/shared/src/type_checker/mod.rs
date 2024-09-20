@@ -24,7 +24,7 @@ use self::statements::check_type_annotation;
 #[derive(Debug, Clone)]
 pub struct Struct {
     pub type_identifier: TypeIdentifier,
-    pub fields: HashMap<String, Type>,
+    pub fields: Vec<StructField>,
 }
 
 impl Struct {
@@ -49,7 +49,14 @@ impl PartialEq for Struct {
 pub struct StructField {
     pub struct_name: TypeIdentifier,
     pub field_name: String,
-    pub field_type: Box<Type>,
+    pub field_type: Type,
+}
+
+pub fn get_field_by_name<'a>(
+    struct_fields: &'a Vec<StructField>,
+    field_name: &'a str,
+) -> Option<&'a StructField> {
+    struct_fields.iter().find(|f| f.field_name == field_name)
 }
 
 impl FullName for StructField {
@@ -64,7 +71,7 @@ impl FullName for StructField {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Enum {
     pub type_identifier: TypeIdentifier,
-    pub shared_fields: HashMap<String, Type>,
+    pub shared_fields: Vec<StructField>,
     pub members: HashMap<String, Type>,
 }
 
@@ -84,7 +91,7 @@ impl FullName for Enum {
 pub struct EnumMember {
     pub enum_name: TypeIdentifier,
     pub discriminant_name: String,
-    pub fields: HashMap<String, Type>,
+    pub fields: Vec<StructField>,
 }
 
 impl EnumMember {
@@ -101,7 +108,11 @@ impl FullName for EnumMember {
             self.discriminant_name,
             self.fields
                 .iter()
-                .map(|(name, type_)| format!("{}: {}", name, type_.full_name()))
+                .map(|struct_| format!(
+                    "{}: {}",
+                    struct_.field_name,
+                    struct_.field_type.full_name()
+                ))
                 .collect::<Vec<String>>()
                 .join(", ")
         )
@@ -289,21 +300,20 @@ impl Type {
 
         Type::Enum(Enum {
             type_identifier: option_ident,
-            shared_fields: HashMap::new(),
+            shared_fields: Vec::new(),
             members: vec![
                 (
                     "Some".to_string(),
                     Type::EnumMember(EnumMember {
-                        enum_name: some_member_ident,
+                        enum_name: some_member_ident.clone(),
                         discriminant_name: "Some".to_string(),
-                        fields: vec![(
-                            "value".to_string(),
-                            Type::Generic(GenericType {
+                        fields: vec![StructField {
+                            struct_name: some_member_ident.clone(),
+                            field_name: "value".to_string(),
+                            field_type: Type::Generic(GenericType {
                                 type_name: "T".to_string(),
                             }),
-                        )]
-                        .into_iter()
-                        .collect(),
+                        }],
                     }),
                 ),
                 (
@@ -311,7 +321,7 @@ impl Type {
                     Type::EnumMember(EnumMember {
                         enum_name: none_member_ident,
                         discriminant_name: "None".to_string(),
-                        fields: HashMap::new(),
+                        fields: vec![],
                     }),
                 ),
             ]
@@ -321,12 +331,21 @@ impl Type {
     }
 
     pub fn option_of(concrete: Type) -> Type {
+        let option_name = "Option".to_string();
+
+        let option_ident = TypeIdentifier::GenericType(
+            option_name,
+            vec![GenericType {
+                type_name: "T".to_string(),
+            }],
+        );
+
+        let some_member_ident =
+            TypeIdentifier::MemberType(Box::new(option_ident.clone()), "Some".to_string());
+
         Type::Enum(Enum {
-            type_identifier: TypeIdentifier::ConcreteType(
-                "Option".to_string(),
-                vec![concrete.type_annotation()],
-            ),
-            shared_fields: HashMap::new(),
+            type_identifier: option_ident,
+            shared_fields: Vec::new(),
             members: vec![
                 (
                     "Some".to_string(),
@@ -336,9 +355,11 @@ impl Type {
                             vec![concrete.type_annotation()],
                         ),
                         discriminant_name: "Some".to_string(),
-                        fields: vec![("f0".to_string(), concrete.clone())]
-                            .into_iter()
-                            .collect(),
+                        fields: vec![StructField {
+                            struct_name: some_member_ident.clone(),
+                            field_name: "f0".to_string(),
+                            field_type: concrete.clone(),
+                        }],
                     }),
                 ),
                 (
@@ -349,7 +370,7 @@ impl Type {
                             vec![concrete.type_annotation()],
                         ),
                         discriminant_name: "None".to_string(),
-                        fields: HashMap::new(),
+                        fields: Vec::new(),
                     }),
                 ),
             ]
@@ -487,11 +508,21 @@ impl Type {
                     type_map.insert(gt, ta);
                 }
 
-                let mut fields = HashMap::new();
+                let mut fields = Vec::new();
 
-                for (field_name, field_type) in s.fields.iter() {
+                for StructField {
+                    struct_name,
+                    field_name,
+                    field_type,
+                } in s.fields.iter()
+                {
                     let Type::Generic(generic) = field_type.clone() else {
-                        fields.insert(field_name.clone(), field_type.clone());
+                        fields.push(StructField {
+                            struct_name: struct_name.clone(),
+                            field_name: field_name.clone(),
+                            field_type: field_type.clone(),
+                        });
+
                         continue;
                     };
 
@@ -503,7 +534,11 @@ impl Type {
                     let concrete_type =
                         check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
 
-                    fields.insert(field_name.clone(), concrete_type);
+                    fields.push(StructField {
+                        struct_name: struct_name.clone(),
+                        field_name: field_name.clone(),
+                        field_type: concrete_type,
+                    });
                 }
 
                 Ok(Type::Struct(Struct {
@@ -528,11 +563,20 @@ impl Type {
                 let type_identifier =
                     TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone());
 
-                let mut shared_fields = HashMap::new();
+                let mut shared_fields = Vec::new();
 
-                for (field_name, field_type) in u.shared_fields.iter() {
+                for StructField {
+                    struct_name,
+                    field_name,
+                    field_type,
+                } in u.shared_fields.iter()
+                {
                     let Type::Generic(generic) = field_type.clone() else {
-                        shared_fields.insert(field_name.clone(), field_type.clone());
+                        shared_fields.push(StructField {
+                            struct_name: struct_name.clone(),
+                            field_name: field_name.clone(),
+                            field_type: field_type.clone(),
+                        });
                         continue;
                     };
 
@@ -544,7 +588,11 @@ impl Type {
                     let concrete_type =
                         check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
 
-                    shared_fields.insert(field_name.clone(), concrete_type);
+                    shared_fields.push(StructField {
+                        struct_name: struct_name.clone(),
+                        field_name: field_name.clone(),
+                        field_type: concrete_type,
+                    });
                 }
 
                 let mut members = HashMap::new();
@@ -557,11 +605,24 @@ impl Type {
                         ));
                     };
 
-                    let mut fields = HashMap::new();
+                    let mut fields = Vec::new();
 
-                    for (field_name, field_type) in u.fields.iter() {
+                    for StructField {
+                        struct_name,
+                        field_name,
+                        field_type,
+                    } in u.fields.iter()
+                    {
+                        let field_name = field_name.clone();
+                        let field_type = field_type.clone();
+
                         let Type::Generic(generic) = field_type else {
-                            fields.insert(field_name.clone(), field_type.clone());
+                            fields.push(StructField {
+                                struct_name: struct_name.clone(),
+                                field_name: field_name.clone(),
+                                field_type,
+                            });
+
                             continue;
                         };
 
@@ -576,7 +637,11 @@ impl Type {
                             type_environment.clone(),
                         )?;
 
-                        fields.insert(field_name.clone(), concrete_type);
+                        fields.push(StructField {
+                            struct_name: struct_name.clone(),
+                            field_name: field_name.clone(),
+                            field_type: concrete_type,
+                        });
                     }
 
                     let member_type = Type::EnumMember(EnumMember {
@@ -613,11 +678,20 @@ impl Type {
                     type_map.insert(gt, ta);
                 }
 
-                let mut cloned_fields = HashMap::new();
+                let mut cloned_fields = Vec::new();
 
-                for (field_name, field_type) in em.fields.iter() {
-                    let Type::Generic(generic) = field_type else {
-                        cloned_fields.insert(field_name.clone(), field_type.clone());
+                for StructField {
+                    struct_name,
+                    field_name,
+                    field_type,
+                } in em.fields.iter()
+                {
+                    let Type::Generic(generic) = field_type.clone() else {
+                        cloned_fields.push(StructField {
+                            struct_name: struct_name.clone(),
+                            field_name: field_name.clone(),
+                            field_type: field_type.clone(),
+                        });
                         continue;
                     };
 
@@ -629,7 +703,11 @@ impl Type {
                     let concrete_type =
                         check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
 
-                    cloned_fields.insert(field_name.clone(), concrete_type);
+                    cloned_fields.push(StructField {
+                        struct_name: struct_name.clone(),
+                        field_name: field_name.clone(),
+                        field_type: concrete_type,
+                    });
                 }
 
                 let member_type = Type::EnumMember(EnumMember {

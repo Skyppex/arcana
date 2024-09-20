@@ -14,8 +14,8 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    type_equals, Enum, EnumMember, Function, Parameter, Protocol, Rcrc, Struct, Type, TypeAlias,
-    Union,
+    type_equals, Enum, EnumMember, Function, Parameter, Protocol, Rcrc, Struct, StructField, Type,
+    TypeAlias, Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -222,10 +222,16 @@ pub fn check_type<'a>(
                 })
                 .collect();
 
-            let field_types: Result<HashMap<String, Type>, String> = fields
+            let field_types: Result<Vec<StructField>, String> = fields
                 .clone()?
                 .iter()
-                .map(|f: &ast::StructField| Ok((f.identifier.clone(), f.type_.clone())))
+                .map(|f| {
+                    Ok(StructField {
+                        struct_name: type_identifier.clone(),
+                        field_name: f.identifier.clone(),
+                        field_type: f.type_.clone(),
+                    })
+                })
                 .collect();
 
             let type_ = Type::Struct(Struct {
@@ -316,10 +322,16 @@ pub fn check_type<'a>(
                         })
                         .collect();
 
-                    let field_types: Result<HashMap<String, Type>, String> = fields
+                    let field_types: Result<Vec<StructField>, String> = fields
                         .clone()?
                         .iter()
-                        .map(|f| Ok((f.identifier.clone(), f.type_.clone())))
+                        .map(|f| {
+                            Ok(StructField {
+                                struct_name: type_identifier.clone(),
+                                field_name: f.identifier.clone(),
+                                field_type: f.type_.clone(),
+                            })
+                        })
                         .collect();
 
                     let enum_member = Type::EnumMember(EnumMember {
@@ -346,7 +358,11 @@ pub fn check_type<'a>(
                 shared_fields: shared_fields
                     .clone()?
                     .iter()
-                    .map(|f| (f.identifier.clone(), f.type_.clone()))
+                    .map(|f| StructField {
+                        struct_name: type_identifier.clone(),
+                        field_name: f.identifier.clone(),
+                        field_type: f.type_.clone(),
+                    })
                     .collect(),
                 members: members
                     .clone()?
@@ -483,16 +499,12 @@ pub fn check_type<'a>(
                 type_environment.clone(),
             )));
 
-            println!("HHHHHDHHDH");
-
             protocol_type_environment
                 .borrow_mut()
                 .add_type(Type::Substitution {
                     type_identifier: TypeIdentifier::Type("Self".to_owned()),
                     actual_type: Box::new(Type::Unknown),
                 })?;
-
-            println!("YYYYYYYDAJKHSD");
 
             let functions: Result<Vec<TypedStatement>, String> = functions
                 .clone()
@@ -505,8 +517,6 @@ pub fn check_type<'a>(
                     )
                 })
                 .collect();
-
-            println!("IIIIIIIKAJHSDLKJAHd");
 
             let functions = functions?;
             let function_tuples = functions
@@ -536,18 +546,12 @@ pub fn check_type<'a>(
                 })
                 .collect();
 
-            println!("JJJJHALKSJDH");
-
             let type_ = Type::Protocol(Protocol {
                 type_identifier: type_identifier.clone(),
                 functions: function_tuples,
             });
 
-            println!("OOOAKSJD");
-
             type_environment.borrow_mut().add_type(type_.clone())?;
-
-            println!("RRRRLKAJSHD");
 
             Ok(TypedStatement::ProtocolDeclaration {
                 type_identifier: type_identifier.clone(),
@@ -692,12 +696,9 @@ pub fn check_type<'a>(
             body,
             signature_only,
         }) => {
-            println!("FFFFFFFFASDKLJH");
             let function_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
-
-            println!("FFFF2");
 
             if let TypeIdentifier::GenericType(_, generics) = type_identifier {
                 println!("Adding generics");
@@ -708,8 +709,6 @@ pub fn check_type<'a>(
                         .add_type(Type::Generic(generic.clone()))?;
                 }
             }
-
-            println!("FFFF3");
 
             if let Some(where_clause) = where_clause {
                 for constraint in where_clause {
@@ -729,8 +728,6 @@ pub fn check_type<'a>(
                 }
             }
 
-            println!("FFFF4");
-
             let return_type = check_type_annotation(
                 &return_type_annotation
                     .clone()
@@ -739,14 +736,10 @@ pub fn check_type<'a>(
                 function_type_environment.clone(),
             )?;
 
-            println!("FFFF5");
-
             let body_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
                 function_type_environment.clone(),
                 ScopeType::Return,
             )));
-
-            println!("FFFF6");
 
             let param: Option<Parameter> = match param {
                 Some(param) => {
@@ -780,8 +773,6 @@ pub fn check_type<'a>(
                 None => None,
             };
 
-            println!("FFFF7");
-
             let body_typed_expression: Option<TypedExpression> = body
                 .as_ref()
                 .map(|body| {
@@ -789,22 +780,14 @@ pub fn check_type<'a>(
                 })
                 .transpose()?;
 
-            println!("FFFF8");
-
             if *signature_only {
-                println!("FFFF81");
-
                 let type_ = Type::Function(Function {
                     identifier: Some(type_identifier.clone()),
                     param: param.clone(),
                     return_type: Box::new(return_type.clone()),
                 });
 
-                println!("FFFF82");
-
                 type_environment.borrow_mut().add_type(type_.clone())?;
-
-                println!("FFFF83");
 
                 return Ok(TypedStatement::FunctionDeclaration {
                     identifier: type_identifier.clone(),
@@ -819,19 +802,13 @@ pub fn check_type<'a>(
                 });
             }
 
-            println!("FFFF9");
-
             let return_scope = body_environment.borrow().get_scope(&ScopeType::Return);
-
-            println!("FFFF10");
 
             let type_ = Type::Function(Function {
                 identifier: Some(type_identifier.clone()),
                 param: param.clone(),
                 return_type: Box::new(return_type.clone()),
             });
-
-            println!("FFFF11");
 
             let Some(body_typed_expression) = body_typed_expression else {
                 return Ok(TypedStatement::FunctionDeclaration {
@@ -847,13 +824,9 @@ pub fn check_type<'a>(
                 });
             };
 
-            println!("FFFF12");
-
             let body_type = return_scope
                 .map(|s| s.fold())
                 .unwrap_or_else(|| Ok(body_typed_expression.get_deep_type()))?;
-
-            println!("FFFF13");
 
             if !type_equals(&return_type, &Type::Void) && !type_equals(&return_type, &body_type) {
                 return Err(format!(
@@ -862,11 +835,7 @@ pub fn check_type<'a>(
                 ));
             }
 
-            println!("FFFF14");
-
             type_environment.borrow_mut().add_type(type_.clone())?;
-
-            println!("FFFF15");
 
             Ok(TypedStatement::FunctionDeclaration {
                 identifier: type_identifier.clone(),
@@ -927,56 +896,62 @@ fn check_type_identifier(
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
             fields: {
-                let mut map = HashMap::new();
+                let mut vec = Vec::new();
 
                 for (identifier, type_annotation) in fields {
-                    map.insert(
-                        identifier.clone(),
-                        check_type_annotation(
+                    vec.push(StructField {
+                        struct_name: type_identifier.clone(),
+                        field_name: identifier.clone(),
+                        field_type: check_type_annotation(
                             type_annotation,
                             discovered_types,
                             type_environment.clone(),
                         )?,
-                    );
+                    });
                 }
 
-                map
+                vec
             },
         })),
         Some(DiscoveredType::Enum(type_identifier, shared_fields, members)) => {
             Ok(Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
                 shared_fields: {
-                    let mut map = HashMap::new();
+                    let mut vec = Vec::new();
 
                     for (identifier, type_annotation) in shared_fields {
-                        map.insert(
-                            identifier.clone(),
-                            check_type_annotation(
+                        vec.push(StructField {
+                            struct_name: type_identifier.clone(),
+                            field_name: identifier.clone(),
+                            field_type: check_type_annotation(
                                 type_annotation,
                                 discovered_types,
                                 type_environment.clone(),
                             )?,
-                        );
+                        });
                     }
 
-                    map
+                    vec
                 },
                 members: {
                     let mut map = HashMap::new();
 
                     for (identifier, fields) in members {
-                        let mut fields_map = HashMap::new();
+                        let mut fields_map = Vec::new();
 
                         for (identifier, type_annotation) in fields {
-                            fields_map.insert(
-                                identifier.clone(),
-                                check_type_annotation(
+                            fields_map.push(StructField {
+                                struct_name: TypeIdentifier::MemberType(
+                                    Box::new(type_identifier.clone()),
+                                    identifier.clone(),
+                                ),
+                                field_name: identifier.clone(),
+                                field_type: check_type_annotation(
                                     type_annotation,
                                     discovered_types,
                                     type_environment.clone(),
                                 )?,
-                            );
+                            });
                         }
 
                         map.insert(identifier.clone(), fields_map);
@@ -1005,13 +980,21 @@ fn check_type_identifier(
                 ));
             };
 
-            let mut field_types = HashMap::new();
+            let mut field_types = Vec::new();
 
             for field in fields {
-                field_types.insert(
-                    field.0.clone(),
-                    check_type_annotation(field.1, discovered_types, type_environment.clone())?,
-                );
+                field_types.push(StructField {
+                    struct_name: TypeIdentifier::MemberType(
+                        Box::new(TypeIdentifier::Type(enum_name.to_owned())),
+                        member_name.to_owned(),
+                    ),
+                    field_name: field.0.clone(),
+                    field_type: check_type_annotation(
+                        field.1,
+                        discovered_types,
+                        type_environment.clone(),
+                    )?,
+                });
             }
 
             Ok(Type::EnumMember(EnumMember {
@@ -1156,17 +1139,18 @@ pub fn check_type_annotation(
         Some(DiscoveredType::Struct(type_identifier, fields)) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
             fields: {
-                let mut map = HashMap::new();
+                let mut map = Vec::new();
 
                 for (identifier, type_annotation) in fields {
-                    map.insert(
-                        identifier.clone(),
-                        check_type_annotation(
+                    map.push(StructField {
+                        struct_name: type_identifier.clone(),
+                        field_name: identifier.clone(),
+                        field_type: check_type_annotation(
                             type_annotation,
                             discovered_types,
                             type_environment.clone(),
                         )?,
-                    );
+                    });
                 }
 
                 map
@@ -1176,36 +1160,38 @@ pub fn check_type_annotation(
             Ok(Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
                 shared_fields: {
-                    let mut map = HashMap::new();
+                    let mut vec = Vec::new();
 
                     for (identifier, type_annotation) in shared_fields {
-                        map.insert(
-                            identifier.clone(),
-                            check_type_annotation(
+                        vec.push(StructField {
+                            struct_name: type_identifier.clone(),
+                            field_name: identifier.clone(),
+                            field_type: check_type_annotation(
                                 type_annotation,
                                 discovered_types,
                                 type_environment.clone(),
                             )?,
-                        );
+                        });
                     }
 
-                    map
+                    vec
                 },
                 members: {
                     let mut map = HashMap::new();
 
                     for (identifier, fields) in members {
-                        let mut fields_map = HashMap::new();
+                        let mut fields_map = Vec::new();
 
                         for (identifier, type_annotation) in fields {
-                            fields_map.insert(
-                                identifier.clone(),
-                                check_type_annotation(
+                            fields_map.push(StructField {
+                                struct_name: type_identifier.clone(),
+                                field_name: identifier.clone(),
+                                field_type: check_type_annotation(
                                     type_annotation,
                                     discovered_types,
                                     type_environment.clone(),
                                 )?,
-                            );
+                            });
                         }
 
                         map.insert(identifier.clone(), fields_map);
@@ -1234,13 +1220,21 @@ pub fn check_type_annotation(
                 ));
             };
 
-            let mut field_types = HashMap::new();
+            let mut field_types = Vec::new();
 
             for field in fields {
-                field_types.insert(
-                    field.0.clone(),
-                    check_type_annotation(field.1, discovered_types, type_environment.clone())?,
-                );
+                field_types.push(StructField {
+                    struct_name: TypeIdentifier::MemberType(
+                        Box::new(TypeIdentifier::Type(enum_name.to_owned())),
+                        member_name.to_owned(),
+                    ),
+                    field_name: field.0.clone(),
+                    field_type: check_type_annotation(
+                        field.1,
+                        discovered_types,
+                        type_environment.clone(),
+                    )?,
+                });
             }
 
             Ok(Type::EnumMember(EnumMember {

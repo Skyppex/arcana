@@ -411,7 +411,7 @@ impl Member {
 pub struct VariableDeclaration {
     pub mutable: bool,
     pub type_annotation: Option<TypeAnnotation>,
-    pub identifier: String,
+    pub pattern: Pattern,
     pub initializer: Option<Box<Expression>>,
 }
 

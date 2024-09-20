@@ -851,18 +851,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         cursor.bump()?; // Consume the mutable
     }
 
-    let TokenKind::Identifier(identifier) = cursor.first().kind else {
-        return Err(format!(
-            "Expected identifier but found {:?}",
-            cursor.first().kind
-        ));
-    };
-
-    cursor.bump()?; // Consume the identifier
-
-    if !identifier.is_variable_identifier_name() {
-        return Err(format!("Invalid variable name: {}", identifier));
-    }
+    let pattern = parse_pattern(cursor)?;
 
     let type_annotation = parse_optional_type_annotation(cursor, false)?;
 
@@ -875,14 +864,14 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
             Ok(Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
                 type_annotation,
-                identifier,
+                pattern,
                 initializer: Some(Box::new(initializer)),
             }))
         }
         TokenKind::Semicolon => Ok(Expression::VariableDeclaration(VariableDeclaration {
             mutable,
             type_annotation,
-            identifier,
+            pattern,
             initializer: None,
         })),
         _ => Err(format!(
@@ -1231,7 +1220,7 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 }
 
 fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
-    let pattern = get_pattern(cursor)?;
+    let pattern = parse_single_pattern(cursor)?;
 
     println!("Parsing pattern");
 
@@ -1260,7 +1249,7 @@ fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
     Ok(pattern)
 }
 
-fn get_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
+fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
     match cursor.first().kind {
         TokenKind::Underscore => {
             cursor.bump()?; // Consume the _
@@ -1325,6 +1314,10 @@ fn get_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
                         identifier: identifier.clone(),
                         pattern: Pattern::Variable(identifier),
                     });
+
+                    if cursor.first().kind == TokenKind::Comma {
+                        cursor.bump()?; // Consume the ,
+                    }
 
                     continue;
                 }

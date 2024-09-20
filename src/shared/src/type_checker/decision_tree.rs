@@ -4,7 +4,8 @@ use crate::{
     type_checker::{
         ast::{BinaryOperator, Member, Typed},
         expressions::check_type,
-        type_annotation_equals, type_equals, type_equals_coerce, Enum, EnumMember, Struct, Type,
+        get_field_by_name, type_annotation_equals, type_equals, type_equals_coerce, Enum,
+        EnumMember, Struct, Type,
     },
     types::TypeAnnotation,
 };
@@ -627,7 +628,7 @@ pub fn create_decision_tree(
             {
                 return Err(format!(
                     "Expected type annotation {} but got {}",
-                    matchee.get_type().type_annotation(),
+                    matchee_type.type_annotation(),
                     type_annotation,
                 ));
             }
@@ -640,16 +641,16 @@ pub fn create_decision_tree(
             let fields = match matchee_type.clone() {
                 Type::Struct(Struct { fields, .. }) => {
                     for field in fields.iter() {
-                        println!("field_ident: {:?}", field.0);
-                        println!("field_type: {:?}", field.1);
+                        println!("field_ident: {:?}", field.field_name);
+                        println!("field_type: {:?}", field.field_type);
                     }
 
                     fields
                 }
                 Type::EnumMember(EnumMember { fields, .. }) => {
                     for field in fields.iter() {
-                        println!("field_ident: {:?}", field.0);
-                        println!("field_type: {:?}", field.1);
+                        println!("field_ident: {:?}", field.field_name);
+                        println!("field_type: {:?}", field.field_type);
                     }
 
                     fields
@@ -668,8 +669,8 @@ pub fn create_decision_tree(
                     };
 
                     for field in fields.iter() {
-                        println!("field_ident: {:?}", field.0);
-                        println!("field_type: {:?}", field.1);
+                        println!("field_ident: {:?}", field.field_name);
+                        println!("field_type: {:?}", field.field_type);
                     }
 
                     fields
@@ -754,12 +755,15 @@ pub fn create_decision_tree(
             }
 
             for field in fields.iter() {
-                println!("field_ident: {:?}", field.0);
-                println!("field_type: {:?}", field.1);
+                println!("field_ident: {:?}", field.field_name);
+                println!("field_type: {:?}", field.field_type);
             }
 
             let field_name = field_patterns.first().unwrap().identifier.clone();
-            let field_type = fields.get(&field_name).expect("testing matches").clone();
+            let field_type = get_field_by_name(&fields, &field_name)
+                .expect("testing matches")
+                .clone()
+                .field_type;
 
             let expr = TypedExpression::Member(Member::MemberAccess {
                 object: Box::new(matchee.clone()),
@@ -778,10 +782,10 @@ pub fn create_decision_tree(
                 }),
                 arguments: fields
                     .iter()
-                    .map(|(field, type_)| Variable {
-                        identifier: field.clone(),
+                    .map(|struct_field| Variable {
+                        identifier: struct_field.field_name.clone(),
                         accessor: Accessor::Environment,
-                        type_: type_.clone(),
+                        type_: struct_field.field_type.clone(),
                     })
                     .collect(),
                 body: create_decision_tree(

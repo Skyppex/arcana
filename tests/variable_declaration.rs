@@ -5,6 +5,7 @@ use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, Ve
 use interpreter::Value;
 use shared::type_checker::{
     ast::{Literal, Typed, TypedExpression},
+    decision_tree::Pattern,
     Type,
 };
 
@@ -76,8 +77,8 @@ fn variable_declaration_has_correct_identifier() {
         .unwrap_expression();
 
     match expression {
-        TypedExpression::VariableDeclaration { identifier, .. } => {
-            assert_eq!(identifier, "x");
+        TypedExpression::VariableDeclaration { pattern, .. } => {
+            assert_eq!(pattern, Pattern::Variable("x".to_owned()));
         }
         _ => panic!(
             "Expected a variable declaration, but found {:?}",
