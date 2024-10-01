@@ -826,8 +826,6 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
             true
         }
         (Type::TypeAlias(TypeAlias { types, .. }), other) => {
-            println!("Type alias: {:?}", types);
-            println!("Other: {:?}", other);
             types.iter().any(|t| type_equals(t, other))
         }
         (other, Type::TypeAlias(TypeAlias { types, .. })) => {

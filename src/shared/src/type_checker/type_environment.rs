@@ -179,7 +179,6 @@ impl TypeEnvironment {
 
             if let Type::Protocol(Protocol { functions, .. }) = constraint_type {
                 for (function_identifier, function_type) in functions {
-                    println!("Function Type: {:?}", function_type);
                     let name = function_identifier.name();
 
                     self.add_static_member(

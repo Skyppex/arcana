@@ -491,10 +491,6 @@ pub fn check_type<'a>(
             associated_types,
             functions,
         }) => {
-            for function in functions {
-                println!("PARAM0: {:?}", function.param);
-            }
-
             let protocol_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
@@ -528,7 +524,6 @@ pub fn check_type<'a>(
                         return_type,
                         ..
                     } => {
-                        println!("PARAM: {:?}", param);
                         let type_ = Type::Function(Function {
                             identifier: Some(identifier.clone()),
                             param: param.clone().map(|p| Parameter {
@@ -537,8 +532,6 @@ pub fn check_type<'a>(
                             }),
                             return_type: Box::new(return_type.clone()),
                         });
-
-                        println!("FT: {:?}", type_);
 
                         (identifier.clone(), type_)
                     }
@@ -660,13 +653,6 @@ pub fn check_type<'a>(
                     implementation_type_environment.clone(),
                 )?;
 
-                println!(
-                    "{:?} | {:?} | {:?}",
-                    type_annotation,
-                    protocol_function_identifier.name(),
-                    typed_function.get_type()
-                );
-
                 let function_name = protocol_function_identifier.name().to_owned();
 
                 type_environment.borrow_mut().add_static_member(
@@ -701,8 +687,6 @@ pub fn check_type<'a>(
             )));
 
             if let TypeIdentifier::GenericType(_, generics) = type_identifier {
-                println!("Adding generics");
-                println!("{:?}", generics);
                 for generic in generics {
                     function_type_environment
                         .borrow_mut()

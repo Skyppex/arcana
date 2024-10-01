@@ -65,7 +65,6 @@ pub fn check_type<'a>(
             }
         },
         Expression::Closure(closure) => {
-            println!("CLOSURE__CONTEXT: {:?}", context);
             let closure_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
@@ -535,8 +534,6 @@ pub fn check_type<'a>(
                 context,
             ),
             crate::parser::Member::ParamPropagation { object, member, .. } => {
-                println!("KASHDLKJASHD: {:?}", context);
-
                 check_type_param_propagation(
                     object,
                     member,
@@ -1328,8 +1325,6 @@ fn check_type_param_propagation(
                 .get_static_member(object_type.type_annotation(), &symbol)
         });
 
-    println!("MEMBER TYPE: {:?}", member_type);
-
     let Some(Type::Function(Function { param, .. })) = member_type else {
         return Err(format!("{} is not a function", symbol));
     };
@@ -1459,9 +1454,6 @@ fn check_type_pattern(
             match &initializer_type {
                 Type::Enum(Enum { members, .. }) => {
                     for (_, member_type) in members {
-                        println!("member_type: {:?}", member_type.type_annotation());
-                        println!("type_annotation: {:?}", type_annotation);
-
                         if type_annotation_equals(&type_annotation, &member_type.type_annotation())
                         {
                             is_enum_member = true;
@@ -1472,9 +1464,6 @@ fn check_type_pattern(
                 Type::EnumMember(EnumMember {
                     discriminant_name, ..
                 }) => {
-                    println!("discriminant_name: {:?}", discriminant_name);
-                    println!("type_annotation: {:?}", type_annotation);
-
                     if type_annotation_equals(
                         &type_annotation,
                         &TypeAnnotation::Type(discriminant_name.clone()),
@@ -1513,11 +1502,6 @@ fn check_type_pattern(
                     let Type::EnumMember(EnumMember { fields, .. }) = member.clone() else {
                         return Err(format!("Expected enum member but got {:?}", member.clone()));
                     };
-
-                    for field in fields.iter() {
-                        println!("field_ident: {:?}", field.field_name);
-                        println!("field_type: {:?}", field.field_type);
-                    }
 
                     fields
                         .into_iter()

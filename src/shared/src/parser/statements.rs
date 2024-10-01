@@ -749,10 +749,6 @@ fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> 
 
     cursor.expect(TokenKind::CloseBrace)?;
 
-    for function in functions.iter() {
-        println!("FUNFUN: {:?}", function.param);
-    }
-
     Ok(Statement::ProtocolDeclaration(ProtocolDeclaration {
         access_modifier,
         type_identifier,

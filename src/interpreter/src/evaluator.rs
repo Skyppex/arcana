@@ -304,13 +304,10 @@ fn evaluate_decision_tree(
             fallback,
             type_: _,
         } => {
-            println!("Variable: {:?}", variable);
-
             let switch_value = match variable.accessor {
                 Accessor::Environment => value.clone(),
                 Accessor::Expression(expression) => {
                     let argument_value = evaluate_expression(*expression, environment.clone())?;
-                    println!("Argument Value: {:?}", argument_value);
 
                     environment.borrow_mut().add_variable(
                         variable.identifier.clone(),
@@ -322,29 +319,20 @@ fn evaluate_decision_tree(
                 }
             };
 
-            println!("Value: {:?}", value);
-            println!("Switch Value: {:?}", switch_value);
-
             for case in cases {
                 let pattern = case.pattern;
                 let arguments = case.arguments;
                 let body = case.body;
 
-                println!("Pattern: {:?}", pattern);
-                println!("Body: {:?}", body);
-
                 let case_environment =
                     Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
 
                 for argument in arguments {
-                    println!("Case Argument: {:?}", argument);
-
                     match argument.accessor {
                         Accessor::Environment => continue,
                         Accessor::Expression(expression) => {
                             let argument_value =
                                 evaluate_expression(*expression, environment.clone())?;
-                            println!("Case Argument Value: {:?}", argument_value);
 
                             case_environment.borrow_mut().add_variable(
                                 argument.identifier,
@@ -357,8 +345,6 @@ fn evaluate_decision_tree(
 
                 if let Some(bindings) = evaluate_pattern(pattern, &value, environment.clone())? {
                     for (identifier, value) in bindings {
-                        println!("Adding variable: {} = {:?}", identifier, value);
-
                         case_environment
                             .borrow_mut()
                             .add_variable(identifier, value, false);
@@ -396,7 +382,6 @@ fn evaluate_pattern(
         },
         Pattern::Int(v) => match value {
             Value::Number(Number::Int(v2)) => {
-                println!("Int Pattern: {:?}", v);
                 if v == *v2 {
                     Ok(Some(Vec::new()))
                 } else {
@@ -498,21 +483,11 @@ fn evaluate_pattern(
                     identifier, type_annotation
                 ))?;
 
-                println!("Field Value: {:?}", field_value);
-                println!("Recurse");
-                println!("Field Pattern: {:?}", pattern);
-
                 match evaluate_pattern(pattern, field_value, environment.clone())? {
                     Some(mut bindings_) => {
-                        println!("Uncurse");
-                        for b in bindings_.iter() {
-                            println!("Binding: {:?}", b);
-                        }
-
                         bindings.append(&mut bindings_)
                     }
                     None => {
-                        println!("Unrecurse");
                         return Ok(None);
                     }
                 }
@@ -838,11 +813,6 @@ fn evaluate_pattern(
                 }
                 other => return Err(format!("Unexpected pattern: '{:?}'", other)),
             };
-
-            println!("ALKSJHDLKAJSHDLKJAHSD");
-            println!("Left: {:?}", left);
-            println!("Right: {:?}", right);
-            println!("Value: {:?}", value);
 
             match (left, value, right) {
                 (

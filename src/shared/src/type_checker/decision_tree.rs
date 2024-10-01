@@ -182,8 +182,6 @@ pub fn create_decision_tree(
 
     let arm = arms.first().expect("testing matches");
 
-    println!("matchee: {:?}", matchee);
-
     let decision = match arm.pattern.clone() {
         Pattern::Wildcard => {
             let expression = &arm.expression;
@@ -540,9 +538,6 @@ pub fn create_decision_tree(
             let type_environment = &arm.type_environment;
             let matchee_type = matchee.get_type();
 
-            println!("identifier: {:?}", identifier);
-            println!("matchee_type: {:?}", matchee_type);
-
             type_environment
                 .borrow_mut()
                 .add_variable(identifier.clone(), matchee_type.clone());
@@ -587,16 +582,12 @@ pub fn create_decision_tree(
             field_patterns,
         }) => {
             let matchee_type = matchee.get_type();
-            println!("matchee_type: {:?}", matchee_type);
 
             let mut is_enum_member = false;
 
             match &matchee_type {
                 Type::Enum(Enum { members, .. }) => {
                     for (_, member_type) in members {
-                        println!("member_type: {:?}", member_type.type_annotation());
-                        println!("type_annotation: {:?}", type_annotation);
-
                         if type_annotation_equals(&type_annotation, &member_type.type_annotation())
                         {
                             is_enum_member = true;
@@ -607,9 +598,6 @@ pub fn create_decision_tree(
                 Type::EnumMember(EnumMember {
                     discriminant_name, ..
                 }) => {
-                    println!("discriminant_name: {:?}", discriminant_name);
-                    println!("type_annotation: {:?}", type_annotation);
-
                     if type_annotation_equals(
                         &type_annotation,
                         &TypeAnnotation::Type(discriminant_name.clone()),
@@ -636,25 +624,9 @@ pub fn create_decision_tree(
             let expression = &arm.expression;
             let type_environment = arm.type_environment.clone();
 
-            println!("struct_matchee: {:?}", matchee);
-
             let fields = match matchee_type.clone() {
-                Type::Struct(Struct { fields, .. }) => {
-                    for field in fields.iter() {
-                        println!("field_ident: {:?}", field.field_name);
-                        println!("field_type: {:?}", field.field_type);
-                    }
-
-                    fields
-                }
-                Type::EnumMember(EnumMember { fields, .. }) => {
-                    for field in fields.iter() {
-                        println!("field_ident: {:?}", field.field_name);
-                        println!("field_type: {:?}", field.field_type);
-                    }
-
-                    fields
-                }
+                Type::Struct(Struct { fields, .. }) => { fields }
+                Type::EnumMember(EnumMember { fields, .. }) => { fields }
                 Type::Enum(Enum {
                     shared_fields,
                     members,
@@ -667,11 +639,6 @@ pub fn create_decision_tree(
                     let Type::EnumMember(EnumMember { fields, .. }) = member.clone() else {
                         return Err(format!("Expected enum member but got {:?}", member.clone()));
                     };
-
-                    for field in fields.iter() {
-                        println!("field_ident: {:?}", field.field_name);
-                        println!("field_type: {:?}", field.field_type);
-                    }
 
                     fields
                         .into_iter()
@@ -752,11 +719,6 @@ pub fn create_decision_tree(
                     alternative: Box::new(alternative),
                     type_,
                 });
-            }
-
-            for field in fields.iter() {
-                println!("field_ident: {:?}", field.field_name);
-                println!("field_type: {:?}", field.field_type);
             }
 
             let field_name = field_patterns.first().unwrap().identifier.clone();

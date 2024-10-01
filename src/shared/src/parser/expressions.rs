@@ -279,12 +279,10 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
 }
 
 fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
-    println!("1");
     let TokenKind::Identifier(_) = cursor.first().kind else {
         return parse_range(cursor);
     };
 
-    println!("2");
     if !matches!(
         cursor.second().kind,
         TokenKind::OpenBrace | TokenKind::DoubleColon | TokenKind::Less
@@ -292,14 +290,12 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_range(cursor);
     };
 
-    println!("3");
     if let TokenKind::Identifier(name) = cursor.third().kind {
         if cursor.second().kind == TokenKind::DoubleColon && name.is_function_identifier_name() {
             return parse_member_access(cursor);
         }
     }
 
-    println!("ADSLKH {:?}", cursor.first());
     let type_annotation = parse_type_annotation(cursor, false)?;
 
     if type_annotation.has_double_colon() {
@@ -1076,9 +1072,6 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             None => TypeAnnotation::Type(symbol.clone()),
         };
 
-        println!("aksdjshalksjhsd");
-        println!("1");
-
         let TokenKind::Identifier(identifier) = cursor.second().kind else {
             return Err(format!(
                 "Expected identifier but found {:?}",
@@ -1086,15 +1079,12 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             ));
         };
 
-        println!("{:?}", identifier);
-        println!("2");
         if !identifier.is_function_identifier_name() {
             return Ok(object);
         }
 
         cursor.bump()?; // Consume the ::
 
-        println!("5");
         let Expression::Member(member) = parse_literal(cursor)? else {
             return Err(format!(
                 "Expected member but found {:?}",
@@ -1102,7 +1092,6 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             ));
         };
 
-        println!("6");
         object = Expression::Member(Member::StaticMemberAccess {
             type_annotation,
             member: Box::new(member),
@@ -1222,19 +1211,13 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
     let pattern = parse_single_pattern(cursor)?;
 
-    println!("Parsing pattern");
-
     if cursor.first().kind == TokenKind::DoubleDot {
         cursor.bump()?; // Consume the ..
-
-        println!("Parsing range");
 
         let inclusive = cursor.first().kind == TokenKind::Equal;
 
         if inclusive {
             cursor.bump()?; // Consume the =
-
-            println!("Inclusive range");
         }
 
         let right = parse_pattern(cursor)?;
