@@ -25,7 +25,7 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
         .expect("Failed to convert path to string")
         .to_string();
 
-    let lib_path = format!("{}\\lib\\lib.ar", exe).replace("\\", "/");
+    let lib_path = format!("{}\\lib\\lib.ar", exe).replace('\\', "/");
 
     let lib = get_path(&lib_path)
         .map_err(|e| e.to_string())?
@@ -87,7 +87,7 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
         if input.trim() == "types" {
             for (ident, type_) in type_environment.borrow().get_types() {
                 if let Type::Function(..) = type_ {
-                    println!("{} -> {}", ident.to_string(), type_);
+                    println!("{} -> {}", ident, type_);
                 } else {
                     println!("{}", type_);
                 }

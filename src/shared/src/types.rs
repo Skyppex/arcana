@@ -29,7 +29,7 @@ impl TypeAnnotation {
             return s.contains("::");
         }
 
-        return false;
+        false
     }
 }
 

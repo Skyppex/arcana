@@ -625,8 +625,8 @@ pub fn create_decision_tree(
             let type_environment = arm.type_environment.clone();
 
             let fields = match matchee_type.clone() {
-                Type::Struct(Struct { fields, .. }) => { fields }
-                Type::EnumMember(EnumMember { fields, .. }) => { fields }
+                Type::Struct(Struct { fields, .. }) => fields,
+                Type::EnumMember(EnumMember { fields, .. }) => fields,
                 Type::Enum(Enum {
                     shared_fields,
                     members,
@@ -640,10 +640,7 @@ pub fn create_decision_tree(
                         return Err(format!("Expected enum member but got {:?}", member.clone()));
                     };
 
-                    fields
-                        .into_iter()
-                        .chain(shared_fields.into_iter())
-                        .collect()
+                    fields.into_iter().chain(shared_fields).collect()
                 }
                 _ => {
                     return Err(format!(
@@ -653,7 +650,7 @@ pub fn create_decision_tree(
                 }
             };
 
-            if fields.len() == 0 {
+            if fields.is_empty() {
                 let expression =
                     check_type(expression, discovered_types, type_environment.clone(), None)?;
 

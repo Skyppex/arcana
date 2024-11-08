@@ -23,10 +23,10 @@ pub fn tokenize(source_code: &str) -> Result<Vec<Token>, String> {
 fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
     cursor.reset_position_within_token();
 
-    let token = match cursor.first() {
+    match cursor.first() {
         ' ' | '\r' | '\t' | '\n' => {
             cursor.bump();
-            cursor.eat_while(|c| is_white_space(c));
+            cursor.eat_while(is_white_space);
 
             Ok(Token {
                 kind: TokenKind::WhiteSpace,
@@ -284,9 +284,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
 
             Err(format!("Unrecognized character: {0}", cursor.first()))
         }
-    };
-
-    token
+    }
 }
 
 fn is_identifier_start(c: char) -> bool {
@@ -317,14 +315,14 @@ fn always_escapable(c: char) -> Option<char> {
 }
 
 fn escapable_is_string(c: char) -> Option<char> {
-    always_escapable(c).or_else(|| match c {
+    always_escapable(c).or(match c {
         '"' => Some('"'),
         _ => None,
     })
 }
 
 fn escapable_is_char(c: char) -> Option<char> {
-    always_escapable(c).or_else(|| match c {
+    always_escapable(c).or(match c {
         '\'' => Some('\''),
         _ => None,
     })

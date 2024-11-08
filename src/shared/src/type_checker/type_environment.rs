@@ -96,7 +96,7 @@ impl TypeEnvironment {
         self.scopes
             .iter()
             .find(|s| s.scope_type == *scope_type && s.active())
-            .map(|f: &Scope| f.clone())
+            .cloned()
             .or_else(|| {
                 self.parent
                     .as_ref()
@@ -235,11 +235,10 @@ impl TypeEnvironment {
                 if let Some((_, t)) = self.types.iter().find(|(k, _)| {
                     k.eq_names(&TypeIdentifier::GenericType(type_name.clone(), vec![]))
                 }) {
-                    let concrete = t.clone_with_concrete_types(
+                    t.clone_with_concrete_types(
                         concrete_types.clone(),
                         Rc::new(RefCell::new(self.clone())),
-                    );
-                    concrete
+                    )
                 } else if let Some(parent) = &self.parent {
                     parent.borrow().get_type_from_annotation(type_annotation)
                 } else {
@@ -254,7 +253,7 @@ impl TypeEnvironment {
                 let param_type = param_type_annotation
                     .as_ref()
                     .map(|p| {
-                        self.get_type_from_annotation(&p)
+                        self.get_type_from_annotation(p)
                             .map_err(|e| format!("Error getting type from annotation: {}", e))
                     })
                     .transpose()?;
@@ -328,7 +327,7 @@ impl TypeEnvironment {
             })
     }
     pub fn lookup_type(&self, type_: &Type) -> bool {
-        self.types.values().into_iter().any(|t| t == type_)
+        self.types.values().any(|t| t == type_)
             || self
                 .parent
                 .as_ref()
@@ -336,10 +335,7 @@ impl TypeEnvironment {
     }
 
     pub fn lookup_type_str(&self, type_name: &str) -> bool {
-        self.types
-            .values()
-            .into_iter()
-            .any(|t| t.full_name() == type_name)
+        self.types.values().any(|t| t.full_name() == type_name)
             || self
                 .parent
                 .as_ref()

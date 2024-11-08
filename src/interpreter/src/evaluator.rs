@@ -18,7 +18,7 @@ use super::{
     value::{EnumFields, EnumMember, Number, Value},
 };
 
-pub fn evaluate<'a>(
+pub fn evaluate(
     typed_statement: TypedStatement,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
@@ -107,7 +107,7 @@ fn evaluate_function_declaration(
     Ok(Value::Void)
 }
 
-fn evaluate_expression<'a>(
+fn evaluate_expression(
     typed_expression: TypedExpression,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
@@ -189,7 +189,7 @@ fn evaluate_expression<'a>(
     }
 }
 
-fn evaluate_program<'a>(
+fn evaluate_program(
     statements: Vec<TypedStatement>,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
@@ -204,7 +204,7 @@ fn evaluate_program<'a>(
     Ok(value)
 }
 
-fn evaluate_variable_declaration<'a>(
+fn evaluate_variable_declaration(
     mutable: bool,
     pattern: Pattern,
     initializer: Option<Box<TypedExpression>>,
@@ -226,7 +226,7 @@ fn evaluate_variable_declaration<'a>(
     Ok(value)
 }
 
-fn evaluate_if<'a>(
+fn evaluate_if(
     condition: Box<TypedExpression>,
     true_expression: Box<TypedExpression>,
     false_expression: Option<Box<TypedExpression>>,
@@ -240,9 +240,9 @@ fn evaluate_if<'a>(
             if v {
                 let value = evaluate_expression(*true_expression, if_environment)?;
                 if false_expression.is_none() {
-                    return Ok(Value::option_some(value));
+                    Ok(Value::option_some(value))
                 } else {
-                    return Ok(value);
+                    Ok(value)
                 }
             } else {
                 match false_expression {
@@ -484,9 +484,7 @@ fn evaluate_pattern(
                 ))?;
 
                 match evaluate_pattern(pattern, field_value, environment.clone())? {
-                    Some(mut bindings_) => {
-                        bindings.append(&mut bindings_)
-                    }
+                    Some(mut bindings_) => bindings.append(&mut bindings_),
                     None => {
                         return Ok(None);
                     }
@@ -826,12 +824,10 @@ fn evaluate_pattern(
                         } else {
                             Ok(None)
                         }
+                    } else if *v >= left && *v < right {
+                        Ok(Some(Vec::new()))
                     } else {
-                        if *v >= left && *v < right {
-                            Ok(Some(Vec::new()))
-                        } else {
-                            Ok(None)
-                        }
+                        Ok(None)
                     }
                 }
                 (
@@ -845,12 +841,10 @@ fn evaluate_pattern(
                         } else {
                             Ok(None)
                         }
+                    } else if *v >= left && *v < right {
+                        Ok(Some(Vec::new()))
                     } else {
-                        if *v >= left && *v < right {
-                            Ok(Some(Vec::new()))
-                        } else {
-                            Ok(None)
-                        }
+                        Ok(None)
                     }
                 }
                 (
@@ -864,12 +858,10 @@ fn evaluate_pattern(
                         } else {
                             Ok(None)
                         }
+                    } else if *v >= left && *v < right {
+                        Ok(Some(Vec::new()))
                     } else {
-                        if *v >= left && *v < right {
-                            Ok(Some(Vec::new()))
-                        } else {
-                            Ok(None)
-                        }
+                        Ok(None)
                     }
                 }
                 other => Err(format!(
@@ -881,7 +873,7 @@ fn evaluate_pattern(
     }
 }
 
-fn evaluate_assignment<'a>(
+fn evaluate_assignment(
     member: Box<Member>,
     initializer: Box<TypedExpression>,
     environment: Rcrc<Environment>,
@@ -893,7 +885,7 @@ fn evaluate_assignment<'a>(
     Ok(value)
 }
 
-fn evaluate_member<'a>(member: Member, environment: Rcrc<Environment>) -> Result<Value, String> {
+fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Value, String> {
     match member {
         Member::Identifier { symbol, .. } => Ok(environment
             .borrow()
@@ -914,7 +906,7 @@ fn evaluate_member<'a>(member: Member, environment: Rcrc<Environment>) -> Result
     }
 }
 
-fn evaluate_static_member_access<'a>(
+fn evaluate_static_member_access(
     type_annotation: TypeAnnotation,
     environment: Rcrc<Environment>,
     member: Box<Member>,
@@ -931,7 +923,7 @@ fn evaluate_static_member_access<'a>(
         .clone())
 }
 
-fn evaluate_member_access<'a>(
+fn evaluate_member_access(
     object: Box<TypedExpression>,
     environment: Rcrc<Environment>,
     member: Box<Member>,
@@ -1038,7 +1030,7 @@ fn evaluate_member_access<'a>(
 //     }
 // }
 
-fn evaluate_literal<'a>(literal: Literal, environment: Rcrc<Environment>) -> Result<Value, String> {
+fn evaluate_literal(literal: Literal, environment: Rcrc<Environment>) -> Result<Value, String> {
     match literal {
         Literal::Void => panic!("Void literals should never be evaluated"),
         Literal::Unit => Ok(Value::Unit),
@@ -1144,15 +1136,12 @@ fn evaluate_call(
                 ScopeType::Return,
             )));
 
-            match evaluated_arg {
-                Some(evaluated_arg) => {
-                    function_environment.borrow_mut().add_variable(
-                        param_name.clone().unwrap(),
-                        evaluated_arg.clone(),
-                        false,
-                    );
-                }
-                None => (),
+            if let Some(evaluated_arg) = evaluated_arg {
+                function_environment.borrow_mut().add_variable(
+                    param_name.clone().unwrap(),
+                    evaluated_arg.clone(),
+                    false,
+                );
             }
 
             let mut value = evaluate_expression(body, function_environment.clone())?;
@@ -1163,7 +1152,7 @@ fn evaluate_call(
                 match v {
                     Some(v) => {
                         if type_ == Type::Void {
-                            return Err(format!("Cannot return a value from a void function",));
+                            return Err("Cannot return a value from a void function".to_string());
                         }
 
                         value = v.clone();
@@ -1217,7 +1206,7 @@ fn evaluate_index(
     }
 }
 
-fn evaluate_unary<'a>(
+fn evaluate_unary(
     operator: UnaryOperator,
     expression: Box<TypedExpression>,
     environment: Rcrc<Environment>,
@@ -1270,7 +1259,7 @@ fn evaluate_unary<'a>(
     }
 }
 
-fn evaluate_binary<'a>(
+fn evaluate_binary(
     left: Box<TypedExpression>,
     operator: BinaryOperator,
     right: Box<TypedExpression>,
@@ -1282,7 +1271,7 @@ fn evaluate_binary<'a>(
     evaluate_binop::evaluate_binop(left, operator, right)
 }
 
-fn evaluate_block<'a>(
+fn evaluate_block(
     statements: Vec<TypedStatement>,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
@@ -1305,7 +1294,7 @@ fn evaluate_block<'a>(
     Ok(value)
 }
 
-fn evaluate_drop<'a>(identifier: String, environment: Rcrc<Environment>) -> Result<Value, String> {
+fn evaluate_drop(identifier: String, environment: Rcrc<Environment>) -> Result<Value, String> {
     let variable = environment
         .borrow_mut()
         .remove_variable(&identifier)
@@ -1403,7 +1392,7 @@ fn evaluate_while(
         if let Some(Scope::Break(v)) = while_environment.borrow().get_scope(&ScopeType::Break) {
             break_value = match v {
                 Some(v) => match else_body {
-                    None => Err(format!("Cannot break with a value in a while loop without an else block (add an else block with 'else {{}}')")),
+                    None => Err("Cannot break with a value in a while loop without an else block (add an else block with 'else {}')".to_string()),
                     Some(_) => Ok(v.clone())
                 },
                 None => Ok(Value::Void)
@@ -1447,7 +1436,7 @@ fn evaluate_for(
         _ => return Err(format!("For iterable must be an array '{}'", value)),
     };
 
-    if array.len() == 0 {
+    if array.is_empty() {
         match else_body {
             Some(else_body) => {
                 let mut value = evaluate_expression(*else_body.clone(), for_environment.clone())?;
@@ -1496,7 +1485,8 @@ fn evaluate_for(
         let value = array
             .get(index)
             .cloned()
-            .expect(format!("Index out of bounds: {}", index).as_str());
+            .unwrap_or_else(|| panic!("Index out of bounds: {}", index));
+
         index += 1;
 
         for_environment
@@ -1508,7 +1498,7 @@ fn evaluate_for(
         if let Some(Scope::Break(v)) = for_environment.borrow().get_scope(&ScopeType::Break) {
             break_value = match v {
                     Some(v) => match else_body {
-                        None => Err(format!("Cannot break with a value in a for loop without an else block (add an else block with 'else {{}}')")),
+                        None => Err("Cannot break with a value in a for loop without an else block (add an else block with 'else {}')".to_string()),
                         Some(_) => Ok(v.clone())
                     },
                     None => Ok(Value::Void)
@@ -1539,7 +1529,7 @@ fn evaluate_break(
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     if !environment.borrow().has_scope(&ScopeType::Break) {
-        return Err(format!("Cannot break outside of a loop"));
+        return Err("Cannot break outside of a loop".to_string());
     };
 
     match expression {
@@ -1561,7 +1551,7 @@ fn evaluate_break(
 
 fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, String> {
     if !environment.borrow().has_scope(&ScopeType::Continue) {
-        return Err(format!("Cannot continue outside of a loop"));
+        return Err("Cannot continue outside of a loop".to_string());
     };
 
     environment.borrow_mut().activate_scope(Scope::Continue)?;
@@ -1573,7 +1563,7 @@ fn evaluate_return(
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     if !environment.borrow().has_scope(&ScopeType::Return) {
-        return Err(format!("Cannot return outside of a function"));
+        return Err("Cannot return outside of a function".to_string());
     };
 
     match expression {

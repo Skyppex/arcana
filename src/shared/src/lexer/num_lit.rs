@@ -7,7 +7,7 @@ pub fn parse_float_literal_starting_with_dot(cursor: &mut Cursor) -> Result<Toke
     let mut value = String::from(".");
     cursor.bump(); // consume the dot
 
-    while cursor.first().is_digit(10) {
+    while cursor.first().is_ascii_digit() {
         value.push(cursor.first());
         cursor.bump(); // consume the digit
     }

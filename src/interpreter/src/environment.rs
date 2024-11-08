@@ -207,11 +207,9 @@ impl Environment {
                 }
 
                 variable.borrow_mut().value = value.clone();
-                return Ok(value);
+                Ok(value)
             }
-            Member::StaticMemberAccess { .. } => {
-                return Err("Cannot assign to static member".to_owned());
-            }
+            Member::StaticMemberAccess { .. } => Err("Cannot assign to static member".to_owned()),
             Member::MemberAccess { member, .. } => {
                 self.set_variable(*member.clone(), value.clone())
             }

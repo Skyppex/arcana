@@ -30,7 +30,7 @@ pub enum DiscoveredType {
     },
 }
 
-pub fn create_typed_ast<'a>(
+pub fn create_typed_ast(
     program: Statement,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<TypedStatement, String> {

@@ -21,9 +21,9 @@ pub struct ScopeState {
     pub active: bool,
 }
 
-impl Into<Scope> for ScopeType {
-    fn into(self) -> Scope {
-        match self {
+impl From<ScopeType> for Scope {
+    fn from(val: ScopeType) -> Self {
+        match val {
             ScopeType::Break => Scope::Break(None),
             ScopeType::Continue => Scope::Continue,
             ScopeType::Return => Scope::Return(None),
@@ -31,25 +31,25 @@ impl Into<Scope> for ScopeType {
     }
 }
 
-impl Into<ScopeState> for Scope {
-    fn into(self) -> ScopeState {
+impl From<Scope> for ScopeState {
+    fn from(val: Scope) -> Self {
         ScopeState {
-            scope_type: self.clone().into(),
-            scope: self,
+            scope_type: val.clone().into(),
+            scope: val,
             active: false,
         }
     }
 }
 
-impl Into<ScopeState> for ScopeType {
-    fn into(self) -> ScopeState {
-        <ScopeType as Into<Scope>>::into(self).into()
+impl From<ScopeType> for ScopeState {
+    fn from(val: ScopeType) -> Self {
+        <ScopeType as Into<Scope>>::into(val).into()
     }
 }
 
-impl Into<ScopeType> for Scope {
-    fn into(self) -> ScopeType {
-        match self {
+impl From<Scope> for ScopeType {
+    fn from(val: Scope) -> Self {
+        match val {
             Scope::Break(_) => ScopeType::Break,
             Scope::Continue => ScopeType::Continue,
             Scope::Return(_) => ScopeType::Return,

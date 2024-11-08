@@ -39,7 +39,7 @@ impl<'a> Cursor<'a> {
     }
 
     pub(crate) fn bump(&mut self) -> Option<char> {
-        Some(self.chars.next()?)
+        self.chars.next()
     }
 
     pub(crate) fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {

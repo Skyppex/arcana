@@ -2,7 +2,7 @@ use shared::type_checker::ast::BinaryOperator;
 
 use super::value::{Number, Value};
 
-pub(crate) fn evaluate_binop<'a>(
+pub(crate) fn evaluate_binop(
     left: Value,
     operator: BinaryOperator,
     right: Value,
@@ -31,7 +31,7 @@ pub(crate) fn evaluate_binop<'a>(
     }
 }
 
-fn evaluate_add<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_add(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left + right))),
@@ -54,7 +54,7 @@ fn evaluate_add<'a>(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_subtract<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_subtract(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left - right))),
@@ -70,7 +70,7 @@ fn evaluate_subtract<'a>(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_multiply<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_multiply(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left * right))),
@@ -86,7 +86,7 @@ fn evaluate_multiply<'a>(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_divide<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_divide(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left / right))),
@@ -102,7 +102,7 @@ fn evaluate_divide<'a>(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_modulo<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_modulo(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left % right))),
@@ -118,7 +118,7 @@ fn evaluate_modulo<'a>(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_bitwise_and<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_and(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left & right))),
@@ -131,7 +131,7 @@ fn evaluate_bitwise_and<'a>(left: Value, right: Value) -> Result<Value, String> 
     }
 }
 
-fn evaluate_bitwise_or<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_or(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left | right))),
@@ -144,7 +144,7 @@ fn evaluate_bitwise_or<'a>(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_bitwise_xor<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_xor(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left ^ right))),
@@ -157,7 +157,7 @@ fn evaluate_bitwise_xor<'a>(left: Value, right: Value) -> Result<Value, String> 
     }
 }
 
-fn evaluate_bitwise_left_shift<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_left_shift(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => {
@@ -178,7 +178,7 @@ fn evaluate_bitwise_left_shift<'a>(left: Value, right: Value) -> Result<Value, S
     }
 }
 
-fn evaluate_bitwise_right_shift<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_right_shift(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => {
@@ -199,7 +199,7 @@ fn evaluate_bitwise_right_shift<'a>(left: Value, right: Value) -> Result<Value, 
     }
 }
 
-fn evaluate_boolean_logical_and<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_boolean_logical_and(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left && right)),
         (left, right) => Err(format!(
@@ -209,7 +209,7 @@ fn evaluate_boolean_logical_and<'a>(left: Value, right: Value) -> Result<Value, 
     }
 }
 
-fn evaluate_boolean_logical_or<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_boolean_logical_or(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left || right)),
         (left, right) => Err(format!(
@@ -219,7 +219,7 @@ fn evaluate_boolean_logical_or<'a>(left: Value, right: Value) -> Result<Value, S
     }
 }
 
-fn evaluate_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_equal(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Unit, Value::Unit) => Ok(Value::Bool(true)),
         (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left == right)),
@@ -247,7 +247,7 @@ fn evaluate_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_not_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_not_equal(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Unit, Value::Unit) => Ok(Value::Bool(false)),
         (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left != right)),
@@ -263,7 +263,7 @@ fn evaluate_not_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_less_than<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_less_than(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left < right)),
@@ -275,7 +275,7 @@ fn evaluate_less_than<'a>(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_less_than_or_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_less_than_or_equal(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left <= right)),
@@ -293,7 +293,7 @@ fn evaluate_less_than_or_equal<'a>(left: Value, right: Value) -> Result<Value, S
     }
 }
 
-fn evaluate_greater_than<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_greater_than(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left > right)),
@@ -305,7 +305,7 @@ fn evaluate_greater_than<'a>(left: Value, right: Value) -> Result<Value, String>
     }
 }
 
-fn evaluate_greater_than_or_equal<'a>(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_greater_than_or_equal(left: Value, right: Value) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left >= right)),
@@ -323,7 +323,7 @@ fn evaluate_greater_than_or_equal<'a>(left: Value, right: Value) -> Result<Value
     }
 }
 
-fn evaluate_range<'a>(left: Value, right: Value, inclusive: bool) -> Result<Value, String> {
+fn evaluate_range(left: Value, right: Value, inclusive: bool) -> Result<Value, String> {
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right, inclusive) {
             (Number::Int(left), Number::Int(right), false) => Ok(Value::Array(

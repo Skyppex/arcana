@@ -52,7 +52,7 @@ fn run() {
 }
 
 pub fn run_source(
-    source: &String,
+    source: &str,
     spell: Option<String>,
     project_files: Option<Paths>,
     args: &MageArgs,
@@ -83,7 +83,7 @@ pub fn run_source(
         .expect("Failed to convert path to string")
         .to_string();
 
-    let lib_path = format!("{}\\lib\\lib.ar", exe).replace("\\", "/");
+    let lib_path = format!("{}\\lib\\lib.ar", exe).replace('\\', "/");
 
     let lib = get_path(&lib_path)
         .map_err(|e| e.to_string())?
@@ -101,15 +101,14 @@ pub fn run_source(
         register_modules(project_files, type_environment.clone(), environment.clone())?;
     }
 
-    match std::fs::read_to_string(lib) {
-        Ok(lib) => read_input(
+    if let Ok(lib) = std::fs::read_to_string(lib) {
+        read_input(
             lib,
             type_environment.clone(),
             environment.clone(),
             args,
             false,
-        )?,
-        Err(_) => {}
+        )?
     }
 
     let result = read_input(

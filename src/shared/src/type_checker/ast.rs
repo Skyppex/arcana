@@ -224,7 +224,7 @@ impl Display for TypedStatement {
             } => write!(
                 f,
                 "imp{} {} for {} {{ associated types: {}, functions: {} }}",
-                format!(
+                format_args!(
                     "<{}>",
                     scoped_generics
                         .iter()
@@ -276,7 +276,7 @@ impl Display for TypedStatement {
                         "".to_string()
                     },
                     return_type,
-                    body.to_string()
+                    body
                 ),
                 None => write!(
                     f,
@@ -700,9 +700,9 @@ pub enum AccessModifier {
     Super,
 }
 
-impl Into<AccessModifier> for parser::AccessModifier {
-    fn into(self) -> AccessModifier {
-        match self {
+impl From<parser::AccessModifier> for AccessModifier {
+    fn from(val: parser::AccessModifier) -> Self {
+        match val {
             parser::AccessModifier::Public => AccessModifier::Public,
             parser::AccessModifier::Super => AccessModifier::Super,
             parser::AccessModifier::Module => AccessModifier::Module,
@@ -799,11 +799,11 @@ impl Typed for Literal {
                 type_: Box::new(Type::Float),
             },
             Literal::String(v) => Type::Literal {
-                name: format!("\"{}\"", v.to_string()),
+                name: format!("\"{}\"", v),
                 type_: Box::new(Type::String),
             },
             Literal::Char(v) => Type::Literal {
-                name: format!("'{}'", v.to_string()),
+                name: format!("'{}'", v),
                 type_: Box::new(Type::Char),
             },
             Literal::Bool(v) => Type::Literal {
@@ -862,7 +862,7 @@ impl Display for Literal {
                     .iter()
                     .map(|fi| {
                         if let Some(identifier) = &fi.identifier {
-                            format!("{}: {}", identifier, fi.initializer.to_string())
+                            format!("{}: {}", identifier, fi.initializer)
                         } else {
                             fi.initializer.to_string()
                         }
@@ -872,7 +872,7 @@ impl Display for Literal {
             ),
             Literal::Enum {
                 field_initializers, ..
-            } => write!(f, "{}", field_initializers.to_string()),
+            } => write!(f, "{}", field_initializers),
         }
     }
 }

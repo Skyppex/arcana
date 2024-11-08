@@ -14,9 +14,7 @@ impl Scope {
     }
 
     pub fn fold(&self) -> Result<Type, String> {
-        let type_ = self.types.iter().fold(Ok(Type::Void), |acc, t| {
-            let acc = acc?;
-
+        let type_ = self.types.iter().try_fold(Type::Void, |acc, t| {
             if acc == Type::Void || type_equals_coerce(&acc, t) {
                 Ok(t.clone())
             } else {
@@ -34,10 +32,10 @@ pub enum ScopeType {
     Return,
 }
 
-impl Into<Scope> for ScopeType {
-    fn into(self) -> Scope {
+impl From<ScopeType> for Scope {
+    fn from(val: ScopeType) -> Self {
         Scope {
-            scope_type: self,
+            scope_type: val,
             types: vec![],
         }
     }

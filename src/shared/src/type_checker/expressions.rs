@@ -19,7 +19,7 @@ use super::{
     Struct, Type, TypeAlias, TypeEnvironment, Union,
 };
 
-pub fn check_type<'a>(
+pub fn check_type(
     expression: &Expression,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
@@ -85,10 +85,10 @@ pub fn check_type<'a>(
                         if let Some(Type::Function(Function { param: Some(t), .. })) =
                             context.clone()
                         {
-                            return Some(*t.type_);
+                            Some(*t.type_)
                         } else {
-                            return None;
-                        };
+                            None
+                        }
                     });
 
                     let Some(type_) = type_ else {
@@ -213,32 +213,30 @@ pub fn check_type<'a>(
                             param.type_
                         ));
                     }
+                } else if let Type::Function(Function { param: None, .. }) = callee_type {
+                    callee = TypedExpression::Call {
+                        callee: Box::new(callee),
+                        argument: None,
+                        type_: return_type.clone(),
+                    };
+                    return_type = match return_type {
+                        Type::Function(Function { return_type, .. }) => *return_type,
+                        _ => {
+                            return Err(format!(
+                                "Expected function type with a return type, found {}",
+                                callee.get_type()
+                            ));
+                        }
+                    };
                 } else {
-                    if let Type::Function(Function { param: None, .. }) = callee_type {
-                        callee = TypedExpression::Call {
-                            callee: Box::new(callee),
-                            argument: None,
-                            type_: return_type.clone(),
-                        };
-                        return_type = match return_type {
-                            Type::Function(Function { return_type, .. }) => *return_type,
-                            _ => {
-                                return Err(format!(
-                                    "Expected function type with a return type, found {}",
-                                    callee.get_type()
-                                ));
-                            }
-                        };
-                    } else {
-                        return Err(format!(
-                            "Expected function type with a parameter, found {}",
-                            callee.get_type()
-                        ));
-                    }
+                    return Err(format!(
+                        "Expected function type with a parameter, found {}",
+                        callee.get_type()
+                    ));
                 };
             }
 
-            let arg = arg_typed_expression.clone().map(|arg| Box::new(arg));
+            let arg = arg_typed_expression.clone().map(Box::new);
 
             Ok(TypedExpression::Call {
                 callee: Box::new(callee),
@@ -322,7 +320,7 @@ pub fn check_type<'a>(
             Ok(TypedExpression::VariableDeclaration {
                 mutable: *mutable,
                 pattern: pattern.clone(),
-                initializer: initializer.map(|i| Box::new(i)),
+                initializer: initializer.map(Box::new),
                 type_,
             })
         }
@@ -336,7 +334,7 @@ pub fn check_type<'a>(
             )));
 
             let if_condition = check_type(
-                &condition,
+                condition,
                 discovered_types,
                 if_else_environment.clone(),
                 None,
@@ -350,7 +348,7 @@ pub fn check_type<'a>(
             };
 
             let if_block = check_type(
-                &true_expression,
+                true_expression,
                 discovered_types,
                 if_else_environment.clone(),
                 None,
@@ -417,7 +415,7 @@ pub fn check_type<'a>(
                 let expression = arm.expression.clone();
 
                 typed_arms.push(TypedMatchArm {
-                    pattern: pattern.into(),
+                    pattern,
                     expression: *expression,
                     type_environment: arm_environment.clone(),
                 });
@@ -558,7 +556,7 @@ pub fn check_type<'a>(
 
                     for value in values {
                         let value =
-                            check_type(&value, discovered_types, type_environment.clone(), None)?;
+                            check_type(value, discovered_types, type_environment.clone(), None)?;
 
                         let type_ = value.get_deep_type();
 
@@ -658,7 +656,7 @@ pub fn check_type<'a>(
                                 fis.insert(
                                     identifier.clone(),
                                     check_type(
-                                        &initializer,
+                                        initializer,
                                         discovered_types,
                                         type_environment.clone(),
                                         None,
@@ -757,14 +755,13 @@ pub fn check_type<'a>(
             if matches!(
                 operator,
                 BinaryOperator::Range | BinaryOperator::RangeInclusive
-            ) {
-                if !type_equals_coerce(&right.get_type(), &left.get_type()) {
-                    return Err(format!(
-                        "Range operator requires both sides to be of the same type, found {} and {}",
-                        left.get_type(),
-                        right.get_type()
-                    ));
-                }
+            ) && !type_equals_coerce(&right.get_type(), &left.get_type())
+            {
+                return Err(format!(
+                    "Range operator requires both sides to be of the same type, found {} and {}",
+                    left.get_type(),
+                    right.get_type()
+                ));
             }
 
             Ok(TypedExpression::Binary {
@@ -860,7 +857,7 @@ pub fn check_type<'a>(
             )?;
 
             if !type_equals(&Type::Bool, &condition.get_type()) {
-                return Err(format!("While condition must be of type bool"));
+                return Err("While condition must be of type bool".to_string());
             };
 
             let body = check_type(body, discovered_types, while_environment.clone(), None)?;
@@ -893,9 +890,10 @@ pub fn check_type<'a>(
                 }
                 None => {
                     if !type_equals(&type_, &Type::Void) {
-                        return Err(format!(
+                        return Err(
                             "Must have an else block if the while block breaks with a value"
-                        ));
+                                .to_string(),
+                        );
                     }
                 }
             };
@@ -971,9 +969,10 @@ pub fn check_type<'a>(
                 }
                 None => {
                     if !type_equals(&type_, &Type::Void) {
-                        return Err(format!(
+                        return Err(
                             "Must have an else block if the for block breaks with a value"
-                        ));
+                                .to_string(),
+                        );
                     }
                 }
             };
@@ -1011,7 +1010,7 @@ fn is_option(type_: &Option<Type>) -> bool {
         return false;
     }
 
-    if shared_fields.len() != 0 {
+    if !shared_fields.is_empty() {
         return false;
     }
 
@@ -1020,9 +1019,7 @@ fn is_option(type_: &Option<Type>) -> bool {
             return false;
         };
 
-        return get_field_by_name(fields, "f0").map_or(false, |_| {
-            return true;
-        });
+        return get_field_by_name(fields, "f0").map_or(false, |_| true);
     });
 }
 
@@ -1030,13 +1027,13 @@ fn check_type_static_member_access(
     type_annotation: &TypeAnnotation,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-    member: &Box<parser::Member>,
+    member: &parser::Member,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
     let object_type =
         check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
 
-    return match *member.clone() {
+    return match member.clone() {
         parser::Member::Identifier { symbol, .. } => match object_type {
             Type::Struct(struct_) => {
                 let Some(static_member_type) = type_environment
@@ -1156,10 +1153,10 @@ fn check_type_static_member_access(
 }
 
 fn check_type_member_access(
-    object: &Box<Expression>,
+    object: &Expression,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-    member: &Box<parser::Member>,
+    member: &parser::Member,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
     let object_type_expression =
@@ -1177,13 +1174,13 @@ fn check_type_member_access(
 
 fn check_type_member_access_recurse(
     object_type: Type,
-    member: &Box<parser::Member>,
+    member: &parser::Member,
     type_environment: Rcrc<TypeEnvironment>,
     object_typed_expression: TypedExpression,
     discovered_types: &Vec<DiscoveredType>,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
-    return match *member.clone() {
+    match member.clone() {
         parser::Member::Identifier { symbol, .. } => match object_type {
             Type::Struct(struct_) => {
                 let field_type = get_field_by_name(&struct_.fields, &symbol)
@@ -1297,17 +1294,17 @@ fn check_type_member_access_recurse(
             type_environment,
             context,
         ),
-    };
+    }
 }
 
 fn check_type_param_propagation(
-    object: &Box<Expression>,
-    member: &Box<parser::Member>,
+    object: &Expression,
+    member: &parser::Member,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
-    let parser::Member::Identifier { symbol, .. } = *member.clone() else {
+    let parser::Member::Identifier { symbol, .. } = member.clone() else {
         return Err("Param propagation must be followed by a member access".to_string());
     };
 
@@ -1353,11 +1350,11 @@ fn check_type_param_propagation(
 
 fn check_type_param_propagation_recurse(
     object_type: Type,
-    member: &Box<parser::Member>,
+    member: &parser::Member,
     type_environment: Rcrc<TypeEnvironment>,
     object_typed_expression: TypedExpression,
 ) -> Result<TypedExpression, String> {
-    match *member.clone() {
+    match member.clone() {
         parser::Member::Identifier { symbol, .. } => {
             let type_ = type_environment
                 .borrow()
@@ -1416,7 +1413,7 @@ fn check_type_param_propagation_recurse(
 fn check_type_pattern(
     pattern: &Pattern,
     initializer: &Option<TypedExpression>,
-    discovered_types: &Vec<DiscoveredType>,
+    _discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
 ) -> Result<(), String> {
@@ -1454,8 +1451,7 @@ fn check_type_pattern(
             match &initializer_type {
                 Type::Enum(Enum { members, .. }) => {
                     for (_, member_type) in members {
-                        if type_annotation_equals(&type_annotation, &member_type.type_annotation())
-                        {
+                        if type_annotation_equals(type_annotation, &member_type.type_annotation()) {
                             is_enum_member = true;
                             break;
                         }
@@ -1465,7 +1461,7 @@ fn check_type_pattern(
                     discriminant_name, ..
                 }) => {
                     if type_annotation_equals(
-                        &type_annotation,
+                        type_annotation,
                         &TypeAnnotation::Type(discriminant_name.clone()),
                     ) {
                         is_enum_member = true;
@@ -1503,10 +1499,7 @@ fn check_type_pattern(
                         return Err(format!("Expected enum member but got {:?}", member.clone()));
                     };
 
-                    fields
-                        .into_iter()
-                        .chain(shared_fields.into_iter())
-                        .collect()
+                    fields.into_iter().chain(shared_fields).collect()
                 }
                 _ => {
                     return Err(format!(
@@ -1543,7 +1536,7 @@ fn check_type_pattern(
                         symbol: field_name.clone(),
                         type_: field_type.clone(),
                     })),
-                    discovered_types,
+                    _discovered_types,
                     type_environment.clone(),
                     context.clone(),
                 )?;
@@ -1577,7 +1570,7 @@ fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, Strin
             if matches!(**type_, Type::Int | Type::UInt | Type::Float) =>
         {
             let mut buf = String::new();
-            buf.push_str("-");
+            buf.push('-');
             buf.push_str(name);
 
             Ok(Type::Literal {
@@ -1663,7 +1656,7 @@ fn get_binop_type(
             let mut acc = Type::Unknown;
 
             for type_ in types {
-                let t = get_binop_type(&type_, operator, right_type)?;
+                let t = get_binop_type(type_, operator, right_type)?;
 
                 if acc == Type::Unknown {
                     acc = t;
@@ -1684,7 +1677,7 @@ fn get_binop_type(
             let mut acc = Type::Unknown;
 
             for type_ in types {
-                let t = get_binop_type(left_type, operator, &type_)?;
+                let t = get_binop_type(left_type, operator, type_)?;
 
                 if acc == Type::Unknown {
                     acc = t;

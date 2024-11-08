@@ -187,7 +187,7 @@ fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, String> {
                 return Ok(UseItem::Navigation(module_name, Box::new(use_item)));
             }
 
-            return Ok(UseItem::Item(module_name));
+            Ok(UseItem::Item(module_name))
         }
         TokenKind::OpenBrace => {
             cursor.bump()?; // Consume the {
@@ -212,14 +212,12 @@ fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, String> {
 
             cursor.bump()?; // Consume the }
 
-            return Ok(UseItem::List(use_items));
+            Ok(UseItem::List(use_items))
         }
-        _ => {
-            return Err(format!(
-                "Expected identifier or {{ but found {:?}",
-                cursor.first().kind
-            ));
-        }
+        _ => Err(format!(
+            "Expected identifier or {{ but found {:?}",
+            cursor.first().kind
+        )),
     }
 }
 

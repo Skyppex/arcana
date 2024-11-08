@@ -11,7 +11,7 @@ pub fn get_path(path: &str) -> Result<PathBuf> {
     };
 
     let path = match path {
-        p if p.starts_with("~") => dirs::home_dir()
+        p if p.starts_with('~') => dirs::home_dir()
             .ok_or(std::io::Error::from(ErrorKind::NotFound))?
             .join(&p[2..]),
         p if p.starts_with("..") => {
@@ -31,7 +31,7 @@ pub fn get_path(path: &str) -> Result<PathBuf> {
 
             current_dir.join(path)
         }
-        p if p.starts_with(".") => {
+        p if p.starts_with('.') => {
             if p == "." || p == "./" {
                 std::env::current_dir()?
             } else {

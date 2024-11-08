@@ -67,9 +67,9 @@ impl Indent {
             result.push_str(if *is_end { "  " } else { "┆ " });
         }
 
-        self.levels.last().map(|is_end| {
+        if let Some(is_end) = self.levels.last() {
             result.push_str(if *is_end { "╰─" } else { "├─" });
-        });
+        }
 
         result
     }
@@ -647,7 +647,7 @@ impl IndentDisplay for Expression {
                 initializer,
             }) => {
                 let mut result = String::new();
-                result.push_str(format!("<variable declaration>\n").as_str());
+                result.push_str("<variable declaration>\n");
                 indent.increase();
                 result.push_str(format!("{}mutable: {}\n", indent.dash(), mutable).as_str());
                 result.push_str(
@@ -1087,7 +1087,7 @@ impl IndentDisplay for Member {
                         format!(
                             "<{}>",
                             generics
-                                .into_iter()
+                                .iter()
                                 .map(|g| g.to_string())
                                 .collect::<Vec<_>>()
                                 .join(", ")
@@ -3047,7 +3047,7 @@ impl IndentDisplay for type_checker::ast::EnumMemberFieldInitializers {
 impl IndentDisplay for TypeIdentifier {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str(format!("<type name>: {}\n", self.to_string()).as_str());
+        result.push_str(format!("<type name>: {}\n", self).as_str());
 
         match self {
             TypeIdentifier::Type(type_name) => {
@@ -3261,7 +3261,7 @@ impl IndentDisplay for TypeAnnotation {
                         "{}param: {}",
                         indent.dash(),
                         param
-                            .into_iter()
+                            .iter()
                             .map(|p| p.to_string())
                             .collect::<Vec<String>>()
                             .join(", ")

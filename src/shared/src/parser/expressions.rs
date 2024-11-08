@@ -21,7 +21,7 @@ pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
     #[cfg(not(feature = "interpreter"))]
     let expression = parse_break(cursor);
 
-    return expression;
+    expression
 }
 
 #[cfg(feature = "interpreter")]
@@ -257,7 +257,7 @@ pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_type_literal(cursor);
     }
 
-    parse_block_statements(cursor).map(|statements| Expression::Block(statements))
+    parse_block_statements(cursor).map(Expression::Block)
 }
 
 pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
@@ -902,11 +902,11 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
         }
     }
 
-    return Ok(Expression::If(If {
+    Ok(Expression::If(If {
         condition: Box::new(if_condition),
         true_expression: Box::new(if_block),
         false_expression: r#else,
-    }));
+    }))
 }
 
 fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -998,7 +998,7 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
         }
     }
 
-    return Ok(expression);
+    Ok(expression)
 }
 
 fn parse_call_expression(callee: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
@@ -1021,7 +1021,7 @@ fn parse_call_expression(callee: Expression, cursor: &mut Cursor) -> Result<Expr
         call = parse_call_expression(call, cursor)?;
     }
 
-    return Ok(call);
+    Ok(call)
 }
 
 fn parse_args(cursor: &mut Cursor) -> Result<Vec<Expression>, String> {

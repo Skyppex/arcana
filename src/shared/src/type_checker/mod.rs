@@ -153,7 +153,7 @@ impl FullName for Union {
     fn full_name(&self) -> String {
         format!(
             "{} {{ {} }}",
-            self.type_identifier.to_string(),
+            self.type_identifier,
             self.literals
                 .iter()
                 .map(|l| l.to_string())
@@ -179,7 +179,7 @@ impl FullName for TypeAlias {
     fn full_name(&self) -> String {
         format!(
             "{} = {}",
-            self.type_identifier.to_string(),
+            self.type_identifier,
             self.types
                 .iter()
                 .map(|l| l.to_string())
@@ -231,7 +231,7 @@ impl FullName for Function {
             self.param
                 .clone()
                 .map(|p| p.type_.full_name())
-                .unwrap_or_else(|| "".to_string()),
+                .unwrap_or_default(),
             self.return_type.full_name()
         )
     }
@@ -532,7 +532,7 @@ impl Type {
                     ))?;
 
                     let concrete_type =
-                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+                        check_type_annotation(concrete_type, &vec![], type_environment.clone())?;
 
                     fields.push(StructField {
                         struct_name: struct_name.clone(),
@@ -586,7 +586,7 @@ impl Type {
                     ))?;
 
                     let concrete_type =
-                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+                        check_type_annotation(concrete_type, &vec![], type_environment.clone())?;
 
                     shared_fields.push(StructField {
                         struct_name: struct_name.clone(),
@@ -632,7 +632,7 @@ impl Type {
                         ))?;
 
                         let concrete_type = check_type_annotation(
-                            &concrete_type,
+                            concrete_type,
                             &vec![],
                             type_environment.clone(),
                         )?;
@@ -701,7 +701,7 @@ impl Type {
                     ))?;
 
                     let concrete_type =
-                        check_type_annotation(&concrete_type, &vec![], type_environment.clone())?;
+                        check_type_annotation(concrete_type, &vec![], type_environment.clone())?;
 
                     cloned_fields.push(StructField {
                         struct_name: struct_name.clone(),
@@ -753,9 +753,9 @@ impl FullName for Type {
     }
 }
 
-impl Into<parser::Literal> for Type {
-    fn into(self) -> parser::Literal {
-        match self {
+impl From<Type> for parser::Literal {
+    fn from(val: Type) -> Self {
+        match val {
             Type::Void => parser::Literal::Unit,
             Type::Unit => parser::Literal::Unit,
             Type::Int => parser::Literal::Int(0),
@@ -764,7 +764,7 @@ impl Into<parser::Literal> for Type {
             Type::String => parser::Literal::String("".to_string()),
             Type::Char => parser::Literal::Char(' '),
             Type::Bool => parser::Literal::Bool(false),
-            _ => panic!("Cannot convert type {} to literal", self.full_name()),
+            _ => panic!("Cannot convert type {} to literal", val.full_name()),
         }
     }
 }

@@ -70,11 +70,11 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             );
 
             let enum_members: Vec<DiscoveredType> = members
-                .into_iter()
+                .iter()
                 .map(|member| {
                     DiscoveredType::EnumMember(
                         TypeIdentifier::Type(
-                            vec![type_identifier.name(), &member.identifier].join("::"),
+                            [type_identifier.name(), &member.identifier].join("::"),
                         ),
                         member
                             .fields
@@ -142,7 +142,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
     }
 }
 
-pub fn check_type<'a>(
+pub fn check_type(
     statement: &Statement,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
@@ -209,7 +209,7 @@ pub fn check_type<'a>(
                 .map(|field| {
                     match check_type_annotation(
                         &field.type_annotation,
-                        &discovered_types,
+                        discovered_types,
                         struct_type_environment.clone(),
                     ) {
                         Ok(t) => Ok(ast::StructField {
@@ -286,7 +286,7 @@ pub fn check_type<'a>(
                 .map(|field| {
                     match check_type_annotation(
                         &field.type_annotation,
-                        &discovered_types,
+                        discovered_types,
                         enum_type_environment.clone(),
                     ) {
                         Ok(t) => Ok(ast::StructField {
@@ -308,7 +308,7 @@ pub fn check_type<'a>(
                         .map(|field| {
                             match check_type_annotation(
                                 &field.type_annotation,
-                                &discovered_types,
+                                discovered_types,
                                 enum_type_environment.clone(),
                             ) {
                                 Ok(t) => Ok(ast::EnumMemberField {
@@ -408,21 +408,16 @@ pub fn check_type<'a>(
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
-            let literal_type = literal_types.iter().fold(Ok(Type::Void), |acc, t| {
-                let Type::Literal { type_, .. } = t else {
-                    return Err(format!("Expected literal, found {}", t));
-                };
-
-                if type_equals(&acc.clone()?, &Type::Void) {
-                    Ok(*type_.clone())
-                } else if !type_equals(&acc.clone()?, type_) {
+            let literal_type = literal_types.iter().try_fold(Type::Void, |acc, t| {
+                if type_equals(&acc.clone(), &Type::Void) {
+                    Ok(t.clone())
+                } else if !type_equals(&acc.clone(), t) {
                     Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
-                        acc.as_ref().unwrap(),
-                        type_
+                        acc, t
                     ))
                 } else {
-                    acc
+                    Ok(acc)
                 }
             })?;
 
@@ -630,7 +625,7 @@ pub fn check_type<'a>(
 
             for (protocol_function_identifier, _) in protocol_functions {
                 let function = functions
-                    .into_iter()
+                    .iter()
                     .find(|f| f.type_identifier == protocol_function_identifier);
 
                 let Some(function) = function else {
@@ -716,7 +711,7 @@ pub fn check_type<'a>(
                 &return_type_annotation
                     .clone()
                     .unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
-                &discovered_types,
+                discovered_types,
                 function_type_environment.clone(),
             )?;
 
@@ -732,7 +727,7 @@ pub fn check_type<'a>(
 
                     let param_type = match check_type_annotation(
                         &param_type_annotation,
-                        &discovered_types,
+                        discovered_types,
                         function_type_environment.clone(),
                     ) {
                         Ok(t) => {
@@ -995,17 +990,16 @@ fn check_type_identifier(
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
-            let literal_type = literal_types.iter().fold(Ok(Type::Void), |acc, t| {
-                if type_equals(&acc.clone()?, &Type::Void) {
+            let literal_type = literal_types.iter().try_fold(Type::Void, |acc, t| {
+                if type_equals(&acc.clone(), &Type::Void) {
                     Ok(t.clone())
-                } else if type_equals(&acc.clone()?, t) {
+                } else if type_equals(&acc.clone(), t) {
                     Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
-                        acc.as_ref().unwrap(),
-                        t
+                        acc, t
                     ))
                 } else {
-                    acc
+                    Ok(acc)
                 }
             })?;
 
@@ -1039,13 +1033,13 @@ fn check_type_identifier(
         }) => Ok(Type::Protocol(Protocol {
             type_identifier: type_identifier.clone(),
             functions: function_identifiers
-                .into_iter()
+                .iter()
                 .map(|f| {
                     (
                         f.clone(),
                         type_environment
                             .borrow()
-                            .get_type_from_identifier(&f)
+                            .get_type_from_identifier(f)
                             .unwrap(),
                     )
                 })
@@ -1235,17 +1229,16 @@ pub fn check_type_annotation(
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
-            let literal_type = literal_types.iter().fold(Ok(Type::Void), |acc, t| {
-                if type_equals(&acc.clone()?, &Type::Void) {
+            let literal_type = literal_types.iter().try_fold(Type::Void, |acc, t| {
+                if type_equals(&acc.clone(), &Type::Void) {
                     Ok(t.clone())
-                } else if !type_equals(&acc.clone()?, t) {
+                } else if !type_equals(&acc.clone(), t) {
                     Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
-                        acc.as_ref().unwrap(),
-                        t
+                        acc, t
                     ))
                 } else {
-                    acc
+                    Ok(acc)
                 }
             })?;
 
@@ -1275,13 +1268,13 @@ pub fn check_type_annotation(
         }) => Ok(Type::Protocol(Protocol {
             type_identifier: type_identifier.clone(),
             functions: function_identifiers
-                .into_iter()
+                .iter()
                 .map(|f| {
                     (
                         f.clone(),
                         type_environment
                             .borrow()
-                            .get_type_from_identifier(&f)
+                            .get_type_from_identifier(f)
                             .unwrap(),
                     )
                 })

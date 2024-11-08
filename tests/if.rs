@@ -181,3 +181,10 @@ fn ifs_are_equals() {
     assert_eq!(value2, Value::Number(value::Number::Int(2)));
     assert_eq!(value, value2);
 }
+    let value2 = evaluate_expression(input2, create_env(), false);
+
+    // Assert
+    assert_eq!(value, Value::Number(value::Number::Int(2)));
+    assert_eq!(value2, Value::Number(value::Number::Int(2)));
+    assert_eq!(value, value2);
+}
