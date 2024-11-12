@@ -1,3 +1,6 @@
 [submodule "arcana-lang-server"]
 	path = arcana-lang-server
 	url = git@github.com:Skyppex/arcana-lang-server.git
+[submodule "src/runesmith"]
+	path = src/runesmith
+	url = git@github.com:Skyppex/runesmith.git
