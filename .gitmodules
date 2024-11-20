@@ -4,3 +4,6 @@
 [submodule "src/runesmith"]
 	path = src/runesmith
 	url = git@github.com:Skyppex/runesmith.git
+[submodule "tree-sitter-arcana"]
+	path = tree-sitter-arcana
+	url = git@github.com:Skyppex/tree-sitter-arcana.git
