@@ -9,7 +9,7 @@ use super::{
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Environment {
     pub parent: Option<Rcrc<Environment>>,
     pub modules: Vec<Vec<String>>,
