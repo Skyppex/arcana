@@ -14,7 +14,7 @@ Compiler
 
 Package manager
 
-### Spell
+### Spell - not a tool
 
 A single package or library
 
@@ -24,4 +24,4 @@ Documentation page
 
 ## Runesmith
 
-Language Server Protocol
+Language Server
