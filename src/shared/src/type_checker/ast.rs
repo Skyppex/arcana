@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Display};
 use crate::display::{Indent, IndentDisplay};
 use crate::parser::{AssociatedType, Expression, UseItem};
 use crate::pretty_print::PrettyPrint;
-use crate::types::GenericType;
+use crate::types::{GenericType, ToKey};
 use crate::{
     parser,
     types::{GenericConstraint, TypeAnnotation, TypeIdentifier},
@@ -407,6 +407,10 @@ pub enum TypedExpression {
     },
     Member(Member),
     Literal(Literal),
+    Tuple {
+        elements: Vec<TypedExpression>,
+        type_: Type,
+    },
     Closure {
         param: Option<TypedClosureParameter>,
         return_type: Type,
@@ -476,6 +480,7 @@ impl Typed for TypedExpression {
             TypedExpression::Assignment { type_, .. } => type_.clone(),
             TypedExpression::Member(member) => member.get_type(),
             TypedExpression::Literal(literal) => literal.get_type(),
+            TypedExpression::Tuple { type_, .. } => type_.clone(),
             TypedExpression::Closure { type_, .. } => type_.clone(),
             TypedExpression::Call { type_, .. } => type_.clone(),
             TypedExpression::Index { type_, .. } => type_.clone(),
@@ -503,6 +508,7 @@ impl Typed for TypedExpression {
             TypedExpression::Assignment { type_, .. } => type_.clone(),
             TypedExpression::Member(member) => member.get_deep_type(),
             TypedExpression::Literal(literal) => literal.get_deep_type(),
+            TypedExpression::Tuple { type_, .. } => type_.clone(),
             TypedExpression::Closure { type_, .. } => type_.clone(),
             TypedExpression::Call { type_, .. } => type_.clone(),
             TypedExpression::Index { type_, .. } => type_.clone(),
@@ -581,6 +587,17 @@ impl Display for TypedExpression {
             } => write!(f, "{} = {}", member, initializer),
             TypedExpression::Member(member) => write!(f, "{}", member),
             TypedExpression::Literal(literal) => write!(f, "{}", literal),
+            TypedExpression::Tuple { elements, .. } => {
+                write!(
+                    f,
+                    "({})",
+                    elements
+                        .iter()
+                        .map(|e| e.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
             TypedExpression::Closure {
                 param,
                 return_type,
@@ -981,6 +998,12 @@ impl Display for Member {
             //     write!(f, "{}.{}", object, member)
             // }
         }
+    }
+}
+
+impl ToKey for Member {
+    fn to_key(&self) -> String {
+        self.get_type().to_key()
     }
 }
 

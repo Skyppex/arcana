@@ -6,12 +6,35 @@ use crate::{
     type_checker::{Function, Type},
 };
 
+pub trait ToKey {
+    fn to_key(&self) -> String;
+}
+
+impl ToKey for String {
+    fn to_key(&self) -> String {
+        self.clone()
+    }
+}
+
+impl ToKey for &str {
+    fn to_key(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl<T: ToKey> ToKey for &T {
+    fn to_key(&self) -> String {
+        (*self).to_key()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeAnnotation {
     Type(String),
     ConcreteType(String, Vec<TypeAnnotation>),
     Array(Box<TypeAnnotation>),
     Literal(Box<Literal>),
+    Tuple(Vec<TypeAnnotation>),
     Function(Option<Box<TypeAnnotation>>, Option<Box<TypeAnnotation>>),
 }
 
@@ -72,6 +95,7 @@ impl From<Type> for TypeAnnotation {
                 param.map(|p| Box::new(p.type_.deref().clone().into())),
                 Some(Box::new(return_type.deref().clone().into())),
             ),
+            Type::Tuple(e) => TypeAnnotation::Tuple(e.into_iter().map(|t| t.into()).collect()),
             Type::Struct(_) => todo!(),
             Type::Enum(_) => todo!(),
             Type::EnumMember(_) => todo!(),
@@ -89,6 +113,40 @@ impl From<&str> for TypeAnnotation {
     }
 }
 
+impl ToKey for TypeAnnotation {
+    fn to_key(&self) -> String {
+        match self {
+            TypeAnnotation::Type(name) => name.to_string(),
+            TypeAnnotation::ConcreteType(name, concretes) => {
+                format!("{}<{}>", name, concretes.len())
+            }
+            TypeAnnotation::Array(element_annotation) => {
+                format!("[{}]", element_annotation.to_key())
+            }
+            TypeAnnotation::Literal(literal) => literal.to_key(),
+            TypeAnnotation::Tuple(elements) => format!(
+                "({})",
+                elements
+                    .iter()
+                    .map(|e| e.to_key())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            TypeAnnotation::Function(name_annotation, param_annotation) => format!(
+                "fun({}){}",
+                name_annotation
+                    .clone()
+                    .map(|p| p.to_key())
+                    .unwrap_or("".to_string()),
+                param_annotation
+                    .clone()
+                    .map(|p| format!(":{}", p.to_key()))
+                    .unwrap_or("".to_string())
+            ),
+        }
+    }
+}
+
 pub enum LiteralType {
     Bool(bool),
     Int(IntLiteral<i64>),
@@ -102,8 +160,8 @@ impl Display for LiteralType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LiteralType::Bool(value) => write!(f, "#{}", value),
-            LiteralType::Int(value) => write!(f, "#{}", value.to_string()),
-            LiteralType::UInt(value) => write!(f, "#{}", value.to_string()),
+            LiteralType::Int(value) => write!(f, "#{}", value),
+            LiteralType::UInt(value) => write!(f, "#{}", value),
             LiteralType::Float(value) => write!(f, "#{}", value),
             LiteralType::Char(value) => write!(f, "#{}", value),
             LiteralType::String(value) => write!(f, "#{}", value),
@@ -118,6 +176,14 @@ impl TypeAnnotation {
             TypeAnnotation::ConcreteType(name, _) => name.clone(),
             TypeAnnotation::Array(type_identifier) => type_identifier.name(),
             TypeAnnotation::Literal(literal) => literal.to_string(),
+            TypeAnnotation::Tuple(elements) => format!(
+                "({})",
+                elements
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
             TypeAnnotation::Function(type_annotation, return_type_annotation) => {
                 format!(
                     "fun({}): {}",
@@ -172,6 +238,15 @@ impl Display for TypeAnnotation {
             }
             TypeAnnotation::Array(type_identifier) => write!(f, "[{}]", type_identifier),
             TypeAnnotation::Literal(literal) => write!(f, "{:?}", literal),
+            TypeAnnotation::Tuple(elements) => write!(
+                f,
+                "({})",
+                elements
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
             TypeAnnotation::Function(type_annotation, return_type_annotation) => {
                 write!(
                     f,
@@ -298,6 +373,21 @@ impl Display for TypeIdentifier {
     }
 }
 
+impl ToKey for TypeIdentifier {
+    fn to_key(&self) -> String {
+        match self {
+            TypeIdentifier::Type(name) => name.clone(),
+            TypeIdentifier::GenericType(name, generics) => format!("{}<{}>", name, generics.len()),
+            TypeIdentifier::ConcreteType(name, concretes) => {
+                format!("{}<{}>", name, concretes.len())
+            }
+            TypeIdentifier::MemberType(identifier, member_name) => {
+                format!("{}.{}", identifier.to_key(), member_name)
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct GenericType {
     pub type_name: String,
@@ -312,6 +402,12 @@ impl GenericType {
 impl Display for GenericType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.type_name)
+    }
+}
+
+impl ToKey for GenericType {
+    fn to_key(&self) -> String {
+        self.type_name.clone()
     }
 }
 
@@ -353,6 +449,7 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
             let _ = cloned_cursor.bump();
             can_be_type_annotation(&cloned_cursor)
         }
+        TokenKind::OpenParen => true,
         TokenKind::Keyword(Keyword::Fun) => true,
         _ => false,
     }
@@ -393,7 +490,7 @@ pub(super) fn parse_type_annotation(
         TokenKind::Identifier(type_name) => {
             cursor.bump()?; // Consume the type identifier
 
-            if !type_name.is_type_identifier_name() {
+            if !type_name.is_type_identifier_name() && !type_name.is_function_identifier_name() {
                 return Err(format!("Invalid type name: {}", type_name));
             }
 
@@ -414,11 +511,25 @@ pub(super) fn parse_type_annotation(
             if cursor.first().kind == TokenKind::DoubleColon {
                 cursor.bump()?; // Consume the ::
 
-                let TokenKind::Identifier(variant_name) = cursor.bump()?.kind else {
-                    return Err(format!(
-                        "Expected variant name but found {:?}",
-                        cursor.first().kind
-                    ));
+                let TokenKind::Identifier(variant_name) = cursor.first().kind else {
+                    if cursor.first().kind != TokenKind::Less {
+                        return Err(format!(
+                            "Expected variant name but found {:?}",
+                            cursor.first().kind
+                        ));
+                    }
+
+                    cursor.bump()?; // Consume the <
+
+                    let generics = parse_comma_separated_type_annotations(
+                        cursor,
+                        |kind| kind != TokenKind::Greater,
+                        allow_void,
+                    )?;
+
+                    cursor.bump()?; // Consume the >
+
+                    return Ok(TypeAnnotation::ConcreteType(type_name, generics));
                 };
 
                 if !variant_name.is_type_identifier_name() {
@@ -451,6 +562,24 @@ pub(super) fn parse_type_annotation(
 
             cursor.bump()?; // Consume the ]
             Ok(TypeAnnotation::Array(Box::new(type_annotation)))
+        }
+        TokenKind::OpenParen => {
+            cursor.bump()?; // Consume the (
+            if cursor.first().kind == TokenKind::CloseParen {
+                return Err("Use 'Unit' instead of '()'".to_string());
+            }
+
+            let type_annotation = parse_type_annotation(cursor, allow_void)?;
+
+            let mut annotations = vec![type_annotation];
+
+            while cursor.first().kind == TokenKind::Comma {
+                cursor.bump()?; // Consume the ,
+                annotations.push(parse_type_annotation(cursor, allow_void)?);
+            }
+
+            cursor.bump()?; // Consume the )
+            Ok(TypeAnnotation::Tuple(annotations))
         }
         TokenKind::Keyword(Keyword::Fun) => {
             cursor.bump()?; // Consume the fun

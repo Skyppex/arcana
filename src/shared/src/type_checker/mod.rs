@@ -12,11 +12,11 @@ pub use full_name::*;
 pub use type_checker::*;
 pub use type_environment::*;
 
-use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc, str::FromStr};
 
 use crate::{
     parser,
-    types::{GenericType, TypeAnnotation, TypeIdentifier},
+    types::{GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };
 
 use self::statements::check_type_annotation;
@@ -53,7 +53,7 @@ pub struct StructField {
 }
 
 pub fn get_field_by_name<'a>(
-    struct_fields: &'a Vec<StructField>,
+    struct_fields: &'a [StructField],
     field_name: &'a str,
 ) -> Option<&'a StructField> {
     struct_fields.iter().find(|f| f.field_name == field_name)
@@ -273,6 +273,7 @@ pub enum Type {
         name: String, // String representation of the literal
         type_: Box<Type>,
     },
+    Tuple(Vec<Type>),
 }
 
 impl Type {
@@ -377,20 +378,6 @@ impl Type {
             .into_iter()
             .collect(),
         })
-    }
-
-    pub fn from_string(type_name: &str) -> Option<Type> {
-        match type_name {
-            "Void" => Some(Type::Void),
-            "Unit" => Some(Type::Unit),
-            "Int" => Some(Type::Int),
-            "UInt" => Some(Type::UInt),
-            "Float" => Some(Type::Float),
-            "String" => Some(Type::String),
-            "Char" => Some(Type::Char),
-            "Bool" => Some(Type::Bool),
-            _ => None,
-        }
     }
 
     pub fn from_literal(literal: &parser::Literal) -> Result<Type, String> {
@@ -718,6 +705,76 @@ impl Type {
 
                 Ok(member_type)
             }
+            Type::Function(Function {
+                identifier,
+                param,
+                return_type,
+            }) => {
+                let Some(TypeIdentifier::GenericType(name, generics)) = identifier else {
+                    return Err(format!(
+                        "Cannot clone concrete types for enum {}",
+                        self.full_name()
+                    ));
+                };
+
+                let mut type_map = HashMap::new();
+
+                for (ta, gt) in concrete_types.iter().zip(generics) {
+                    type_map.insert(gt, ta);
+                }
+
+                let cloned_param = match param {
+                    Some(Parameter { identifier, type_ }) => {
+                        if let Type::Generic(generic) = *type_.clone() {
+                            let concrete_type = type_map.get(&generic).ok_or(format!(
+                                "No concrete type found for generic type {}",
+                                generic.type_name
+                            ))?;
+
+                            let concrete_type = check_type_annotation(
+                                concrete_type,
+                                &vec![],
+                                type_environment.clone(),
+                            )?;
+
+                            Some(Parameter {
+                                identifier: identifier.clone(),
+                                type_: Box::new(concrete_type),
+                            })
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
+                };
+
+                let cloned_return_type = if let Type::Generic(generic) = *return_type.clone() {
+                    let concrete_type = type_map.get(&generic).ok_or(format!(
+                        "No concrete type found for generic type {}",
+                        generic.type_name
+                    ))?;
+
+                    let concrete_type =
+                        check_type_annotation(concrete_type, &vec![], type_environment.clone())?;
+
+                    Box::new(concrete_type)
+                } else {
+                    return_type.clone()
+                };
+
+                Ok(Type::Function(Function {
+                    identifier: if identifier.is_some() {
+                        Some(TypeIdentifier::ConcreteType(
+                            name.clone(),
+                            concrete_types.clone(),
+                        ))
+                    } else {
+                        None
+                    },
+                    param: cloned_param,
+                    return_type: cloned_return_type,
+                }))
+            }
             _ => Err(format!(
                 "Cannot clone concrete types for type {}",
                 self.full_name()
@@ -748,6 +805,13 @@ impl FullName for Type {
             Type::TypeAlias(t) => t.full_name(),
             Type::Function(f) => f.full_name(),
             Type::Literal { name, type_ } => format!("#{}: {}", type_.full_name(), name),
+            Type::Tuple(e) => format!(
+                "({})",
+                e.iter()
+                    .map(|t| t.full_name())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
             Type::Protocol(t) => t.full_name(),
         }
     }
@@ -769,9 +833,33 @@ impl From<Type> for parser::Literal {
     }
 }
 
+impl FromStr for Type {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Void" => Ok(Type::Void),
+            "Unit" => Ok(Type::Unit),
+            "Int" => Ok(Type::Int),
+            "UInt" => Ok(Type::UInt),
+            "Float" => Ok(Type::Float),
+            "String" => Ok(Type::String),
+            "Char" => Ok(Type::Char),
+            "Bool" => Ok(Type::Bool),
+            _ => Err(format!("Cannot convert string {} to type", s)),
+        }
+    }
+}
+
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.full_name().fmt(f)
+    }
+}
+
+impl ToKey for Type {
+    fn to_key(&self) -> String {
+        self.type_annotation().to_key()
     }
 }
 

@@ -587,7 +587,7 @@ pub fn create_decision_tree(
 
             match &matchee_type {
                 Type::Enum(Enum { members, .. }) => {
-                    for (_, member_type) in members {
+                    for member_type in members.values() {
                         if type_annotation_equals(&type_annotation, &member_type.type_annotation())
                         {
                             is_enum_member = true;

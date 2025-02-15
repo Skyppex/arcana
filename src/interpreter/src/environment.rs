@@ -1,6 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use shared::{type_checker::ast::Member, types::TypeAnnotation};
+use shared::{
+    type_checker::ast::Member,
+    types::{ToKey, TypeAnnotation},
+};
 
 use super::{
     scope::{Scope, ScopeState, ScopeType},
@@ -112,17 +115,17 @@ impl Environment {
         self.modules.push(module_path);
     }
 
-    pub fn add_variable(&mut self, identifier: String, value: Value, mutable: bool) {
+    pub fn add_variable<K: ToKey>(&mut self, key: K, value: Value, mutable: bool) {
         self.variables.insert(
-            identifier.clone(),
-            Rc::new(RefCell::new(Variable::new(identifier, value, mutable))),
+            key.to_key(),
+            Rc::new(RefCell::new(Variable::new(key.to_key(), value, mutable))),
         );
     }
 
-    pub fn add_function(&mut self, identifier: String, value: Value, mutable: bool) {
+    pub fn add_function<K: ToKey>(&mut self, key: K, value: Value, mutable: bool) {
         self.functions.insert(
-            identifier.clone(),
-            Rc::new(RefCell::new(Variable::new(identifier, value, mutable))),
+            key.to_key(),
+            Rc::new(RefCell::new(Variable::new(key.to_key(), value, mutable))),
         );
     }
 
@@ -146,23 +149,23 @@ impl Environment {
         }
     }
 
-    pub fn get_variable(&self, identifier: &str) -> Option<Rcrc<Variable>> {
-        self.resolve(identifier)
+    pub fn get_variable<K: ToKey>(&self, key: K) -> Option<Rcrc<Variable>> {
+        self.resolve(key)
     }
 
     pub fn get_variables(&self) -> HashMap<String, Rcrc<Variable>> {
-        let current_funcs = self.variables.clone();
-        let parent_funcs = self
+        let current_vars = self.variables.clone();
+        let parent_vars = self
             .parent
             .clone()
             .map(|p| p.borrow().get_variables())
             .unwrap_or_default();
 
-        current_funcs.into_iter().chain(parent_funcs).collect()
+        current_vars.into_iter().chain(parent_vars).collect()
     }
 
-    pub fn get_function(&self, identifier: &str) -> Option<Rcrc<Variable>> {
-        self.resolve_function(identifier)
+    pub fn get_function<K: ToKey>(&self, key: K) -> Option<Rcrc<Variable>> {
+        self.resolve_function(key)
     }
 
     pub fn get_functions(&self) -> HashMap<String, Rcrc<Variable>> {
@@ -176,17 +179,17 @@ impl Environment {
         current_funcs.into_iter().chain(parent_funcs).collect()
     }
 
-    pub fn get_static_member(
+    pub fn get_static_member<K: ToKey>(
         &self,
         type_annotation: &TypeAnnotation,
-        member_name: &str,
+        member_key: K,
     ) -> Option<Rcrc<Variable>> {
         if let Some(static_members) = self.static_members.get(type_annotation) {
-            static_members.get(member_name).cloned()
+            static_members.get(&member_key.to_key()).cloned()
         } else if let Some(parent) = &self.parent {
             parent
                 .borrow()
-                .get_static_member(type_annotation, member_name)
+                .get_static_member(type_annotation, member_key)
         } else {
             None
         }
@@ -216,25 +219,25 @@ impl Environment {
         }
     }
 
-    pub fn remove_variable(&mut self, identifier: &str) -> Option<Rcrc<Variable>> {
-        self.variables.remove(identifier)
+    pub fn remove_variable<K: ToKey>(&mut self, key: K) -> Option<Rcrc<Variable>> {
+        self.variables.remove(&key.to_key())
     }
 
-    pub fn resolve(&self, name: &str) -> Option<Rcrc<Variable>> {
-        if let Some(variable) = self.variables.get(name) {
+    pub fn resolve<K: ToKey>(&self, key: K) -> Option<Rcrc<Variable>> {
+        if let Some(variable) = self.variables.get(&key.to_key()) {
             Some(variable.clone())
         } else if let Some(parent) = &self.parent {
-            parent.borrow().resolve(name)
+            parent.borrow().resolve(key)
         } else {
             None
         }
     }
 
-    pub fn resolve_function(&self, name: &str) -> Option<Rcrc<Variable>> {
-        if let Some(functions) = self.functions.get(name) {
+    pub fn resolve_function<K: ToKey>(&self, key: K) -> Option<Rcrc<Variable>> {
+        if let Some(functions) = self.functions.get(&key.to_key()) {
             Some(functions.clone())
         } else if let Some(parent) = &self.parent {
-            parent.borrow().resolve_function(name)
+            parent.borrow().resolve_function(key)
         } else {
             None
         }

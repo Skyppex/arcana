@@ -1,12 +1,3 @@
-enum E {
-    A { value: Bool, },
-    B { value: Int, },
-}
+fun zip<T1, T2>(a: T1, b: T2): (T1, T2) => (a, b);
 
-fun get_value(a: E::A): Bool => {
-    a.value
-}
-
-let a = E::A { value: false };
-
-get_value(a)
+zip::<Int, String>(1, "a")

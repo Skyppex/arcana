@@ -9,7 +9,10 @@ use std::{
 
 use crate::{mage_args::MageArgs, read_input, utils::get_path};
 use interpreter::Environment;
-use shared::type_checker::{Type, TypeEnvironment};
+use shared::{
+    type_checker::{Type, TypeEnvironment},
+    types::ToKey,
+};
 
 pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
     let exe = std::env::current_exe()
@@ -97,12 +100,31 @@ pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
 
         if input.trim() == "vars" {
             println!("Type environment variables:");
+
             for (name, type_) in type_environment.borrow().get_variables() {
                 println!("{}: {}", name, type_);
             }
 
             println!();
             println!("Environment variables:");
+
+            for (_, variable) in environment.borrow().get_variables() {
+                println!("{}", variable.clone().deref().borrow().deref());
+            }
+
+            continue;
+        }
+
+        if input.trim() == "varkeys" {
+            println!("Type environment variables:");
+
+            for (name, type_) in type_environment.borrow().get_variables() {
+                println!("{}: {}", name, type_.to_key());
+            }
+
+            println!();
+            println!("Environment variables:");
+
             for (_, variable) in environment.borrow().get_variables() {
                 println!("{}", variable.clone().deref().borrow().deref());
             }

@@ -98,11 +98,11 @@ fn evaluate_function_declaration(
 
     function_environment
         .borrow_mut()
-        .add_function(identifier.to_string(), function.clone(), false);
+        .add_function(&identifier, function.clone(), false);
 
     environment
         .borrow_mut()
-        .add_function(identifier.to_string(), function, false);
+        .add_function(&identifier, function, false);
 
     Ok(Value::Void)
 }
@@ -137,6 +137,7 @@ fn evaluate_expression(
         } => evaluate_assignment(member, initializer, environment),
         TypedExpression::Member(m) => evaluate_member(m, environment),
         TypedExpression::Literal(l) => evaluate_literal(l, environment),
+        TypedExpression::Tuple { elements, .. } => evaluate_tuple(elements, environment),
         TypedExpression::Closure {
             param,
             return_type: _,
@@ -187,6 +188,19 @@ fn evaluate_expression(
         TypedExpression::Continue => evaluate_continue(environment),
         TypedExpression::Return(e) => evaluate_return(e, environment),
     }
+}
+
+fn evaluate_tuple(
+    elements: Vec<TypedExpression>,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let mut tuple = Vec::new();
+
+    for element in elements {
+        tuple.push(evaluate_expression(element, environment.clone())?);
+    }
+
+    Ok(Value::Tuple(tuple))
 }
 
 fn evaluate_program(
@@ -886,12 +900,12 @@ fn evaluate_assignment(
 }
 
 fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Value, String> {
-    match member {
+    match &member {
         Member::Identifier { symbol, .. } => Ok(environment
             .borrow()
-            .get_variable(&symbol)
-            .or(environment.borrow().get_function(&symbol))
-            .ok_or(format!("Variable '{}' not found", symbol))?
+            .get_variable(symbol)
+            .or(environment.borrow().get_function(&member))
+            .ok_or(format!("Variable '{}' not found", &member))?
             .borrow()
             .value
             .clone()),
@@ -899,9 +913,9 @@ fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Val
             type_annotation,
             member,
             ..
-        } => evaluate_static_member_access(type_annotation, environment, member),
+        } => evaluate_static_member_access(type_annotation.clone(), environment, member.clone()),
         Member::MemberAccess { object, member, .. } => {
-            evaluate_member_access(object, environment, member)
+            evaluate_member_access(object.clone(), environment, member.clone())
         }
     }
 }

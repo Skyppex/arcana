@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Display};
 use crate::display::{Indent, IndentDisplay};
 use crate::pretty_print::PrettyPrint;
 use crate::type_checker::decision_tree::Pattern;
-use crate::types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier};
+use crate::types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -40,6 +40,7 @@ pub enum Expression {
     Assignment(Assignment),
     Member(Member),
     Literal(Literal),
+    Tuple(Vec<Expression>),
     Closure(Closure),
     Call(Call),
     Unary(Unary),
@@ -223,17 +224,18 @@ impl Hash for Literal {
     }
 }
 
-impl ToString for Literal {
-    fn to_string(&self) -> String {
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Unit => "unit".to_string(),
-            Literal::Int(v) => v.to_string(),
-            Literal::UInt(v) => v.to_string(),
-            Literal::Float(v) => v.to_string(),
-            Literal::String(v) => v.to_string(),
-            Literal::Char(v) => v.to_string(),
-            Literal::Bool(v) => v.to_string(),
-            Literal::Array(array) => format!(
+            Literal::Unit => write!(f, "unit"),
+            Literal::Int(v) => write!(f, "{}", v),
+            Literal::UInt(v) => write!(f, "{}", v),
+            Literal::Float(v) => write!(f, "{}", v),
+            Literal::String(v) => write!(f, "{}", v),
+            Literal::Char(v) => write!(f, "{}", v),
+            Literal::Bool(v) => write!(f, "{}", v),
+            Literal::Array(array) => write!(
+                f,
                 "[{}]",
                 array
                     .iter()
@@ -249,6 +251,42 @@ impl ToString for Literal {
             ),
             Literal::Struct { .. } => todo!(),
             Literal::Enum { .. } => todo!(),
+        }
+    }
+}
+
+impl ToKey for Literal {
+    fn to_key(&self) -> String {
+        match self {
+            Literal::Unit => "unit".to_string(),
+            Literal::Int(v) => format!("int:{}", v),
+            Literal::UInt(v) => format!("uint:{}", v),
+            Literal::Float(v) => format!("float:{}", v),
+            Literal::String(v) => format!("string:{}", v),
+            Literal::Char(v) => format!("char:{}", v),
+            Literal::Bool(v) => format!("bool:{}", v),
+            Literal::Array(array) => format!(
+                "[{}]",
+                array
+                    .iter()
+                    .map(|e| {
+                        if let Expression::Literal(literal) = e {
+                            literal.to_key()
+                        } else {
+                            panic!("Array element is not a literal")
+                        }
+                    })
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Literal::Struct {
+                type_annotation, ..
+            } => type_annotation.to_key(),
+            Literal::Enum {
+                type_annotation,
+                member,
+                ..
+            } => format!("{}::{}", type_annotation.to_key(), member),
         }
     }
 }
@@ -377,7 +415,7 @@ impl Member {
                 ..
             } => Member::StaticMemberAccess {
                 type_annotation,
-                member,
+                member: Box::new(member.with_generics(generics.clone())),
                 symbol,
                 generics: Some(generics),
             },
@@ -388,7 +426,7 @@ impl Member {
                 ..
             } => Member::MemberAccess {
                 object,
-                member,
+                member: Box::new(member.with_generics(generics.clone())),
                 symbol,
                 generics: Some(generics),
             },
@@ -399,10 +437,77 @@ impl Member {
                 ..
             } => Member::ParamPropagation {
                 object,
-                member,
+                member: Box::new(member.with_generics(generics.clone())),
                 symbol,
                 generics: Some(generics),
             },
+        }
+    }
+}
+
+impl Display for Member {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Member::Identifier { symbol, generics } => {
+                if let Some(generics) = generics {
+                    write!(
+                        f,
+                        "{}<{}>",
+                        symbol,
+                        generics
+                            .iter()
+                            .map(|g| g.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                } else {
+                    write!(f, "{}", symbol)
+                }
+            }
+            Member::StaticMemberAccess {
+                type_annotation,
+                member,
+                ..
+            } => write!(f, "{}::{}", type_annotation, member),
+            Member::MemberAccess { member, .. } => {
+                write!(f, ".{}", member)
+            }
+            Member::ParamPropagation { member, .. } => {
+                write!(f, ":{}", member)
+            }
+        }
+    }
+}
+
+impl ToKey for Member {
+    fn to_key(&self) -> String {
+        match self {
+            Member::Identifier { symbol, generics } => {
+                if let Some(generics) = generics {
+                    format!(
+                        "{}<{}>",
+                        symbol,
+                        generics
+                            .iter()
+                            .map(|g| g.to_key())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                } else {
+                    symbol.to_string()
+                }
+            }
+            Member::StaticMemberAccess {
+                type_annotation,
+                member,
+                ..
+            } => format!("{}::{}", type_annotation.to_key(), member.to_key()),
+            Member::MemberAccess { member, .. } => {
+                format!(".{}", member.to_key())
+            }
+            Member::ParamPropagation { member, .. } => {
+                format!(":{}", member.to_key())
+            }
         }
     }
 }

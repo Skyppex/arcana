@@ -1,8 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr};
 
 use crate::{
     type_checker::Protocol,
-    types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
+    types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
@@ -16,7 +16,7 @@ pub type Rcrc<T> = Rc<RefCell<T>>;
 pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
     modules: Vec<Vec<String>>,
-    types: HashMap<TypeIdentifier, Type>,
+    types: HashMap<String, Type>,
     static_members: HashMap<TypeAnnotation, HashMap<String, Type>>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
@@ -29,14 +29,14 @@ impl TypeEnvironment {
             parent: None,
             modules: Vec::new(),
             types: HashMap::from([
-                (TypeIdentifier::Type("Void".to_string()), Type::Void),
-                (TypeIdentifier::Type("Unit".to_string()), Type::Unit),
-                (TypeIdentifier::Type("Bool".to_string()), Type::Bool),
-                (TypeIdentifier::Type("Int".to_string()), Type::Int),
-                (TypeIdentifier::Type("UInt".to_string()), Type::UInt),
-                (TypeIdentifier::Type("Float".to_string()), Type::Float),
-                (TypeIdentifier::Type("Char".to_string()), Type::Char),
-                (TypeIdentifier::Type("String".to_string()), Type::String),
+                ("Void".to_string(), Type::Void),
+                ("Unit".to_string(), Type::Unit),
+                ("Bool".to_string(), Type::Bool),
+                ("Int".to_string(), Type::Int),
+                ("UInt".to_string(), Type::UInt),
+                ("Float".to_string(), Type::Float),
+                ("Char".to_string(), Type::Char),
+                ("String".to_string(), Type::String),
             ]),
             static_members: HashMap::new(),
             variables: HashMap::new(),
@@ -127,11 +127,11 @@ impl TypeEnvironment {
     }
 
     pub fn add_type(&mut self, type_: Type) -> Result<(), String> {
-        if !self.allow_override_types && self.types.contains_key(&type_.type_identifier()) {
+        if !self.allow_override_types && self.types.contains_key(&type_.to_key()) {
             return Err(format!("Type {} already exists", type_.full_name()));
         }
 
-        self.types.insert(type_.type_identifier(), type_);
+        self.types.insert(type_.to_key(), type_);
         Ok(())
     }
 
@@ -171,7 +171,7 @@ impl TypeEnvironment {
 
         for constraint in constraints {
             let constraint_type = self.get_type_from_annotation(constraint)?;
-            let Some(generic_type) = self.get_type_from_str(type_name) else {
+            let Some(generic_type) = self.get_type(type_name) else {
                 return Err(format!("Type {} not found", type_name));
             };
 
@@ -193,15 +193,11 @@ impl TypeEnvironment {
         Ok(())
     }
 
-    pub fn get_type_from_str(&self, type_str: &str) -> Option<Type> {
+    pub fn get_type<K: ToKey>(&self, key: K) -> Option<Type> {
         self.types
-            .get(&TypeIdentifier::Type(type_str.to_string()))
+            .get(&key.to_key())
             .cloned()
-            .or_else(|| {
-                self.parent
-                    .as_ref()
-                    .and_then(|p| p.borrow().get_type_from_str(type_str))
-            })
+            .or_else(|| self.parent.as_ref().and_then(|p| p.borrow().get_type(key)))
     }
 
     pub fn get_type_from_annotation(
@@ -210,17 +206,20 @@ impl TypeEnvironment {
     ) -> Result<Type, String> {
         match type_annotation {
             TypeAnnotation::Type(type_name) => {
-                if let Some(t) = self.types.get(&TypeIdentifier::Type(type_name.clone())) {
+                if let Some(t) = self.types.get(type_name) {
                     Ok(t.clone())
                 } else if type_name.contains("::") {
                     let parts: Vec<&str> = type_name.split("::").collect();
                     let type_name = parts[0];
                     let variant_name = parts[1];
 
-                    let Some(t) = self.types.get(&TypeIdentifier::MemberType(
-                        Box::new(TypeIdentifier::Type(type_name.to_string())),
-                        variant_name.to_string(),
-                    )) else {
+                    let Some(t) = self.types.get(
+                        &TypeIdentifier::MemberType(
+                            Box::new(TypeIdentifier::Type(type_name.to_string())),
+                            variant_name.to_string(),
+                        )
+                        .to_key(),
+                    ) else {
                         return Err(format!("Type {} not found", type_name));
                     };
 
@@ -233,7 +232,7 @@ impl TypeEnvironment {
             }
             TypeAnnotation::ConcreteType(type_name, concrete_types) => {
                 if let Some((_, t)) = self.types.iter().find(|(k, _)| {
-                    k.eq_names(&TypeIdentifier::GenericType(type_name.clone(), vec![]))
+                    **k == TypeIdentifier::GenericType(type_name.clone(), vec![]).to_key()
                 }) {
                     t.clone_with_concrete_types(
                         concrete_types.clone(),
@@ -249,6 +248,17 @@ impl TypeEnvironment {
                 .get_type_from_annotation(type_annotation)
                 .map(|t| Type::Array(Box::new(t))),
             TypeAnnotation::Literal(literal) => Ok(Type::from_literal(literal)?),
+            TypeAnnotation::Tuple(annotations) => {
+                let types = annotations
+                    .iter()
+                    .map(|a| {
+                        self.get_type_from_annotation(a)
+                            .map_err(|e| format!("Error getting type from annotation: {}", e))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                Ok(Type::Tuple(types))
+            }
             TypeAnnotation::Function(param_type_annotation, return_type_annotation) => {
                 let param_type = param_type_annotation
                     .as_ref()
@@ -279,20 +289,37 @@ impl TypeEnvironment {
     }
 
     pub fn get_type_from_identifier(&self, _type_identifier: &TypeIdentifier) -> Option<Type> {
-        todo!("get_type_from_identifier")
+        match _type_identifier {
+            TypeIdentifier::Type(name) => Type::from_str(name).ok(),
+            TypeIdentifier::GenericType(name, _) => Type::from_str(name).ok(),
+            TypeIdentifier::ConcreteType(name, _) => Type::from_str(name).ok(),
+            TypeIdentifier::MemberType(type_identifier, member_name) => self
+                .get_type(format!(
+                    "{}::{}",
+                    type_identifier.to_key(),
+                    member_name.to_key()
+                ))
+                .or_else(|| {
+                    self.get_type(format!(
+                        "{}.{}",
+                        type_identifier.to_key(),
+                        member_name.to_key()
+                    ))
+                }),
+        }
     }
 
-    pub fn get_variable(&self, name: &str) -> Option<Type> {
-        if let Some(type_) = self.variables.get(name) {
+    pub fn get_variable<K: ToKey>(&self, key: K) -> Option<Type> {
+        if let Some(type_) = self.variables.get(&key.to_key()) {
             Some(type_.clone())
         } else if let Some(parent) = &self.parent {
-            parent.borrow().get_variable(name)
+            parent.borrow().get_variable(key)
         } else {
             None
         }
     }
 
-    pub fn get_types(&self) -> &HashMap<TypeIdentifier, Type> {
+    pub fn get_types(&self) -> &HashMap<String, Type> {
         &self.types
     }
 
@@ -300,14 +327,14 @@ impl TypeEnvironment {
         &self.variables
     }
 
-    pub fn get_static_member(
+    pub fn get_static_member<K: ToKey>(
         &self,
         type_annotation: TypeAnnotation,
-        member_name: &str,
+        member_key: K,
     ) -> Option<Type> {
         self.static_members
             .get(&type_annotation)
-            .and_then(|members| members.get(member_name))
+            .and_then(|members| members.get(&member_key.to_key()))
             .cloned()
             .or_else(|| {
                 if type_annotation.has_double_colon() {
@@ -317,12 +344,12 @@ impl TypeEnvironment {
 
                     self.static_members
                         .get(&TypeAnnotation::Type(type_name.to_owned()))
-                        .and_then(|members| members.get(member_name))
+                        .and_then(|members| members.get(&member_key.to_key()))
                         .cloned()
                 } else {
                     self.parent
                         .as_ref()
-                        .and_then(|p| p.borrow().get_static_member(type_annotation, member_name))
+                        .and_then(|p| p.borrow().get_static_member(type_annotation, member_key))
                 }
             })
     }

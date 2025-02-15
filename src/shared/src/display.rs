@@ -75,6 +75,12 @@ impl Indent {
     }
 }
 
+impl Default for Indent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub trait IndentDisplay {
     fn indent_display(&self, indent: &mut Indent) -> String;
 }
@@ -168,7 +174,7 @@ impl IndentDisplay for Statement {
                         format!(
                             "\n{}where_clause: {}",
                             indent.dash(),
-                            indent_display_vec(
+                            indent_display_slice(
                                 where_clause,
                                 "generic constraints",
                                 "constraint",
@@ -308,7 +314,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "\n{}{}",
                         indent.dash_end(),
-                        indent_display_vec(literals, "literals", "literal", indent)
+                        indent_display_slice(literals, "literals", "literal", indent)
                     )
                     .as_str(),
                 );
@@ -367,7 +373,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "\n{}{}",
                         indent.dash_end(),
-                        indent_display_vec(
+                        indent_display_slice(
                             type_annotations,
                             "type_annotations",
                             "type_annotation",
@@ -412,7 +418,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "\n{}{}",
                         indent.dash(),
-                        indent_display_vec(
+                        indent_display_slice(
                             associated_types,
                             "associated_types",
                             "associated_type",
@@ -428,7 +434,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "\n{}{}",
                         indent.dash_end(),
-                        indent_display_vec(functions, "functions", "function", indent)
+                        indent_display_slice(functions, "functions", "function", indent)
                     )
                     .as_str(),
                 );
@@ -451,7 +457,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "\n{}scoped_generics: {}",
                         indent.dash(),
-                        indent_display_vec(
+                        indent_display_slice(
                             scoped_generics,
                             "scoped_generics",
                             "scoped_generic",
@@ -483,7 +489,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "\n{}{}",
                         indent.dash(),
-                        indent_display_vec(
+                        indent_display_slice(
                             associated_types,
                             "associated_types",
                             "associated_type",
@@ -499,7 +505,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "\n{}{}",
                         indent.dash_end(),
-                        indent_display_vec(functions, "functions", "function", indent)
+                        indent_display_slice(functions, "functions", "function", indent)
                     )
                     .as_str(),
                 );
@@ -774,6 +780,20 @@ impl IndentDisplay for Expression {
             }
             Expression::Member(m) => m.indent_display(indent),
             Expression::Literal(l) => l.indent_display(indent),
+            Expression::Tuple(e) => {
+                let mut result = String::new();
+                result.push_str("<tuple>");
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash(),
+                        indent_display_slice(e, "elements", "element", indent).as_str()
+                    )
+                    .as_str(),
+                );
+
+                result
+            }
             Expression::Closure(c) => {
                 let mut result = String::new();
                 result.push_str("<closure>\n");
@@ -1082,8 +1102,8 @@ impl IndentDisplay for Member {
                 let mut result = String::new();
                 result.push_str(format!("<identifier> {}", symbol).as_str());
 
-                match generics {
-                    Some(generics) => result.push_str(
+                if let Some(generics) = generics {
+                    result.push_str(
                         format!(
                             "<{}>",
                             generics
@@ -1093,8 +1113,7 @@ impl IndentDisplay for Member {
                                 .join(", ")
                         )
                         .as_str(),
-                    ),
-                    None => {}
+                    )
                 }
 
                 result
@@ -1135,7 +1154,7 @@ impl IndentDisplay for Member {
                         format!(
                             "\n{}generics: {}",
                             indent.dash_end(),
-                            indent_display_vec(generics, "generics", "generic", indent)
+                            indent_display_slice(generics, "generics", "generic", indent)
                         )
                         .as_str(),
                     );
@@ -1182,7 +1201,7 @@ impl IndentDisplay for Member {
                         format!(
                             "\n{}generics: {}",
                             indent.dash_end(),
-                            indent_display_vec(generics, "generics", "generic", indent)
+                            indent_display_slice(generics, "generics", "generic", indent)
                         )
                         .as_str(),
                     );
@@ -1836,7 +1855,7 @@ impl IndentDisplay for TypedStatement {
                         format!(
                             "\n{}where_clause: {}",
                             indent.dash(),
-                            indent_display_vec(
+                            indent_display_slice(
                                 where_clause,
                                 "generic constraints",
                                 "constraint",
@@ -1978,7 +1997,7 @@ impl IndentDisplay for TypedStatement {
                     format!(
                         "{}{}\n",
                         indent.dash(),
-                        indent_display_vec(
+                        indent_display_slice(
                             associated_types,
                             "associated_types",
                             "associated_type",
@@ -1994,7 +2013,7 @@ impl IndentDisplay for TypedStatement {
                     format!(
                         "{}{}\n",
                         indent.dash_end(),
-                        indent_display_vec(functions, "functions", "function", indent)
+                        indent_display_slice(functions, "functions", "function", indent)
                     )
                     .as_str(),
                 );
@@ -2018,7 +2037,7 @@ impl IndentDisplay for TypedStatement {
                     format!(
                         "{}scoped_generics: {}\n",
                         indent.dash(),
-                        indent_display_vec(
+                        indent_display_slice(
                             scoped_generics,
                             "scoped_generics",
                             "scoped_generic",
@@ -2050,7 +2069,7 @@ impl IndentDisplay for TypedStatement {
                     format!(
                         "{}associated_types: {}\n",
                         indent.dash(),
-                        indent_display_vec(
+                        indent_display_slice(
                             associated_types,
                             "associated_types",
                             "associated_type",
@@ -2065,8 +2084,12 @@ impl IndentDisplay for TypedStatement {
                     format!(
                         "{}functions: {}",
                         indent.dash_end(),
-                        indent_display_vec(
-                            &functions.clone().into_iter().map(|f| f.1).collect(),
+                        indent_display_slice(
+                            &functions
+                                .clone()
+                                .into_iter()
+                                .map(|f| f.1)
+                                .collect::<Vec<_>>(),
                             "functions",
                             "function",
                             indent
@@ -2101,7 +2124,7 @@ impl IndentDisplay for TypedStatement {
                     format!(
                         "\n{}{}",
                         indent.dash_end(),
-                        indent_display_vec(
+                        indent_display_slice(
                             type_annotations,
                             "type_annotations",
                             "type_annotation",
@@ -2272,7 +2295,7 @@ impl IndentDisplay for TypedExpression {
                     format!(
                         "{}{}",
                         indent.dash(),
-                        indent_display_vec(arms, "arms", "arm", indent)
+                        indent_display_slice(arms, "arms", "arm", indent)
                     )
                     .as_str(),
                 );
@@ -2320,6 +2343,21 @@ impl IndentDisplay for TypedExpression {
             }
             TypedExpression::Member(m) => m.indent_display(indent),
             TypedExpression::Literal(l) => l.indent_display(indent),
+            TypedExpression::Tuple { elements, type_ } => {
+                let mut result = String::new();
+                result.push_str(format!("<tuple>: ({})", type_).as_str());
+
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash(),
+                        indent_display_slice(elements, "elements", "element", indent)
+                    )
+                    .as_str(),
+                );
+
+                result
+            }
             TypedExpression::Closure {
                 param,
                 return_type,
@@ -3255,6 +3293,16 @@ impl IndentDisplay for TypeAnnotation {
                     .as_str(),
                 );
             }
+            TypeAnnotation::Tuple(elements) => {
+                result.push_str(
+                    format!(
+                        "{}tuple: {}",
+                        indent.dash_end(),
+                        indent_display_slice(elements, "elements", "element", indent)
+                    )
+                    .as_str(),
+                );
+            }
             TypeAnnotation::Function(param, return_type) => {
                 result.push_str(
                     format!(
@@ -3401,7 +3449,7 @@ impl IndentDisplay for Decision {
                     format!(
                         "\n{}{}",
                         indent.dash(),
-                        indent_display_vec(cases, "cases", "case", indent)
+                        indent_display_slice(cases, "cases", "case", indent)
                     )
                     .as_str(),
                 );
@@ -3442,7 +3490,7 @@ impl IndentDisplay for Case {
             format!(
                 "\n{}{}",
                 indent.dash(),
-                indent_display_vec(&self.arguments, "arguments", "argument", indent)
+                indent_display_slice(&self.arguments, "arguments", "argument", indent)
             )
             .as_str(),
         );
@@ -3510,7 +3558,7 @@ impl<T: IndentDisplay> IndentDisplay for &T {
 
 impl<T: IndentDisplay> IndentDisplay for Vec<T> {
     fn indent_display(&self, indent: &mut Indent) -> String {
-        indent_display_vec(self, "vec", "item", indent)
+        indent_display_slice(self, "vec", "item", indent)
     }
 }
 
@@ -3520,8 +3568,8 @@ impl IndentDisplay for String {
     }
 }
 
-fn indent_display_vec<T: IndentDisplay>(
-    vec: &Vec<T>,
+fn indent_display_slice<T: IndentDisplay>(
+    slice: &[T],
     parent_type_name: &str,
     item_field_name: &str,
     indent: &mut Indent,
@@ -3531,8 +3579,8 @@ fn indent_display_vec<T: IndentDisplay>(
     result.push_str(format!("<{}>", parent_type_name).as_str());
     indent.increase();
 
-    for (i, item) in vec.iter().enumerate() {
-        if i < vec.len() - 1 {
+    for (i, item) in slice.iter().enumerate() {
+        if i < slice.len() - 1 {
             result.push_str(
                 format!(
                     "\n{}{}: {},",

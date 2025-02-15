@@ -262,7 +262,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
         if !can_be_type_annotation(cursor) {
             return Err(format!(
-                "Expected type identifier but found {:?}",
+                "Expected type annotation but found {:?}",
                 cursor.first().kind
             ));
         }

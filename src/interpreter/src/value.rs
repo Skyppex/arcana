@@ -14,6 +14,7 @@ pub enum Value {
     Char(char),
     String(String),
     Array(Vec<Value>),
+    Tuple(Vec<Value>),
     Struct {
         struct_name: TypeAnnotation,
         fields: HashMap<String, Value>,
@@ -76,6 +77,19 @@ impl Display for Value {
                 }
 
                 write!(f, "]")
+            }
+            Value::Tuple(values) => {
+                write!(f, "(")?;
+
+                for (index, value) in values.iter().enumerate() {
+                    write!(f, "{}", value)?;
+
+                    if index < values.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+
+                write!(f, ")")
             }
             Value::Struct {
                 struct_name,

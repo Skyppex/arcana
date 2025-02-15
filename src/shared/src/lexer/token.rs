@@ -113,17 +113,17 @@ pub enum Literal {
     Bool(bool),
 }
 
-impl ToString for Literal {
-    fn to_string(&self) -> String {
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Void => "void".to_string(),
-            Literal::Unit => "unit".to_string(),
-            Literal::Int(v) => v.to_string(),
-            Literal::UInt(v) => v.to_string(),
-            Literal::Float(v) => v.to_string(),
-            Literal::String(v) => v.to_string(),
-            Literal::Char(v) => v.to_string(),
-            Literal::Bool(v) => v.to_string(),
+            Literal::Void => write!(f, "void"),
+            Literal::Unit => write!(f, "unit"),
+            Literal::Int(v) => write!(f, "{}", v),
+            Literal::UInt(v) => write!(f, "{}", v),
+            Literal::Float(v) => write!(f, "{}", v),
+            Literal::String(v) => write!(f, "{}", v),
+            Literal::Char(v) => write!(f, "{}", v),
+            Literal::Bool(v) => write!(f, "{}", v),
         }
     }
 }
@@ -134,9 +134,9 @@ pub struct IntLiteral<T: PrimInt> {
     pub base: IntLiteralBase,
 }
 
-impl<T: PrimInt + Display> ToString for IntLiteral<T> {
-    fn to_string(&self) -> String {
-        format!("{}{}", self.base.to_string(), self.value)
+impl<T: PrimInt + Display> Display for IntLiteral<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.base, self.value)
     }
 }
 
@@ -149,14 +149,14 @@ pub enum IntLiteralBase {
     Hexadecimal = 16,
 }
 
-impl ToString for IntLiteralBase {
-    fn to_string(&self) -> String {
+impl Display for IntLiteralBase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IntLiteralBase::None => "".to_string(),
-            IntLiteralBase::Binary => "0b".to_string(),
-            IntLiteralBase::Octal => "0o".to_string(),
-            IntLiteralBase::Decimal => "0d".to_string(),
-            IntLiteralBase::Hexadecimal => "0x".to_string(),
+            IntLiteralBase::None => write!(f, ""),
+            IntLiteralBase::Binary => write!(f, "0b"),
+            IntLiteralBase::Octal => write!(f, "0o"),
+            IntLiteralBase::Decimal => write!(f, "0d"),
+            IntLiteralBase::Hexadecimal => write!(f, "0x"),
         }
     }
 }

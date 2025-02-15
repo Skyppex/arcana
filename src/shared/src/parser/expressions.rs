@@ -283,17 +283,24 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
         return parse_range(cursor);
     };
 
-    if !matches!(
-        cursor.second().kind,
-        TokenKind::OpenBrace | TokenKind::DoubleColon | TokenKind::Less
-    ) {
-        return parse_range(cursor);
-    };
-
-    if let TokenKind::Identifier(name) = cursor.third().kind {
-        if cursor.second().kind == TokenKind::DoubleColon && name.is_function_identifier_name() {
+    match (cursor.second().kind, cursor.third().kind) {
+        (kind, _)
+            if !matches!(
+                kind,
+                TokenKind::OpenBrace | TokenKind::DoubleColon | TokenKind::Less
+            ) =>
+        {
+            return parse_range(cursor);
+        }
+        (_, TokenKind::Less) => {
+            return parse_range(cursor);
+        }
+        (TokenKind::DoubleColon, TokenKind::Identifier(name))
+            if name.is_function_identifier_name() =>
+        {
             return parse_member_access(cursor);
         }
+        _ => {}
     }
 
     let type_annotation = parse_type_annotation(cursor, false)?;
@@ -954,7 +961,9 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
 
     if cursor.first().kind == TokenKind::DoubleColon && cursor.second().kind == TokenKind::Less {
         cursor.bump()?; // Consume the ::
+        cursor.bump()?; // Consume the <
         let generics = parse_generics_in_type_name(cursor)?;
+        cursor.bump()?; // Consume the >
 
         let Expression::Member(member) = expression.clone() else {
             return Err(format!("Expected member but found {:?}", expression));
@@ -1181,7 +1190,23 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
                     cursor.bump()?; // Consume the )
                     Ok(expression)
                 }
-                _ => Err(format!("Expected ) but found {:?}", cursor.first().kind)),
+                TokenKind::Comma => {
+                    let mut elements = vec![expression];
+
+                    while cursor.first().kind == TokenKind::Comma {
+                        cursor.bump()?; // Consume the ,
+
+                        elements.push(parse_expression(cursor)?);
+                    }
+
+                    cursor.expect(TokenKind::CloseParen)?;
+
+                    Ok(Expression::Tuple(elements))
+                }
+                _ => Err(format!(
+                    "Expected ) or , but found {:?}",
+                    cursor.first().kind
+                )),
             }
         }
         TokenKind::OpenBracket => {

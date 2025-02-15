@@ -161,6 +161,7 @@ pub fn check_type(
             )?;
 
             let callee_type = callee.get_type();
+
             if !matches!(&callee_type, &Type::Function(_)) {
                 return Err(format!(
                     "Expected function type, found {}",
@@ -500,11 +501,28 @@ pub fn check_type(
             })
         }
         Expression::Member(member) => match member {
-            crate::parser::Member::Identifier { symbol, .. } => {
+            crate::parser::Member::Identifier { symbol, generics } => {
                 let type_ = type_environment
                     .borrow()
                     .get_variable(symbol)
-                    .or_else(|| type_environment.borrow().get_type_from_str(symbol))
+                    .or_else(|| {
+                        let type_ = type_environment.borrow().get_type(member);
+
+                        match (type_, generics) {
+                            (None, _) => None,
+                            (Some(type_), None) => Some(type_),
+                            (Some(type_), Some(generics)) => {
+                                return Some(
+                                    type_
+                                        .clone_with_concrete_types(
+                                            generics.iter().map(|g| g.type_annotation()).collect(),
+                                            type_environment.clone(),
+                                        )
+                                        .expect("Failed to clone type with concrete types"),
+                                );
+                            }
+                        }
+                    })
                     .ok_or_else(|| format!("Unexpected variable: {}", symbol))?
                     .clone();
 
@@ -721,6 +739,26 @@ pub fn check_type(
                 }))
             }
         },
+        Expression::Tuple(elements) => {
+            let typed_elements = elements
+                .iter()
+                .map(|element| {
+                    check_type(
+                        element,
+                        discovered_types,
+                        type_environment.clone(),
+                        context.clone(),
+                    )
+                })
+                .collect::<Result<Vec<TypedExpression>, String>>()?;
+
+            let types = typed_elements.iter().map(|e| e.get_type()).collect();
+
+            Ok(TypedExpression::Tuple {
+                elements: typed_elements,
+                type_: Type::Tuple(types),
+            })
+        }
         Expression::Unary(unary) => {
             let expression =
                 check_type(&unary.expression, discovered_types, type_environment, None)?;
@@ -1304,7 +1342,7 @@ fn check_type_param_propagation(
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
-    let parser::Member::Identifier { symbol, .. } = member.clone() else {
+    let parser::Member::Identifier { .. } = member.clone() else {
         return Err("Param propagation must be followed by a member access".to_string());
     };
 
@@ -1313,30 +1351,27 @@ fn check_type_param_propagation(
 
     let object_type = object_type_expression.get_type();
 
-    let member_type = type_environment
-        .borrow()
-        .get_type_from_str(&symbol)
-        .or_else(|| {
-            type_environment
-                .borrow()
-                .get_static_member(object_type.type_annotation(), &symbol)
-        });
+    let member_type = type_environment.borrow().get_type(member).or_else(|| {
+        type_environment
+            .borrow()
+            .get_static_member(object_type.type_annotation(), member)
+    });
 
     let Some(Type::Function(Function { param, .. })) = member_type else {
-        return Err(format!("{} is not a function", symbol));
+        return Err(format!("{} is not a function", member));
     };
 
     let Some(param) = param else {
         Err(format!(
             "Function {} must have at least one parameter",
-            symbol
+            member
         ))?
     };
 
     if !type_equals(&param.type_, &object_type) {
         Err(format!(
             "Function '{}' must be called on type {}. Found {}",
-            symbol, param.type_, object_type
+            member, param.type_, object_type
         ))?
     }
 
@@ -1359,7 +1394,7 @@ fn check_type_param_propagation_recurse(
             let type_ = type_environment
                 .borrow()
                 .get_variable(&symbol)
-                .or_else(|| type_environment.borrow().get_type_from_str(&symbol))
+                .or_else(|| type_environment.borrow().get_type(&symbol))
                 .or_else(|| {
                     type_environment
                         .borrow()
@@ -1450,7 +1485,7 @@ fn check_type_pattern(
 
             match &initializer_type {
                 Type::Enum(Enum { members, .. }) => {
-                    for (_, member_type) in members {
+                    for member_type in members.values() {
                         if type_annotation_equals(type_annotation, &member_type.type_annotation()) {
                             is_enum_member = true;
                             break;
