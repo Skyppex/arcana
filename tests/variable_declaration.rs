@@ -177,7 +177,7 @@ fn variable_declaration_adds_variable_to_environment() {
 #[test]
 fn variable_declaration_adds_variable_to_environment_with_value() {
     // Arrange
-    let input = "let x: bool = true";
+    let input = "let x: Bool = true";
     let environment = create_env();
 
     // Act

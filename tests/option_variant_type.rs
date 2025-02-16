@@ -19,7 +19,7 @@ fn enum_variant_can_be_used_as_a_type() {
             N
         }
 
-        let x: O::S; 
+        let x: O::S;
         "#;
 
     // Act

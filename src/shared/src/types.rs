@@ -532,6 +532,8 @@ pub(super) fn parse_type_annotation(
                     return Ok(TypeAnnotation::ConcreteType(type_name, generics));
                 };
 
+                cursor.bump()?; // Consume the variant name
+
                 if !variant_name.is_type_identifier_name() {
                     return Err(format!("Invalid variant name: {}", variant_name));
                 }

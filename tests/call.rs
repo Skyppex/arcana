@@ -52,7 +52,7 @@ fn call_has_void_return_type() {
 fn call_has_return_type() {
     // Arrange
     let input = r#"
-        fun a(): bool => { true }
+        fun a(): Bool => { true }
         a()
     "#;
 
@@ -104,7 +104,7 @@ fn call_takes_caller_variable_as_first_argument_using_function_propagation() {
     let input = r#"
         fun a(x: Int): Int => x
         let y: Int = 5;
-        y:a()
+        y:a
     "#;
 
     // Act
@@ -134,16 +134,16 @@ fn function_propagation_works_with_multiple_arguments() {
 fn function_propagation_can_be_chained() {
     // Arrange
     let input = r#"
-        fun a(x: Int): Int => x
+        fun a(x: Int): Int => x + 1
         let y: Int = 5;
-        y:a():a()
+        y:a:a
     "#;
 
     // Act
     let value = evaluate_expression(input, create_env(), false);
 
     // Assert
-    assert_eq!(value, Value::Number(Number::Int(5)))
+    assert_eq!(value, Value::Number(Number::Int(7)))
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn call_takes_caller_expression_as_first_argument() {
     // Arrange
     let input = r#"
         fun a(x: Int): Int => x
-        8:a()
+        8:a
     "#;
 
     // Act

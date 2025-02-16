@@ -1,3 +1,6 @@
-fun zip<T1, T2>(a: T1, b: T2): (T1, T2) => (a, b);
+enum O {
+    S,
+    N
+}
 
-zip::<Int, String>(1, "a")
+let a: O::S;

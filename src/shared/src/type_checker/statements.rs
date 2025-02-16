@@ -22,9 +22,11 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
     match statement {
         Statement::Program { statements } => {
             let mut discovered_types = vec![];
+
             for statement in statements {
                 discovered_types.append(&mut discover_user_defined_types(statement)?);
             }
+
             Ok(discovered_types)
         }
         Statement::ModuleDeclaration(_) => Ok(vec![]),
@@ -73,8 +75,9 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .iter()
                 .map(|member| {
                     DiscoveredType::EnumMember(
-                        TypeIdentifier::Type(
-                            [type_identifier.name(), &member.identifier].join("::"),
+                        TypeIdentifier::MemberType(
+                            Box::new(type_identifier.clone()),
+                            member.identifier.clone(),
                         ),
                         member
                             .fields
@@ -327,7 +330,10 @@ pub fn check_type(
                         .iter()
                         .map(|f| {
                             Ok(StructField {
-                                struct_name: type_identifier.clone(),
+                                struct_name: TypeIdentifier::MemberType(
+                                    Box::new(type_identifier.clone()),
+                                    member.identifier.clone(),
+                                ),
                                 field_name: f.identifier.clone(),
                                 field_type: f.type_.clone(),
                             })

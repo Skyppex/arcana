@@ -277,6 +277,8 @@ pub fn check_type(
                         ));
                     }
 
+                    println!("ann & init");
+
                     Some(initializer)
                 }
                 (Some(initializer), None) => {
@@ -288,6 +290,20 @@ pub fn check_type(
                     )?;
 
                     type_ = initializer.get_type();
+
+                    if *mutable {
+                        if let Type::Literal {
+                            type_: literal_type,
+                            ..
+                        } = type_
+                        {
+                            type_ = *literal_type;
+                        }
+                    }
+
+                    println!("init");
+                    dbg!(&type_);
+
                     Some(initializer)
                 }
                 (None, Some(type_annotation)) => {
@@ -300,15 +316,7 @@ pub fn check_type(
                 _ => None,
             };
 
-            if *mutable {
-                if let Type::Literal {
-                    type_: literal_type,
-                    ..
-                } = type_
-                {
-                    type_ = *literal_type;
-                }
-            }
+            dbg!(&type_);
 
             check_type_pattern(
                 pattern,
@@ -354,6 +362,7 @@ pub fn check_type(
                 if_else_environment.clone(),
                 None,
             )?;
+
             let if_block_type = if_block.get_deep_type();
 
             let else_block = if let Some(false_expression) = false_expression {
@@ -369,8 +378,9 @@ pub fn check_type(
 
             let else_type = else_block.clone().map(|e| e.get_deep_type());
 
-            let type_ = if !is_option(&else_type) {
-                if let Some(else_type) = else_type {
+            let type_ = if let Some(else_type) = else_type {
+                dbg!(&if_block_type, &else_type);
+                if !is_option(&else_type) {
                     if !type_equals(&if_block_type, &else_type) {
                         return Err(format!(
                             "If block type {:?} does not match else block type {:?}",
@@ -1026,11 +1036,7 @@ pub fn check_type(
     }
 }
 
-fn is_option(type_: &Option<Type>) -> bool {
-    let Some(type_) = type_ else {
-        return false;
-    };
-
+fn is_option(type_: &Type) -> bool {
     let Type::Enum(Enum {
         type_identifier,
         shared_fields,
@@ -1040,25 +1046,26 @@ fn is_option(type_: &Option<Type>) -> bool {
         return false;
     };
 
-    let TypeIdentifier::ConcreteType(name, ..) = type_identifier else {
-        return false;
-    };
+    match type_identifier {
+        TypeIdentifier::GenericType(name, ..) | TypeIdentifier::ConcreteType(name, ..) => {
+            if name != "Option" {
+                return false;
+            }
 
-    if name != "Option" {
-        return false;
+            if !shared_fields.is_empty() {
+                return false;
+            }
+
+            return members.get("Some").map_or(false, |member| {
+                let Type::EnumMember(EnumMember { fields, .. }) = member else {
+                    return false;
+                };
+
+                return get_field_by_name(fields, "f0").map_or(false, |_| true);
+            });
+        }
+        _ => false,
     }
-
-    if !shared_fields.is_empty() {
-        return false;
-    }
-
-    return members.get("Some").map_or(false, |member| {
-        let Type::EnumMember(EnumMember { fields, .. }) = member else {
-            return false;
-        };
-
-        return get_field_by_name(fields, "f0").map_or(false, |_| true);
-    });
 }
 
 fn check_type_static_member_access(
@@ -1456,6 +1463,14 @@ fn check_type_pattern(
         Pattern::Wildcard => Ok(()),
         Pattern::Unit => Ok(()),
         Pattern::Variable(identifier) => {
+            if let Some(context) = context {
+                type_environment
+                    .borrow_mut()
+                    .add_variable(identifier.clone(), context);
+
+                return Ok(());
+            }
+
             if let Some(initializer) = initializer {
                 let initializer_type = initializer.get_type();
 

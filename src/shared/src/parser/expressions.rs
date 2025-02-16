@@ -856,7 +856,11 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
 
     let pattern = parse_pattern(cursor)?;
 
+    dbg!(&cursor.first().kind);
+
     let type_annotation = parse_optional_type_annotation(cursor, false)?;
+
+    dbg!(&cursor.first().kind);
 
     match cursor.first().kind {
         TokenKind::Equal => {
