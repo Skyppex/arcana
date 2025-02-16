@@ -277,8 +277,6 @@ pub fn check_type(
                         ));
                     }
 
-                    println!("ann & init");
-
                     Some(initializer)
                 }
                 (Some(initializer), None) => {
@@ -301,9 +299,6 @@ pub fn check_type(
                         }
                     }
 
-                    println!("init");
-                    dbg!(&type_);
-
                     Some(initializer)
                 }
                 (None, Some(type_annotation)) => {
@@ -315,8 +310,6 @@ pub fn check_type(
                 }
                 _ => None,
             };
-
-            dbg!(&type_);
 
             check_type_pattern(
                 pattern,
@@ -379,7 +372,6 @@ pub fn check_type(
             let else_type = else_block.clone().map(|e| e.get_deep_type());
 
             let type_ = if let Some(else_type) = else_type {
-                dbg!(&if_block_type, &else_type);
                 if !is_option(&else_type) {
                     if !type_equals(&if_block_type, &else_type) {
                         return Err(format!(

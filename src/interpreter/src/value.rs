@@ -112,10 +112,10 @@ impl Display for Value {
                 fields,
             } => match fields {
                 EnumFields::None => {
-                    write!(f, "{}", enum_member.enum_name)
+                    write!(f, "{}", enum_member)
                 }
                 EnumFields::Named(fields) => {
-                    write!(f, "{} {{ ", enum_member.enum_name)?;
+                    write!(f, "{} {{ ", enum_member)?;
 
                     for (index, (identifier, value)) in fields.iter().enumerate() {
                         write!(f, "{}: {}", identifier, value)?;
@@ -168,7 +168,7 @@ impl EnumMember {
 
 impl Display for EnumMember {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.enum_name)
+        write!(f, "{}::{}", self.enum_name, self.member_name)
     }
 }
 
