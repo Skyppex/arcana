@@ -138,7 +138,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             param: param.clone(),
             return_type_annotation: return_type_annotation
                 .clone()
-                .unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
+                .unwrap_or(Type::Void.type_annotation()),
         }]),
         Statement::Semi(_) => Ok(vec![]),
         Statement::Expression(_) => Ok(vec![]),
