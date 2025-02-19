@@ -168,7 +168,7 @@ impl EnumMember {
 
 impl Display for EnumMember {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}", self.enum_name, self.member_name)
+        write!(f, "{}", self.enum_name)
     }
 }
 

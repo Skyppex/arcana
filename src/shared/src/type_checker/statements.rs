@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr, vec};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use crate::{
     parser::{
@@ -1078,7 +1078,10 @@ fn check_type_identifier(
                 )?),
             }))
         }
-        None => Type::from_str(&type_identifier.to_string()),
+        None => type_environment
+            .borrow()
+            .get_type_from_identifier(type_identifier)
+            .ok_or_else(|| "Could not find type".to_string()),
     }
 }
 
@@ -1312,6 +1315,8 @@ pub fn check_type_annotation(
                 )?),
             }))
         }
-        None => Type::from_str(&type_annotation.to_string()),
+        None => type_environment
+            .borrow()
+            .get_type_from_annotation(type_annotation),
     }
 }

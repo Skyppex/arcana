@@ -288,8 +288,8 @@ impl TypeEnvironment {
         }
     }
 
-    pub fn get_type_from_identifier(&self, _type_identifier: &TypeIdentifier) -> Option<Type> {
-        match _type_identifier {
+    pub fn get_type_from_identifier(&self, type_identifier: &TypeIdentifier) -> Option<Type> {
+        match type_identifier {
             TypeIdentifier::Type(name) => Type::from_str(name).ok(),
             TypeIdentifier::GenericType(name, _) => Type::from_str(name).ok(),
             TypeIdentifier::ConcreteType(name, _) => Type::from_str(name).ok(),
