@@ -425,11 +425,14 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
             access_modifier,
             type_identifier,
             where_clause,
+            embedded_structs: vec![],
             fields: vec![],
         }));
     };
 
     cursor.bump()?; // Consume the {
+
+    let embedded_structs = parse_embedded_structs(cursor)?;
 
     let mut fields = vec![];
     let mut has_comma = true;
@@ -455,6 +458,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
         access_modifier,
         type_identifier,
         where_clause,
+        embedded_structs,
         fields,
     }))
 }
@@ -1001,53 +1005,60 @@ fn parse_enum_member(
         return Err(format!("Invalid type name: {}", identifier));
     }
 
-    match cursor.first().kind {
-        TokenKind::OpenBrace => {
-            cursor.bump()?; // Consume the (
+    if cursor.first().kind == TokenKind::OpenBrace {
+        cursor.bump()?; // Consume the (
 
-            let mut fields = vec![];
+        let embedded_structs = parse_embedded_structs(cursor)?;
 
-            for shared_field in shared_fields {
-                fields.push(EnumMemberField {
-                    identifier: shared_field.identifier,
-                    type_annotation: shared_field.type_annotation,
-                });
-            }
+        let mut fields = vec![];
 
-            let mut has_comma = true;
-
-            while cursor.first().kind != TokenKind::CloseBrace {
-                if !has_comma {
-                    return Err(format!("Expected , but found {:?}", cursor.first().kind));
-                }
-
-                has_comma = true;
-                fields.push(parse_enum_field(cursor)?);
-
-                if cursor.first().kind == TokenKind::Comma {
-                    cursor.bump()?; // Consume the ,
-                } else {
-                    has_comma = false;
-                }
-            }
-
-            cursor.bump()?; // Consume the )
-
-            Ok(EnumMember { identifier, fields })
+        for shared_field in shared_fields {
+            fields.push(EnumMemberField {
+                identifier: shared_field.identifier,
+                type_annotation: shared_field.type_annotation,
+            });
         }
-        _ => {
-            let mut fields = vec![];
 
-            for shared_field in shared_fields {
-                fields.push(EnumMemberField {
-                    identifier: shared_field.identifier,
-                    type_annotation: shared_field.type_annotation,
-                });
+        let mut has_comma = true;
+
+        while cursor.first().kind != TokenKind::CloseBrace {
+            if !has_comma {
+                return Err(format!("Expected , but found {:?}", cursor.first().kind));
             }
 
-            Ok(EnumMember { identifier, fields })
+            has_comma = true;
+            fields.push(parse_enum_field(cursor)?);
+
+            if cursor.first().kind == TokenKind::Comma {
+                cursor.bump()?; // Consume the ,
+            } else {
+                has_comma = false;
+            }
         }
+
+        cursor.bump()?; // Consume the )
+
+        return Ok(EnumMember {
+            identifier,
+            embedded_structs,
+            fields,
+        });
     }
+
+    let mut fields = vec![];
+
+    for shared_field in shared_fields {
+        fields.push(EnumMemberField {
+            identifier: shared_field.identifier,
+            type_annotation: shared_field.type_annotation,
+        });
+    }
+
+    Ok(EnumMember {
+        identifier,
+        embedded_structs: vec![],
+        fields,
+    })
 }
 
 fn parse_enum_field(cursor: &mut Cursor) -> Result<EnumMemberField, String> {
@@ -1091,6 +1102,29 @@ fn parse_enum_field(cursor: &mut Cursor) -> Result<EnumMemberField, String> {
 //         value: FlagsValue::Default,
 //     })
 // }
+
+fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<TypeAnnotation>, String> {
+    let mut embedded_structs = vec![];
+
+    loop {
+        if let TokenKind::Identifier(identifier) = cursor.first().kind {
+            if identifier.is_type_identifier_name() {
+                cursor.bump()?; // Consume the identifier
+
+                embedded_structs.push(TypeAnnotation::Type(identifier));
+
+                if cursor.first().kind == TokenKind::Comma {
+                    cursor.bump()?; // Consume the ,
+                    continue;
+                }
+            }
+        }
+
+        break;
+    }
+
+    Ok(embedded_structs)
+}
 
 fn parse_where_clause(cursor: &mut Cursor) -> Result<Option<Vec<GenericConstraint>>, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Where) {

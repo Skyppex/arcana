@@ -108,6 +108,7 @@ pub struct StructDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
     pub where_clause: Option<Vec<GenericConstraint>>,
+    pub embedded_structs: Vec<TypeAnnotation>,
     pub fields: Vec<StructField>,
 }
 
@@ -316,13 +317,14 @@ pub struct StructField {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldInitializer {
-    pub identifier: Option<String>,
+    pub identifier: String,
     pub initializer: Expression,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumMember {
     pub identifier: String,
+    pub embedded_structs: Vec<TypeAnnotation>,
     pub fields: Vec<EnumMemberField>,
 }
 

@@ -353,17 +353,14 @@ fn parse_struct_literal(
 
 fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, String> {
     let TokenKind::Identifier(identifier) = cursor.first().kind else {
-        return Ok(FieldInitializer {
-            identifier: None,
-            initializer: parse_expression(cursor)?,
-        });
+        return Err(format!(
+            "Expected identifier but found {:?}",
+            cursor.first().kind
+        ));
     };
 
     let TokenKind::Colon = cursor.second().kind else {
-        return Ok(FieldInitializer {
-            identifier: None,
-            initializer: parse_expression(cursor)?,
-        });
+        return Err(format!("Expected : but found {:?}", cursor.first().kind));
     };
 
     cursor.bump()?; // Consume the identifier
@@ -372,7 +369,7 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
     let initializer = parse_expression(cursor)?;
 
     Ok(FieldInitializer {
-        identifier: Some(identifier),
+        identifier,
         initializer,
     })
 }

@@ -989,61 +989,6 @@ fn evaluate_member_access(
     }
 }
 
-// fn evaluate_member_function_access<'a>(
-//     object: Box<TypedExpression>,
-//     environment: Rcrc<Environment>,
-//     member: Box<Member>,
-// ) -> Result<Value, String> {
-//     let value = evaluate_expression(*object, environment.clone())?;
-//
-//     match value {
-//         Value::Struct {
-//             struct_name,
-//             fields,
-//         } => match *member.clone() {
-//             Member::Identifier { symbol, .. } => {
-//                 let field_value = fields.get(&symbol).ok_or(format!(
-//                     "Field '{}' not found in struct '{}'",
-//                     symbol, struct_name
-//                 ))?;
-//
-//                 Ok(field_value.clone())
-//             }
-//             Member::MemberAccess { object, member, .. } => {
-//                 evaluate_member_access(object, environment, member)
-//             }
-//             Member::MemberFunctionAccess { object, member, .. } => {
-//                 evaluate_member_function_access(object, environment, member)
-//             }
-//         },
-//         _ => {
-//             let Member::Identifier { symbol, .. } = *member else {
-//                 return Err(format!("Expected identifier, found '{}'", member));
-//             };
-//
-//             let function_value = environment
-//                 .borrow()
-//                 .get_variable(&symbol)
-//                 .or_else(|| environment.borrow().get_function(&symbol))
-//                 .ok_or(format!("Variable '{}' not found in env", symbol))?;
-//
-//             let new_function_value = match function_value.borrow().value.clone() {
-//                 Value::Function {
-//                     param_name,
-//                     body,
-//                     environment,
-//                 } => Value::Function {
-//                     param_name,
-//                     body,
-//                     environment: Rc::new(RefCell::new(Environment::new_parent(environment))),
-//                 },
-//                 _ => return Err(format!("Expected function, found '{}'", function_value)),
-//             };
-//             Ok(function_value.clone().borrow().value.clone())
-//         }
-//     }
-// }
-
 fn evaluate_literal(literal: Literal, environment: Rcrc<Environment>) -> Result<Value, String> {
     match literal {
         Literal::Void => panic!("Void literals should never be evaluated"),
@@ -1072,7 +1017,7 @@ fn evaluate_literal(literal: Literal, environment: Rcrc<Environment>) -> Result<
 
             for field_initializer in field_initializers {
                 fields.insert(
-                    field_initializer.identifier.unwrap(),
+                    field_initializer.identifier,
                     evaluate_expression(field_initializer.initializer, environment.clone())?,
                 );
             }

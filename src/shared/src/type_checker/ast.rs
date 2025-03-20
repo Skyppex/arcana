@@ -36,6 +36,7 @@ pub enum TypedStatement {
     StructDeclaration {
         type_identifier: TypeIdentifier,
         where_clause: Option<Vec<GenericConstraint>>,
+        embedded_structs: Vec<Type>,
         fields: Vec<StructField>,
         type_: Type,
     },
@@ -731,6 +732,7 @@ impl From<parser::AccessModifier> for AccessModifier {
 pub struct EnumMember {
     pub enum_name: TypeIdentifier,
     pub discriminant_name: String,
+    pub embedded_structs: Vec<Type>,
     pub fields: Vec<EnumMemberField>,
     pub type_: Type,
 }
@@ -877,13 +879,7 @@ impl Display for Literal {
                 "{{{}}}",
                 field_initializers
                     .iter()
-                    .map(|fi| {
-                        if let Some(identifier) = &fi.identifier {
-                            format!("{}: {}", identifier, fi.initializer)
-                        } else {
-                            fi.initializer.to_string()
-                        }
-                    })
+                    .map(|fi| { format!("{}: {}", fi.identifier, fi.initializer) })
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -896,17 +892,13 @@ impl Display for Literal {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FieldInitializer {
-    pub identifier: Option<String>,
+    pub identifier: String,
     pub initializer: TypedExpression,
 }
 
 impl Display for FieldInitializer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(identifier) = &self.identifier {
-            write!(f, "{}: {}", identifier, self.initializer)
-        } else {
-            write!(f, "{}", self.initializer)
-        }
+        write!(f, "{}: {}", self.identifier, self.initializer)
     }
 }
 

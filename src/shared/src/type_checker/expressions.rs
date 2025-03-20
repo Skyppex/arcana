@@ -641,9 +641,24 @@ pub fn check_type(
 
                 let field_initializers = field_initializers?;
 
-                for (field, initializer) in fields.iter().zip(field_initializers.iter()) {
+                let field_initializer_map: HashMap<_, _> = field_initializers
+                    .iter()
+                    .map(|fi| (fi.identifier.clone(), fi.initializer.clone()))
+                    .collect();
+
+                for (field, initializer) in fields
+                    .iter()
+                    .map(|f| (f, field_initializer_map.get(&f.field_name)))
+                {
+                    let Some(initializer) = initializer else {
+                        return Err(format!(
+                            "Field '{}' is missing from struct initializer",
+                            field.field_name
+                        ));
+                    };
+
                     let field_type = field.field_type.clone();
-                    let initializer_type = initializer.initializer.get_type();
+                    let initializer_type = initializer.get_type();
 
                     if !type_equals(&field_type, &initializer_type) {
                         return Err(format!(
@@ -708,19 +723,20 @@ pub fn check_type(
                 match field_initializers {
                     EnumMemberFieldInitializers::None => (),
                     EnumMemberFieldInitializers::Named(ref field_initializers) => {
-                        for (struct_field, (initializer_field_name, initializer)) in
-                            fields.iter().zip(field_initializers.iter())
+                        for (struct_field, initializer) in fields
+                            .iter()
+                            .map(|f| (f, field_initializers.get(&f.field_name)))
+                        // for (struct_field, (initializer_field_name, initializer)) in
+                        //     fields.iter().zip(field_initializers.iter())
                         {
-                            let field_name = struct_field.field_name.clone();
-                            let field_type = struct_field.field_type.clone();
-
-                            if &field_name != initializer_field_name {
+                            let Some(initializer) = initializer else {
                                 return Err(format!(
-                                    "Field '{}' does not match initializer field '{}'",
-                                    field_name, initializer_field_name
+                                    "Field '{}' is missing from struct initializer",
+                                    struct_field.field_name
                                 ));
-                            }
+                            };
 
+                            let field_type = struct_field.field_type.clone();
                             let initializer_type = initializer.get_type();
 
                             if !type_equals(&field_type, &initializer_type) {

@@ -24,6 +24,7 @@ use self::statements::check_type_annotation;
 #[derive(Debug, Clone)]
 pub struct Struct {
     pub type_identifier: TypeIdentifier,
+    pub embedded_structs: Vec<TypeAnnotation>,
     pub fields: Vec<StructField>,
 }
 
@@ -91,6 +92,7 @@ impl FullName for Enum {
 pub struct EnumMember {
     pub enum_name: TypeIdentifier,
     pub discriminant_name: String,
+    pub embedded_structs: Vec<TypeAnnotation>,
     pub fields: Vec<StructField>,
 }
 
@@ -308,6 +310,7 @@ impl Type {
                     Type::EnumMember(EnumMember {
                         enum_name: some_member_ident.clone(),
                         discriminant_name: "Some".to_string(),
+                        embedded_structs: vec![],
                         fields: vec![StructField {
                             struct_name: some_member_ident.clone(),
                             field_name: "value".to_string(),
@@ -322,6 +325,7 @@ impl Type {
                     Type::EnumMember(EnumMember {
                         enum_name: none_member_ident,
                         discriminant_name: "None".to_string(),
+                        embedded_structs: vec![],
                         fields: vec![],
                     }),
                 ),
@@ -356,6 +360,7 @@ impl Type {
                             vec![concrete.type_annotation()],
                         ),
                         discriminant_name: "Some".to_string(),
+                        embedded_structs: vec![],
                         fields: vec![StructField {
                             struct_name: some_member_ident.clone(),
                             field_name: "f0".to_string(),
@@ -371,6 +376,7 @@ impl Type {
                             vec![concrete.type_annotation()],
                         ),
                         discriminant_name: "None".to_string(),
+                        embedded_structs: vec![],
                         fields: Vec::new(),
                     }),
                 ),
@@ -530,11 +536,13 @@ impl Type {
 
                 Ok(Type::Struct(Struct {
                     type_identifier: TypeIdentifier::ConcreteType(name, concrete_types),
+                    embedded_structs: vec![], // TODO: Implement embedded structs,
                     fields,
                 }))
             }
-            Type::Enum(u) => {
-                let TypeIdentifier::GenericType(name, generics) = u.type_identifier.clone() else {
+            Type::Enum(r#enum) => {
+                let TypeIdentifier::GenericType(name, generics) = r#enum.type_identifier.clone()
+                else {
                     return Err(format!(
                         "Cannot clone concrete types for enum {}",
                         self.full_name()
@@ -556,7 +564,7 @@ impl Type {
                     struct_name,
                     field_name,
                     field_type,
-                } in u.shared_fields.iter()
+                } in r#enum.shared_fields.iter()
                 {
                     let Type::Generic(generic) = field_type.clone() else {
                         shared_fields.push(StructField {
@@ -584,8 +592,8 @@ impl Type {
 
                 let mut members = HashMap::new();
 
-                for (member_name, type_) in u.members.iter() {
-                    let Type::EnumMember(u) = type_ else {
+                for (member_name, type_) in r#enum.members.iter() {
+                    let Type::EnumMember(enum_member) = type_ else {
                         return Err(format!(
                             "Enum members are not of type EnumMember {}",
                             type_.full_name()
@@ -598,7 +606,7 @@ impl Type {
                         struct_name,
                         field_name,
                         field_type,
-                    } in u.fields.iter()
+                    } in enum_member.fields.iter()
                     {
                         let field_name = field_name.clone();
                         let field_type = field_type.clone();
@@ -637,6 +645,7 @@ impl Type {
                             concrete_types.clone(),
                         ),
                         discriminant_name: member_name.clone(),
+                        embedded_structs: enum_member.embedded_structs.clone(),
                         fields,
                     });
 
@@ -700,6 +709,7 @@ impl Type {
                 let member_type = Type::EnumMember(EnumMember {
                     enum_name: TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone()),
                     discriminant_name: em.discriminant_name.clone(),
+                    embedded_structs: em.embedded_structs.clone(),
                     fields: cloned_fields,
                 });
 
@@ -940,7 +950,30 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 ..
             }),
         ) => type_identifier == enum_name && members.contains_key(discriminant_name),
-        _ => left == right,
+        (
+            Type::Struct(Struct {
+                type_identifier: left_type_identifier,
+                ..
+            }),
+            Type::Struct(Struct {
+                type_identifier: right_type_identifier,
+                embedded_structs,
+                ..
+            }),
+        ) => {
+            dbg!(left_type_identifier);
+            dbg!(right_type_identifier);
+            dbg!(embedded_structs);
+
+            let e = embedded_structs
+                .iter()
+                .map(|s| s.to_key())
+                .chain(std::iter::once(right_type_identifier.to_key()))
+                .any(|k| k == left_type_identifier.to_key());
+
+            e
+        }
+        _ => left.to_key() == right.to_key(),
     }
 }
 

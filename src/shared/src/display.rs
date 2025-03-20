@@ -143,6 +143,7 @@ impl IndentDisplay for Statement {
                 result
             }
             Statement::StructDeclaration(StructDeclaration {
+                embedded_structs,
                 access_modifier,
                 type_identifier,
                 where_clause,
@@ -186,6 +187,20 @@ impl IndentDisplay for Statement {
                 } else {
                     result.push_str(format!("\n{}where_clause: None", indent.dash()).as_str());
                 }
+
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash_end(),
+                        indent_display_slice(
+                            embedded_structs,
+                            "embedded_structs",
+                            "embedded_struct",
+                            indent,
+                        )
+                    )
+                    .as_str(),
+                );
 
                 for (i, field) in fields.iter().enumerate() {
                     if i < fields.len() - 1 {
@@ -1456,12 +1471,7 @@ impl IndentDisplay for FieldInitializer {
         result.push_str("<field initializer>\n");
         indent.increase();
 
-        if let Some(identifier) = &self.identifier {
-            result
-                .push_str(format!("{}field initializer: {}\n", indent.dash(), identifier).as_str());
-        } else {
-            result.push_str(format!("{}field initializer: None\n", indent.dash()).as_str());
-        }
+        result.push_str(format!("{}identifier: {}\n", indent.dash(), self.identifier).as_str());
 
         indent.end_current();
         result.push_str(
@@ -1834,6 +1844,7 @@ impl IndentDisplay for TypedStatement {
             TypedStatement::StructDeclaration {
                 type_identifier,
                 where_clause,
+                embedded_structs,
                 fields,
                 type_,
             } => {
@@ -1867,6 +1878,23 @@ impl IndentDisplay for TypedStatement {
                 } else {
                     result.push_str(format!("\n{}where_clause: None", indent.dash()).as_str());
                 }
+
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash(),
+                        indent_display_slice(
+                            &embedded_structs
+                                .iter()
+                                .map(|t| t.to_string())
+                                .collect::<Vec<_>>(),
+                            "embedded_structs",
+                            "embedded_struct",
+                            indent
+                        )
+                    )
+                    .as_str(),
+                );
 
                 for field in fields.iter() {
                     indent.end_current();
@@ -3020,12 +3048,7 @@ impl IndentDisplay for type_checker::ast::FieldInitializer {
         result.push_str("<field initializer>\n");
         indent.increase();
 
-        if let Some(identifier) = &self.identifier {
-            result
-                .push_str(format!("{}field initializer: {}\n", indent.dash(), identifier).as_str());
-        } else {
-            result.push_str(format!("{}field initializer: None\n", indent.dash()).as_str());
-        }
+        result.push_str(format!("{}identifier: {}\n", indent.dash(), self.identifier).as_str());
 
         indent.end_current();
         result.push_str(

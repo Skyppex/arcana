@@ -37,6 +37,7 @@ fn enum_variant_can_be_used_as_a_type() {
         Type::EnumMember(EnumMember {
             enum_name: TypeIdentifier::Type("O".to_owned()),
             discriminant_name: "S".to_owned(),
+            embedded_structs: vec![],
             fields: vec![StructField {
                 struct_name: TypeIdentifier::MemberType(
                     Box::new(TypeIdentifier::Type("O".to_owned())),

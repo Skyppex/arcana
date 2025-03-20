@@ -9,13 +9,21 @@ use super::{ast::TypedStatement, statements, type_environment::TypeEnvironment, 
 
 #[derive(Debug)]
 pub enum DiscoveredType {
-    Struct(TypeIdentifier, HashMap<String, TypeAnnotation>),
+    Struct(
+        TypeIdentifier,
+        Vec<TypeAnnotation>,
+        HashMap<String, TypeAnnotation>,
+    ),
     Enum(
         TypeIdentifier,
         HashMap<String, TypeAnnotation>,
-        HashMap<String, Vec<(String, TypeAnnotation)>>,
+        HashMap<String, (Vec<TypeAnnotation>, Vec<(String, TypeAnnotation)>)>,
     ),
-    EnumMember(TypeIdentifier, HashMap<String, TypeAnnotation>),
+    EnumMember(
+        TypeIdentifier,
+        Vec<TypeAnnotation>,
+        HashMap<String, TypeAnnotation>,
+    ),
     Union(TypeIdentifier, Vec<TypeAnnotation>),
     TypeAlias(TypeIdentifier, Vec<TypeAnnotation>),
     Protocol {
