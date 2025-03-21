@@ -6,16 +6,15 @@ use shared::{
         decision_tree::{Accessor, Constructor, Decision, FieldPattern, Pattern},
         type_annotation_equals, Type,
     },
-    types::{TypeAnnotation, TypeIdentifier},
+    types::{ToKey, TypeAnnotation, TypeIdentifier},
 };
-
-use crate::scope::Scope;
 
 use super::{
     environment::{Environment, Rcrc},
     evaluate_binop,
     scope::ScopeType,
-    value::{EnumFields, EnumMember, Number, Value},
+    value::{self, Enum, Number, Struct, Value},
+    Scope,
 };
 
 pub fn evaluate(
@@ -450,37 +449,30 @@ fn evaluate_pattern(
             field_patterns,
         }) => {
             let fields = match value {
-                Value::Struct {
-                    struct_name,
-                    fields,
-                } => {
-                    if struct_name != &type_annotation {
+                Value::Struct(Struct { type_name, fields }) => {
+                    if type_name != &type_annotation.to_key() {
                         return Err(format!(
                             "Expected struct '{}', found struct '{}'",
-                            type_annotation, struct_name
+                            type_annotation, type_name
                         ));
                     }
 
                     fields
                 }
-                Value::Enum {
-                    enum_member,
-                    fields,
-                } => {
-                    let member_type_annotation =
-                        TypeAnnotation::Type(enum_member.member_name.clone());
+                Value::Enum(Enum {
+                    enum_member: Struct { type_name, fields },
+                    ..
+                }) => {
+                    let member_type_annotation = TypeAnnotation::Type(type_name.clone());
 
                     if !type_annotation_equals(&member_type_annotation, &type_annotation) {
                         return Err(format!(
                             "Expected enum '{}', found '{}'",
-                            type_annotation, enum_member
+                            type_annotation, type_name
                         ));
                     }
 
-                    match fields {
-                        EnumFields::None => return Ok(Some(Vec::new())),
-                        EnumFields::Named(fields) => fields,
-                    }
+                    fields
                 }
                 _ => return Err(format!("Expected enum, found '{}'", value)),
             };
@@ -492,12 +484,16 @@ fn evaluate_pattern(
                 pattern,
             } in field_patterns
             {
-                let field_value = fields.get(&identifier).ok_or(format!(
-                    "Field '{}' not found in struct '{}'",
-                    identifier, type_annotation
-                ))?;
+                let field_value =
+                    fields
+                        .iter()
+                        .find(|f| f.identifier == identifier)
+                        .ok_or(format!(
+                            "Field '{}' not found in struct '{}'",
+                            identifier, type_annotation
+                        ))?;
 
-                match evaluate_pattern(pattern, field_value, environment.clone())? {
+                match evaluate_pattern(pattern, &field_value.value, environment.clone())? {
                     Some(mut bindings_) => bindings.append(&mut bindings_),
                     None => {
                         return Ok(None);
@@ -945,41 +941,44 @@ fn evaluate_member_access(
     let value = evaluate_expression(*object, environment.clone())?;
 
     match value {
-        Value::Struct {
-            struct_name,
-            fields,
-        } => match *member.clone() {
+        Value::Struct(Struct { type_name, fields }) => match *member.clone() {
             Member::Identifier { symbol, .. } => {
-                let field_value = fields.get(&symbol).ok_or(format!(
-                    "Field '{}' not found in struct '{}'",
-                    symbol, struct_name
-                ))?;
+                let field = fields
+                    .iter()
+                    .find(|f| f.identifier == symbol)
+                    .ok_or(format!(
+                        "Field '{}' not found in struct '{}'",
+                        symbol, type_name
+                    ))?;
 
-                Ok(field_value.clone())
+                Ok(field.value.clone())
             }
             Member::StaticMemberAccess { .. } => Err(format!(
                 "Cannot access static member on an instance of a struct '{}'",
-                struct_name
+                type_name
             )),
             Member::MemberAccess { object, member, .. } => {
                 evaluate_member_access(object, environment, member)
             }
         },
-        Value::Enum {
-            enum_member,
-            fields,
-        } => match *member.clone() {
+        Value::Enum(Enum {
+            enum_member: Struct { type_name, fields },
+            ..
+        }) => match *member.clone() {
             Member::Identifier { symbol, .. } => {
-                let field_value = fields.get(&symbol).ok_or(format!(
-                    "Field '{}' not found in enum member '{}.{}'",
-                    symbol, enum_member.enum_name, enum_member.member_name
-                ))?;
+                let field = fields
+                    .iter()
+                    .find(|f| f.identifier == symbol)
+                    .ok_or(format!(
+                        "Field '{}' not found in enum member '{}'",
+                        symbol, type_name
+                    ))?;
 
-                Ok(field_value.clone())
+                Ok(field.value.clone())
             }
             Member::StaticMemberAccess { .. } => Err(format!(
                 "Cannot access static member on an instance of a enum '{}'",
-                enum_member
+                type_name
             )),
             Member::MemberAccess { object, member, .. } => {
                 evaluate_member_access(object, environment, member)
@@ -1013,49 +1012,45 @@ fn evaluate_literal(literal: Literal, environment: Rcrc<Environment>) -> Result<
             field_initializers,
             ..
         } => {
-            let mut fields = std::collections::HashMap::new();
+            let mut fields = vec![];
 
             for field_initializer in field_initializers {
-                fields.insert(
-                    field_initializer.identifier,
-                    evaluate_expression(field_initializer.initializer, environment.clone())?,
-                );
+                fields.push(value::StructField {
+                    identifier: field_initializer.identifier,
+                    value: evaluate_expression(field_initializer.initializer, environment.clone())?,
+                });
             }
 
-            Ok(Value::Struct {
-                struct_name: type_annotation,
+            Ok(Value::Struct(Struct {
+                type_name: type_annotation.to_key(),
                 fields,
-            })
+            }))
         }
         Literal::Enum {
             type_annotation,
-            member,
             field_initializers,
             ..
         } => {
-            let fields: EnumFields = match field_initializers {
-                EnumMemberFieldInitializers::None => EnumFields::None,
-                EnumMemberFieldInitializers::Named(field_initializers) => {
-                    let mut fields = std::collections::HashMap::new();
+            let mut fields = vec![];
 
-                    for (identifier, initializer) in field_initializers {
-                        fields.insert(
-                            identifier,
-                            evaluate_expression(initializer, environment.clone())?,
-                        );
-                    }
+            for FieldInitializer {
+                identifier,
+                initializer,
+            } in field_initializers
+            {
+                fields.push(value::StructField {
+                    identifier,
+                    value: evaluate_expression(initializer, environment.clone())?,
+                });
+            }
 
-                    EnumFields::Named(fields)
-                }
-            };
-
-            Ok(Value::Enum {
-                enum_member: EnumMember {
-                    enum_name: type_annotation,
-                    member_name: member,
+            Ok(Value::Enum(Enum {
+                type_name: type_annotation.to_key(),
+                enum_member: Struct {
+                    type_name: type_annotation.to_key(),
+                    fields,
                 },
-                fields,
-            })
+            }))
         }
     }
 }

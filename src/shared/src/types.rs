@@ -67,8 +67,8 @@ impl From<TypeIdentifier> for TypeAnnotation {
             TypeIdentifier::ConcreteType(name, generics) => {
                 TypeAnnotation::ConcreteType(name, generics)
             }
-            TypeIdentifier::MemberType(_, _) => {
-                panic!("Cannot convert member type to type annotation")
+            TypeIdentifier::MemberType(parent, member) => {
+                TypeAnnotation::from(format!("{}::{}", parent, member).as_str())
             }
         }
     }
@@ -98,7 +98,6 @@ impl From<Type> for TypeAnnotation {
             Type::Tuple(e) => TypeAnnotation::Tuple(e.into_iter().map(|t| t.into()).collect()),
             Type::Struct(_) => todo!(),
             Type::Enum(_) => todo!(),
-            Type::EnumMember(_) => todo!(),
             Type::Union(_) => todo!(),
             Type::TypeAlias(_) => todo!(),
             Type::Protocol(_) => todo!(),

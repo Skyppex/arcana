@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Display};
 use crate::display::{Indent, IndentDisplay};
 use crate::pretty_print::PrettyPrint;
 use crate::type_checker::decision_tree::Pattern;
-use crate::types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier};
+use crate::types::{GenericType, ToKey, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -106,8 +106,12 @@ impl Display for UseItem {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructDeclaration {
     pub access_modifier: Option<AccessModifier>,
+    pub body: StructData,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructData {
     pub type_identifier: TypeIdentifier,
-    pub where_clause: Option<Vec<GenericConstraint>>,
     pub embedded_structs: Vec<TypeAnnotation>,
     pub fields: Vec<StructField>,
 }
@@ -116,9 +120,8 @@ pub struct StructDeclaration {
 pub struct EnumDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
-    pub where_clause: Option<Vec<GenericConstraint>>,
     pub shared_fields: Vec<StructField>,
-    pub members: Vec<EnumMember>,
+    pub members: Vec<StructData>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -170,7 +173,6 @@ pub struct FunctionDeclaration {
     pub type_identifier: TypeIdentifier,
     pub param: Option<Parameter>,
     pub return_type_annotation: Option<TypeAnnotation>,
-    pub where_clause: Option<Vec<GenericConstraint>>,
     pub body: Option<Expression>,
     pub signature_only: bool,
 }
@@ -214,7 +216,7 @@ pub enum Literal {
     Enum {
         type_annotation: TypeAnnotation,
         member: String,
-        field_initializers: EnumMemberFieldInitializers,
+        field_initializers: Vec<FieldInitializer>,
     },
 }
 

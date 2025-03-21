@@ -1,6 +1,6 @@
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
-use shared::{type_checker::ast::TypedExpression, types::TypeAnnotation};
+use shared::type_checker::ast::TypedExpression;
 
 use crate::{environment::Rcrc, Environment};
 
@@ -15,14 +15,8 @@ pub enum Value {
     String(String),
     Array(Vec<Value>),
     Tuple(Vec<Value>),
-    Struct {
-        struct_name: TypeAnnotation,
-        fields: HashMap<String, Value>,
-    },
-    Enum {
-        enum_member: EnumMember,
-        fields: EnumFields,
-    },
+    Struct(Struct),
+    Enum(Enum),
     Function {
         param_name: Option<String>,
         body: TypedExpression,
@@ -34,24 +28,27 @@ impl Value {
     pub fn option_some(value: Value) -> Value {
         match value {
             Value::Void => Value::Void,
-            v => Value::Enum {
-                enum_member: EnumMember {
-                    enum_name: TypeAnnotation::ConcreteType("Option".to_owned(), vec![]),
-                    member_name: "Some".to_owned(),
+            v => Value::Enum(Enum {
+                type_name: "Option".to_owned(),
+                enum_member: Struct {
+                    type_name: "Option::Some".to_owned(),
+                    fields: vec![StructField {
+                        identifier: "v".to_owned(),
+                        value: v,
+                    }],
                 },
-                fields: EnumFields::Named(HashMap::from([("v".to_owned(), v)])),
-            },
+            }),
         }
     }
 
     pub fn option_none() -> Value {
-        Value::Enum {
-            enum_member: EnumMember {
-                enum_name: TypeAnnotation::ConcreteType("Option".to_owned(), vec![]),
-                member_name: "None".to_owned(),
+        Value::Enum(Enum {
+            type_name: "Option".to_owned(),
+            enum_member: Struct {
+                type_name: "Option::None".to_owned(),
+                fields: vec![],
             },
-            fields: EnumFields::None,
-        }
+        })
     }
 }
 
@@ -91,13 +88,10 @@ impl Display for Value {
 
                 write!(f, ")")
             }
-            Value::Struct {
-                struct_name,
-                fields,
-            } => {
-                write!(f, "{} {{ ", struct_name)?;
+            Value::Struct(Struct { type_name, fields }) => {
+                write!(f, "{} {{ ", type_name)?;
 
-                for (index, (identifier, value)) in fields.iter().enumerate() {
+                for (index, StructField { identifier, value }) in fields.iter().enumerate() {
                     write!(f, "{}: {}", identifier, value)?;
 
                     if index < fields.len() - 1 {
@@ -107,27 +101,26 @@ impl Display for Value {
 
                 write!(f, " }}")
             }
-            Value::Enum {
-                enum_member,
-                fields,
-            } => match fields {
-                EnumFields::None => {
-                    write!(f, "{}", enum_member)
-                }
-                EnumFields::Named(fields) => {
-                    write!(f, "{} {{ ", enum_member)?;
+            Value::Enum(Enum {
+                enum_member:
+                    Struct {
+                        type_name: enum_member,
+                        fields,
+                    },
+                ..
+            }) => {
+                write!(f, "{} {{ ", enum_member)?;
 
-                    for (index, (identifier, value)) in fields.iter().enumerate() {
-                        write!(f, "{}: {}", identifier, value)?;
+                for (index, StructField { identifier, value }) in fields.iter().enumerate() {
+                    write!(f, "{}: {}", identifier, value)?;
 
-                        if index < fields.len() - 1 {
-                            write!(f, ", ")?;
-                        }
+                    if index < fields.len() - 1 {
+                        write!(f, ", ")?;
                     }
-
-                    write!(f, " }}")
                 }
-            },
+
+                write!(f, " }}")
+            }
             Value::Function {
                 param_name,
                 body: _,
@@ -155,21 +148,21 @@ impl Display for Number {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct EnumMember {
-    pub enum_name: TypeAnnotation,
-    pub member_name: String,
+pub struct Struct {
+    pub type_name: String,
+    pub fields: Vec<StructField>,
 }
 
-impl EnumMember {
-    pub fn type_annotation(&self) -> TypeAnnotation {
-        TypeAnnotation::Type(self.enum_name.name())
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructField {
+    pub identifier: String,
+    pub value: Value,
 }
 
-impl Display for EnumMember {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.enum_name)
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub struct Enum {
+    pub type_name: String,
+    pub enum_member: Struct,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -196,20 +189,5 @@ impl Display for Variable {
             "{} = {} -> {:?}",
             self.identifier, self.value, self.value
         )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum EnumFields {
-    None,
-    Named(HashMap<String, Value>),
-}
-
-impl EnumFields {
-    pub fn get(&self, key: &str) -> Option<&Value> {
-        match self {
-            EnumFields::None => None,
-            EnumFields::Named(fields) => fields.get(key),
-        }
     }
 }

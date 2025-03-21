@@ -1,5 +1,5 @@
+use std::fmt::Display;
 use std::hash::Hash;
-use std::{collections::HashMap, fmt::Display};
 
 use crate::display::{Indent, IndentDisplay};
 use crate::parser::{AssociatedType, Expression, UseItem};
@@ -7,7 +7,7 @@ use crate::pretty_print::PrettyPrint;
 use crate::types::{GenericType, ToKey};
 use crate::{
     parser,
-    types::{GenericConstraint, TypeAnnotation, TypeIdentifier},
+    types::{TypeAnnotation, TypeIdentifier},
 };
 
 use super::decision_tree::{Decision, Pattern};
@@ -35,7 +35,6 @@ pub enum TypedStatement {
     },
     StructDeclaration {
         type_identifier: TypeIdentifier,
-        where_clause: Option<Vec<GenericConstraint>>,
         embedded_structs: Vec<Type>,
         fields: Vec<StructField>,
         type_: Type,
@@ -43,7 +42,7 @@ pub enum TypedStatement {
     EnumDeclaration {
         type_identifier: TypeIdentifier,
         shared_fields: Vec<StructField>,
-        members: Vec<EnumMember>,
+        members: Vec<StructData>,
         type_: Type,
     },
     UnionDeclaration {
@@ -176,7 +175,7 @@ impl Display for TypedStatement {
                 type_identifier,
                 members
                     .iter()
-                    .map(|m| m.to_string())
+                    .map(|m| m.type_identifier.to_key())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -694,6 +693,7 @@ impl Display for TypedExpression {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructField {
+    pub struct_identifier: TypeIdentifier,
     pub mutable: bool,
     pub identifier: String,
     pub type_: Type,
@@ -707,6 +707,29 @@ impl Display for StructField {
             if self.mutable { "mut " } else { "" },
             self.identifier,
             self.type_
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StructData {
+    pub type_identifier: TypeIdentifier,
+    pub embedded_structs: Vec<Type>,
+    pub fields: Vec<StructField>,
+    pub type_: Type,
+}
+
+impl Display for StructData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {{{}}}",
+            self.type_identifier,
+            self.fields
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
         )
     }
 }
@@ -728,43 +751,43 @@ impl From<parser::AccessModifier> for AccessModifier {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct EnumMember {
-    pub enum_name: TypeIdentifier,
-    pub discriminant_name: String,
-    pub embedded_structs: Vec<Type>,
-    pub fields: Vec<EnumMemberField>,
-    pub type_: Type,
-}
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct EnumMember {
+//     pub enum_name: TypeIdentifier,
+//     pub discriminant_name: String,
+//     pub embedded_structs: Vec<Type>,
+//     pub fields: Vec<EnumMemberField>,
+//     pub type_: Type,
+// }
 
-impl Display for EnumMember {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {{{}}}",
-            self.enum_name,
-            self.fields
-                .iter()
-                .map(|f| f.to_string())
-                .collect::<Vec<String>>()
-                .join(", ")
-        )
-    }
-}
+// impl Display for EnumMember {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(
+//             f,
+//             "{} {{{}}}",
+//             self.enum_name,
+//             self.fields
+//                 .iter()
+//                 .map(|f| f.to_string())
+//                 .collect::<Vec<String>>()
+//                 .join(", ")
+//         )
+//     }
+// }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct EnumMemberField {
-    pub enum_name: TypeIdentifier,
-    pub discriminant_name: String,
-    pub identifier: String,
-    pub type_: Type,
-}
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct EnumMemberField {
+//     pub enum_name: TypeIdentifier,
+//     pub discriminant_name: String,
+//     pub identifier: String,
+//     pub type_: Type,
+// }
 
-impl Display for EnumMemberField {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.identifier, self.type_)
-    }
-}
+// impl Display for EnumMemberField {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{}: {}", self.identifier, self.type_)
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
@@ -788,7 +811,7 @@ pub enum Literal {
     Enum {
         type_annotation: TypeAnnotation,
         member: String,
-        field_initializers: EnumMemberFieldInitializers,
+        field_initializers: Vec<FieldInitializer>,
         type_: Type,
     },
 }
@@ -885,7 +908,15 @@ impl Display for Literal {
             ),
             Literal::Enum {
                 field_initializers, ..
-            } => write!(f, "{}", field_initializers),
+            } => write!(
+                f,
+                "{}",
+                field_initializers
+                    .iter()
+                    .map(|fi| fi.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
         }
     }
 }
@@ -899,29 +930,6 @@ pub struct FieldInitializer {
 impl Display for FieldInitializer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.identifier, self.initializer)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum EnumMemberFieldInitializers {
-    None,
-    Named(HashMap<String, TypedExpression>),
-}
-
-impl Display for EnumMemberFieldInitializers {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EnumMemberFieldInitializers::None => write!(f, ""),
-            EnumMemberFieldInitializers::Named(field_initializers) => write!(
-                f,
-                "{{{}}}",
-                field_initializers
-                    .iter()
-                    .map(|(k, v)| format!("{}: {}", k, v))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
-        }
     }
 }
 

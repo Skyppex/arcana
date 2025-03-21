@@ -1,5 +1,7 @@
 use shared::type_checker::ast::BinaryOperator;
 
+use crate::value::Enum;
+
 use super::value::{Number, Value};
 
 pub(crate) fn evaluate_binop(
@@ -232,17 +234,15 @@ fn evaluate_equal(left: Value, right: Value) -> Result<Value, String> {
         (Value::Char(left), Value::Char(right)) => Ok(Value::Bool(left == right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left == right)),
         (
-            Value::Enum {
+            Value::Enum(Enum {
                 enum_member: left_enum_member,
-                fields: left_fields,
-            },
-            Value::Enum {
+                ..
+            }),
+            Value::Enum(Enum {
                 enum_member: right_enum_member,
-                fields: right_fields,
-            },
-        ) => Ok(Value::Bool(
-            left_enum_member == right_enum_member && left_fields == right_fields,
-        )),
+                ..
+            }),
+        ) => Ok(Value::Bool(left_enum_member == right_enum_member)),
         (left, right) => Err(format!("Cannot equal {:?} and {:?}", left, right)),
     }
 }

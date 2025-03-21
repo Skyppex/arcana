@@ -8,15 +8,15 @@ use crate::{
 
 use super::{
     ast::{
-        BinaryOperator, Block, EnumMemberFieldInitializers, FieldInitializer, Member, Typed,
-        TypedClosureParameter, TypedExpression, TypedMatchArm, TypedStatement, UnaryOperator,
+        BinaryOperator, Block, FieldInitializer, Member, Typed, TypedClosureParameter,
+        TypedExpression, TypedMatchArm, TypedStatement, UnaryOperator,
     },
     decision_tree::{create_decision_tree, Constructor, Pattern},
     get_field_by_name,
     scope::ScopeType,
     statements::{self, check_type_annotation},
-    type_equals, type_equals_coerce, DiscoveredType, Enum, EnumMember, FullName, Function, Rcrc,
-    Struct, Type, TypeAlias, TypeEnvironment, Union,
+    type_equals, type_equals_coerce, DiscoveredType, Enum, FullName, Function, Rcrc, Struct, Type,
+    TypeAlias, TypeEnvironment, Union,
 };
 
 pub fn check_type(
@@ -679,38 +679,33 @@ pub fn check_type(
                 member,
                 field_initializers,
             } => {
-                let field_initializers: Result<EnumMemberFieldInitializers, String> = {
-                    let field_initializers = match field_initializers {
-                        parser::EnumMemberFieldInitializers::None => {
-                            EnumMemberFieldInitializers::None
-                        }
-                        parser::EnumMemberFieldInitializers::Named(field_initializers) => {
-                            let mut fis: HashMap<String, TypedExpression> = HashMap::new();
+                let field_initializers: Result<Vec<FieldInitializer>, String> = {
+                    let mut fis = Vec::new();
 
-                            for (identifier, initializer) in field_initializers {
-                                fis.insert(
-                                    identifier.clone(),
-                                    check_type(
-                                        initializer,
-                                        discovered_types,
-                                        type_environment.clone(),
-                                        None,
-                                    )?,
-                                );
-                            }
+                    for parser::ast::FieldInitializer {
+                        identifier,
+                        initializer,
+                    } in field_initializers
+                    {
+                        fis.push(FieldInitializer {
+                            identifier: identifier.clone(),
+                            initializer: check_type(
+                                initializer,
+                                discovered_types,
+                                type_environment.clone(),
+                                None,
+                            )?,
+                        });
+                    }
 
-                            EnumMemberFieldInitializers::Named(fis)
-                        }
-                    };
-
-                    Ok(field_initializers)
+                    Ok(fis)
                 };
 
                 let type_ = type_environment
                     .borrow()
                     .get_type_from_annotation(type_annotation)?;
 
-                let Type::EnumMember(EnumMember { fields, .. }) = &type_ else {
+                let Type::Struct(Struct { fields, .. }) = &type_ else {
                     Err(format!(
                         "{} is not a member of {}",
                         member,
@@ -720,32 +715,29 @@ pub fn check_type(
 
                 let field_initializers = field_initializers?;
 
-                match field_initializers {
-                    EnumMemberFieldInitializers::None => (),
-                    EnumMemberFieldInitializers::Named(ref field_initializers) => {
-                        for (struct_field, initializer) in fields
+                for (struct_field, initializer) in fields.iter().map(|f| {
+                    (
+                        f,
+                        field_initializers
                             .iter()
-                            .map(|f| (f, field_initializers.get(&f.field_name)))
-                        // for (struct_field, (initializer_field_name, initializer)) in
-                        //     fields.iter().zip(field_initializers.iter())
-                        {
-                            let Some(initializer) = initializer else {
-                                return Err(format!(
-                                    "Field '{}' is missing from struct initializer",
-                                    struct_field.field_name
-                                ));
-                            };
+                            .find(|fi| fi.identifier == f.field_name),
+                    )
+                }) {
+                    let Some(initializer) = initializer else {
+                        return Err(format!(
+                            "Field '{}' is missing from struct initializer",
+                            struct_field.field_name
+                        ));
+                    };
 
-                            let field_type = struct_field.field_type.clone();
-                            let initializer_type = initializer.get_type();
+                    let field_type = struct_field.field_type.clone();
+                    let initializer_type = initializer.initializer.get_type();
 
-                            if !type_equals(&field_type, &initializer_type) {
-                                return Err(format!(
-                                    "Field type {} does not match initializer type {}",
-                                    field_type, initializer_type
-                                ));
-                            }
-                        }
+                    if !type_equals(&field_type, &initializer_type) {
+                        return Err(format!(
+                            "Field type {} does not match initializer type {}",
+                            field_type, initializer_type
+                        ));
                     }
                 }
 
@@ -1065,7 +1057,7 @@ fn is_option(type_: &Type) -> bool {
             }
 
             return members.get("Some").map_or(false, |member| {
-                let Type::EnumMember(EnumMember { fields, .. }) = member else {
+                let Type::Struct(Struct { fields, .. }) = member else {
                     return false;
                 };
 
@@ -1098,36 +1090,6 @@ fn check_type_static_member_access(
                         struct_.type_identifier, symbol
                     ));
                 };
-
-                let identifier_type = static_member_type.clone();
-
-                Ok(TypedExpression::Member(Member::StaticMemberAccess {
-                    type_annotation: type_annotation.clone(),
-                    member: Box::new(Member::Identifier {
-                        symbol: symbol.clone(),
-                        type_: identifier_type.clone(),
-                    }),
-                    symbol: symbol.clone(),
-                    type_: static_member_type.clone(),
-                }))
-            }
-            Type::EnumMember(enum_member) => {
-                let Some(static_member_type) = type_environment
-                    .borrow()
-                    .get_static_member(enum_member.type_annotation(), &symbol)
-                else {
-                    return Err(format!(
-                        "EnumMember '{}' does not have a static member called '{}'",
-                        enum_member.enum_name, symbol
-                    ));
-                };
-
-                if !type_environment.borrow().lookup_type(&static_member_type) {
-                    return Err(format!(
-                        "Unexpected type: {}",
-                        static_member_type.full_name()
-                    ));
-                }
 
                 let identifier_type = static_member_type.clone();
 
@@ -1240,33 +1202,6 @@ fn check_type_member_access_recurse(
                     .ok_or(format!(
                         "Struct '{}' does not have a field called '{}'",
                         struct_.type_identifier, symbol
-                    ))?
-                    .field_type
-                    .clone();
-
-                if !type_environment.borrow().lookup_type(&field_type) {
-                    return Err(format!("Unexpected type: {}", field_type.full_name()));
-                }
-
-                let identifier_type = field_type.clone();
-
-                Ok(TypedExpression::Member(Member::MemberAccess {
-                    object: Box::new(object_typed_expression),
-                    member: Box::new(Member::Identifier {
-                        symbol: symbol.clone(),
-                        type_: identifier_type.clone(),
-                    }),
-                    symbol: symbol.clone(),
-                    type_: field_type.clone(),
-                }))
-            }
-            Type::EnumMember(EnumMember {
-                enum_name, fields, ..
-            }) => {
-                let field_type = get_field_by_name(&fields, &symbol)
-                    .ok_or(format!(
-                        "EnumMember '{}' does not have a field called '{}'",
-                        enum_name, symbol
                     ))?
                     .field_type
                     .clone();
@@ -1515,8 +1450,9 @@ fn check_type_pattern(
                         }
                     }
                 }
-                Type::EnumMember(EnumMember {
-                    discriminant_name, ..
+                Type::Struct(Struct {
+                    type_identifier: TypeIdentifier::MemberType(_, discriminant_name),
+                    ..
                 }) => {
                     if type_annotation_equals(
                         type_annotation,
@@ -1543,7 +1479,6 @@ fn check_type_pattern(
 
             let fields = match initializer_type.clone() {
                 Type::Struct(Struct { fields, .. }) => fields,
-                Type::EnumMember(EnumMember { fields, .. }) => fields,
                 Type::Enum(Enum {
                     shared_fields,
                     members,
@@ -1553,7 +1488,7 @@ fn check_type_pattern(
                         "Already checked if the constructor name exists in the member list",
                     );
 
-                    let Type::EnumMember(EnumMember { fields, .. }) = member.clone() else {
+                    let Type::Struct(Struct { fields, .. }) = member.clone() else {
                         return Err(format!("Expected enum member but got {:?}", member.clone()));
                     };
 

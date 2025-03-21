@@ -1,15 +1,13 @@
-use std::collections::HashMap;
-
 use crate::{
     lexer::token::{self, IdentifierType, Keyword, TokenKind},
     type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
-    types::{parse_generics_in_type_name, parse_optional_type_annotation, TypeAnnotation},
+    types::{parse_generics_in_type_name, parse_optional_type_annotation, ToKey, TypeAnnotation},
 };
 
 use super::{
     cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, Closure,
-    ClosureParameter, EnumMemberFieldInitializers, Expression, FieldInitializer, For, If, Literal,
-    Match, MatchArm, Member, Statement, Unary, UnaryOperator, VariableDeclaration, While,
+    ClosureParameter, Expression, FieldInitializer, For, If, Literal, Match, MatchArm, Member,
+    Statement, Unary, UnaryOperator, VariableDeclaration, While,
 };
 
 use crate::types::parse_type_annotation;
@@ -324,7 +322,16 @@ fn parse_struct_literal(
     }
 
     cursor.bump()?; // Consume the {
+    let field_initializers = parse_field_initializers(cursor)?;
+    cursor.bump()?; // Consume the }
 
+    Ok(Expression::Literal(Literal::Struct {
+        type_annotation,
+        field_initializers,
+    }))
+}
+
+fn parse_field_initializers(cursor: &mut Cursor) -> Result<Vec<FieldInitializer>, String> {
     let mut field_initializers = vec![];
     let mut has_comma = true;
 
@@ -343,12 +350,7 @@ fn parse_struct_literal(
         }
     }
 
-    cursor.bump()?; // Consume the }
-
-    Ok(Expression::Literal(Literal::Struct {
-        type_annotation,
-        field_initializers,
-    }))
+    Ok(field_initializers)
 }
 
 fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, String> {
@@ -378,59 +380,33 @@ fn parse_enum_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
 ) -> Result<Expression, String> {
-    let field_initializers = {
-        if cursor.first().kind == TokenKind::OpenBrace {
-            cursor.bump()?; // Consume the {
-            let fields = parse_named_enum_member_field_initializers(cursor)?;
-            cursor.bump()?; // Consume the }
-            fields
-        } else {
-            EnumMemberFieldInitializers::None
-        }
-    };
+    if cursor.first().kind != TokenKind::OpenBrace {
+        return Ok(Expression::Literal(Literal::Enum {
+            type_annotation: type_annotation.clone(),
+            member: type_annotation
+                .to_key()
+                .split("::")
+                .last()
+                .unwrap()
+                .to_string(),
+            field_initializers: vec![],
+        }));
+    }
+
+    cursor.bump()?; // Consume the {
+    let field_initializers = parse_field_initializers(cursor)?;
+    cursor.bump()?; // Consume the }
 
     Ok(Expression::Literal(Literal::Enum {
         type_annotation: type_annotation.clone(),
         member: type_annotation
-            .to_string()
+            .to_key()
             .split("::")
             .last()
             .unwrap()
             .to_string(),
         field_initializers,
     }))
-}
-
-fn parse_named_enum_member_field_initializers(
-    cursor: &mut Cursor,
-) -> Result<EnumMemberFieldInitializers, String> {
-    let mut field_initializers = HashMap::new();
-
-    while cursor.first().kind != TokenKind::CloseBrace {
-        let TokenKind::Identifier(identifier) = cursor.first().kind else {
-            return Err(format!(
-                "Expected identifier but found {:?}",
-                cursor.first().kind
-            ));
-        };
-
-        let TokenKind::Colon = cursor.second().kind else {
-            return Err(format!("Expected : but found {:?}", cursor.first().kind));
-        };
-
-        cursor.bump()?; // Consume the identifier
-        cursor.bump()?; // Consume the :
-
-        let initializer = parse_expression(cursor)?;
-
-        if cursor.first().kind == TokenKind::Comma {
-            cursor.bump()?; // Consume the ,
-        }
-
-        field_initializers.insert(identifier, initializer);
-    }
-
-    Ok(EnumMemberFieldInitializers::Named(field_initializers))
 }
 
 fn parse_range(cursor: &mut Cursor) -> Result<Expression, String> {

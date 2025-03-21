@@ -4,10 +4,10 @@ use crate::{
     type_checker::{
         ast::{BinaryOperator, Member, Typed},
         expressions::check_type,
-        get_field_by_name, type_annotation_equals, type_equals, type_equals_coerce, Enum,
-        EnumMember, Struct, Type,
+        get_field_by_name, type_annotation_equals, type_equals, type_equals_coerce, Enum, Struct,
+        Type,
     },
-    types::TypeAnnotation,
+    types::{TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
@@ -595,8 +595,9 @@ pub fn create_decision_tree(
                         }
                     }
                 }
-                Type::EnumMember(EnumMember {
-                    discriminant_name, ..
+                Type::Struct(Struct {
+                    type_identifier: TypeIdentifier::MemberType(_, discriminant_name),
+                    ..
                 }) => {
                     if type_annotation_equals(
                         &type_annotation,
@@ -626,7 +627,6 @@ pub fn create_decision_tree(
 
             let fields = match matchee_type.clone() {
                 Type::Struct(Struct { fields, .. }) => fields,
-                Type::EnumMember(EnumMember { fields, .. }) => fields,
                 Type::Enum(Enum {
                     shared_fields,
                     members,
@@ -636,7 +636,7 @@ pub fn create_decision_tree(
                         "Already checked if the constructor name exists in the member list",
                     );
 
-                    let Type::EnumMember(EnumMember { fields, .. }) = member.clone() else {
+                    let Type::Struct(Struct { fields, .. }) = member.clone() else {
                         return Err(format!("Expected enum member but got {:?}", member.clone()));
                     };
 
@@ -684,8 +684,7 @@ pub fn create_decision_tree(
                                     )
                                     .as_str(),
                                 ),
-                                field_initializers:
-                                    crate::type_checker::ast::EnumMemberFieldInitializers::None,
+                                field_initializers: vec![],
                                 member: type_annotation.name(),
                                 type_: matchee_type.clone(),
                             },

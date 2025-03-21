@@ -1,10 +1,10 @@
 use crate::{
     parser::{
         AccessModifier, Assignment, AssociatedType, Binary, BinaryOperator, Call, ClosureParameter,
-        EnumDeclaration, EnumMember, EnumMemberField, EnumMemberFieldInitializers, Expression,
-        FieldInitializer, FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration,
-        Literal, Match, MatchArm, Member, ModuleDeclaration, Parameter, ProtocolDeclaration,
-        Statement, StructDeclaration, StructField, TypeAliasDeclaration, Unary, UnaryOperator,
+        EnumDeclaration, EnumMember, EnumMemberField, Expression, FieldInitializer, FlagsMember,
+        For, FunctionDeclaration, If, ImplementationDeclaration, Literal, Match, MatchArm, Member,
+        ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData,
+        StructDeclaration, StructField, TypeAliasDeclaration, Unary, UnaryOperator,
         UnionDeclaration, Use, UseItem, VariableDeclaration, While,
     },
     type_checker::{
@@ -143,11 +143,8 @@ impl IndentDisplay for Statement {
                 result
             }
             Statement::StructDeclaration(StructDeclaration {
-                embedded_structs,
                 access_modifier,
-                type_identifier,
-                where_clause,
-                fields,
+                body,
             }) => {
                 let mut result = String::new();
                 result.push_str("<struct declaration>\n");
@@ -157,7 +154,7 @@ impl IndentDisplay for Statement {
                     format!(
                         "{}type_name: {}\n",
                         indent.dash(),
-                        type_identifier.indent_display(indent)
+                        body.type_identifier.indent_display(indent)
                     )
                     .as_str(),
                 );
@@ -170,30 +167,12 @@ impl IndentDisplay for Statement {
                     .as_str(),
                 );
 
-                if let Some(where_clause) = where_clause {
-                    result.push_str(
-                        format!(
-                            "\n{}where_clause: {}",
-                            indent.dash(),
-                            indent_display_slice(
-                                where_clause,
-                                "generic constraints",
-                                "constraint",
-                                indent
-                            )
-                        )
-                        .as_str(),
-                    );
-                } else {
-                    result.push_str(format!("\n{}where_clause: None", indent.dash()).as_str());
-                }
-
                 result.push_str(
                     format!(
                         "\n{}{}",
                         indent.dash_end(),
                         indent_display_slice(
-                            embedded_structs,
+                            &body.embedded_structs,
                             "embedded_structs",
                             "embedded_struct",
                             indent,
@@ -202,8 +181,8 @@ impl IndentDisplay for Statement {
                     .as_str(),
                 );
 
-                for (i, field) in fields.iter().enumerate() {
-                    if i < fields.len() - 1 {
+                for (i, field) in body.fields.iter().enumerate() {
+                    if i < body.fields.len() - 1 {
                         result.push_str(
                             format!("\n{}{}", indent.dash(), field.indent_display(indent)).as_str(),
                         );
@@ -222,7 +201,6 @@ impl IndentDisplay for Statement {
             Statement::EnumDeclaration(EnumDeclaration {
                 access_modifier,
                 type_identifier,
-                where_clause,
                 shared_fields,
                 members,
             }) => {
@@ -243,15 +221,6 @@ impl IndentDisplay for Statement {
                         "{}access_modifier: {}",
                         indent.dash(),
                         access_modifier.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-
-                result.push_str(
-                    format!(
-                        "\n{}where_clause: {}",
-                        indent.dash(),
-                        where_clause.indent_display(indent)
                     )
                     .as_str(),
                 );
@@ -1487,44 +1456,27 @@ impl IndentDisplay for FieldInitializer {
     }
 }
 
-impl IndentDisplay for EnumMemberFieldInitializers {
+impl IndentDisplay for StructData {
     fn indent_display(&self, indent: &mut Indent) -> String {
-        match self {
-            EnumMemberFieldInitializers::None => "".to_string(),
-            EnumMemberFieldInitializers::Named(field_initializers) => {
-                let mut result = String::new();
-                result.push_str("<named field initializers>");
-                indent.increase();
+        let mut result = String::new();
+        result.push_str("<struct data>");
+        indent.increase();
 
-                for (i, (identifier, initializer)) in field_initializers.iter().enumerate() {
-                    if i < field_initializers.len() - 1 {
-                        result.push_str(
-                            format!(
-                                "\n{}{}: {},",
-                                indent.dash(),
-                                identifier,
-                                initializer.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!(
-                                "\n{}{}: {}",
-                                indent.dash_end(),
-                                identifier,
-                                initializer.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    }
-                }
-
-                indent.decrease();
-                result
+        for (i, field) in self.fields.iter().enumerate() {
+            if i < self.fields.len() - 1 {
+                result.push_str(
+                    format!("\n{}{},", indent.dash(), field.indent_display(indent)).as_str(),
+                );
+            } else {
+                indent.end_current();
+                result.push_str(
+                    format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str(),
+                );
             }
         }
+
+        indent.decrease();
+        result
     }
 }
 
@@ -1843,7 +1795,6 @@ impl IndentDisplay for TypedStatement {
             }
             TypedStatement::StructDeclaration {
                 type_identifier,
-                where_clause,
                 embedded_structs,
                 fields,
                 type_,
@@ -1860,24 +1811,6 @@ impl IndentDisplay for TypedStatement {
                     )
                     .as_str(),
                 );
-
-                if let Some(where_clause) = where_clause {
-                    result.push_str(
-                        format!(
-                            "\n{}where_clause: {}",
-                            indent.dash(),
-                            indent_display_slice(
-                                where_clause,
-                                "generic constraints",
-                                "constraint",
-                                indent
-                            )
-                        )
-                        .as_str(),
-                    );
-                } else {
-                    result.push_str(format!("\n{}where_clause: None", indent.dash()).as_str());
-                }
 
                 result.push_str(
                     format!(
@@ -2958,10 +2891,10 @@ impl IndentDisplay for type_checker::ast::StructField {
     }
 }
 
-impl IndentDisplay for type_checker::ast::EnumMember {
+impl IndentDisplay for type_checker::ast::StructData {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str(format!("<enum member> {}", self.type_).as_str());
+        result.push_str(format!("<struct data> {}", self.type_).as_str());
         indent.increase();
 
         for (i, field) in self.fields.iter().enumerate() {
@@ -2977,18 +2910,6 @@ impl IndentDisplay for type_checker::ast::EnumMember {
             }
         }
 
-        indent.decrease();
-        result
-    }
-}
-
-impl IndentDisplay for type_checker::ast::EnumMemberField {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        let mut result = String::new();
-        result.push_str(format!("<enum member field>: {}\n", self.type_).as_str());
-        indent.increase_leaf();
-        result.push_str(format!("{}identifier: {}\n", indent.dash(), self.identifier).as_str());
-        result.push_str(format!("{}type: {}", indent.dash_end(), self.type_).as_str());
         indent.decrease();
         result
     }
@@ -3061,47 +2982,6 @@ impl IndentDisplay for type_checker::ast::FieldInitializer {
         );
         indent.decrease();
         result
-    }
-}
-
-impl IndentDisplay for type_checker::ast::EnumMemberFieldInitializers {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        match self {
-            type_checker::ast::EnumMemberFieldInitializers::None => "".to_string(),
-            type_checker::ast::EnumMemberFieldInitializers::Named(field_initializers) => {
-                let mut result = String::new();
-                result.push_str("<named field initializer>");
-                indent.increase();
-
-                for (i, (identifier, initializer)) in field_initializers.iter().enumerate() {
-                    if i < field_initializers.len() - 1 {
-                        result.push_str(
-                            format!(
-                                "\n{}{}: {},",
-                                indent.dash(),
-                                identifier,
-                                initializer.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!(
-                                "\n{}{}: {}",
-                                indent.dash_end(),
-                                identifier,
-                                initializer.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    }
-                }
-
-                indent.decrease();
-                result
-            }
-        }
     }
 }
 

@@ -3,9 +3,9 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 use crate::{
     parser::{
         self, ImplementationDeclaration, ModuleDeclaration, ProtocolDeclaration, Statement,
-        UnionDeclaration, Use,
+        StructData, UnionDeclaration, Use,
     },
-    types::{TypeAnnotation, TypeIdentifier},
+    types::{ToKey, TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
@@ -14,8 +14,8 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    type_equals, Enum, EnumMember, Function, Parameter, Protocol, Rcrc, Struct, StructField, Type,
-    TypeAlias, Union,
+    type_equals, Enum, Function, Parameter, Protocol, Rcrc, Struct, StructField, Type, TypeAlias,
+    Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -32,65 +32,57 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         Statement::ModuleDeclaration(_) => Ok(vec![]),
         Statement::Use(_) => Ok(vec![]),
         Statement::StructDeclaration(parser::StructDeclaration {
-            type_identifier,
-            embedded_structs,
-            fields,
+            body:
+                StructData {
+                    type_identifier,
+                    embedded_structs,
+                    fields,
+                    ..
+                },
             ..
-        }) => Ok(vec![DiscoveredType::Struct(
-            type_identifier.clone(),
-            embedded_structs.clone(),
-            fields
+        }) => Ok(vec![DiscoveredType::Struct {
+            type_identifier: type_identifier.clone(),
+            embedded_structs: embedded_structs.clone(),
+            fields: fields
                 .iter()
                 .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
                 .collect(),
-        )]),
+        }]),
         Statement::EnumDeclaration(parser::EnumDeclaration {
             type_identifier,
             shared_fields,
             members,
             ..
         }) => {
-            let enum_ = DiscoveredType::Enum(
-                type_identifier.clone(),
-                shared_fields
+            let enum_ = DiscoveredType::Enum {
+                type_identifier: type_identifier.clone(),
+                shared_fields: shared_fields
                     .iter()
                     .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
                     .collect(),
-                members
+                members: members
                     .iter()
-                    .map(|member| {
-                        (
-                            member.identifier.clone(),
-                            (
-                                member.embedded_structs.clone(),
-                                member
-                                    .fields
-                                    .iter()
-                                    .map(|field| {
-                                        (field.identifier.clone(), field.type_annotation.clone())
-                                    })
-                                    .collect(),
-                            ),
-                        )
+                    .map(|member| StructData {
+                        type_identifier: member.type_identifier.clone(),
+                        embedded_structs: member.embedded_structs.clone(),
+                        fields: member.fields.clone(),
                     })
                     .collect(),
-            );
+            };
 
             let enum_members: Vec<DiscoveredType> = members
                 .iter()
-                .map(|member| {
-                    DiscoveredType::EnumMember(
-                        TypeIdentifier::MemberType(
-                            Box::new(type_identifier.clone()),
-                            member.identifier.clone(),
-                        ),
-                        member.embedded_structs.clone(),
-                        member
-                            .fields
-                            .iter()
-                            .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
-                            .collect(),
-                    )
+                .map(|member| DiscoveredType::Struct {
+                    type_identifier: TypeIdentifier::MemberType(
+                        Box::new(type_identifier.clone()),
+                        member.type_identifier.to_key(),
+                    ),
+                    embedded_structs: member.embedded_structs.clone(),
+                    fields: member
+                        .fields
+                        .iter()
+                        .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
+                        .collect(),
                 })
                 .collect();
 
@@ -183,10 +175,12 @@ pub fn check_type(
         }),
         Statement::StructDeclaration(parser::StructDeclaration {
             access_modifier: _,
-            type_identifier,
-            where_clause,
-            embedded_structs,
-            fields,
+            body:
+                StructData {
+                    type_identifier,
+                    embedded_structs,
+                    fields,
+                },
         }) => {
             let struct_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
@@ -197,20 +191,6 @@ pub fn check_type(
                     struct_type_environment
                         .borrow_mut()
                         .add_type(Type::Generic(generic.clone()))?;
-                }
-            }
-
-            if let Some(where_clause) = where_clause {
-                for constraint in where_clause {
-                    if !struct_type_environment
-                        .borrow()
-                        .lookup_type_str(&constraint.generic.type_name)
-                    {
-                        return Err(format!(
-                            "Generic type {} not found in struct declaration",
-                            constraint.generic.type_name
-                        ));
-                    }
                 }
             }
 
@@ -232,6 +212,7 @@ pub fn check_type(
                         struct_type_environment.clone(),
                     ) {
                         Ok(t) => Ok(ast::StructField {
+                            struct_identifier: type_identifier.clone(),
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
                             type_: t,
@@ -260,6 +241,7 @@ pub fn check_type(
                     fields.insert(
                         0,
                         ast::StructField {
+                            struct_identifier: type_identifier.clone(),
                             mutable: false,
                             identifier: field.field_name.clone(),
                             type_: field.field_type.clone(),
@@ -313,7 +295,6 @@ pub fn check_type(
 
             Ok(TypedStatement::StructDeclaration {
                 type_identifier: type_identifier.clone(),
-                where_clause: where_clause.clone(),
                 embedded_structs: recursive_embedded_structs,
                 fields,
                 type_,
@@ -322,7 +303,6 @@ pub fn check_type(
         Statement::EnumDeclaration(parser::EnumDeclaration {
             access_modifier: _,
             type_identifier,
-            where_clause,
             shared_fields,
             members,
         }) => {
@@ -338,20 +318,6 @@ pub fn check_type(
                 }
             }
 
-            if let Some(where_clause) = where_clause {
-                for constraint in where_clause {
-                    if !enum_type_environment
-                        .borrow()
-                        .lookup_type_str(&constraint.generic.type_name)
-                    {
-                        return Err(format!(
-                            "Generic type {} not found in struct declaration",
-                            constraint.generic.type_name
-                        ));
-                    }
-                }
-            }
-
             let shared_fields: Result<Vec<ast::StructField>, String> = shared_fields
                 .iter()
                 .map(|field| {
@@ -361,6 +327,7 @@ pub fn check_type(
                         enum_type_environment.clone(),
                     ) {
                         Ok(t) => Ok(ast::StructField {
+                            struct_identifier: type_identifier.clone(),
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
                             type_: t,
@@ -370,7 +337,7 @@ pub fn check_type(
                 })
                 .collect();
 
-            let members: Result<Vec<ast::EnumMember>, String> = members
+            let members: Result<Vec<ast::StructData>, String> = members
                 .iter()
                 .map(|member| {
                     let embedded_structs: Result<Vec<_>, _> = member
@@ -387,7 +354,7 @@ pub fn check_type(
 
                     let embedded_structs = embedded_structs?;
 
-                    let fields: Result<Vec<ast::EnumMemberField>, String> = member
+                    let fields: Result<Vec<ast::StructField>, String> = member
                         .fields
                         .iter()
                         .map(|field| {
@@ -396,9 +363,9 @@ pub fn check_type(
                                 discovered_types,
                                 enum_type_environment.clone(),
                             ) {
-                                Ok(t) => Ok(ast::EnumMemberField {
-                                    enum_name: type_identifier.clone(),
-                                    discriminant_name: member.identifier.clone(),
+                                Ok(t) => Ok(ast::StructField {
+                                    struct_identifier: type_identifier.clone(),
+                                    mutable: field.mutable,
                                     identifier: field.identifier.clone(),
                                     type_: t,
                                 }),
@@ -425,9 +392,9 @@ pub fn check_type(
 
                             fields.insert(
                                 0,
-                                ast::EnumMemberField {
-                                    enum_name: type_identifier.clone(),
-                                    discriminant_name: member.identifier.clone(),
+                                ast::StructField {
+                                    struct_identifier: type_identifier.clone(),
+                                    mutable: false,
                                     identifier: field.field_name.clone(),
                                     type_: field.field_type.clone(),
                                 },
@@ -462,7 +429,7 @@ pub fn check_type(
                             Ok(StructField {
                                 struct_name: TypeIdentifier::MemberType(
                                     Box::new(type_identifier.clone()),
-                                    member.identifier.clone(),
+                                    member.type_identifier.to_key(),
                                 ),
                                 field_name: f.identifier.clone(),
                                 field_type: f.type_.clone(),
@@ -470,9 +437,11 @@ pub fn check_type(
                         })
                         .collect();
 
-                    let enum_member = Type::EnumMember(EnumMember {
-                        enum_name: type_identifier.clone(),
-                        discriminant_name: member.identifier.clone(),
+                    let enum_member = Type::Struct(Struct {
+                        type_identifier: TypeIdentifier::MemberType(
+                            Box::new(type_identifier.clone()),
+                            member.type_identifier.to_key(),
+                        ),
                         embedded_structs: recursive_embedded_structs
                             .iter()
                             .map(|s| s.type_annotation())
@@ -484,9 +453,11 @@ pub fn check_type(
                         .borrow_mut()
                         .add_type(enum_member.clone())?;
 
-                    Ok(ast::EnumMember {
-                        enum_name: type_identifier.clone(),
-                        discriminant_name: member.identifier.clone(),
+                    Ok(ast::StructData {
+                        type_identifier: TypeIdentifier::MemberType(
+                            Box::new(type_identifier.clone()),
+                            member.type_identifier.to_key(),
+                        ),
                         embedded_structs: recursive_embedded_structs,
                         fields,
                         type_: enum_member,
@@ -508,7 +479,7 @@ pub fn check_type(
                 members: members
                     .clone()?
                     .iter()
-                    .map(|m| (m.discriminant_name.clone(), m.type_.clone()))
+                    .map(|m| (m.type_identifier.to_key(), m.type_.clone()))
                     .collect(),
             });
 
@@ -814,7 +785,6 @@ pub fn check_type(
             type_identifier,
             param,
             return_type_annotation,
-            where_clause,
             body,
             signature_only,
         }) => {
@@ -827,24 +797,6 @@ pub fn check_type(
                     function_type_environment
                         .borrow_mut()
                         .add_type(Type::Generic(generic.clone()))?;
-                }
-            }
-
-            if let Some(where_clause) = where_clause {
-                for constraint in where_clause {
-                    if !function_type_environment
-                        .borrow()
-                        .lookup_type_str(&constraint.generic.type_name)
-                    {
-                        return Err(format!(
-                            "Generic type {} not found in struct declaration",
-                            constraint.generic.type_name
-                        ));
-                    }
-
-                    function_type_environment
-                        .borrow_mut()
-                        .add_generic_constraint(constraint)?;
                 }
             }
 
@@ -999,9 +951,14 @@ fn check_type_identifier(
     match discovered_types
         .iter()
         .find(|discovered_type| match discovered_type {
-            DiscoveredType::Struct(name, ..) => name == type_identifier,
-            DiscoveredType::Enum(name, ..) => name == type_identifier,
-            DiscoveredType::EnumMember(name, ..) => name == type_identifier,
+            DiscoveredType::Struct {
+                type_identifier: name,
+                ..
+            } => name == type_identifier,
+            DiscoveredType::Enum {
+                type_identifier: name,
+                ..
+            } => name == type_identifier,
             DiscoveredType::Union(name, ..) => name == type_identifier,
             DiscoveredType::TypeAlias(name, ..) => name == type_identifier,
             DiscoveredType::Protocol {
@@ -1013,121 +970,105 @@ fn check_type_identifier(
                 ..
             } => name == type_identifier,
         }) {
-        Some(DiscoveredType::Struct(type_identifier, embedded_structs, fields)) => {
-            Ok(Type::Struct(Struct {
-                type_identifier: type_identifier.clone(),
-                embedded_structs: embedded_structs.clone(),
-                fields: {
-                    let mut vec = Vec::new();
+        Some(DiscoveredType::Struct {
+            type_identifier,
+            embedded_structs,
+            fields,
+        }) => Ok(Type::Struct(Struct {
+            type_identifier: type_identifier.clone(),
+            embedded_structs: embedded_structs.clone(),
+            fields: {
+                let mut vec = Vec::new();
 
-                    for (identifier, type_annotation) in fields {
-                        vec.push(StructField {
-                            struct_name: type_identifier.clone(),
+                for (identifier, type_annotation) in fields {
+                    vec.push(StructField {
+                        struct_name: type_identifier.clone(),
+                        field_name: identifier.clone(),
+                        field_type: check_type_annotation(
+                            type_annotation,
+                            discovered_types,
+                            type_environment.clone(),
+                        )?,
+                    });
+                }
+
+                vec
+            },
+        })),
+        Some(DiscoveredType::Enum {
+            type_identifier,
+            shared_fields,
+            members,
+        }) => Ok(Type::Enum(Enum {
+            type_identifier: type_identifier.clone(),
+            shared_fields: {
+                let mut vec = Vec::new();
+
+                for (identifier, type_annotation) in shared_fields {
+                    vec.push(StructField {
+                        struct_name: type_identifier.clone(),
+                        field_name: identifier.clone(),
+                        field_type: check_type_annotation(
+                            type_annotation,
+                            discovered_types,
+                            type_environment.clone(),
+                        )?,
+                    });
+                }
+
+                vec
+            },
+            members: {
+                let mut map = HashMap::new();
+
+                for StructData {
+                    type_identifier,
+                    embedded_structs,
+                    fields,
+                } in members
+                {
+                    let mut fields_map = Vec::new();
+
+                    for parser::ast::StructField {
+                        identifier,
+                        type_annotation,
+                        ..
+                    } in fields.clone()
+                    {
+                        fields_map.push(StructField {
+                            struct_name: TypeIdentifier::MemberType(
+                                Box::new(type_identifier.clone()),
+                                identifier.clone(),
+                            ),
                             field_name: identifier.clone(),
                             field_type: check_type_annotation(
-                                type_annotation,
+                                &type_annotation,
                                 discovered_types,
                                 type_environment.clone(),
                             )?,
                         });
                     }
 
-                    vec
-                },
-            }))
-        }
-        Some(DiscoveredType::Enum(type_identifier, shared_fields, members)) => {
-            Ok(Type::Enum(Enum {
-                type_identifier: type_identifier.clone(),
-                shared_fields: {
-                    let mut vec = Vec::new();
+                    map.insert(type_identifier.clone(), (embedded_structs, fields_map));
+                }
 
-                    for (identifier, type_annotation) in shared_fields {
-                        vec.push(StructField {
-                            struct_name: type_identifier.clone(),
-                            field_name: identifier.clone(),
-                            field_type: check_type_annotation(
-                                type_annotation,
-                                discovered_types,
-                                type_environment.clone(),
-                            )?,
-                        });
-                    }
-
-                    vec
-                },
-                members: {
-                    let mut map = HashMap::new();
-
-                    for (identifier, fields) in members {
-                        let mut fields_map = Vec::new();
-
-                        for (identifier, type_annotation) in fields.1.clone() {
-                            fields_map.push(StructField {
-                                struct_name: TypeIdentifier::MemberType(
+                map.iter()
+                    .map(|(k, (e, f))| {
+                        (
+                            k.to_key(),
+                            Type::Struct(Struct {
+                                type_identifier: TypeIdentifier::MemberType(
                                     Box::new(type_identifier.clone()),
-                                    identifier.clone(),
+                                    k.to_key(),
                                 ),
-                                field_name: identifier.clone(),
-                                field_type: check_type_annotation(
-                                    &type_annotation,
-                                    discovered_types,
-                                    type_environment.clone(),
-                                )?,
-                            });
-                        }
-
-                        map.insert(identifier.clone(), (fields.0.clone(), fields_map));
-                    }
-
-                    map.iter()
-                        .map(|(k, (e, f))| {
-                            (
-                                k.clone(),
-                                Type::EnumMember(EnumMember {
-                                    enum_name: type_identifier.clone(),
-                                    discriminant_name: k.clone(),
-                                    embedded_structs: e.clone(),
-                                    fields: f.clone(),
-                                }),
-                            )
-                        })
-                        .collect()
-                },
-            }))
-        }
-        Some(DiscoveredType::EnumMember(type_identifier, embedded_structs, fields)) => {
-            let Some((enum_name, member_name)) = type_identifier.name().split_once("::") else {
-                return Err(format!(
-                    "Invalid enum member type identifier {}",
-                    type_identifier
-                ));
-            };
-
-            let mut field_types = Vec::new();
-
-            for field in fields {
-                field_types.push(StructField {
-                    struct_name: TypeIdentifier::MemberType(
-                        Box::new(TypeIdentifier::Type(enum_name.to_owned())),
-                        member_name.to_owned(),
-                    ),
-                    field_name: field.0.clone(),
-                    field_type: check_type_annotation(
-                        field.1,
-                        discovered_types,
-                        type_environment.clone(),
-                    )?,
-                });
-            }
-
-            Ok(Type::EnumMember(EnumMember {
-                enum_name: TypeIdentifier::Type(enum_name.to_owned()),
-                discriminant_name: member_name.to_owned(),
-                embedded_structs: embedded_structs.clone(),
-                fields: field_types,
-            }))
-        }
+                                embedded_structs: (*e).clone(),
+                                fields: f.clone(),
+                            }),
+                        )
+                    })
+                    .collect()
+            },
+        })),
         Some(DiscoveredType::Union(type_identifier, literals)) => {
             let literal_types = literals
                 .iter()
@@ -1240,15 +1181,12 @@ pub fn check_type_annotation(
     match discovered_types
         .iter()
         .find(|discovered_type| match discovered_type {
-            DiscoveredType::Struct(type_identifier, ..) => {
-                type_identifier.name() == type_annotation.name()
-            }
-            DiscoveredType::Enum(type_identifier, ..) => {
-                type_identifier.name() == type_annotation.name()
-            }
-            DiscoveredType::EnumMember(type_identifier, ..) => {
-                type_identifier.name() == type_annotation.name()
-            }
+            DiscoveredType::Struct {
+                type_identifier, ..
+            } => type_identifier.name() == type_annotation.name(),
+            DiscoveredType::Enum {
+                type_identifier, ..
+            } => type_identifier.name() == type_annotation.name(),
             DiscoveredType::Union(type_identifier, ..) => {
                 type_identifier.name() == type_annotation.name()
             }
@@ -1262,15 +1200,72 @@ pub fn check_type_annotation(
                 type_identifier, ..
             } => type_identifier.name() == type_annotation.name(),
         }) {
-        Some(DiscoveredType::Struct(type_identifier, embedded_structs, fields)) => {
-            Ok(Type::Struct(Struct {
-                type_identifier: type_identifier.clone(),
-                embedded_structs: embedded_structs.clone(),
-                fields: {
-                    let mut map = Vec::new();
+        Some(DiscoveredType::Struct {
+            type_identifier,
+            embedded_structs,
+            fields,
+        }) => Ok(Type::Struct(Struct {
+            type_identifier: type_identifier.clone(),
+            embedded_structs: embedded_structs.clone(),
+            fields: {
+                let mut map = Vec::new();
 
-                    for (identifier, type_annotation) in fields {
-                        map.push(StructField {
+                for (identifier, type_annotation) in fields {
+                    map.push(StructField {
+                        struct_name: type_identifier.clone(),
+                        field_name: identifier.clone(),
+                        field_type: check_type_annotation(
+                            type_annotation,
+                            discovered_types,
+                            type_environment.clone(),
+                        )?,
+                    });
+                }
+
+                map
+            },
+        })),
+        Some(DiscoveredType::Enum {
+            type_identifier,
+            shared_fields,
+            members,
+        }) => Ok(Type::Enum(Enum {
+            type_identifier: type_identifier.clone(),
+            shared_fields: {
+                let mut vec = Vec::new();
+
+                for (identifier, type_annotation) in shared_fields {
+                    vec.push(StructField {
+                        struct_name: type_identifier.clone(),
+                        field_name: identifier.clone(),
+                        field_type: check_type_annotation(
+                            type_annotation,
+                            discovered_types,
+                            type_environment.clone(),
+                        )?,
+                    });
+                }
+
+                vec
+            },
+            members: {
+                let mut field_map = HashMap::new();
+
+                for StructData {
+                    type_identifier,
+                    embedded_structs,
+                    fields,
+                } in members
+                {
+                    let mut fields_map = Vec::new();
+
+                    for parser::ast::StructField {
+                        identifier,
+                        type_annotation,
+                        ..
+                    } in fields
+                    {
+                        fields_map.push(StructField {
                             struct_name: type_identifier.clone(),
                             field_name: identifier.clone(),
                             field_type: check_type_annotation(
@@ -1281,100 +1276,27 @@ pub fn check_type_annotation(
                         });
                     }
 
-                    map
-                },
-            }))
-        }
-        Some(DiscoveredType::Enum(type_identifier, shared_fields, members)) => {
-            Ok(Type::Enum(Enum {
-                type_identifier: type_identifier.clone(),
-                shared_fields: {
-                    let mut vec = Vec::new();
+                    field_map.insert(type_identifier.to_key(), (embedded_structs, fields_map));
+                }
 
-                    for (identifier, type_annotation) in shared_fields {
-                        vec.push(StructField {
-                            struct_name: type_identifier.clone(),
-                            field_name: identifier.clone(),
-                            field_type: check_type_annotation(
-                                type_annotation,
-                                discovered_types,
-                                type_environment.clone(),
-                            )?,
-                        });
-                    }
-
-                    vec
-                },
-                members: {
-                    let mut field_map = HashMap::new();
-
-                    for (identifier, (embedded_structs, fields)) in members {
-                        let mut fields_map = Vec::new();
-
-                        for (identifier, type_annotation) in fields {
-                            fields_map.push(StructField {
-                                struct_name: type_identifier.clone(),
-                                field_name: identifier.clone(),
-                                field_type: check_type_annotation(
-                                    type_annotation,
-                                    discovered_types,
-                                    type_environment.clone(),
-                                )?,
-                            });
-                        }
-
-                        field_map.insert(identifier.clone(), (embedded_structs, fields_map));
-                    }
-
-                    field_map
-                        .iter()
-                        .map(|(k, (e, f))| {
-                            (
-                                k.clone(),
-                                Type::EnumMember(EnumMember {
-                                    enum_name: type_identifier.clone(),
-                                    discriminant_name: k.clone(),
-                                    embedded_structs: (*e).clone(),
-                                    fields: f.clone(),
-                                }),
-                            )
-                        })
-                        .collect()
-                },
-            }))
-        }
-        Some(DiscoveredType::EnumMember(type_identifier, embedded_structs, fields)) => {
-            let Some((enum_name, member_name)) = type_identifier.name().split_once("::") else {
-                return Err(format!(
-                    "Invalid enum member type identifier {}",
-                    type_identifier
-                ));
-            };
-
-            let mut field_types = Vec::new();
-
-            for field in fields {
-                field_types.push(StructField {
-                    struct_name: TypeIdentifier::MemberType(
-                        Box::new(TypeIdentifier::Type(enum_name.to_owned())),
-                        member_name.to_owned(),
-                    ),
-                    field_name: field.0.clone(),
-                    field_type: check_type_annotation(
-                        field.1,
-                        discovered_types,
-                        type_environment.clone(),
-                    )?,
-                });
-            }
-
-            Ok(Type::EnumMember(EnumMember {
-                enum_name: TypeIdentifier::Type(enum_name.to_owned()),
-                discriminant_name: member_name.to_owned(),
-                embedded_structs: embedded_structs.clone(),
-                fields: field_types,
-            }))
-        }
+                field_map
+                    .iter()
+                    .map(|(k, (e, f))| {
+                        (
+                            k.clone(),
+                            Type::Struct(Struct {
+                                type_identifier: TypeIdentifier::MemberType(
+                                    Box::new(type_identifier.clone()),
+                                    k.clone(),
+                                ),
+                                embedded_structs: (*e).clone(),
+                                fields: f.clone(),
+                            }),
+                        )
+                    })
+                    .collect()
+            },
+        })),
         Some(DiscoveredType::Union(type_identifier, literals)) => {
             let literal_types = literals
                 .iter()

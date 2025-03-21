@@ -1,12 +1,10 @@
 mod common;
 
-use std::collections::HashMap;
-
 use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
-use interpreter::{value::EnumFields, Value};
+use interpreter::{value::Enum, Value};
 use shared::{
-    type_checker::{ast::Typed, EnumMember, StructField, Type},
+    type_checker::{ast::Typed, Struct, StructField, Type},
     types::TypeIdentifier,
 };
 
@@ -34,9 +32,11 @@ fn enum_variant_can_be_used_as_a_type() {
 
     assert_eq!(
         expression.get_type(),
-        Type::EnumMember(EnumMember {
-            enum_name: TypeIdentifier::Type("O".to_owned()),
-            discriminant_name: "S".to_owned(),
+        Type::Struct(Struct {
+            type_identifier: TypeIdentifier::MemberType(
+                Box::new(TypeIdentifier::Type("O".to_owned())),
+                "S".to_owned()
+            ),
             embedded_structs: vec![],
             fields: vec![StructField {
                 struct_name: TypeIdentifier::MemberType(
@@ -71,15 +71,15 @@ fn enum_variant_can_be_assigned_to_variable_with_variant_type() {
     // Assert
     assert_eq!(
         value,
-        Value::Enum {
-            enum_member: interpreter::value::EnumMember {
-                enum_name: shared::types::TypeAnnotation::Type("O".to_string()),
-                member_name: "S".to_string(),
+        Value::Enum(Enum {
+            type_name: "O".to_string(),
+            enum_member: interpreter::value::Struct {
+                type_name: "O::S".to_string(),
+                fields: vec![interpreter::value::StructField {
+                    identifier: "x".to_string(),
+                    value: Value::Number(interpreter::value::Number::Int(1))
+                }]
             },
-            fields: EnumFields::Named(HashMap::from([(
-                "x".to_string(),
-                Value::Number(interpreter::value::Number::Int(1))
-            )]))
-        }
+        })
     );
 }

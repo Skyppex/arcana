@@ -3,17 +3,17 @@ use crate::{
     parser::AssociatedType,
     types::{
         can_be_type_annotation, parse_generic_type_parameters, parse_type_annotation,
-        parse_type_identifier, GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier,
+        parse_type_identifier, TypeAnnotation, TypeIdentifier,
     },
 };
 
 use super::{
     cursor::Cursor,
     expressions::{self, parse_expression},
-    AccessModifier, Closure, EnumDeclaration, EnumMember, EnumMemberField, Expression,
-    FunctionDeclaration, ImplementationDeclaration, Literal, ModuleDeclaration, Parameter,
-    ProtocolDeclaration, Statement, StructDeclaration, StructField, TypeAliasDeclaration,
-    UnionDeclaration, Use, UseItem,
+    AccessModifier, Closure, EnumDeclaration, Expression, FunctionDeclaration,
+    ImplementationDeclaration, Literal, ModuleDeclaration, Parameter, ProtocolDeclaration,
+    Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration,
+    Use, UseItem,
 };
 
 pub fn parse_module_only(
@@ -281,13 +281,10 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
             type_identifier,
             param,
             return_type_annotation,
-            where_clause: None,
             body: None,
             signature_only: true,
         }));
     }
-
-    let where_clause = parse_where_clause(cursor)?;
 
     let TokenKind::FatArrow = cursor.bump()?.kind else {
         return Err(format!("Expected => but found {:?}", cursor.first().kind));
@@ -299,7 +296,6 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         type_identifier,
         params,
         return_type_annotation.clone(),
-        where_clause,
         body,
     )?;
 
@@ -334,7 +330,6 @@ fn unwrap_parameters(
     type_identifier: TypeIdentifier,
     params: Vec<Parameter>,
     return_type_annotation: Option<TypeAnnotation>,
-    where_clause: Option<Vec<GenericConstraint>>,
     body: Expression,
 ) -> Result<Statement, String> {
     match params.first().cloned() {
@@ -343,7 +338,6 @@ fn unwrap_parameters(
             type_identifier,
             param: None,
             return_type_annotation,
-            where_clause,
             body: Some(body),
             signature_only: false,
         })),
@@ -359,7 +353,6 @@ fn unwrap_parameters(
                 type_identifier,
                 param: Some(first),
                 return_type_annotation: new_return_type_annotation,
-                where_clause,
                 body: Some(new_body),
                 signature_only: false,
             }))
@@ -418,20 +411,33 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
         return Err(format!("Invalid type name: {}", type_identifier.name()));
     }
 
-    let where_clause = parse_where_clause(cursor)?;
-
     let TokenKind::OpenBrace = cursor.first().kind else {
         return Ok(Statement::StructDeclaration(StructDeclaration {
             access_modifier,
-            type_identifier,
-            where_clause,
-            embedded_structs: vec![],
-            fields: vec![],
+            body: StructData {
+                type_identifier,
+                embedded_structs: vec![],
+                fields: vec![],
+            },
         }));
     };
 
     cursor.bump()?; // Consume the {
 
+    let body = parse_struct(type_identifier, cursor)?;
+
+    cursor.bump()?; // Consume the }
+
+    Ok(Statement::StructDeclaration(StructDeclaration {
+        access_modifier,
+        body,
+    }))
+}
+
+fn parse_struct(
+    type_identifier: TypeIdentifier,
+    cursor: &mut Cursor,
+) -> Result<StructData, String> {
     let embedded_structs = parse_embedded_structs(cursor)?;
 
     let mut fields = vec![];
@@ -452,15 +458,11 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
         }
     }
 
-    cursor.bump()?; // Consume the }
-
-    Ok(Statement::StructDeclaration(StructDeclaration {
-        access_modifier,
+    Ok(StructData {
         type_identifier,
-        where_clause,
         embedded_structs,
         fields,
-    }))
+    })
 }
 
 fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
@@ -487,14 +489,11 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
         return Err(format!("Invalid type name: {}", type_name.name()));
     }
 
-    let where_clause = parse_where_clause(cursor)?;
-
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
         return Ok(Statement::EnumDeclaration(EnumDeclaration {
             access_modifier,
             type_identifier: type_name,
-            where_clause: None,
             shared_fields: vec![],
             members: vec![],
         }));
@@ -520,7 +519,24 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
         {
             shared_fields.push(parse_struct_field(cursor, false)?);
         } else {
-            members.push(parse_enum_member(cursor, shared_fields.clone())?);
+            let TokenKind::Identifier(identifier) = cursor.first().kind else {
+                return Err(format!(
+                    "Expected identifier but found {:?}",
+                    cursor.first().kind
+                ));
+            };
+
+            if !identifier.is_type_identifier_name() {
+                return Err(format!("Invalid type name: {}", identifier));
+            }
+
+            cursor.bump()?; // Consume the identifier
+
+            if cursor.first().kind == TokenKind::OpenBrace {
+                cursor.expect(TokenKind::OpenBrace)?; // Consume the {
+                members.push(parse_struct(TypeIdentifier::Type(identifier), cursor)?);
+                cursor.expect(TokenKind::CloseBrace)?; // Consume the }
+            }
         }
 
         if cursor.first().kind == TokenKind::Comma {
@@ -535,7 +551,6 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
     Ok(Statement::EnumDeclaration(EnumDeclaration {
         access_modifier,
         type_identifier: type_name,
-        where_clause,
         shared_fields,
         members,
     }))
@@ -990,119 +1005,6 @@ fn parse_struct_field(
     })
 }
 
-fn parse_enum_member(
-    cursor: &mut Cursor,
-    shared_fields: Vec<StructField>,
-) -> Result<EnumMember, String> {
-    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-        return Err(format!(
-            "Expected identifier but found {:?}",
-            cursor.first().kind
-        ));
-    };
-
-    if !identifier.is_type_identifier_name() {
-        return Err(format!("Invalid type name: {}", identifier));
-    }
-
-    if cursor.first().kind == TokenKind::OpenBrace {
-        cursor.bump()?; // Consume the (
-
-        let embedded_structs = parse_embedded_structs(cursor)?;
-
-        let mut fields = vec![];
-
-        for shared_field in shared_fields {
-            fields.push(EnumMemberField {
-                identifier: shared_field.identifier,
-                type_annotation: shared_field.type_annotation,
-            });
-        }
-
-        let mut has_comma = true;
-
-        while cursor.first().kind != TokenKind::CloseBrace {
-            if !has_comma {
-                return Err(format!("Expected , but found {:?}", cursor.first().kind));
-            }
-
-            has_comma = true;
-            fields.push(parse_enum_field(cursor)?);
-
-            if cursor.first().kind == TokenKind::Comma {
-                cursor.bump()?; // Consume the ,
-            } else {
-                has_comma = false;
-            }
-        }
-
-        cursor.bump()?; // Consume the )
-
-        return Ok(EnumMember {
-            identifier,
-            embedded_structs,
-            fields,
-        });
-    }
-
-    let mut fields = vec![];
-
-    for shared_field in shared_fields {
-        fields.push(EnumMemberField {
-            identifier: shared_field.identifier,
-            type_annotation: shared_field.type_annotation,
-        });
-    }
-
-    Ok(EnumMember {
-        identifier,
-        embedded_structs: vec![],
-        fields,
-    })
-}
-
-fn parse_enum_field(cursor: &mut Cursor) -> Result<EnumMemberField, String> {
-    let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-        return Err(format!(
-            "Expected identifier but found {:?}",
-            cursor.first().kind
-        ));
-    };
-
-    if !identifier.is_variable_identifier_name() {
-        return Err(format!("Invalid field name: {}", identifier));
-    }
-
-    let TokenKind::Colon = cursor.bump()?.kind else {
-        return Err(format!("Expected : but found {:?}", cursor.first().kind));
-    };
-
-    if !can_be_type_annotation(cursor) {
-        return Err(format!(
-            "Expected type identifier but found {:?}",
-            cursor.first().kind
-        ));
-    }
-
-    let type_annotation = parse_type_annotation(cursor, false)?;
-
-    Ok(EnumMemberField {
-        identifier,
-        type_annotation,
-    })
-}
-
-// fn parse_flags_member(cursor: &mut Cursor) -> Result<FlagsMember, String> {
-//     let TokenKind::Identifier(identifier) = cursor.bump()?.kind else {
-//         return Err(format!("Expected identifier but found {:?}", cursor.first().kind));
-//     };
-
-//     Ok(FlagsMember {
-//         identifier,
-//         value: FlagsValue::Default,
-//     })
-// }
-
 fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<TypeAnnotation>, String> {
     let mut embedded_structs = vec![];
 
@@ -1126,63 +1028,63 @@ fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<TypeAnnotation>, St
     Ok(embedded_structs)
 }
 
-fn parse_where_clause(cursor: &mut Cursor) -> Result<Option<Vec<GenericConstraint>>, String> {
-    if cursor.first().kind != TokenKind::Keyword(Keyword::Where) {
-        return Ok(None);
-    }
+// fn parse_where_clause(cursor: &mut Cursor) -> Result<Option<Vec<GenericConstraint>>, String> {
+//     if cursor.first().kind != TokenKind::Keyword(Keyword::Where) {
+//         return Ok(None);
+//     }
+//
+//     cursor.bump()?; // Consume the where
+//
+//     let mut constraints = vec![];
+//
+//     while !matches!(cursor.first().kind, TokenKind::Comma | TokenKind::FatArrow) {
+//         constraints.push(parse_generic_constraint(cursor)?);
+//     }
+//
+//     Ok(Some(constraints))
+// }
 
-    cursor.bump()?; // Consume the where
-
-    let mut constraints = vec![];
-
-    while !matches!(cursor.first().kind, TokenKind::Comma | TokenKind::FatArrow) {
-        constraints.push(parse_generic_constraint(cursor)?);
-    }
-
-    Ok(Some(constraints))
-}
-
-fn parse_generic_constraint(cursor: &mut Cursor) -> Result<GenericConstraint, String> {
-    let generic = parse_type_identifier(cursor, false)?;
-
-    let TypeIdentifier::Type(generic_name) = generic else {
-        return Err(format!(
-            "Expected type identifier variant Type but found {:?}",
-            generic
-        ));
-    };
-
-    if !generic_name.is_generic_type_identifier_name() {
-        return Err(format!("Invalid field name: {}", generic_name));
-    }
-
-    let TokenKind::Colon = cursor.bump()?.kind else {
-        return Err(format!("Expected ':' but found {:?}", cursor.first().kind));
-    };
-
-    let mut constraints = vec![];
-
-    let mut has_and = true;
-
-    while let TokenKind::Identifier(_) = cursor.first().kind {
-        if !has_and {
-            break;
-        }
-
-        let type_annotation = parse_type_annotation(cursor, false)?;
-        constraints.push(type_annotation);
-
-        if cursor.first().kind == TokenKind::Keyword(Keyword::And) {
-            cursor.bump()?; // Consume the and
-        } else {
-            has_and = false;
-        }
-    }
-
-    Ok(GenericConstraint {
-        generic: GenericType {
-            type_name: generic_name,
-        },
-        constraints,
-    })
-}
+// fn parse_generic_constraint(cursor: &mut Cursor) -> Result<GenericConstraint, String> {
+//     let generic = parse_type_identifier(cursor, false)?;
+//
+//     let TypeIdentifier::Type(generic_name) = generic else {
+//         return Err(format!(
+//             "Expected type identifier variant Type but found {:?}",
+//             generic
+//         ));
+//     };
+//
+//     if !generic_name.is_generic_type_identifier_name() {
+//         return Err(format!("Invalid field name: {}", generic_name));
+//     }
+//
+//     let TokenKind::Colon = cursor.bump()?.kind else {
+//         return Err(format!("Expected ':' but found {:?}", cursor.first().kind));
+//     };
+//
+//     let mut constraints = vec![];
+//
+//     let mut has_and = true;
+//
+//     while let TokenKind::Identifier(_) = cursor.first().kind {
+//         if !has_and {
+//             break;
+//         }
+//
+//         let type_annotation = parse_type_annotation(cursor, false)?;
+//         constraints.push(type_annotation);
+//
+//         if cursor.first().kind == TokenKind::Keyword(Keyword::And) {
+//             cursor.bump()?; // Consume the and
+//         } else {
+//             has_and = false;
+//         }
+//     }
+//
+//     Ok(GenericConstraint {
+//         generic: GenericType {
+//             type_name: generic_name,
+//         },
+//         constraints,
+//     })
+// }

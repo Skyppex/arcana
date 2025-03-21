@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    parser::{Parameter, Statement},
+    parser::{Parameter, Statement, StructData},
     types::{TypeAnnotation, TypeIdentifier},
 };
 
@@ -9,21 +9,16 @@ use super::{ast::TypedStatement, statements, type_environment::TypeEnvironment, 
 
 #[derive(Debug)]
 pub enum DiscoveredType {
-    Struct(
-        TypeIdentifier,
-        Vec<TypeAnnotation>,
-        HashMap<String, TypeAnnotation>,
-    ),
-    Enum(
-        TypeIdentifier,
-        HashMap<String, TypeAnnotation>,
-        HashMap<String, (Vec<TypeAnnotation>, Vec<(String, TypeAnnotation)>)>,
-    ),
-    EnumMember(
-        TypeIdentifier,
-        Vec<TypeAnnotation>,
-        HashMap<String, TypeAnnotation>,
-    ),
+    Struct {
+        type_identifier: TypeIdentifier,
+        embedded_structs: Vec<TypeAnnotation>,
+        fields: HashMap<String, TypeAnnotation>,
+    },
+    Enum {
+        type_identifier: TypeIdentifier,
+        shared_fields: HashMap<String, TypeAnnotation>,
+        members: Vec<StructData>,
+    },
     Union(TypeIdentifier, Vec<TypeAnnotation>),
     TypeAlias(TypeIdentifier, Vec<TypeAnnotation>),
     Protocol {
