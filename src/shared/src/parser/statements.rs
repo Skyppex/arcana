@@ -1,6 +1,5 @@
 use crate::{
     lexer::token::{IdentifierType, Keyword, TokenKind},
-    parser::AssociatedType,
     types::{
         can_be_type_annotation, parse_generic_type_parameters, parse_type_annotation,
         parse_type_identifier, TypeAnnotation, TypeIdentifier,
@@ -8,12 +7,10 @@ use crate::{
 };
 
 use super::{
-    cursor::Cursor,
-    expressions::{self, parse_expression},
-    AccessModifier, Closure, EnumDeclaration, Expression, FunctionDeclaration,
-    ImplementationDeclaration, Literal, ModuleDeclaration, Parameter, ProtocolDeclaration,
-    Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration,
-    Use, UseItem,
+    cursor::Cursor, expressions, fat_arrow_expr_or_block_expr, AccessModifier, AssociatedType,
+    Closure, EnumDeclaration, Expression, FunctionDeclaration, ImplementationDeclaration, Literal,
+    ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData, StructDeclaration,
+    StructField, TypeAliasDeclaration, UnionDeclaration, Use, UseItem,
 };
 
 pub fn parse_module_only(
@@ -286,11 +283,8 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         }));
     }
 
-    let TokenKind::FatArrow = cursor.bump()?.kind else {
-        return Err(format!("Expected => but found {:?}", cursor.first().kind));
-    };
+    let body = fat_arrow_expr_or_block_expr(cursor)?;
 
-    let body = parse_expression(cursor)?;
     let body = unwrap_parameters(
         access_modifier,
         type_identifier,

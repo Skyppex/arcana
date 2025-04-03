@@ -58,6 +58,8 @@ pub enum Expression {
     Print(Box<Expression>),
     #[cfg(feature = "interpreter")]
     Drop(String),
+    #[cfg(feature = "interpreter")]
+    Input(Box<Expression>),
 }
 
 impl PrettyPrint for Expression {

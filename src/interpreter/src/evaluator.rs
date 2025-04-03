@@ -169,6 +169,18 @@ fn evaluate_expression(
             Ok(Value::Void)
         }
         TypedExpression::Drop { identifier, .. } => evaluate_drop(identifier, environment),
+        TypedExpression::Input { value } => {
+            let value = evaluate_expression(*value, environment)?;
+            println!("{}", value);
+
+            let mut buf = String::new();
+
+            std::io::stdin()
+                .read_line(&mut buf)
+                .expect("Failed to read line");
+
+            Ok(Value::String(buf))
+        }
         TypedExpression::Loop { body, .. } => evaluate_loop(body, environment),
         TypedExpression::While {
             condition,

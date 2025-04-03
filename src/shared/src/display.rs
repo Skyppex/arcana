@@ -933,6 +933,18 @@ impl IndentDisplay for Expression {
                 result.push_str(format!("<drop> {}", identifier).as_str());
                 result
             }
+            Expression::Input(value) => {
+                let mut result = String::new();
+                result.push_str(
+                    format!(
+                        "{}<input> {}",
+                        indent.dash_end(),
+                        value.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result
+            }
             Expression::Loop(body) => {
                 let mut result = String::new();
                 result.push_str("<loop>");
@@ -2493,6 +2505,11 @@ impl IndentDisplay for TypedExpression {
             TypedExpression::Drop { identifier, type_ } => {
                 let mut result = String::new();
                 result.push_str(format!("<drop> {}: {}", identifier, type_).as_str());
+                result
+            }
+            TypedExpression::Input { value } => {
+                let mut result = String::new();
+                result.push_str(format!("<input> {}: {}", value, Type::String).as_str());
                 result
             }
             TypedExpression::Loop { body, type_ } => {

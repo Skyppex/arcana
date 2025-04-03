@@ -4,8 +4,9 @@ mod expressions;
 mod statements;
 
 pub use ast::*;
+use expressions::{parse_block, parse_expression};
 
-use crate::lexer::token::Token;
+use crate::lexer::token::{Token, TokenKind};
 
 use self::cursor::Cursor;
 
@@ -23,4 +24,18 @@ pub fn discover_module(
     let mut cursor = Cursor::new(tokens, false);
     let module = statements::parse_module_only(&mut cursor)?;
     Ok(module)
+}
+
+pub fn fat_arrow_expr_or_block_expr(cursor: &mut Cursor) -> Result<Expression, String> {
+    match cursor.first().kind {
+        TokenKind::FatArrow => {
+            cursor.bump()?; // Consume the =>
+            parse_expression(cursor)
+        }
+        TokenKind::OpenBrace => parse_block(cursor),
+        _ => Err(format!(
+            "Expected => or {{ but found {:?}",
+            cursor.first().kind
+        )),
+    }
 }

@@ -5,9 +5,9 @@ use crate::{
 };
 
 use super::{
-    cursor::Cursor, statements::parse_statement, Assignment, Binary, BinaryOperator, Call, Closure,
-    ClosureParameter, Expression, FieldInitializer, For, If, Literal, Match, MatchArm, Member,
-    Statement, Unary, UnaryOperator, VariableDeclaration, While,
+    cursor::Cursor, fat_arrow_expr_or_block_expr, statements::parse_statement, Assignment, Binary,
+    BinaryOperator, Call, Closure, ClosureParameter, Expression, FieldInitializer, For, If,
+    Literal, Match, MatchArm, Member, Statement, Unary, UnaryOperator, VariableDeclaration, While,
 };
 
 use crate::types::parse_type_annotation;
@@ -46,7 +46,7 @@ fn parse_print(cursor: &mut Cursor) -> Result<Expression, String> {
 #[cfg(feature = "interpreter")]
 fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Drop) {
-        return parse_break(cursor);
+        return parse_input(cursor);
     }
 
     cursor.bump()?; // Consume the drop
@@ -67,6 +67,27 @@ fn parse_drop(cursor: &mut Cursor) -> Result<Expression, String> {
     };
 
     Ok(Expression::Drop(identifier))
+}
+
+#[cfg(feature = "interpreter")]
+fn parse_input(cursor: &mut Cursor) -> Result<Expression, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Input) {
+        return parse_break(cursor);
+    }
+
+    cursor.bump()?; // Consume the input
+
+    let TokenKind::OpenParen = cursor.bump()?.kind else {
+        return Err(format!("Expected ( but found {:?}", cursor.first().kind));
+    };
+
+    let expression = parse_expression(cursor)?;
+
+    let TokenKind::CloseParen = cursor.bump()?.kind else {
+        return Err(format!("Expected ) but found {:?}", cursor.first().kind));
+    };
+
+    Ok(Expression::Input(Box::new(expression)))
 }
 
 fn parse_break(cursor: &mut Cursor) -> Result<Expression, String> {
@@ -168,9 +189,8 @@ pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
     }
 
     cursor.bump()?; // Consume the loop
-    cursor.optional_bump(TokenKind::FatArrow)?;
 
-    let body = parse_expression(cursor)?;
+    let body = fat_arrow_expr_or_block_expr(cursor)?;
 
     Ok(Expression::Loop(Box::new(body)))
 }
@@ -183,8 +203,8 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.bump()?; // Consume the while
 
     let condition = parse_expression(cursor)?;
-    cursor.expect(TokenKind::FatArrow)?;
-    let body = parse_expression(cursor)?;
+
+    let body = fat_arrow_expr_or_block_expr(cursor)?;
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
         return Ok(Expression::While(While {
@@ -195,9 +215,8 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
     }
 
     cursor.bump()?; // Consume the else
-    cursor.optional_bump(TokenKind::FatArrow)?;
 
-    let else_body = parse_expression(cursor)?;
+    let else_body = fat_arrow_expr_or_block_expr(cursor)?;
 
     Ok(Expression::While(While {
         condition: Box::new(condition),
@@ -225,8 +244,7 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.expect(TokenKind::Keyword(Keyword::In))?;
 
     let iterable = parse_expression(cursor)?;
-    cursor.expect(TokenKind::FatArrow)?;
-    let body = parse_expression(cursor)?;
+    let body = fat_arrow_expr_or_block_expr(cursor)?;
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
         return Ok(Expression::For(For {
@@ -238,9 +256,8 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
     }
 
     cursor.bump()?; // Consume the else
-    cursor.optional_bump(TokenKind::FatArrow)?;
 
-    let else_block = parse_expression(cursor)?;
+    let else_block = fat_arrow_expr_or_block_expr(cursor)?;
 
     Ok(Expression::For(For {
         identifier,
@@ -517,10 +534,7 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
     let return_type_annotation = parse_optional_type_annotation(cursor, true)?;
 
-    // Optional fat arrow
-    if cursor.first().kind == TokenKind::FatArrow {
-        cursor.bump()?; // Consume the =>
-    }
+    cursor.optional_bump(TokenKind::FatArrow)?;
 
     let body = parse_expression(cursor)?;
 
@@ -622,9 +636,7 @@ fn parse_match(cursor: &mut Cursor) -> Result<Expression, String> {
 
     let mut arms = vec![];
 
-    if cursor.first().kind == TokenKind::Pipe {
-        cursor.bump()?; // Consume the |
-    }
+    cursor.optional_bump(TokenKind::Pipe)?;
 
     loop {
         let pattern = parse_pattern(cursor)?;
@@ -636,30 +648,13 @@ fn parse_match(cursor: &mut Cursor) -> Result<Expression, String> {
             expression: Box::new(body),
         });
 
-        if cursor.first().kind == TokenKind::Comma {
-            cursor.bump()?; // Consume the ,
-        }
+        cursor.optional_bump(TokenKind::Comma)?;
 
         if cursor.first().kind != TokenKind::Pipe {
             break;
         }
 
-        cursor.expect(TokenKind::Pipe)?; // Consume the |
-    }
-    while cursor.first().kind == TokenKind::Pipe {
-        cursor.bump()?; // Consume the arm keyword
-        let pattern = parse_pattern(cursor)?;
-        cursor.expect(TokenKind::FatArrow)?; // Consume the =>
-        let body = parse_expression(cursor)?;
-
-        arms.push(MatchArm {
-            pattern,
-            expression: Box::new(body),
-        });
-
-        if cursor.first().kind == TokenKind::Comma {
-            cursor.bump()?; // Consume the ,
-        }
+        cursor.bump()?; // consume the |
     }
 
     Ok(Expression::Match(Match {
@@ -865,8 +860,7 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
     cursor.bump()?; // Consume the if
 
     let if_condition = parse_expression(cursor)?;
-    cursor.expect(TokenKind::FatArrow)?;
-    let if_block = parse_expression(cursor)?;
+    let if_block = fat_arrow_expr_or_block_expr(cursor)?;
 
     let mut r#else = None;
 
@@ -876,9 +870,8 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
         if cursor.first().kind == TokenKind::Keyword(Keyword::If) {
             r#else = Some(Box::new(parse_if(cursor)?));
         } else {
-            cursor.optional_bump(TokenKind::FatArrow)?;
-            let block = parse_block(cursor)?;
-            r#else = Some(Box::new(block));
+            let else_expr = fat_arrow_expr_or_block_expr(cursor)?;
+            r#else = Some(Box::new(else_expr));
         }
     }
 

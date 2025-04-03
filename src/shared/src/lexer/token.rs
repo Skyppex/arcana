@@ -214,6 +214,9 @@ pub enum Keyword {
 
     #[cfg(feature = "interpreter")]
     Print,
+
+    #[cfg(feature = "interpreter")]
+    Input,
 }
 
 pub trait IdentifierType {

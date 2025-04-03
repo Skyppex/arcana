@@ -448,6 +448,10 @@ pub enum TypedExpression {
         identifier: String,
         type_: Type,
     },
+    #[cfg(feature = "interpreter")]
+    Input {
+        value: Box<TypedExpression>,
+    },
     Loop {
         body: Box<TypedExpression>,
         type_: Type,
@@ -492,6 +496,7 @@ impl Typed for TypedExpression {
             TypedExpression::For { type_, .. } => type_.clone(),
             TypedExpression::Print { .. } => Type::Void,
             TypedExpression::Drop { type_, .. } => type_.clone(),
+            TypedExpression::Input { .. } => Type::String,
             TypedExpression::Break(_) => Type::Void,
             TypedExpression::Continue => Type::Void,
             TypedExpression::Return(_) => Type::Void,
@@ -518,8 +523,9 @@ impl Typed for TypedExpression {
             TypedExpression::Loop { type_, .. } => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
             TypedExpression::For { type_, .. } => type_.clone(),
-            TypedExpression::Print { value } => value.get_deep_type(),
+            TypedExpression::Print { .. } => Type::Void,
             TypedExpression::Drop { type_, .. } => type_.clone(),
+            TypedExpression::Input { .. } => Type::String,
             TypedExpression::Break(_) => Type::Void,
             TypedExpression::Continue => Type::Void,
             TypedExpression::Return(_) => Type::Void,
@@ -642,6 +648,7 @@ impl Display for TypedExpression {
             TypedExpression::Block(block) => write!(f, "{}", block),
             TypedExpression::Drop { identifier, .. } => write!(f, "drop {}", identifier),
             TypedExpression::Print { value, .. } => write!(f, "print {}", value),
+            TypedExpression::Input { value, .. } => write!(f, "input {}", value),
             TypedExpression::Loop { body, .. } => write!(f, "loop {}", body),
             TypedExpression::While {
                 condition,

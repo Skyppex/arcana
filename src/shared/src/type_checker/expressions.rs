@@ -860,6 +860,9 @@ pub fn check_type(
                 type_,
             })
         }
+        Expression::Input(e) => Ok(TypedExpression::Input {
+            value: Box::new(check_type(e, discovered_types, type_environment, None)?),
+        }),
         Expression::Loop(body) => {
             let loop_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
                 type_environment,
