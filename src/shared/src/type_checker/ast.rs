@@ -33,12 +33,7 @@ pub enum TypedStatement {
         use_item: UseItem,
         type_: Type,
     },
-    StructDeclaration {
-        type_identifier: TypeIdentifier,
-        embedded_structs: Vec<Type>,
-        fields: Vec<StructField>,
-        type_: Type,
-    },
+    StructDeclaration(StructData),
     EnumDeclaration {
         type_identifier: TypeIdentifier,
         shared_fields: Vec<StructField>,
@@ -96,7 +91,7 @@ impl Typed for TypedStatement {
             TypedStatement::Program { .. } => Type::Void,
             TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Use { type_, .. } => type_.clone(),
-            TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::StructDeclaration(StructData { type_, .. }) => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::TypeAliasDeclaration { type_, .. } => type_.clone(),
@@ -114,7 +109,7 @@ impl Typed for TypedStatement {
             TypedStatement::Program { .. } => Type::Void,
             TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Use { type_, .. } => type_.clone(),
-            TypedStatement::StructDeclaration { type_, .. } => type_.clone(),
+            TypedStatement::StructDeclaration(StructData { type_, .. }) => type_.clone(),
             TypedStatement::EnumDeclaration { type_, .. } => type_.clone(),
             TypedStatement::UnionDeclaration { type_, .. } => type_.clone(),
             TypedStatement::TypeAliasDeclaration { type_, .. } => type_.clone(),
@@ -151,11 +146,11 @@ impl Display for TypedStatement {
                 write!(f, "mod {}", module_path.join("::"))
             }
             TypedStatement::Use { use_item, .. } => write!(f, "use {}", use_item),
-            TypedStatement::StructDeclaration {
+            TypedStatement::StructDeclaration(StructData {
                 type_identifier,
                 fields,
                 ..
-            } => write!(
+            }) => write!(
                 f,
                 "struct {} {{{}}}",
                 type_identifier,
@@ -699,6 +694,34 @@ impl Display for TypedExpression {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct EmbeddedStruct {
+    pub type_annotation: TypeAnnotation,
+    pub field_initializers: Vec<FieldInitializer>,
+    pub type_: Type,
+}
+
+impl ToKey for EmbeddedStruct {
+    fn to_key(&self) -> String {
+        self.type_annotation.to_key()
+    }
+}
+
+impl Display for EmbeddedStruct {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {{{}}}",
+            self.type_annotation,
+            self.field_initializers
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct StructField {
     pub struct_identifier: TypeIdentifier,
     pub mutable: bool,
@@ -721,7 +744,7 @@ impl Display for StructField {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructData {
     pub type_identifier: TypeIdentifier,
-    pub embedded_structs: Vec<Type>,
+    pub embedded_structs: Vec<EmbeddedStruct>,
     pub fields: Vec<StructField>,
     pub type_: Type,
 }

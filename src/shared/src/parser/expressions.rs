@@ -348,7 +348,7 @@ fn parse_struct_literal(
     }))
 }
 
-fn parse_field_initializers(cursor: &mut Cursor) -> Result<Vec<FieldInitializer>, String> {
+pub fn parse_field_initializers(cursor: &mut Cursor) -> Result<Vec<FieldInitializer>, String> {
     let mut field_initializers = vec![];
     let mut has_comma = true;
 

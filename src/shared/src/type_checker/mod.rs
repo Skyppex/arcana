@@ -19,12 +19,14 @@ use crate::{
     types::{GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };
 
+use ast::EmbeddedStruct;
+
 use self::statements::check_type_annotation;
 
 #[derive(Debug, Clone)]
 pub struct Struct {
     pub type_identifier: TypeIdentifier,
-    pub embedded_structs: Vec<TypeAnnotation>,
+    pub embedded_structs: Vec<EmbeddedStruct>,
     pub fields: Vec<StructField>,
 }
 
@@ -85,56 +87,6 @@ impl Enum {
 impl FullName for Enum {
     fn full_name(&self) -> String {
         self.type_identifier.to_string()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct EnumMember {
-    pub enum_name: TypeIdentifier,
-    pub discriminant_name: String,
-    pub embedded_structs: Vec<TypeAnnotation>,
-    pub fields: Vec<StructField>,
-}
-
-impl EnumMember {
-    pub fn type_annotation(&self) -> TypeAnnotation {
-        TypeAnnotation::Type(format!("{}::{}", self.enum_name, self.discriminant_name))
-    }
-}
-
-impl FullName for EnumMember {
-    fn full_name(&self) -> String {
-        format!(
-            "{}::{} {{{}}}",
-            self.enum_name,
-            self.discriminant_name,
-            self.fields
-                .iter()
-                .map(|struct_| format!(
-                    "{}: {}",
-                    struct_.field_name,
-                    struct_.field_type.full_name()
-                ))
-                .collect::<Vec<String>>()
-                .join(", ")
-        )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct EnumMemberField {
-    pub enum_name: TypeIdentifier,
-    pub discriminant_name: String,
-    pub field_name: String,
-    pub field_type: Box<Type>,
-}
-
-impl FullName for EnumMemberField {
-    fn full_name(&self) -> String {
-        format!(
-            "{}::{}.{}",
-            self.enum_name, self.discriminant_name, self.field_name
-        )
     }
 }
 
@@ -969,10 +921,6 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 ..
             }),
         ) => {
-            dbg!(left_type_identifier);
-            dbg!(right_type_identifier);
-            dbg!(embedded_structs);
-
             let e = embedded_structs
                 .iter()
                 .map(|s| s.to_key())

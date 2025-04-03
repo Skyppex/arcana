@@ -9,13 +9,13 @@ use crate::{
 };
 
 use super::{
-    ast::{self, Typed, TypedExpression, TypedParameter, TypedStatement},
+    ast::{self, FieldInitializer, Typed, TypedExpression, TypedParameter, TypedStatement},
     expressions,
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    type_equals, Enum, Function, Parameter, Protocol, Rcrc, Struct, StructField, Type, TypeAlias,
-    Union,
+    type_equals, DiscoveredEmbeddedStruct, EmbeddedStruct, Enum, Function, Parameter, Protocol,
+    Rcrc, Struct, StructField, Type, TypeAlias, Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -42,7 +42,17 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             ..
         }) => Ok(vec![DiscoveredType::Struct {
             type_identifier: type_identifier.clone(),
-            embedded_structs: embedded_structs.clone(),
+            embedded_structs: embedded_structs
+                .iter()
+                .map(|e| DiscoveredEmbeddedStruct {
+                    type_annotation: e.type_annotation.clone(),
+                    initialized_fields: e
+                        .field_initializers
+                        .iter()
+                        .map(|f| f.identifier.clone())
+                        .collect(),
+                })
+                .collect(),
             fields: fields
                 .iter()
                 .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
@@ -77,7 +87,18 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                         Box::new(type_identifier.clone()),
                         member.type_identifier.to_key(),
                     ),
-                    embedded_structs: member.embedded_structs.clone(),
+                    embedded_structs: member
+                        .embedded_structs
+                        .iter()
+                        .map(|e| DiscoveredEmbeddedStruct {
+                            type_annotation: e.type_annotation.clone(),
+                            initialized_fields: e
+                                .field_initializers
+                                .iter()
+                                .map(|f| f.identifier.clone())
+                                .collect(),
+                        })
+                        .collect(),
                     fields: member
                         .fields
                         .iter()
@@ -197,7 +218,13 @@ pub fn check_type(
             let embedded_structs: Result<Vec<_>, _> = embedded_structs
                 .iter()
                 .map(|e| {
-                    check_type_annotation(e, discovered_types, struct_type_environment.clone())
+                    let embedded_type = check_type_annotation(
+                        &e.type_annotation,
+                        discovered_types,
+                        struct_type_environment.clone(),
+                    )?;
+
+                    Ok((embedded_type, e.field_initializers))
                 })
                 .collect();
 
@@ -224,10 +251,9 @@ pub fn check_type(
 
             let mut fields = fields?;
 
-            for embedded_struct in embedded_structs.iter().rev() {
-                let embedded_struct = match embedded_struct {
-                    Type::Struct(s) => s,
-                    _ => return Err("Embedded struct must be a struct".to_string()),
+            for (embedded_struct_type, _) in embedded_structs.iter().rev() {
+                let Type::Struct(embedded_struct) = embedded_struct_type else {
+                    return Err("Embedded struct must be a struct".to_string());
                 };
 
                 for field in embedded_struct.fields.clone() {
@@ -252,7 +278,7 @@ pub fn check_type(
 
             let mut recursive_embedded_structs = embedded_structs.clone();
 
-            for embedded_struct in &embedded_structs {
+            for (embedded_struct, field_initializers) in &embedded_structs {
                 let Type::Struct(Struct {
                     embedded_structs: es,
                     ..
@@ -262,11 +288,14 @@ pub fn check_type(
                 };
 
                 for embedded_struct in es {
-                    recursive_embedded_structs.push(check_type_annotation(
-                        embedded_struct,
-                        discovered_types,
-                        type_environment.clone(),
-                    )?);
+                    recursive_embedded_structs.push((
+                        check_type_annotation(
+                            &embedded_struct.type_annotation,
+                            discovered_types,
+                            type_environment.clone(),
+                        )?,
+                        field_initializers.clone(),
+                    ));
                 }
             }
 
@@ -282,23 +311,47 @@ pub fn check_type(
                 })
                 .collect();
 
+            let embedded_structs: Result<Vec<EmbeddedStruct>, String> = recursive_embedded_structs
+                .iter()
+                .map(|(es, fis)| {
+                    let mut field_initializers = vec![];
+
+                    for fi in fis {
+                        field_initializers.push(FieldInitializer {
+                            identifier: fi.identifier.clone(),
+                            initializer: expressions::check_type(
+                                &fi.initializer,
+                                discovered_types,
+                                type_environment.clone(),
+                                None,
+                            )?,
+                        })
+                    }
+
+                    Ok(EmbeddedStruct {
+                        type_annotation: es.type_annotation(),
+                        field_initializers,
+                        type_: es.clone(),
+                    })
+                })
+                .collect();
+
+            let embedded_structs = embedded_structs?;
+
             let type_ = Type::Struct(Struct {
                 type_identifier: type_identifier.clone(),
-                embedded_structs: recursive_embedded_structs
-                    .iter()
-                    .map(|s| s.type_annotation())
-                    .collect(),
+                embedded_structs,
                 fields: field_types?,
             });
 
             type_environment.borrow_mut().add_type(type_.clone())?;
 
-            Ok(TypedStatement::StructDeclaration {
+            Ok(TypedStatement::StructDeclaration(super::ast::StructData {
                 type_identifier: type_identifier.clone(),
-                embedded_structs: recursive_embedded_structs,
+                embedded_structs,
                 fields,
                 type_,
-            })
+            }))
         }
         Statement::EnumDeclaration(parser::EnumDeclaration {
             access_modifier: _,
@@ -344,11 +397,13 @@ pub fn check_type(
                         .embedded_structs
                         .iter()
                         .map(|e| {
-                            check_type_annotation(
-                                e,
+                            let embedded_type = check_type_annotation(
+                                &e.type_annotation,
                                 discovered_types,
                                 enum_type_environment.clone(),
-                            )
+                            )?;
+
+                            Ok((embedded_type, e.field_initializers))
                         })
                         .collect();
 
@@ -376,10 +431,9 @@ pub fn check_type(
 
                     let mut fields = fields?;
 
-                    for embedded_struct in embedded_structs.iter().rev() {
-                        let embedded_struct = match embedded_struct {
-                            Type::Struct(s) => s,
-                            _ => return Err("Embedded struct must be a struct".to_string()),
+                    for (embedded_struct, _) in embedded_structs.iter().rev() {
+                        let Type::Struct(embedded_struct) = embedded_struct else {
+                            return Err("Embedded struct must be a struct".to_string());
                         };
 
                         for field in embedded_struct.fields.clone() {
@@ -404,7 +458,7 @@ pub fn check_type(
 
                     let mut recursive_embedded_structs = embedded_structs.clone();
 
-                    for embedded_struct in &embedded_structs {
+                    for (embedded_struct, field_initializers) in &embedded_structs {
                         let Type::Struct(Struct {
                             embedded_structs: es,
                             ..
@@ -414,13 +468,44 @@ pub fn check_type(
                         };
 
                         for embedded_struct in es {
-                            recursive_embedded_structs.push(check_type_annotation(
-                                embedded_struct,
-                                discovered_types,
-                                type_environment.clone(),
-                            )?);
+                            recursive_embedded_structs.push((
+                                check_type_annotation(
+                                    &embedded_struct.type_annotation,
+                                    discovered_types,
+                                    type_environment.clone(),
+                                )?,
+                                field_initializers.clone(),
+                            ));
                         }
                     }
+
+                    let embedded_structs: Result<Vec<EmbeddedStruct>, String> =
+                        recursive_embedded_structs
+                            .iter()
+                            .map(|(es, fis)| {
+                                let mut field_initializers = vec![];
+
+                                for fi in fis {
+                                    field_initializers.push(FieldInitializer {
+                                        identifier: fi.identifier.clone(),
+                                        initializer: expressions::check_type(
+                                            &fi.initializer,
+                                            discovered_types,
+                                            type_environment.clone(),
+                                            None,
+                                        )?,
+                                    })
+                                }
+
+                                Ok(EmbeddedStruct {
+                                    type_annotation: es.type_annotation(),
+                                    field_initializers,
+                                    type_: es.clone(),
+                                })
+                            })
+                            .collect();
+
+                    let embedded_structs = embedded_structs?;
 
                     let field_types: Result<Vec<StructField>, String> = fields
                         .clone()
@@ -442,10 +527,7 @@ pub fn check_type(
                             Box::new(type_identifier.clone()),
                             member.type_identifier.to_key(),
                         ),
-                        embedded_structs: recursive_embedded_structs
-                            .iter()
-                            .map(|s| s.type_annotation())
-                            .collect(),
+                        embedded_structs,
                         fields: field_types?,
                     });
 
@@ -458,7 +540,7 @@ pub fn check_type(
                             Box::new(type_identifier.clone()),
                             member.type_identifier.to_key(),
                         ),
-                        embedded_structs: recursive_embedded_structs,
+                        embedded_structs,
                         fields,
                         type_: enum_member,
                     })
@@ -976,7 +1058,20 @@ fn check_type_identifier(
             fields,
         }) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
-            embedded_structs: embedded_structs.clone(),
+            embedded_structs: embedded_structs
+                .iter()
+                .map(|e| {
+                    Ok(EmbeddedStruct {
+                        type_annotation: e.type_annotation.clone(),
+                        field_initializers: e.initialized_fields.clone(),
+                        type_: check_type_annotation(
+                            &e.type_annotation,
+                            discovered_types,
+                            type_environment.clone(),
+                        )?,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?,
             fields: {
                 let mut vec = Vec::new();
 
@@ -1206,7 +1301,7 @@ pub fn check_type_annotation(
             fields,
         }) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
-            embedded_structs: embedded_structs.clone(),
+            embedded_structs: embedded_structs.into(),
             fields: {
                 let mut map = Vec::new();
 

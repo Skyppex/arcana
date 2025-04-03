@@ -114,8 +114,20 @@ pub struct StructDeclaration {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructData {
     pub type_identifier: TypeIdentifier,
-    pub embedded_structs: Vec<TypeAnnotation>,
+    pub embedded_structs: Vec<EmbeddedStruct>,
     pub fields: Vec<StructField>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EmbeddedStruct {
+    pub type_annotation: TypeAnnotation,
+    pub field_initializers: Vec<FieldInitializer>,
+}
+
+impl ToKey for EmbeddedStruct {
+    fn to_key(&self) -> String {
+        self.type_annotation.to_key()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -8,10 +8,16 @@ use crate::{
 use super::{ast::TypedStatement, statements, type_environment::TypeEnvironment, Rcrc};
 
 #[derive(Debug)]
+pub struct DiscoveredEmbeddedStruct {
+    pub type_annotation: TypeAnnotation,
+    pub initialized_fields: Vec<String>,
+}
+
+#[derive(Debug)]
 pub enum DiscoveredType {
     Struct {
         type_identifier: TypeIdentifier,
-        embedded_structs: Vec<TypeAnnotation>,
+        embedded_structs: Vec<DiscoveredEmbeddedStruct>,
         fields: HashMap<String, TypeAnnotation>,
     },
     Enum {

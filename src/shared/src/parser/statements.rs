@@ -8,9 +8,10 @@ use crate::{
 
 use super::{
     cursor::Cursor, expressions, fat_arrow_expr_or_block_expr, AccessModifier, AssociatedType,
-    Closure, EnumDeclaration, Expression, FunctionDeclaration, ImplementationDeclaration, Literal,
-    ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData, StructDeclaration,
-    StructField, TypeAliasDeclaration, UnionDeclaration, Use, UseItem,
+    Closure, EmbeddedStruct, EnumDeclaration, Expression, FieldInitializer, FunctionDeclaration,
+    ImplementationDeclaration, Literal, ModuleDeclaration, Parameter, ProtocolDeclaration,
+    Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration,
+    Use, UseItem,
 };
 
 pub fn parse_module_only(
@@ -999,7 +1000,7 @@ fn parse_struct_field(
     })
 }
 
-fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<TypeAnnotation>, String> {
+fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<EmbeddedStruct>, String> {
     let mut embedded_structs = vec![];
 
     loop {
@@ -1007,7 +1008,17 @@ fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<TypeAnnotation>, St
             if identifier.is_type_identifier_name() {
                 cursor.bump()?; // Consume the identifier
 
-                embedded_structs.push(TypeAnnotation::Type(identifier));
+                let field_initializers = if cursor.first().kind == TokenKind::OpenBrace {
+                    cursor.bump()?; // Consume the {
+                    expressions::parse_field_initializers(cursor)?
+                } else {
+                    vec![]
+                };
+
+                embedded_structs.push(EmbeddedStruct {
+                    type_annotation: TypeAnnotation::Type(identifier),
+                    field_initializers,
+                });
 
                 if cursor.first().kind == TokenKind::Comma {
                     cursor.bump()?; // Consume the ,

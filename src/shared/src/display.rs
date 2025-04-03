@@ -1,9 +1,9 @@
 use crate::{
     parser::{
         AccessModifier, Assignment, AssociatedType, Binary, BinaryOperator, Call, ClosureParameter,
-        EnumDeclaration, EnumMember, EnumMemberField, Expression, FieldInitializer, FlagsMember,
-        For, FunctionDeclaration, If, ImplementationDeclaration, Literal, Match, MatchArm, Member,
-        ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData,
+        EmbeddedStruct, EnumDeclaration, EnumMember, EnumMemberField, Expression, FieldInitializer,
+        FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration, Literal, Match,
+        MatchArm, Member, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData,
         StructDeclaration, StructField, TypeAliasDeclaration, Unary, UnaryOperator,
         UnionDeclaration, Use, UseItem, VariableDeclaration, While,
     },
@@ -1486,6 +1486,35 @@ impl IndentDisplay for StructData {
                 );
             }
         }
+
+        indent.decrease();
+        result
+    }
+}
+
+impl IndentDisplay for EmbeddedStruct {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<embedded_struct>");
+        indent.increase();
+
+        result.push_str(
+            format!(
+                "\n{}type_name: {}",
+                indent.dash(),
+                self.type_annotation.indent_display(indent)
+            )
+            .as_str(),
+        );
+
+        result.push_str(
+            format!(
+                "\n{}field_initialzers: {}",
+                indent.dash_end(),
+                self.field_initializers.indent_display(indent)
+            )
+            .as_str(),
+        );
 
         indent.decrease();
         result
