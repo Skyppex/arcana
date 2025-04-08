@@ -2,12 +2,26 @@ struct Test {
     test: Int,
 }
 
-// enum Either {
-    struct Test {
+enum Either {
+    share: Bool,
+    Test {
         Test,
+        extra: UInt,
+    },
+    Test2 {
+        test2: String,
     }
-// }
+}
 
-let e = Test {
+let e1 = Either::Test {
+    share: true,
     test: 1,
+    extra: 0,
+}
+
+print(e1);
+
+let e2 = Either::Test2 {
+    share: true,
+    test2: "wow",
 }

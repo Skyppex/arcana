@@ -229,7 +229,7 @@ pub trait IdentifierType {
 
 impl IdentifierType for str {
     fn is_type_identifier_name(&self) -> bool {
-        let regex = regex::Regex::new(r"[A-Z]\w*");
+        let regex = regex::Regex::new(r"^[A-Z]\w*$");
 
         match regex {
             Ok(re) => re.is_match(self),
@@ -238,7 +238,7 @@ impl IdentifierType for str {
     }
 
     fn is_generic_type_identifier_name(&self) -> bool {
-        let regex = regex::Regex::new(r"T\w*");
+        let regex = regex::Regex::new(r"^T\w*$");
 
         match regex {
             Ok(re) => re.is_match(self),
@@ -247,16 +247,22 @@ impl IdentifierType for str {
     }
 
     fn is_function_identifier_name(&self) -> bool {
-        let regex = regex::Regex::new(r"[_a-z][_a-z\d]*");
+        dbg!(self);
+        let regex = regex::Regex::new(r"^[_a-z][_a-z\d]*$");
+
+        dbg!(&regex);
 
         match regex {
-            Ok(re) => re.is_match(self),
+            Ok(re) => {
+                dbg!(re.is_match(self));
+                re.is_match(self)
+            }
             Err(_) => false,
         }
     }
 
     fn is_variable_identifier_name(&self) -> bool {
-        let regex = regex::Regex::new(r"[_a-z][_a-z\d]*");
+        let regex = regex::Regex::new(r"^[_a-z][_a-z\d]*$");
 
         match regex {
             Ok(re) => re.is_match(self),
@@ -265,7 +271,7 @@ impl IdentifierType for str {
     }
 
     fn is_module_identifier_name(&self) -> bool {
-        let regex = regex::Regex::new(r"[_a-z][_a-z\d]*");
+        let regex = regex::Regex::new(r"^[_a-z][_a-z\d]*$");
 
         match regex {
             Ok(re) => re.is_match(self),
