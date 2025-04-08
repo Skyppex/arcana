@@ -367,7 +367,7 @@ impl Display for TypeIdentifier {
                         .join(", ")
                 )
             }
-            TypeIdentifier::MemberType(parent, member) => write!(f, "{}->{}", parent, member),
+            TypeIdentifier::MemberType(parent, member) => write!(f, "{}::{}", parent, member),
         }
     }
 }

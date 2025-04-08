@@ -1834,12 +1834,12 @@ impl IndentDisplay for TypedStatement {
                 indent.decrease();
                 result
             }
-            TypedStatement::StructDeclaration {
+            TypedStatement::StructDeclaration(type_checker::ast::StructData {
                 type_identifier,
                 embedded_structs,
                 fields,
                 type_,
-            } => {
+            }) => {
                 let mut result = String::new();
                 result.push_str(format!("<struct declaration> {}\n", type_).as_str());
                 indent.increase();

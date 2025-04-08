@@ -294,9 +294,12 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
 }
 
 fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
+    println!("100");
     let TokenKind::Identifier(_) = cursor.first().kind else {
         return parse_range(cursor);
     };
+
+    println!("101");
 
     match (cursor.second().kind, cursor.third().kind) {
         (kind, _)
@@ -305,24 +308,31 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::OpenBrace | TokenKind::DoubleColon | TokenKind::Less
             ) =>
         {
+            println!("102");
             return parse_range(cursor);
         }
         (_, TokenKind::Less) => {
+            println!("103");
             return parse_range(cursor);
         }
         (TokenKind::DoubleColon, TokenKind::Identifier(name))
             if name.is_function_identifier_name() =>
         {
+            println!("104");
             return parse_member_access(cursor);
         }
         _ => {}
     }
+    println!("105");
 
     let type_annotation = parse_type_annotation(cursor, false)?;
 
+    println!("106");
     if type_annotation.has_double_colon() {
+        println!("107");
         parse_enum_literal(cursor, type_annotation)
     } else {
+        println!("108");
         parse_struct_literal(cursor, type_annotation)
     }
 }
@@ -331,6 +341,7 @@ fn parse_struct_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
 ) -> Result<Expression, String> {
+    println!("struct literal");
     if cursor.first().kind != TokenKind::OpenBrace {
         return Ok(Expression::Literal(Literal::Struct {
             type_annotation,
@@ -384,6 +395,7 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
 
     cursor.bump()?; // Consume the identifier
     cursor.bump()?; // Consume the :
+    println!("hellooooo");
 
     let initializer = parse_expression(cursor)?;
 
@@ -397,6 +409,7 @@ fn parse_enum_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
 ) -> Result<Expression, String> {
+    println!("enum literal");
     if cursor.first().kind != TokenKind::OpenBrace {
         return Ok(Expression::Literal(Literal::Enum {
             type_annotation: type_annotation.clone(),
@@ -410,9 +423,9 @@ fn parse_enum_literal(
         }));
     }
 
-    cursor.bump()?; // Consume the {
+    cursor.expect(TokenKind::OpenBrace)?;
     let field_initializers = parse_field_initializers(cursor)?;
-    cursor.bump()?; // Consume the }
+    cursor.expect(TokenKind::CloseBrace)?;
 
     Ok(Expression::Literal(Literal::Enum {
         type_annotation: type_annotation.clone(),

@@ -358,7 +358,7 @@ impl TypeEnvironment {
             || self
                 .parent
                 .as_ref()
-                .map_or(false, |parent| parent.borrow().lookup_type(type_))
+                .is_some_and(|parent| parent.borrow().lookup_type(type_))
     }
 
     pub fn lookup_type_str(&self, type_name: &str) -> bool {
@@ -366,6 +366,6 @@ impl TypeEnvironment {
             || self
                 .parent
                 .as_ref()
-                .map_or(false, |parent| parent.borrow().lookup_type_str(type_name))
+                .is_some_and(|parent| parent.borrow().lookup_type_str(type_name))
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    parser::{Parameter, Statement, StructData},
+    parser::{Expression, Parameter, Statement, StructData},
     types::{TypeAnnotation, TypeIdentifier},
 };
 
@@ -10,7 +10,7 @@ use super::{ast::TypedStatement, statements, type_environment::TypeEnvironment, 
 #[derive(Debug)]
 pub struct DiscoveredEmbeddedStruct {
     pub type_annotation: TypeAnnotation,
-    pub initialized_fields: Vec<String>,
+    pub initialized_fields: Vec<(String, Expression)>,
 }
 
 #[derive(Debug)]

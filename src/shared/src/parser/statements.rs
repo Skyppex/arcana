@@ -8,7 +8,7 @@ use crate::{
 
 use super::{
     cursor::Cursor, expressions, fat_arrow_expr_or_block_expr, AccessModifier, AssociatedType,
-    Closure, EmbeddedStruct, EnumDeclaration, Expression, FieldInitializer, FunctionDeclaration,
+    Closure, EmbeddedStruct, EnumDeclaration, Expression, FunctionDeclaration,
     ImplementationDeclaration, Literal, ModuleDeclaration, Parameter, ProtocolDeclaration,
     Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration,
     Use, UseItem,
@@ -433,25 +433,34 @@ fn parse_struct(
     type_identifier: TypeIdentifier,
     cursor: &mut Cursor,
 ) -> Result<StructData, String> {
+    println!("0");
     let embedded_structs = parse_embedded_structs(cursor)?;
+    println!("8");
 
     let mut fields = vec![];
     let mut has_comma = true;
 
     while cursor.first().kind != TokenKind::CloseBrace {
+        println!("9");
         if !has_comma {
             return Err(format!("Expected , but found {:?}", cursor.first().kind));
         }
 
+        println!("10");
         has_comma = true;
         fields.push(parse_struct_field(cursor, true)?);
+        println!("11");
 
         if cursor.first().kind == TokenKind::Comma {
+            println!("12");
             cursor.bump()?; // Consume the ,
         } else {
+            println!("13");
             has_comma = false;
         }
     }
+
+    println!("14");
 
     Ok(StructData {
         type_identifier,
@@ -1004,28 +1013,37 @@ fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<EmbeddedStruct>, St
     let mut embedded_structs = vec![];
 
     loop {
+        println!("1");
         if let TokenKind::Identifier(identifier) = cursor.first().kind {
+            println!("2");
             if identifier.is_type_identifier_name() {
+                println!("3");
                 cursor.bump()?; // Consume the identifier
 
                 let field_initializers = if cursor.first().kind == TokenKind::OpenBrace {
                     cursor.bump()?; // Consume the {
-                    expressions::parse_field_initializers(cursor)?
+                    let fis = expressions::parse_field_initializers(cursor)?;
+                    cursor.bump()?; // Consume the }
+                    fis
                 } else {
                     vec![]
                 };
 
+                println!("4");
                 embedded_structs.push(EmbeddedStruct {
                     type_annotation: TypeAnnotation::Type(identifier),
                     field_initializers,
                 });
 
+                println!("5");
                 if cursor.first().kind == TokenKind::Comma {
+                    println!("6");
                     cursor.bump()?; // Consume the ,
                     continue;
                 }
             }
         }
+        println!("7");
 
         break;
     }

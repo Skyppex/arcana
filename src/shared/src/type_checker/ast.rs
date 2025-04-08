@@ -726,6 +726,7 @@ pub struct StructField {
     pub struct_identifier: TypeIdentifier,
     pub mutable: bool,
     pub identifier: String,
+    pub default_value: Option<TypedExpression>,
     pub type_: Type,
 }
 
@@ -901,6 +902,48 @@ impl Typed for Literal {
             Literal::Array { type_, .. } => type_.clone(),
             Literal::Struct { type_, .. } => type_.clone(),
             Literal::Enum { type_, .. } => type_.clone(),
+        }
+    }
+}
+
+impl TryFrom<Type> for Literal {
+    type Error = String;
+
+    fn try_from(type_: Type) -> Result<Self, Self::Error> {
+        let Type::Literal { name, type_ } = type_ else {
+            return Err("Invalid type for Literal".into());
+        };
+
+        match *type_ {
+            Type::Void => Ok(Literal::Void),
+            Type::Unit => Ok(Literal::Unit),
+            Type::Int => Ok(Literal::Int(
+                name.parse::<i64>().map_err(|e| format!("{}", e))?,
+            )),
+            Type::UInt => Ok(Literal::UInt(
+                name.parse::<u64>().map_err(|e| format!("{}", e))?,
+            )),
+            Type::Float => Ok(Literal::Float(
+                name.parse::<f64>().map_err(|e| format!("{}", e))?,
+            )),
+            Type::String => Ok(Literal::String(name)),
+            Type::Char => {
+                if name.len() != 1 {
+                    return Err("Invalid char literal".into());
+                }
+
+                Ok(Literal::Char(name.chars().next().unwrap()))
+            }
+            Type::Bool => {
+                if name == "true" {
+                    Ok(Literal::Bool(true))
+                } else if name == "false" {
+                    Ok(Literal::Bool(false))
+                } else {
+                    Err("Invalid bool literal".into())
+                }
+            }
+            _ => Err("Invalid type for Literal".into()),
         }
     }
 }

@@ -49,7 +49,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                     initialized_fields: e
                         .field_initializers
                         .iter()
-                        .map(|f| f.identifier.clone())
+                        .map(|f| (f.identifier.clone(), f.initializer.clone()))
                         .collect(),
                 })
                 .collect(),
@@ -95,7 +95,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                             initialized_fields: e
                                 .field_initializers
                                 .iter()
-                                .map(|f| f.identifier.clone())
+                                .map(|f| (f.identifier.clone(), f.initializer.clone()))
                                 .collect(),
                         })
                         .collect(),
@@ -215,7 +215,7 @@ pub fn check_type(
                 }
             }
 
-            let embedded_structs: Result<Vec<_>, _> = embedded_structs
+            let embedded_structs: Result<Vec<_>, String> = embedded_structs
                 .iter()
                 .map(|e| {
                     let embedded_type = check_type_annotation(
@@ -224,7 +224,7 @@ pub fn check_type(
                         struct_type_environment.clone(),
                     )?;
 
-                    Ok((embedded_type, e.field_initializers))
+                    Ok((embedded_type, e.field_initializers.clone()))
                 })
                 .collect();
 
@@ -242,6 +242,7 @@ pub fn check_type(
                             struct_identifier: type_identifier.clone(),
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
+                            default_value: None,
                             type_: t,
                         }),
                         Err(e) => Err(e),
@@ -251,7 +252,7 @@ pub fn check_type(
 
             let mut fields = fields?;
 
-            for (embedded_struct_type, _) in embedded_structs.iter().rev() {
+            for (embedded_struct_type, field_initializers) in embedded_structs.iter().rev() {
                 let Type::Struct(embedded_struct) = embedded_struct_type else {
                     return Err("Embedded struct must be a struct".to_string());
                 };
@@ -264,17 +265,39 @@ pub fn check_type(
                         ));
                     }
 
+                    dbg!(&field_initializers);
+                    dbg!(&field);
+
+                    let default_value = field_initializers
+                        .iter()
+                        .find(|f| f.identifier == field.field_name)
+                        .map(|f| {
+                            dbg!(&f);
+                            expressions::check_type(
+                                &f.initializer,
+                                discovered_types,
+                                type_environment.clone(),
+                                None,
+                            )
+                        })
+                        .transpose()?;
+
+                    dbg!(&default_value);
+
                     fields.insert(
                         0,
                         ast::StructField {
                             struct_identifier: type_identifier.clone(),
                             mutable: false,
                             identifier: field.field_name.clone(),
+                            default_value,
                             type_: field.field_type.clone(),
                         },
                     );
                 }
             }
+
+            dbg!(&fields);
 
             let mut recursive_embedded_structs = embedded_structs.clone();
 
@@ -298,18 +321,6 @@ pub fn check_type(
                     ));
                 }
             }
-
-            let field_types: Result<Vec<StructField>, String> = fields
-                .clone()
-                .iter()
-                .map(|f| {
-                    Ok(StructField {
-                        struct_name: type_identifier.clone(),
-                        field_name: f.identifier.clone(),
-                        field_type: f.type_.clone(),
-                    })
-                })
-                .collect();
 
             let embedded_structs: Result<Vec<EmbeddedStruct>, String> = recursive_embedded_structs
                 .iter()
@@ -338,9 +349,37 @@ pub fn check_type(
 
             let embedded_structs = embedded_structs?;
 
+            let field_types: Result<Vec<StructField>, String> = fields
+                .clone()
+                .iter()
+                .map(|f| {
+                    Ok(StructField {
+                        struct_name: type_identifier.clone(),
+                        field_name: f.identifier.clone(),
+                        default_value: f.default_value.clone().map(|t| t.get_type()),
+                        field_type: {
+                            if let Some(default_value) = &f.default_value {
+                                let default_type = default_value.get_type();
+
+                                if !type_equals(&f.type_, &default_type) {
+                                    return Err(format!(
+                                        "Default value for field '{}' must be of type '{}'",
+                                        f.identifier, f.type_
+                                    ));
+                                }
+
+                                default_type
+                            } else {
+                                f.type_.clone()
+                            }
+                        },
+                    })
+                })
+                .collect();
+
             let type_ = Type::Struct(Struct {
                 type_identifier: type_identifier.clone(),
-                embedded_structs,
+                embedded_structs: embedded_structs.clone(),
                 fields: field_types?,
             });
 
@@ -383,6 +422,7 @@ pub fn check_type(
                             struct_identifier: type_identifier.clone(),
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
+                            default_value: None,
                             type_: t,
                         }),
                         Err(e) => Err(e),
@@ -393,7 +433,7 @@ pub fn check_type(
             let members: Result<Vec<ast::StructData>, String> = members
                 .iter()
                 .map(|member| {
-                    let embedded_structs: Result<Vec<_>, _> = member
+                    let embedded_structs: Result<Vec<_>, String> = member
                         .embedded_structs
                         .iter()
                         .map(|e| {
@@ -403,7 +443,7 @@ pub fn check_type(
                                 enum_type_environment.clone(),
                             )?;
 
-                            Ok((embedded_type, e.field_initializers))
+                            Ok((embedded_type, e.field_initializers.clone()))
                         })
                         .collect();
 
@@ -422,6 +462,7 @@ pub fn check_type(
                                     struct_identifier: type_identifier.clone(),
                                     mutable: field.mutable,
                                     identifier: field.identifier.clone(),
+                                    default_value: None,
                                     type_: t,
                                 }),
                                 Err(e) => Err(e),
@@ -431,7 +472,7 @@ pub fn check_type(
 
                     let mut fields = fields?;
 
-                    for (embedded_struct, _) in embedded_structs.iter().rev() {
+                    for (embedded_struct, field_initializers) in embedded_structs.iter().rev() {
                         let Type::Struct(embedded_struct) = embedded_struct else {
                             return Err("Embedded struct must be a struct".to_string());
                         };
@@ -444,12 +485,26 @@ pub fn check_type(
                                 ));
                             }
 
+                            let default_value = field_initializers
+                                .iter()
+                                .find(|f| f.identifier == field.field_name)
+                                .map(|f| {
+                                    expressions::check_type(
+                                        &f.initializer,
+                                        discovered_types,
+                                        type_environment.clone(),
+                                        None,
+                                    )
+                                })
+                                .transpose()?;
+
                             fields.insert(
                                 0,
                                 ast::StructField {
                                     struct_identifier: type_identifier.clone(),
                                     mutable: false,
                                     identifier: field.field_name.clone(),
+                                    default_value,
                                     type_: field.field_type.clone(),
                                 },
                             );
@@ -517,6 +572,7 @@ pub fn check_type(
                                     member.type_identifier.to_key(),
                                 ),
                                 field_name: f.identifier.clone(),
+                                default_value: None,
                                 field_type: f.type_.clone(),
                             })
                         })
@@ -527,7 +583,7 @@ pub fn check_type(
                             Box::new(type_identifier.clone()),
                             member.type_identifier.to_key(),
                         ),
-                        embedded_structs,
+                        embedded_structs: embedded_structs.clone(),
                         fields: field_types?,
                     });
 
@@ -555,6 +611,7 @@ pub fn check_type(
                     .map(|f| StructField {
                         struct_name: type_identifier.clone(),
                         field_name: f.identifier.clone(),
+                        default_value: None,
                         field_type: f.type_.clone(),
                     })
                     .collect(),
@@ -1061,9 +1118,23 @@ fn check_type_identifier(
             embedded_structs: embedded_structs
                 .iter()
                 .map(|e| {
+                    let mut field_initializers = vec![];
+
+                    for (identifier, initializer) in &e.initialized_fields {
+                        field_initializers.push(FieldInitializer {
+                            identifier: identifier.clone(),
+                            initializer: expressions::check_type(
+                                initializer,
+                                discovered_types,
+                                type_environment.clone(),
+                                None,
+                            )?,
+                        });
+                    }
+
                     Ok(EmbeddedStruct {
                         type_annotation: e.type_annotation.clone(),
-                        field_initializers: e.initialized_fields.clone(),
+                        field_initializers,
                         type_: check_type_annotation(
                             &e.type_annotation,
                             discovered_types,
@@ -1071,7 +1142,7 @@ fn check_type_identifier(
                         )?,
                     })
                 })
-                .collect::<Result<Vec<_>, _>>()?,
+                .collect::<Result<Vec<_>, String>>()?,
             fields: {
                 let mut vec = Vec::new();
 
@@ -1079,6 +1150,7 @@ fn check_type_identifier(
                     vec.push(StructField {
                         struct_name: type_identifier.clone(),
                         field_name: identifier.clone(),
+                        default_value: None,
                         field_type: check_type_annotation(
                             type_annotation,
                             discovered_types,
@@ -1103,6 +1175,7 @@ fn check_type_identifier(
                     vec.push(StructField {
                         struct_name: type_identifier.clone(),
                         field_name: identifier.clone(),
+                        default_value: None,
                         field_type: check_type_annotation(
                             type_annotation,
                             discovered_types,
@@ -1136,6 +1209,7 @@ fn check_type_identifier(
                                 identifier.clone(),
                             ),
                             field_name: identifier.clone(),
+                            default_value: None,
                             field_type: check_type_annotation(
                                 &type_annotation,
                                 discovered_types,
@@ -1148,20 +1222,49 @@ fn check_type_identifier(
                 }
 
                 map.iter()
-                    .map(|(k, (e, f))| {
-                        (
-                            k.to_key(),
+                    .map(|(type_identifier, (embedded_structs, fields))| {
+                        let embedded_structs = embedded_structs
+                            .iter()
+                            .map(|e| {
+                                Ok(EmbeddedStruct {
+                                    type_annotation: e.type_annotation.clone(),
+                                    field_initializers: e
+                                        .field_initializers
+                                        .iter()
+                                        .map(|f| {
+                                            Ok(FieldInitializer {
+                                                identifier: f.identifier.clone(),
+                                                initializer: expressions::check_type(
+                                                    &f.initializer,
+                                                    discovered_types,
+                                                    type_environment.clone(),
+                                                    None,
+                                                )?,
+                                            })
+                                        })
+                                        .collect::<Result<_, String>>()?,
+                                    type_: check_type_annotation(
+                                        &e.type_annotation,
+                                        discovered_types,
+                                        type_environment.clone(),
+                                    )?,
+                                })
+                            })
+                            .collect::<Result<_, String>>()?;
+
+                        Ok((
+                            type_identifier.to_key(),
                             Type::Struct(Struct {
                                 type_identifier: TypeIdentifier::MemberType(
                                     Box::new(type_identifier.clone()),
-                                    k.to_key(),
+                                    type_identifier.to_key(),
                                 ),
-                                embedded_structs: (*e).clone(),
-                                fields: f.clone(),
+                                embedded_structs,
+                                fields: fields.clone(),
                             }),
-                        )
+                        ))
                     })
-                    .collect()
+                    .collect::<Result<_, String>>()?
             },
         })),
         Some(DiscoveredType::Union(type_identifier, literals)) => {
@@ -1301,7 +1404,34 @@ pub fn check_type_annotation(
             fields,
         }) => Ok(Type::Struct(Struct {
             type_identifier: type_identifier.clone(),
-            embedded_structs: embedded_structs.into(),
+            embedded_structs: embedded_structs
+                .iter()
+                .map(|e| {
+                    let mut field_initializers = vec![];
+
+                    for (identifier, initializer) in &e.initialized_fields {
+                        field_initializers.push(FieldInitializer {
+                            identifier: identifier.clone(),
+                            initializer: expressions::check_type(
+                                initializer,
+                                discovered_types,
+                                type_environment.clone(),
+                                None,
+                            )?,
+                        })
+                    }
+
+                    Ok(EmbeddedStruct {
+                        type_annotation: e.type_annotation.clone(),
+                        field_initializers,
+                        type_: check_type_annotation(
+                            &e.type_annotation,
+                            discovered_types,
+                            type_environment.clone(),
+                        )?,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?,
             fields: {
                 let mut map = Vec::new();
 
@@ -1309,6 +1439,7 @@ pub fn check_type_annotation(
                     map.push(StructField {
                         struct_name: type_identifier.clone(),
                         field_name: identifier.clone(),
+                        default_value: None,
                         field_type: check_type_annotation(
                             type_annotation,
                             discovered_types,
@@ -1333,6 +1464,7 @@ pub fn check_type_annotation(
                     vec.push(StructField {
                         struct_name: type_identifier.clone(),
                         field_name: identifier.clone(),
+                        default_value: None,
                         field_type: check_type_annotation(
                             type_annotation,
                             discovered_types,
@@ -1363,6 +1495,7 @@ pub fn check_type_annotation(
                         fields_map.push(StructField {
                             struct_name: type_identifier.clone(),
                             field_name: identifier.clone(),
+                            default_value: None,
                             field_type: check_type_annotation(
                                 type_annotation,
                                 discovered_types,
@@ -1376,20 +1509,51 @@ pub fn check_type_annotation(
 
                 field_map
                     .iter()
-                    .map(|(k, (e, f))| {
-                        (
-                            k.clone(),
+                    .map(|(identifier, (embedded_structs, fields))| {
+                        Ok((
+                            identifier.clone(),
                             Type::Struct(Struct {
                                 type_identifier: TypeIdentifier::MemberType(
                                     Box::new(type_identifier.clone()),
-                                    k.clone(),
+                                    identifier.clone(),
                                 ),
-                                embedded_structs: (*e).clone(),
-                                fields: f.clone(),
+                                embedded_structs: embedded_structs
+                                    .iter()
+                                    .map(|e| {
+                                        let mut field_initializers = vec![];
+
+                                        for parser::ast::FieldInitializer {
+                                            identifier,
+                                            initializer,
+                                        } in &e.field_initializers
+                                        {
+                                            field_initializers.push(FieldInitializer {
+                                                identifier: identifier.clone(),
+                                                initializer: expressions::check_type(
+                                                    initializer,
+                                                    discovered_types,
+                                                    type_environment.clone(),
+                                                    None,
+                                                )?,
+                                            })
+                                        }
+
+                                        Ok(EmbeddedStruct {
+                                            type_annotation: e.type_annotation.clone(),
+                                            field_initializers,
+                                            type_: check_type_annotation(
+                                                &e.type_annotation,
+                                                discovered_types,
+                                                type_environment.clone(),
+                                            )?,
+                                        })
+                                    })
+                                    .collect::<Result<_, String>>()?,
+                                fields: fields.clone(),
                             }),
-                        )
+                        ))
                     })
-                    .collect()
+                    .collect::<Result<_, String>>()?
             },
         })),
         Some(DiscoveredType::Union(type_identifier, literals)) => {

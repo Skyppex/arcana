@@ -15,7 +15,7 @@ pub use type_environment::*;
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc, str::FromStr};
 
 use crate::{
-    parser,
+    parser::{self, Expression},
     types::{GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };
 
@@ -52,6 +52,7 @@ impl PartialEq for Struct {
 pub struct StructField {
     pub struct_name: TypeIdentifier,
     pub field_name: String,
+    pub default_value: Option<Type>,
     pub field_type: Type,
 }
 
@@ -264,6 +265,7 @@ impl Type {
                         fields: vec![StructField {
                             struct_name: some_member_ident.clone(),
                             field_name: "value".to_string(),
+                            default_value: None,
                             field_type: Type::Generic(GenericType {
                                 type_name: "T".to_string(),
                             }),
@@ -314,7 +316,8 @@ impl Type {
                         embedded_structs: vec![],
                         fields: vec![StructField {
                             struct_name: some_member_ident.clone(),
-                            field_name: "f0".to_string(),
+                            field_name: "value".to_string(),
+                            default_value: None,
                             field_type: concrete.clone(),
                         }],
                     }),
@@ -454,6 +457,7 @@ impl Type {
                 for StructField {
                     struct_name,
                     field_name,
+                    default_value,
                     field_type,
                 } in s.fields.iter()
                 {
@@ -461,6 +465,7 @@ impl Type {
                         fields.push(StructField {
                             struct_name: struct_name.clone(),
                             field_name: field_name.clone(),
+                            default_value: default_value.clone(),
                             field_type: field_type.clone(),
                         });
 
@@ -478,6 +483,7 @@ impl Type {
                     fields.push(StructField {
                         struct_name: struct_name.clone(),
                         field_name: field_name.clone(),
+                        default_value: default_value.clone(),
                         field_type: concrete_type,
                     });
                 }
@@ -514,6 +520,7 @@ impl Type {
                 for StructField {
                     struct_name,
                     field_name,
+                    default_value,
                     field_type,
                 } in s.fields.iter()
                 {
@@ -521,6 +528,7 @@ impl Type {
                         cloned_fields.push(StructField {
                             struct_name: struct_name.clone(),
                             field_name: field_name.clone(),
+                            default_value: default_value.clone(),
                             field_type: field_type.clone(),
                         });
                         continue;
@@ -537,6 +545,7 @@ impl Type {
                     cloned_fields.push(StructField {
                         struct_name: struct_name.clone(),
                         field_name: field_name.clone(),
+                        default_value: default_value.clone(),
                         field_type: concrete_type,
                     });
                 }
@@ -578,6 +587,7 @@ impl Type {
                 for StructField {
                     struct_name,
                     field_name,
+                    default_value,
                     field_type,
                 } in r#enum.shared_fields.iter()
                 {
@@ -585,6 +595,7 @@ impl Type {
                         shared_fields.push(StructField {
                             struct_name: struct_name.clone(),
                             field_name: field_name.clone(),
+                            default_value: default_value.clone(),
                             field_type: field_type.clone(),
                         });
                         continue;
@@ -601,6 +612,7 @@ impl Type {
                     shared_fields.push(StructField {
                         struct_name: struct_name.clone(),
                         field_name: field_name.clone(),
+                        default_value: default_value.clone(),
                         field_type: concrete_type,
                     });
                 }
@@ -620,6 +632,7 @@ impl Type {
                     for StructField {
                         struct_name,
                         field_name,
+                        default_value,
                         field_type,
                     } in r#struct.fields.iter()
                     {
@@ -630,6 +643,7 @@ impl Type {
                             fields.push(StructField {
                                 struct_name: struct_name.clone(),
                                 field_name: field_name.clone(),
+                                default_value: default_value.clone(),
                                 field_type,
                             });
 
@@ -650,6 +664,7 @@ impl Type {
                         fields.push(StructField {
                             struct_name: struct_name.clone(),
                             field_name: field_name.clone(),
+                            default_value: default_value.clone(),
                             field_type: concrete_type,
                         });
                     }
@@ -897,7 +912,7 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                     .param
                     .as_ref()
                     .zip(fr.param.as_ref())
-                    .map_or(true, |(p, p2)| type_equals(&p.type_, &p2.type_))
+                    .is_none_or(|(p, p2)| type_equals(&p.type_, &p2.type_))
         }
         (
             Type::Enum(Enum {

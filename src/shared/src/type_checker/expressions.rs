@@ -513,16 +513,14 @@ pub fn check_type(
                         match (type_, generics) {
                             (None, _) => None,
                             (Some(type_), None) => Some(type_),
-                            (Some(type_), Some(generics)) => {
-                                return Some(
-                                    type_
-                                        .clone_with_concrete_types(
-                                            generics.iter().map(|g| g.type_annotation()).collect(),
-                                            type_environment.clone(),
-                                        )
-                                        .expect("Failed to clone type with concrete types"),
-                                );
-                            }
+                            (Some(type_), Some(generics)) => Some(
+                                type_
+                                    .clone_with_concrete_types(
+                                        generics.iter().map(|g| g.type_annotation()).collect(),
+                                        type_environment.clone(),
+                                    )
+                                    .expect("Failed to clone type with concrete types"),
+                            ),
                         }
                     })
                     .ok_or_else(|| format!("Unexpected variable: {}", symbol))?
@@ -639,32 +637,57 @@ pub fn check_type(
                     Err(format!("{} is not a struct", type_.full_name()))?
                 };
 
-                let field_initializers = field_initializers?;
+                let mut field_initializers = field_initializers?;
 
                 let field_initializer_map: HashMap<_, _> = field_initializers
                     .iter()
                     .map(|fi| (fi.identifier.clone(), fi.initializer.clone()))
                     .collect();
 
+                dbg!(&fields);
+                dbg!(&field_initializer_map);
+
                 for (field, initializer) in fields
                     .iter()
                     .map(|f| (f, field_initializer_map.get(&f.field_name)))
                 {
-                    let Some(initializer) = initializer else {
-                        return Err(format!(
-                            "Field '{}' is missing from struct initializer",
-                            field.field_name
-                        ));
-                    };
+                    match (initializer, &field.default_value) {
+                        (None, None) => {
+                            return Err(format!(
+                                "Field '{}' is missing from struct initializer",
+                                field.field_name
+                            ))
+                        }
+                        (None, Some(default_value)) => {
+                            let field_type = field.field_type.clone();
 
-                    let field_type = field.field_type.clone();
-                    let initializer_type = initializer.get_type();
+                            if !type_equals(&field_type, default_value) {
+                                return Err(format!(
+                                    "Field type {} does not match initializer type {}",
+                                    field_type, default_value
+                                ));
+                            }
 
-                    if !type_equals(&field_type, &initializer_type) {
-                        return Err(format!(
-                            "Field type {} does not match initializer type {}",
-                            field_type, initializer_type
-                        ));
+                            let lit = Literal::try_from(default_value.clone())?;
+
+                            let initializer = TypedExpression::Literal(lit);
+
+                            field_initializers.push(FieldInitializer {
+                                identifier: field.field_name.clone(),
+                                initializer,
+                            });
+                        }
+                        (Some(initializer), _) => {
+                            let field_type = field.field_type.clone();
+                            let initializer_type = initializer.get_type();
+
+                            if !type_equals(&field_type, &initializer_type) {
+                                return Err(format!(
+                                    "Field type {} does not match initializer type {}",
+                                    field_type, initializer_type
+                                ));
+                            }
+                        }
                     }
                 }
 
@@ -713,31 +736,54 @@ pub fn check_type(
                     ))?
                 };
 
-                let field_initializers = field_initializers?;
+                let mut field_initializers = field_initializers?;
 
-                for (struct_field, initializer) in fields.iter().map(|f| {
-                    (
-                        f,
-                        field_initializers
-                            .iter()
-                            .find(|fi| fi.identifier == f.field_name),
-                    )
-                }) {
-                    let Some(initializer) = initializer else {
-                        return Err(format!(
-                            "Field '{}' is missing from struct initializer",
-                            struct_field.field_name
-                        ));
-                    };
+                let field_initializer_map: HashMap<_, _> = field_initializers
+                    .iter()
+                    .map(|fi| (fi.identifier.clone(), fi.initializer.clone()))
+                    .collect();
 
-                    let field_type = struct_field.field_type.clone();
-                    let initializer_type = initializer.initializer.get_type();
+                for (struct_field, initializer) in fields
+                    .iter()
+                    .map(|f| (f, field_initializer_map.get(&f.field_name)))
+                {
+                    match (initializer, &struct_field.default_value) {
+                        (None, None) => {
+                            return Err(format!(
+                                "Field '{}' is missing from struct initializer",
+                                struct_field.field_name
+                            ))
+                        }
+                        (None, Some(default_value)) => {
+                            let field_type = struct_field.field_type.clone();
 
-                    if !type_equals(&field_type, &initializer_type) {
-                        return Err(format!(
-                            "Field type {} does not match initializer type {}",
-                            field_type, initializer_type
-                        ));
+                            if !type_equals(&field_type, default_value) {
+                                return Err(format!(
+                                    "Field type {} does not match initializer type {}",
+                                    field_type, default_value
+                                ));
+                            }
+
+                            let lit = Literal::try_from(default_value.clone())?;
+
+                            let initializer = TypedExpression::Literal(lit);
+
+                            field_initializers.push(FieldInitializer {
+                                identifier: struct_field.field_name.clone(),
+                                initializer,
+                            });
+                        }
+                        (Some(initializer), _) => {
+                            let field_type = struct_field.field_type.clone();
+                            let initializer_type = initializer.get_type();
+
+                            if !type_equals(&field_type, &initializer_type) {
+                                return Err(format!(
+                                    "Field type {} does not match initializer type {}",
+                                    field_type, initializer_type
+                                ));
+                            }
+                        }
                     }
                 }
 
@@ -1059,13 +1105,13 @@ fn is_option(type_: &Type) -> bool {
                 return false;
             }
 
-            return members.get("Some").map_or(false, |member| {
+            members.get("Some").is_some_and(|member| {
                 let Type::Struct(Struct { fields, .. }) = member else {
                     return false;
                 };
 
-                return get_field_by_name(fields, "f0").map_or(false, |_| true);
-            });
+                get_field_by_name(fields, "f0").is_some_and(|_| true)
+            })
         }
         _ => false,
     }
@@ -1081,7 +1127,7 @@ fn check_type_static_member_access(
     let object_type =
         check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
 
-    return match member.clone() {
+    match member.clone() {
         parser::Member::Identifier { symbol, .. } => match object_type {
             Type::Struct(struct_) => {
                 let Some(static_member_type) = type_environment
@@ -1167,7 +1213,7 @@ fn check_type_static_member_access(
             type_environment,
             context,
         ),
-    };
+    }
 }
 
 fn check_type_member_access(

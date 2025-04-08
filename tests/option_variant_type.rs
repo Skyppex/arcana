@@ -44,6 +44,7 @@ fn enum_variant_can_be_used_as_a_type() {
                     "S".to_owned()
                 ),
                 field_name: "x".to_owned(),
+                default_value: None,
                 field_type: Type::Int
             }]
         })

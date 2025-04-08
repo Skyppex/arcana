@@ -1,6 +1,13 @@
-enum O {
-    S,
-    N
+struct Test {
+    test: Int,
 }
 
-let a: O::S;
+// enum Either {
+    struct Test {
+        Test,
+    }
+// }
+
+let e = Test {
+    test: 1,
+}
