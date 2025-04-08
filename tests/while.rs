@@ -70,7 +70,7 @@ fn while_does_not_require_body_or_else_body_to_be_a_block() {
     // Arrange
     let input = r#"
         while true => 1 + 1
-        else 2 + 2
+        else => 2 + 2
         "#;
 
     // Act

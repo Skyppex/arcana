@@ -70,7 +70,7 @@ fn for_does_not_require_body_or_else_body_to_be_a_block() {
     // Arrange
     let input = r#"
         for x in 0..1 => 1 + 1
-        else 2 + 2
+        else => 2 + 2
         "#;
 
     // Act
