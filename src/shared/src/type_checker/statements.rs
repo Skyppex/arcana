@@ -117,7 +117,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             type_identifier.clone(),
             literals
                 .iter()
-                .map(|literal| TypeAnnotation::Literal(Box::new(literal.clone())))
+                .map(|literal| TypeAnnotation::Literal(Box::new(literal.clone().into())))
                 .collect(),
         )]),
         Statement::TypeAliasDeclaration(parser::TypeAliasDeclaration {
@@ -652,7 +652,7 @@ pub fn check_type(
                 .iter()
                 .map(|literal| {
                     check_type_annotation(
-                        &TypeAnnotation::Literal(Box::new(literal.clone())),
+                        &TypeAnnotation::Literal(Box::new(literal.clone().into())),
                         discovered_types,
                         union_type_environment.clone(),
                     )
@@ -685,7 +685,7 @@ pub fn check_type(
                 literals: literals
                     .clone()
                     .iter()
-                    .map(|l| TypeAnnotation::Literal(Box::new(l.clone())))
+                    .map(|l| TypeAnnotation::Literal(Box::new(l.clone().into())))
                     .collect(),
                 type_,
             })

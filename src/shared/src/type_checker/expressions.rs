@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     parser::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
-    type_checker::{ast::Literal, type_annotation_equals, StructField},
+    type_checker::{ast::ValueLiteral, type_annotation_equals, StructField},
     types::{TypeAnnotation, TypeIdentifier},
 };
 
@@ -15,8 +15,8 @@ use super::{
     get_field_by_name,
     scope::ScopeType,
     statements::{self, check_type_annotation},
-    type_equals, type_equals_coerce, DiscoveredType, Enum, FullName, Function, Rcrc, Struct, Type,
-    TypeAlias, TypeEnvironment, Union,
+    type_equals, type_equals_coerce, DiscoveredType, Enum, FullName, Function, LiteralType, Rcrc,
+    Struct, Type, TypeAlias, TypeEnvironment, Union,
 };
 
 pub fn check_type(
@@ -269,6 +269,10 @@ pub fn check_type(
                         .borrow()
                         .get_type_from_annotation(type_annotation)?;
 
+                    println!("100");
+                    dbg!(&type_);
+                    println!("100");
+
                     if !type_equals(&type_, &initializer.get_type()) {
                         return Err(format!(
                             "Initializer type {} does not match variable type {}",
@@ -289,22 +293,31 @@ pub fn check_type(
 
                     type_ = initializer.get_type();
 
+                    println!("101");
+                    dbg!(&type_);
+                    println!("101");
+
                     if *mutable {
                         if let Type::Literal {
                             type_: literal_type,
                             ..
                         } = type_
                         {
-                            type_ = *literal_type;
+                            type_ = literal_type.get_runtime_type();
                         }
                     }
 
                     Some(initializer)
                 }
                 (None, Some(type_annotation)) => {
+                    dbg!(type_annotation);
                     type_ = type_environment
                         .borrow()
                         .get_type_from_annotation(type_annotation)?;
+
+                    println!("102");
+                    dbg!(&type_);
+                    println!("102");
 
                     None
                 }
@@ -318,6 +331,10 @@ pub fn check_type(
                 type_environment.clone(),
                 Some(type_.clone()),
             )?;
+
+            println!("10001");
+            dbg!(&type_);
+            println!("10001");
 
             Ok(TypedExpression::VariableDeclaration {
                 mutable: *mutable,
@@ -462,7 +479,11 @@ pub fn check_type(
 
             let mut member_type = member.get_type();
 
+            dbg!(&member_type);
+
+            println!("checking member_type");
             if member_type == Type::Unknown {
+                println!("member_type is unknown");
                 member_type = initializer.get_deep_type();
 
                 type_environment
@@ -560,14 +581,16 @@ pub fn check_type(
             }
         },
         Expression::Literal(l) => match l {
-            parser::Literal::Unit => Ok(TypedExpression::Literal(Literal::Unit)),
-            parser::Literal::Int(v) => Ok(TypedExpression::Literal(Literal::Int(*v))),
-            parser::Literal::UInt(v) => Ok(TypedExpression::Literal(Literal::UInt(*v))),
-            parser::Literal::Float(v) => Ok(TypedExpression::Literal(Literal::Float(*v))),
-            parser::Literal::String(v) => Ok(TypedExpression::Literal(Literal::String(v.clone()))),
-            parser::Literal::Char(v) => Ok(TypedExpression::Literal(Literal::Char(*v))),
-            parser::Literal::Bool(v) => Ok(TypedExpression::Literal(Literal::Bool(*v))),
-            parser::Literal::Array(values) => {
+            parser::ValueLiteral::Unit => Ok(TypedExpression::Literal(ValueLiteral::Unit)),
+            parser::ValueLiteral::Int(v) => Ok(TypedExpression::Literal(ValueLiteral::Int(*v))),
+            parser::ValueLiteral::UInt(v) => Ok(TypedExpression::Literal(ValueLiteral::UInt(*v))),
+            parser::ValueLiteral::Float(v) => Ok(TypedExpression::Literal(ValueLiteral::Float(*v))),
+            parser::ValueLiteral::String(v) => {
+                Ok(TypedExpression::Literal(ValueLiteral::String(v.clone())))
+            }
+            parser::ValueLiteral::Char(v) => Ok(TypedExpression::Literal(ValueLiteral::Char(*v))),
+            parser::ValueLiteral::Bool(v) => Ok(TypedExpression::Literal(ValueLiteral::Bool(*v))),
+            parser::ValueLiteral::Array(values) => {
                 let v: Result<(Vec<TypedExpression>, Type), String> = {
                     let mut v_: Vec<TypedExpression> = vec![];
                     let mut previous_type = Type::Void;
@@ -603,12 +626,12 @@ pub fn check_type(
                     }
                 }
 
-                Ok(TypedExpression::Literal(Literal::Array {
+                Ok(TypedExpression::Literal(ValueLiteral::Array {
                     values: v.0,
                     type_: target_type,
                 }))
             }
-            parser::Literal::Struct {
+            parser::ValueLiteral::Struct {
                 type_annotation,
                 field_initializers,
             } => {
@@ -668,7 +691,7 @@ pub fn check_type(
                                 ));
                             }
 
-                            let lit = Literal::try_from(default_value.clone())?;
+                            let lit = ValueLiteral::try_from(default_value.clone())?;
 
                             let initializer = TypedExpression::Literal(lit);
 
@@ -691,13 +714,13 @@ pub fn check_type(
                     }
                 }
 
-                Ok(TypedExpression::Literal(Literal::Struct {
+                Ok(TypedExpression::Literal(ValueLiteral::Struct {
                     type_annotation: type_annotation.clone(),
                     field_initializers,
                     type_,
                 }))
             }
-            parser::Literal::Enum {
+            parser::ValueLiteral::Enum {
                 type_annotation,
                 member,
                 field_initializers,
@@ -764,7 +787,7 @@ pub fn check_type(
                                 ));
                             }
 
-                            let lit = Literal::try_from(default_value.clone())?;
+                            let lit = ValueLiteral::try_from(default_value.clone())?;
 
                             let initializer = TypedExpression::Literal(lit);
 
@@ -787,7 +810,7 @@ pub fn check_type(
                     }
                 }
 
-                Ok(TypedExpression::Literal(Literal::Enum {
+                Ok(TypedExpression::Literal(ValueLiteral::Enum {
                     type_annotation: type_annotation.clone(),
                     member: member.clone(),
                     field_initializers,
@@ -1605,13 +1628,32 @@ fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, Strin
         (UnaryOperator::Identity, Type::Int) => Ok(Type::Int),
         (UnaryOperator::Identity, Type::UInt) => Ok(Type::UInt),
         (UnaryOperator::Identity, Type::Float) => Ok(Type::Float),
+        (UnaryOperator::Identity, Type::Literal { name, type_ })
+            if matches!(
+                **type_,
+                LiteralType::Int | LiteralType::UInt | LiteralType::Float
+            ) =>
+        {
+            let mut buf = String::new();
+            println!("120934alksdjalksjdalskjdhalkdsj");
+            buf.push_str(name);
+
+            Ok(Type::Literal {
+                name: buf,
+                type_: type_.clone(),
+            })
+        }
         (UnaryOperator::Negate, Type::Int) => Ok(Type::Int),
         (UnaryOperator::Negate, Type::UInt) => Ok(Type::UInt),
         (UnaryOperator::Negate, Type::Float) => Ok(Type::Float),
         (UnaryOperator::Negate, Type::Literal { name, type_ })
-            if matches!(**type_, Type::Int | Type::UInt | Type::Float) =>
+            if matches!(
+                **type_,
+                LiteralType::Int | LiteralType::UInt | LiteralType::Float
+            ) =>
         {
             let mut buf = String::new();
+            println!("alksdjalksjdalskjdhalkdsj");
             buf.push('-');
             buf.push_str(name);
 
@@ -1765,39 +1807,63 @@ fn get_binop_type(
         // {
         //     Ok(Type::Array(Box::new(Type::UInt)))
         // }
-        (Type::Literal { name, type_ }, operator, Type::Int) if **type_ == Type::UInt => {
-            if name.parse::<i64>().is_ok() {
-                get_binop_type(&Type::Int, operator, &Type::Int)
-            } else {
-                Err(format!("{} is not a valid uint", name))
-            }
-        }
-        (Type::Literal { name, type_ }, operator, Type::UInt) if **type_ == Type::Int => {
-            if name.parse::<u64>().is_ok() {
+        (Type::Literal { type_, .. }, operator, Type::Int)
+            if matches!(**type_, LiteralType::UIntValue(_)) =>
+        {
+            let LiteralType::UIntValue(value) = type_.as_ref() else {
+                unreachable!()
+            };
+
+            if *value < i64::MAX as u64 {
                 get_binop_type(&Type::UInt, operator, &Type::UInt)
             } else {
-                Err(format!("{} is not a valid int", name))
+                Err(format!("{} is not a valid i64", value))
             }
         }
-        (Type::Int, operator, Type::Literal { name, type_ }) if **type_ == Type::UInt => {
-            if name.parse::<i64>().is_ok() {
-                get_binop_type(&Type::Int, operator, &Type::Int)
-            } else {
-                Err(format!("{} is not a valid uint", name))
-            }
-        }
-        (Type::UInt, operator, Type::Literal { name, type_ }) if **type_ == Type::Int => {
-            if name.parse::<u64>().is_ok() {
+        (Type::Literal { type_, .. }, operator, Type::UInt)
+            if matches!(**type_, LiteralType::IntValue(_)) =>
+        {
+            let LiteralType::IntValue(value) = type_.as_ref() else {
+                unreachable!()
+            };
+
+            if *value >= 0 {
                 get_binop_type(&Type::UInt, operator, &Type::UInt)
             } else {
-                Err(format!("{} is not a valid int", name))
+                Err(format!("{} is not a valid u64", value))
+            }
+        }
+        (Type::Int, operator, Type::Literal { type_, .. })
+            if matches!(**type_, LiteralType::UIntValue(_)) =>
+        {
+            let LiteralType::UIntValue(value) = type_.as_ref() else {
+                unreachable!()
+            };
+
+            if *value < i64::MAX as u64 {
+                get_binop_type(&Type::UInt, operator, &Type::UInt)
+            } else {
+                Err(format!("{} is not a valid i64", value))
+            }
+        }
+        (Type::UInt, operator, Type::Literal { type_, .. })
+            if matches!(**type_, LiteralType::IntValue(_)) =>
+        {
+            let LiteralType::IntValue(value) = type_.as_ref() else {
+                unreachable!()
+            };
+
+            if *value >= 0 {
+                get_binop_type(&Type::UInt, operator, &Type::UInt)
+            } else {
+                Err(format!("{} is not a valid u64", value))
             }
         }
         (Type::Literal { type_, .. }, operator, right_type) => {
-            get_binop_type(type_, operator, right_type)
+            get_binop_type(&type_.get_runtime_type(), operator, right_type)
         }
         (left_type, operator, Type::Literal { type_, .. }) => {
-            get_binop_type(left_type, operator, type_)
+            get_binop_type(left_type, operator, &type_.get_runtime_type())
         }
         (Type::Union(Union { literal_type, .. }), operator, right_type) => {
             get_binop_type(literal_type, operator, right_type)

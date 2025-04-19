@@ -4,8 +4,8 @@ use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementEx
 
 use interpreter::{value, Value};
 use shared::type_checker::{
-    ast::{Literal, Member, TypedExpression},
-    Type,
+    ast::{Member, TypedExpression, ValueLiteral},
+    LiteralType, Type,
 };
 
 use crate::common::create_env;
@@ -34,10 +34,10 @@ fn assignment_is_assignment() {
                 symbol: "x".to_owned(),
                 type_: Type::Int
             }),
-            initializer: Box::new(TypedExpression::Literal(Literal::Int(1))),
+            initializer: Box::new(TypedExpression::Literal(ValueLiteral::Int(1))),
             type_: Type::Literal {
-                name: "1".to_owned(),
-                type_: Box::new(Type::Int)
+                name: "1".to_string(),
+                type_: Box::new(LiteralType::IntValue(1))
             }
         }
     );
@@ -47,8 +47,8 @@ fn assignment_is_assignment() {
 fn assignment_has_correct_type() {
     // Arrange
     let input = r#"
-        let x: Int;
-        x = 1
+        let x: Int; // The type annotation is for the variable
+        x = 1 // here the assignment itself has type #1 but x is of type Int
     "#;
 
     // Act
@@ -65,8 +65,8 @@ fn assignment_has_correct_type() {
             assert_eq!(
                 type_,
                 Type::Literal {
-                    name: "1".to_owned(),
-                    type_: Box::new(Type::Int)
+                    name: "1".to_string(),
+                    type_: Box::new(LiteralType::IntValue(1))
                 }
             );
         }

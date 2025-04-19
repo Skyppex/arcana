@@ -247,7 +247,7 @@ impl TypeEnvironment {
             TypeAnnotation::Array(type_annotation) => self
                 .get_type_from_annotation(type_annotation)
                 .map(|t| Type::Array(Box::new(t))),
-            TypeAnnotation::Literal(literal) => Ok(Type::from_literal(literal)?),
+            TypeAnnotation::Literal(literal) => Ok(literal.get_type()),
             TypeAnnotation::Tuple(annotations) => {
                 let types = annotations
                     .iter()

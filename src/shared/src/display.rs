@@ -2,10 +2,10 @@ use crate::{
     parser::{
         AccessModifier, Assignment, AssociatedType, Binary, BinaryOperator, Call, ClosureParameter,
         EmbeddedStruct, EnumDeclaration, EnumMember, EnumMemberField, Expression, FieldInitializer,
-        FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration, Literal, Match,
-        MatchArm, Member, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData,
+        FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration, Match, MatchArm,
+        Member, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData,
         StructDeclaration, StructField, TypeAliasDeclaration, Unary, UnaryOperator,
-        UnionDeclaration, Use, UseItem, VariableDeclaration, While,
+        UnionDeclaration, Use, UseItem, ValueLiteral, VariableDeclaration, While,
     },
     type_checker::{
         self,
@@ -14,7 +14,7 @@ use crate::{
             TypedStatement,
         },
         decision_tree::{Case, Constructor, Decision, FieldPattern, Pattern, Variable},
-        FullName, Type,
+        FullName, LiteralType, Type,
     },
     types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
 };
@@ -1242,17 +1242,17 @@ impl IndentDisplay for Member {
     }
 }
 
-impl IndentDisplay for Literal {
+impl IndentDisplay for ValueLiteral {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            Literal::Unit => "unit".to_string(),
-            Literal::Int(v) => v.to_string(),
-            Literal::UInt(v) => v.to_string(),
-            Literal::Float(v) => v.to_string(),
-            Literal::String(s) => s.to_string(),
-            Literal::Char(c) => c.to_string(),
-            Literal::Bool(b) => b.to_string(),
-            Literal::Array(expressions) => {
+            ValueLiteral::Unit => "#Unit".to_string(),
+            ValueLiteral::Int(v) => format!("#{}", v),
+            ValueLiteral::UInt(v) => format!("#{}", v),
+            ValueLiteral::Float(v) => format!("#{}", v),
+            ValueLiteral::String(s) => format!("#\"{}\"", s),
+            ValueLiteral::Char(c) => format!("#'{}'", c),
+            ValueLiteral::Bool(b) => format!("#{}", b),
+            ValueLiteral::Array(expressions) => {
                 let mut result = String::new();
                 result.push_str("<array>");
                 indent.increase();
@@ -1279,7 +1279,7 @@ impl IndentDisplay for Literal {
                 indent.decrease();
                 result
             }
-            Literal::Struct {
+            ValueLiteral::Struct {
                 type_annotation: type_identifier,
                 field_initializers,
             } => {
@@ -1313,7 +1313,7 @@ impl IndentDisplay for Literal {
                 indent.decrease();
                 result
             }
-            Literal::Enum {
+            ValueLiteral::Enum {
                 type_annotation: type_identifier,
                 member,
                 field_initializers,
@@ -2818,18 +2818,18 @@ impl IndentDisplay for type_checker::ast::Member {
     }
 }
 
-impl IndentDisplay for type_checker::ast::Literal {
+impl IndentDisplay for type_checker::ast::ValueLiteral {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::Literal::Void => "void".to_string(),
-            type_checker::ast::Literal::Unit => "unit".to_string(),
-            type_checker::ast::Literal::Int(v) => v.to_string(),
-            type_checker::ast::Literal::UInt(v) => v.to_string(),
-            type_checker::ast::Literal::Float(v) => v.to_string(),
-            type_checker::ast::Literal::String(s) => s.to_string(),
-            type_checker::ast::Literal::Char(c) => c.to_string(),
-            type_checker::ast::Literal::Bool(b) => b.to_string(),
-            type_checker::ast::Literal::Array { values, type_ } => {
+            type_checker::ast::ValueLiteral::Void => "Void".to_string(),
+            type_checker::ast::ValueLiteral::Unit => "Unit".to_string(),
+            type_checker::ast::ValueLiteral::Int(v) => format!("#{}", v),
+            type_checker::ast::ValueLiteral::UInt(v) => format!("#{}", v),
+            type_checker::ast::ValueLiteral::Float(v) => format!("#{}", v),
+            type_checker::ast::ValueLiteral::String(s) => format!("#\"{}\"", s),
+            type_checker::ast::ValueLiteral::Char(c) => format!("#'{}'", c),
+            type_checker::ast::ValueLiteral::Bool(b) => format!("#{}", b),
+            type_checker::ast::ValueLiteral::Array { values, type_ } => {
                 let mut result = String::new();
                 result.push_str(format!("<array>: {}", type_).as_str());
                 indent.increase();
@@ -2856,7 +2856,7 @@ impl IndentDisplay for type_checker::ast::Literal {
                 indent.decrease();
                 result
             }
-            type_checker::ast::Literal::Struct {
+            type_checker::ast::ValueLiteral::Struct {
                 type_annotation: type_identifier,
                 field_initializers,
                 type_,
@@ -2891,7 +2891,7 @@ impl IndentDisplay for type_checker::ast::Literal {
                 indent.decrease();
                 result
             }
-            type_checker::ast::Literal::Enum {
+            type_checker::ast::ValueLiteral::Enum {
                 type_annotation: type_identifier,
                 member,
                 field_initializers,
@@ -3481,6 +3481,25 @@ impl IndentDisplay for Variable {
         indent.decrease();
 
         result
+    }
+}
+
+impl IndentDisplay for LiteralType {
+    fn indent_display(&self, _indent: &mut Indent) -> String {
+        match self {
+            LiteralType::Int => "#Int".to_string(),
+            LiteralType::UInt => "#UInt".to_string(),
+            LiteralType::Float => "#Float".to_string(),
+            LiteralType::String => "#String".to_string(),
+            LiteralType::Char => "#Char".to_string(),
+            LiteralType::Bool => "#Bool".to_string(),
+            LiteralType::BoolValue(v) => format!("#{}", v),
+            LiteralType::IntValue(v) => format!("#{}", v),
+            LiteralType::UIntValue(v) => format!("#{}", v),
+            LiteralType::FloatValue(v) => format!("#{}", v),
+            LiteralType::CharValue(v) => format!("#'{}'", v),
+            LiteralType::StringValue(v) => format!("#\"{}\"", v),
+        }
     }
 }
 

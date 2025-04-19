@@ -3,7 +3,7 @@ mod common;
 use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 
 use interpreter::{value, Value};
-use shared::type_checker::ast::{Literal, TypedExpression};
+use shared::type_checker::ast::{TypedExpression, ValueLiteral};
 
 use crate::common::create_env;
 
@@ -40,7 +40,7 @@ fn literal_has_correct_type() {
 
     match expression {
         TypedExpression::Literal(literal) => {
-            assert!(matches!(literal, Literal::Int(_)));
+            assert!(matches!(literal, ValueLiteral::Int(_)));
         }
         _ => panic!("Expected a literal expression, but found {:?}", expression),
     }

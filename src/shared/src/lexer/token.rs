@@ -128,7 +128,7 @@ impl Display for Literal {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IntLiteral<T: PrimInt> {
     pub value: T,
     pub base: IntLiteralBase,
@@ -140,7 +140,7 @@ impl<T: PrimInt + Display> Display for IntLiteral<T> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum IntLiteralBase {
     None = 0,
     Binary = 2,

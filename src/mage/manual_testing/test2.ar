@@ -1,27 +1,25 @@
-struct Test {
-    test: Int,
+enum Expr {
+    Identifier { name: String },
+    BinaryExpr { left: Box<Expr>, operator: BinaryOperator, right: Box<Expr> },
+    UnaryExpr { name: String },
+    UnaryExpr { name: String },
 }
 
-enum Either {
-    share: Bool,
-    Test {
-        Test,
-        extra: UInt,
-    },
-    Test2 {
-        test2: String,
-    }
+enum BinaryOperator {
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Modulus,
 }
 
-let e1 = Either::Test {
-    share: true,
-    test: 1,
-    extra: 0,
-}
+type TypedExpr = Expr && type_: Type;
 
-print(e1);
-
-let e2 = Either::Test2 {
-    share: true,
-    test2: "wow",
-}
+// becomes
+// enum TypedExpr {
+//     type_: Type,
+//     Identifier { name: String },
+//     BinaryExpr { left: Box<Expr>, operator: BinaryOperator, right: Box<Expr> },
+//     UnaryExpr { name: String },
+//     UnaryExpr { name: String },
+// }

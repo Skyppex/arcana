@@ -5,7 +5,7 @@ use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementEx
 use interpreter::{value, Value};
 use shared::type_checker::{
     ast::{Typed, TypedExpression},
-    Type,
+    LiteralType, Type,
 };
 
 use crate::common::create_env;
@@ -71,7 +71,7 @@ fn match_has_correct_type_2() {
         expression.get_type(),
         Type::Literal {
             name: "1".to_owned(),
-            type_: Box::new(Type::Int)
+            type_: Box::new(LiteralType::IntValue(1))
         }
     );
 }

@@ -11,7 +11,7 @@ use crate::{
 };
 
 use super::decision_tree::{Decision, Pattern};
-use super::{Rcrc, Type, TypeEnvironment};
+use super::{LiteralType, Rcrc, Type, TypeEnvironment};
 
 pub trait Typed {
     fn get_type(&self) -> Type;
@@ -401,7 +401,7 @@ pub enum TypedExpression {
         type_: Type,
     },
     Member(Member),
-    Literal(Literal),
+    Literal(ValueLiteral),
     Tuple {
         elements: Vec<TypedExpression>,
         type_: Type,
@@ -821,7 +821,7 @@ impl From<parser::AccessModifier> for AccessModifier {
 // }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
+pub enum ValueLiteral {
     Void,
     Unit,
     Int(i64),
@@ -847,128 +847,108 @@ pub enum Literal {
     },
 }
 
-impl Eq for Literal {}
-impl Hash for Literal {
+impl Eq for ValueLiteral {}
+impl Hash for ValueLiteral {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
     }
 }
 
-impl Typed for Literal {
+impl Typed for ValueLiteral {
     fn get_type(&self) -> Type {
         match self {
-            Literal::Void => Type::Void,
-            Literal::Unit => Type::Unit,
-            Literal::Int(v) => Type::Literal {
+            ValueLiteral::Void => Type::Void,
+            ValueLiteral::Unit => Type::Unit,
+            ValueLiteral::Int(v) => Type::Literal {
                 name: v.to_string(),
-                type_: Box::new(Type::Int),
+                type_: Box::new(LiteralType::IntValue(*v)),
             },
-            Literal::UInt(v) => Type::Literal {
+            ValueLiteral::UInt(v) => Type::Literal {
                 name: v.to_string(),
-                type_: Box::new(Type::UInt),
+                type_: Box::new(LiteralType::UIntValue(*v)),
             },
-            Literal::Float(v) => Type::Literal {
+            ValueLiteral::Float(v) => Type::Literal {
                 name: v.to_string(),
-                type_: Box::new(Type::Float),
+                type_: Box::new(LiteralType::FloatValue(*v)),
             },
-            Literal::String(v) => Type::Literal {
+            ValueLiteral::String(v) => Type::Literal {
                 name: format!("\"{}\"", v),
-                type_: Box::new(Type::String),
+                type_: Box::new(LiteralType::StringValue(v.clone())),
             },
-            Literal::Char(v) => Type::Literal {
+            ValueLiteral::Char(v) => Type::Literal {
                 name: format!("'{}'", v),
-                type_: Box::new(Type::Char),
+                type_: Box::new(LiteralType::CharValue(v.to_string())),
             },
-            Literal::Bool(v) => Type::Literal {
+            ValueLiteral::Bool(v) => Type::Literal {
                 name: v.to_string(),
-                type_: Box::new(Type::Bool),
+                type_: Box::new(LiteralType::BoolValue(*v)),
             },
-            Literal::Array { type_, .. } => Type::Array(Box::new(type_.clone())),
-            Literal::Struct { type_, .. } => type_.clone(),
-            Literal::Enum { type_, .. } => type_.clone(),
+            ValueLiteral::Array { type_, .. } => Type::Array(Box::new(type_.clone())),
+            ValueLiteral::Struct { type_, .. } => type_.clone(),
+            ValueLiteral::Enum { type_, .. } => type_.clone(),
         }
     }
 
     fn get_deep_type(&self) -> Type {
         match self {
-            Literal::Void => Type::Void,
-            Literal::Unit => Type::Unit,
-            Literal::Int(_) => Type::Int,
-            Literal::UInt(_) => Type::UInt,
-            Literal::Float(_) => Type::Float,
-            Literal::String(_) => Type::String,
-            Literal::Char(_) => Type::Char,
-            Literal::Bool(_) => Type::Bool,
-            Literal::Array { type_, .. } => type_.clone(),
-            Literal::Struct { type_, .. } => type_.clone(),
-            Literal::Enum { type_, .. } => type_.clone(),
+            ValueLiteral::Void => Type::Void,
+            ValueLiteral::Unit => Type::Unit,
+            ValueLiteral::Int(_) => Type::Int,
+            ValueLiteral::UInt(_) => Type::UInt,
+            ValueLiteral::Float(_) => Type::Float,
+            ValueLiteral::String(_) => Type::String,
+            ValueLiteral::Char(_) => Type::Char,
+            ValueLiteral::Bool(_) => Type::Bool,
+            ValueLiteral::Array { type_, .. } => type_.clone(),
+            ValueLiteral::Struct { type_, .. } => type_.clone(),
+            ValueLiteral::Enum { type_, .. } => type_.clone(),
         }
     }
 }
 
-impl TryFrom<Type> for Literal {
+impl TryFrom<Type> for ValueLiteral {
     type Error = String;
 
     fn try_from(type_: Type) -> Result<Self, Self::Error> {
-        let Type::Literal { name, type_ } = type_ else {
+        let Type::Literal { type_, .. } = type_ else {
             return Err("Invalid type for Literal".into());
         };
 
         match *type_ {
-            Type::Void => Ok(Literal::Void),
-            Type::Unit => Ok(Literal::Unit),
-            Type::Int => Ok(Literal::Int(
-                name.parse::<i64>().map_err(|e| format!("{}", e))?,
+            LiteralType::IntValue(value) => Ok(ValueLiteral::Int(value)),
+            LiteralType::UIntValue(value) => Ok(ValueLiteral::UInt(value)),
+            LiteralType::FloatValue(value) => Ok(ValueLiteral::Float(value)),
+            LiteralType::StringValue(value) => Ok(ValueLiteral::String(value)),
+            LiteralType::CharValue(value) => Ok(ValueLiteral::Char(
+                value.parse().map_err(|_| "Invalid char literal")?,
             )),
-            Type::UInt => Ok(Literal::UInt(
-                name.parse::<u64>().map_err(|e| format!("{}", e))?,
-            )),
-            Type::Float => Ok(Literal::Float(
-                name.parse::<f64>().map_err(|e| format!("{}", e))?,
-            )),
-            Type::String => Ok(Literal::String(name)),
-            Type::Char => {
-                if name.len() != 1 {
-                    return Err("Invalid char literal".into());
-                }
-
-                Ok(Literal::Char(name.chars().next().unwrap()))
-            }
-            Type::Bool => {
-                if name == "true" {
-                    Ok(Literal::Bool(true))
-                } else if name == "false" {
-                    Ok(Literal::Bool(false))
-                } else {
-                    Err("Invalid bool literal".into())
-                }
-            }
+            LiteralType::BoolValue(value) => Ok(ValueLiteral::Bool(value)),
             _ => Err("Invalid type for Literal".into()),
         }
     }
 }
 
-impl Display for Literal {
+impl Display for ValueLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Void => write!(f, "void"),
-            Literal::Unit => write!(f, "unit"),
-            Literal::Int(v) => write!(f, "{}", v),
-            Literal::UInt(v) => write!(f, "{}", v),
-            Literal::Float(v) => write!(f, "{}", v),
-            Literal::String(v) => write!(f, "\"{}\"", v),
-            Literal::Char(v) => write!(f, "'{}'", v),
-            Literal::Bool(v) => write!(f, "{}", v),
-            Literal::Array { values, .. } => write!(
+            ValueLiteral::Void => write!(f, "#Void"),
+            ValueLiteral::Unit => write!(f, "#Unit"),
+            ValueLiteral::Int(v) => write!(f, "#{}", v),
+            ValueLiteral::UInt(v) => write!(f, "#{}", v),
+            ValueLiteral::Float(v) => write!(f, "#{}", v),
+            ValueLiteral::String(v) => write!(f, "#\"{}\"", v),
+            ValueLiteral::Char(v) => write!(f, "#'{}'", v),
+            ValueLiteral::Bool(v) => write!(f, "#{}", v),
+            ValueLiteral::Array { values, .. } => write!(
                 f,
-                "[{}]",
+                "#[{}]",
                 values
                     .iter()
                     .map(|e| e.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Literal::Struct {
+            ValueLiteral::Struct {
                 field_initializers, ..
             } => write!(
                 f,
@@ -979,7 +959,7 @@ impl Display for Literal {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Literal::Enum {
+            ValueLiteral::Enum {
                 field_initializers, ..
             } => write!(
                 f,

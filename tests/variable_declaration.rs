@@ -4,9 +4,9 @@ use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, Ve
 
 use interpreter::Value;
 use shared::type_checker::{
-    ast::{Literal, Typed, TypedExpression},
+    ast::{Typed, TypedExpression, ValueLiteral},
     decision_tree::Pattern,
-    Type,
+    LiteralType, Type,
 };
 
 #[test]
@@ -151,7 +151,10 @@ fn variable_declaration_has_value() {
             assert!(initializer.is_some());
 
             let initializer = *initializer.unwrap();
-            assert_eq!(initializer, TypedExpression::Literal(Literal::Bool(true)));
+            assert_eq!(
+                initializer,
+                TypedExpression::Literal(ValueLiteral::Bool(true))
+            );
         }
         _ => panic!(
             "Expected a variable declaration, but found {:?}",
@@ -206,7 +209,7 @@ fn variable_declaration_type_is_inferred() {
         expression.get_type(),
         Type::Literal {
             name: "true".to_owned(),
-            type_: Box::new(Type::Bool)
+            type_: Box::new(LiteralType::BoolValue(true))
         }
     );
 }
@@ -232,7 +235,7 @@ fn variable_declaration_type_is_deferred() {
         expression.get_type(),
         Type::Literal {
             name: "true".to_owned(),
-            type_: Box::new(Type::Bool)
+            type_: Box::new(LiteralType::BoolValue(true))
         }
     );
 }

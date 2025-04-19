@@ -39,7 +39,7 @@ pub enum Expression {
     Match(Match),
     Assignment(Assignment),
     Member(Member),
-    Literal(Literal),
+    Literal(ValueLiteral),
     Tuple(Vec<Expression>),
     Closure(Closure),
     Call(Call),
@@ -142,7 +142,7 @@ pub struct EnumDeclaration {
 pub struct UnionDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
-    pub literals: Vec<Literal>,
+    pub literals: Vec<ValueLiteral>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -213,7 +213,7 @@ impl From<Parameter> for ClosureParameter {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
+pub enum ValueLiteral {
     Unit,
     Int(i64),
     UInt(u64),
@@ -234,26 +234,26 @@ pub enum Literal {
     },
 }
 
-impl Eq for Literal {}
-impl Hash for Literal {
+impl Eq for ValueLiteral {}
+impl Hash for ValueLiteral {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
     }
 }
 
-impl Display for Literal {
+impl Display for ValueLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Unit => write!(f, "unit"),
-            Literal::Int(v) => write!(f, "{}", v),
-            Literal::UInt(v) => write!(f, "{}", v),
-            Literal::Float(v) => write!(f, "{}", v),
-            Literal::String(v) => write!(f, "{}", v),
-            Literal::Char(v) => write!(f, "{}", v),
-            Literal::Bool(v) => write!(f, "{}", v),
-            Literal::Array(array) => write!(
+            ValueLiteral::Unit => write!(f, "#Unit"),
+            ValueLiteral::Int(v) => write!(f, "#{}", v),
+            ValueLiteral::UInt(v) => write!(f, "#{}", v),
+            ValueLiteral::Float(v) => write!(f, "#{}", v),
+            ValueLiteral::String(v) => write!(f, "#\"{}\"", v),
+            ValueLiteral::Char(v) => write!(f, "#'{}'", v),
+            ValueLiteral::Bool(v) => write!(f, "#{}", v),
+            ValueLiteral::Array(array) => write!(
                 f,
-                "[{}]",
+                "#[{}]",
                 array
                     .iter()
                     .map(|e| {
@@ -266,24 +266,24 @@ impl Display for Literal {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Literal::Struct { .. } => todo!(),
-            Literal::Enum { .. } => todo!(),
+            ValueLiteral::Struct { .. } => todo!(),
+            ValueLiteral::Enum { .. } => todo!(),
         }
     }
 }
 
-impl ToKey for Literal {
+impl ToKey for ValueLiteral {
     fn to_key(&self) -> String {
         match self {
-            Literal::Unit => "unit".to_string(),
-            Literal::Int(v) => format!("int:{}", v),
-            Literal::UInt(v) => format!("uint:{}", v),
-            Literal::Float(v) => format!("float:{}", v),
-            Literal::String(v) => format!("string:{}", v),
-            Literal::Char(v) => format!("char:{}", v),
-            Literal::Bool(v) => format!("bool:{}", v),
-            Literal::Array(array) => format!(
-                "[{}]",
+            ValueLiteral::Unit => "#Unit".to_string(),
+            ValueLiteral::Int(v) => format!("#Int:{}", v),
+            ValueLiteral::UInt(v) => format!("#Uint:{}", v),
+            ValueLiteral::Float(v) => format!("#Float:{}", v),
+            ValueLiteral::String(v) => format!("#String:{}", v),
+            ValueLiteral::Char(v) => format!("#Char:{}", v),
+            ValueLiteral::Bool(v) => format!("#Bool:{}", v),
+            ValueLiteral::Array(array) => format!(
+                "#[{}]",
                 array
                     .iter()
                     .map(|e| {
@@ -296,10 +296,10 @@ impl ToKey for Literal {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Literal::Struct {
+            ValueLiteral::Struct {
                 type_annotation, ..
             } => type_annotation.to_key(),
-            Literal::Enum {
+            ValueLiteral::Enum {
                 type_annotation,
                 member,
                 ..

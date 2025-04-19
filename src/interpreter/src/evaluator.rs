@@ -2,7 +2,7 @@ use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use shared::{
     type_checker::{
-        ast::{Block, *},
+        ast::*,
         decision_tree::{Accessor, Constructor, Decision, FieldPattern, Pattern},
         type_annotation_equals, Type,
     },
@@ -1000,17 +1000,20 @@ fn evaluate_member_access(
     }
 }
 
-fn evaluate_literal(literal: Literal, environment: Rcrc<Environment>) -> Result<Value, String> {
+fn evaluate_literal(
+    literal: ValueLiteral,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
     match literal {
-        Literal::Void => panic!("Void literals should never be evaluated"),
-        Literal::Unit => Ok(Value::Unit),
-        Literal::Int(v) => Ok(Value::Number(Number::Int(v))),
-        Literal::UInt(v) => Ok(Value::Number(Number::UInt(v))),
-        Literal::Float(v) => Ok(Value::Number(Number::Float(v))),
-        Literal::String(v) => Ok(Value::String(v)),
-        Literal::Char(v) => Ok(Value::Char(v)),
-        Literal::Bool(v) => Ok(Value::Bool(v)),
-        Literal::Array { values, .. } => {
+        ValueLiteral::Void => panic!("Void literals should never be evaluated"),
+        ValueLiteral::Unit => Ok(Value::Unit),
+        ValueLiteral::Int(v) => Ok(Value::Number(Number::Int(v))),
+        ValueLiteral::UInt(v) => Ok(Value::Number(Number::UInt(v))),
+        ValueLiteral::Float(v) => Ok(Value::Number(Number::Float(v))),
+        ValueLiteral::String(v) => Ok(Value::String(v)),
+        ValueLiteral::Char(v) => Ok(Value::Char(v)),
+        ValueLiteral::Bool(v) => Ok(Value::Bool(v)),
+        ValueLiteral::Array { values, .. } => {
             let mut array = Vec::new();
 
             for element in values {
@@ -1019,7 +1022,7 @@ fn evaluate_literal(literal: Literal, environment: Rcrc<Environment>) -> Result<
 
             Ok(Value::Array(array))
         }
-        Literal::Struct {
+        ValueLiteral::Struct {
             type_annotation,
             field_initializers,
             ..
@@ -1038,7 +1041,7 @@ fn evaluate_literal(literal: Literal, environment: Rcrc<Environment>) -> Result<
                 fields,
             }))
         }
-        Literal::Enum {
+        ValueLiteral::Enum {
             type_annotation,
             field_initializers,
             ..

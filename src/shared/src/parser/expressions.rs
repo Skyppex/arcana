@@ -6,8 +6,8 @@ use crate::{
 
 use super::{
     cursor::Cursor, fat_arrow_expr_or_block_expr, statements::parse_statement, Assignment, Binary,
-    BinaryOperator, Call, Closure, ClosureParameter, Expression, FieldInitializer, For, If,
-    Literal, Match, MatchArm, Member, Statement, Unary, UnaryOperator, VariableDeclaration, While,
+    BinaryOperator, Call, Closure, ClosureParameter, Expression, FieldInitializer, For, If, Match,
+    MatchArm, Member, Statement, Unary, UnaryOperator, ValueLiteral, VariableDeclaration, While,
 };
 
 use crate::types::parse_type_annotation;
@@ -294,12 +294,9 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
 }
 
 fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
-    println!("100");
     let TokenKind::Identifier(_) = cursor.first().kind else {
         return parse_range(cursor);
     };
-
-    println!("101");
 
     match (cursor.second().kind, cursor.third().kind) {
         (kind, _)
@@ -308,31 +305,24 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::OpenBrace | TokenKind::DoubleColon | TokenKind::Less
             ) =>
         {
-            println!("102");
             return parse_range(cursor);
         }
         (_, TokenKind::Less) => {
-            println!("103");
             return parse_range(cursor);
         }
         (TokenKind::DoubleColon, TokenKind::Identifier(name))
             if name.is_function_identifier_name() =>
         {
-            println!("104");
             return parse_member_access(cursor);
         }
         _ => {}
     }
-    println!("105");
 
     let type_annotation = parse_type_annotation(cursor, false)?;
 
-    println!("106");
     if type_annotation.has_double_colon() {
-        println!("107");
         parse_enum_literal(cursor, type_annotation)
     } else {
-        println!("108");
         parse_struct_literal(cursor, type_annotation)
     }
 }
@@ -343,7 +333,7 @@ fn parse_struct_literal(
 ) -> Result<Expression, String> {
     println!("struct literal");
     if cursor.first().kind != TokenKind::OpenBrace {
-        return Ok(Expression::Literal(Literal::Struct {
+        return Ok(Expression::Literal(ValueLiteral::Struct {
             type_annotation,
             field_initializers: vec![],
         }));
@@ -353,7 +343,7 @@ fn parse_struct_literal(
     let field_initializers = parse_field_initializers(cursor)?;
     cursor.bump()?; // Consume the }
 
-    Ok(Expression::Literal(Literal::Struct {
+    Ok(Expression::Literal(ValueLiteral::Struct {
         type_annotation,
         field_initializers,
     }))
@@ -411,7 +401,7 @@ fn parse_enum_literal(
 ) -> Result<Expression, String> {
     println!("enum literal");
     if cursor.first().kind != TokenKind::OpenBrace {
-        return Ok(Expression::Literal(Literal::Enum {
+        return Ok(Expression::Literal(ValueLiteral::Enum {
             type_annotation: type_annotation.clone(),
             member: type_annotation
                 .to_key()
@@ -427,7 +417,7 @@ fn parse_enum_literal(
     let field_initializers = parse_field_initializers(cursor)?;
     cursor.expect(TokenKind::CloseBrace)?;
 
-    Ok(Expression::Literal(Literal::Enum {
+    Ok(Expression::Literal(ValueLiteral::Enum {
         type_annotation: type_annotation.clone(),
         member: type_annotation
             .to_key()
@@ -906,15 +896,38 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
         if matches!(operator, TokenKind::Minus)
             && matches!(
                 right,
-                Expression::Literal(Literal::Int(_)) | Expression::Literal(Literal::Float(_))
+                Expression::Literal(ValueLiteral::Int(_))
+                    | Expression::Literal(ValueLiteral::Float(_))
             )
         {
             match right {
-                Expression::Literal(Literal::Int(value)) => {
-                    return Ok(Expression::Literal(Literal::Int(-value)));
+                Expression::Literal(ValueLiteral::Int(value)) => {
+                    return Ok(Expression::Literal(ValueLiteral::Int(-value)));
                 }
-                Expression::Literal(Literal::Float(value)) => {
-                    return Ok(Expression::Literal(Literal::Float(-value)));
+                Expression::Literal(ValueLiteral::Float(value)) => {
+                    return Ok(Expression::Literal(ValueLiteral::Float(-value)));
+                }
+                _ => unreachable!("Checked in previous if"),
+            }
+        }
+
+        if matches!(operator, TokenKind::Plus)
+            && matches!(
+                right,
+                Expression::Literal(ValueLiteral::Int(_))
+                    | Expression::Literal(ValueLiteral::UInt(_))
+                    | Expression::Literal(ValueLiteral::Float(_))
+            )
+        {
+            match right {
+                Expression::Literal(ValueLiteral::Int(value)) => {
+                    return Ok(Expression::Literal(ValueLiteral::Int(value)));
+                }
+                Expression::Literal(ValueLiteral::UInt(value)) => {
+                    return Ok(Expression::Literal(ValueLiteral::UInt(value)));
+                }
+                Expression::Literal(ValueLiteral::Float(value)) => {
+                    return Ok(Expression::Literal(ValueLiteral::Float(value)));
                 }
                 _ => unreachable!("Checked in previous if"),
             }
@@ -1203,7 +1216,7 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
 
             cursor.bump()?; // Consume the ]
 
-            Ok(Expression::Literal(Literal::Array(elements)))
+            Ok(Expression::Literal(ValueLiteral::Array(elements)))
         }
         _ => Err(format!(
             "Expected primary expression but found {:?}",
@@ -1364,14 +1377,14 @@ fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
 fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> {
     match literal {
         token::Literal::Void => Err("Void literals are not allowed".to_string()),
-        token::Literal::Unit => Ok(Expression::Literal(Literal::Unit)),
-        token::Literal::Int(literal) => Ok(Expression::Literal(Literal::Int(literal.value))),
-        token::Literal::UInt(literal) => Ok(Expression::Literal(Literal::UInt(literal.value))),
-        token::Literal::Float(value) => Ok(Expression::Literal(Literal::Float(value))),
-        token::Literal::String(value) => Ok(Expression::Literal(Literal::String(value))),
-        token::Literal::Char(value) => Ok(Expression::Literal(Literal::Char(
+        token::Literal::Unit => Ok(Expression::Literal(ValueLiteral::Unit)),
+        token::Literal::Int(literal) => Ok(Expression::Literal(ValueLiteral::Int(literal.value))),
+        token::Literal::UInt(literal) => Ok(Expression::Literal(ValueLiteral::UInt(literal.value))),
+        token::Literal::Float(value) => Ok(Expression::Literal(ValueLiteral::Float(value))),
+        token::Literal::String(value) => Ok(Expression::Literal(ValueLiteral::String(value))),
+        token::Literal::Char(value) => Ok(Expression::Literal(ValueLiteral::Char(
             value.parse::<char>().expect("Failed to parse char literal"),
         ))),
-        token::Literal::Bool(value) => Ok(Expression::Literal(Literal::Bool(value))),
+        token::Literal::Bool(value) => Ok(Expression::Literal(ValueLiteral::Bool(value))),
     }
 }

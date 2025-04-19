@@ -9,9 +9,9 @@ use crate::{
 use super::{
     cursor::Cursor, expressions, fat_arrow_expr_or_block_expr, AccessModifier, AssociatedType,
     Closure, EmbeddedStruct, EnumDeclaration, Expression, FunctionDeclaration,
-    ImplementationDeclaration, Literal, ModuleDeclaration, Parameter, ProtocolDeclaration,
-    Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration,
-    Use, UseItem,
+    ImplementationDeclaration, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement,
+    StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration, Use,
+    UseItem, ValueLiteral,
 };
 
 pub fn parse_module_only(
@@ -613,7 +613,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
 
     cursor.bump()?; // Consume the }
 
-    let literals: Result<Vec<Literal>, String> = literals
+    let literals: Result<Vec<ValueLiteral>, String> = literals
         .iter()
         .map(|l| match l {
             Expression::Literal(l) => Ok(l.clone()),

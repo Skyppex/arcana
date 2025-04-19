@@ -1,9 +1,9 @@
-use std::{fmt::Display, hash::Hash, ops::Deref};
+use std::{fmt::Display, hash::Hash, ops::Deref, str::FromStr};
 
 use crate::{
-    lexer::token::{self, IdentifierType, IntLiteral, Keyword, TokenKind},
-    parser::{cursor::Cursor, Literal},
-    type_checker::{Function, Type},
+    lexer::token::{self, IdentifierType, Keyword, TokenKind},
+    parser::cursor::Cursor,
+    type_checker::{Function, LiteralType, Type},
 };
 
 pub trait ToKey {
@@ -33,7 +33,7 @@ pub enum TypeAnnotation {
     Type(String),
     ConcreteType(String, Vec<TypeAnnotation>),
     Array(Box<TypeAnnotation>),
-    Literal(Box<Literal>),
+    Literal(Box<LiteralType>),
     Tuple(Vec<TypeAnnotation>),
     Function(Option<Box<TypeAnnotation>>, Option<Box<TypeAnnotation>>),
 }
@@ -142,28 +142,6 @@ impl ToKey for TypeAnnotation {
                     .map(|p| format!(":{}", p.to_key()))
                     .unwrap_or("".to_string())
             ),
-        }
-    }
-}
-
-pub enum LiteralType {
-    Bool(bool),
-    Int(IntLiteral<i64>),
-    UInt(IntLiteral<u64>),
-    Float(f64),
-    Char(String),
-    String(String),
-}
-
-impl Display for LiteralType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LiteralType::Bool(value) => write!(f, "#{}", value),
-            LiteralType::Int(value) => write!(f, "#{}", value),
-            LiteralType::UInt(value) => write!(f, "#{}", value),
-            LiteralType::Float(value) => write!(f, "#{}", value),
-            LiteralType::Char(value) => write!(f, "#{}", value),
-            LiteralType::String(value) => write!(f, "#{}", value),
         }
     }
 }
@@ -473,18 +451,9 @@ pub(super) fn parse_type_annotation(
         }
         TokenKind::Hash => {
             cursor.bump()?; // Consume the #
-            match parse_literal_type(cursor)? {
-                LiteralType::Bool(v) => Ok(TypeAnnotation::Literal(Box::new(Literal::Bool(v)))),
-                LiteralType::Int(v) => Ok(TypeAnnotation::Literal(Box::new(Literal::Int(v.value)))),
-                LiteralType::UInt(v) => {
-                    Ok(TypeAnnotation::Literal(Box::new(Literal::UInt(v.value))))
-                }
-                LiteralType::Float(v) => Ok(TypeAnnotation::Literal(Box::new(Literal::Float(v)))),
-                LiteralType::Char(v) => Ok(TypeAnnotation::Literal(Box::new(Literal::Char(
-                    v.parse::<char>().expect("Failed to parse char literal"),
-                )))),
-                LiteralType::String(v) => Ok(TypeAnnotation::Literal(Box::new(Literal::String(v)))),
-            }
+            Ok(TypeAnnotation::Literal(Box::new(parse_literal_type(
+                cursor,
+            )?)))
         }
         TokenKind::Identifier(type_name) => {
             cursor.bump()?; // Consume the type identifier
@@ -753,23 +722,42 @@ fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, String> {
     match cursor.first().kind {
         TokenKind::Literal(token::Literal::Bool(value)) => {
             cursor.bump()?; // Consume the bool
-            Ok(LiteralType::Bool(value))
+            Ok(LiteralType::BoolValue(value))
         }
         TokenKind::Literal(token::Literal::Int(value)) => {
             cursor.bump()?; // Consume the int
-            Ok(LiteralType::Int(value))
+            Ok(LiteralType::IntValue(value.value))
+        }
+        TokenKind::Literal(token::Literal::UInt(value)) => {
+            cursor.bump()?; // Consume the int
+            Ok(LiteralType::UIntValue(value.value))
         }
         TokenKind::Literal(token::Literal::Float(value)) => {
             cursor.bump()?; // Consume the float
-            Ok(LiteralType::Float(value))
+            Ok(LiteralType::FloatValue(value))
         }
         TokenKind::Literal(token::Literal::Char(value)) => {
             cursor.bump()?; // Consume the char
-            Ok(LiteralType::Char(value))
+            Ok(LiteralType::CharValue(value))
         }
         TokenKind::Literal(token::Literal::String(value)) => {
             cursor.bump()?; // Consume the string
-            Ok(LiteralType::String(value))
+            Ok(LiteralType::StringValue(value))
+        }
+        TokenKind::Plus => {
+            cursor.bump()?; // Consume the +
+
+            match cursor.first().kind {
+                TokenKind::Literal(token::Literal::Int(literal)) => {
+                    cursor.bump()?; // Consume the int
+                    Ok(LiteralType::IntValue(literal.value))
+                }
+                TokenKind::Literal(token::Literal::Float(value)) => {
+                    cursor.bump()?; // Consume the float
+                    Ok(LiteralType::FloatValue(value))
+                }
+                _ => Err(format!("Cannot negate type: {:?}", cursor.first().kind)),
+            }
         }
         TokenKind::Minus => {
             cursor.bump()?; // Consume the -
@@ -777,17 +765,25 @@ fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, String> {
             match cursor.first().kind {
                 TokenKind::Literal(token::Literal::Int(literal)) => {
                     cursor.bump()?; // Consume the int
-                    Ok(LiteralType::Int(IntLiteral {
-                        value: -literal.value,
-                        base: literal.base,
-                    }))
+                    Ok(LiteralType::IntValue(literal.value))
                 }
                 TokenKind::Literal(token::Literal::Float(value)) => {
                     cursor.bump()?; // Consume the float
-                    Ok(LiteralType::Float(-value))
+                    Ok(LiteralType::FloatValue(-value))
                 }
                 _ => Err(format!("Cannot negate type: {:?}", cursor.first().kind)),
             }
+        }
+        TokenKind::Identifier(identifier) => {
+            if identifier.is_type_identifier_name() {
+                cursor.bump()?; // Consume the identifier
+                return LiteralType::from_str(&identifier);
+            }
+
+            Err(format!(
+                "Expected type identifier but found '{}'",
+                identifier
+            ))
         }
         _ => Err(format!(
             "Expected literal type but found {:?}",

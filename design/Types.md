@@ -188,6 +188,7 @@ Note that this example doesn't require the explicit generic annotation because i
 
 Here a union is used as a type constraint. This causes the generic type to only
 allow one of the union's variants at a time.
+
 ```arcana
 union Choice { 1, 2, 3 }
 
@@ -203,6 +204,7 @@ let a2 = A::<#2> { a: 3 } // This would fail
 
 This is different from allowing any type as a generic parameter and using a
 union as the generic type. In this case, the generic type can be any of the
+
 ```arcana
 union Choice { 1, 2, 3 }
 
@@ -246,7 +248,7 @@ struct Foo {
 
 type Bar = Foo;
 
-implement Bar {
+imp Bar {
     fun new(bar: int): Bar {
         return Bar { bar: bar };
     }
@@ -256,6 +258,82 @@ fun main() {
     Bar bar = Bar::new(5), // This works
     Foo foo = Foo::new(5), // This doesn't work
 }
+```
+
+#### things i want to do with type aliases
+
+- add one or more fields to a struct
+
+```arcana
+struct S {
+    s: Int
+}
+
+type T => S + s2: Int
+type T2 => S + [s2: Int, s3: Int]
+```
+
+- remove one or more fields from a struct
+
+```arcana
+struct S {
+    s: Int
+    s2: Int
+}
+
+type T => S - s
+type T2 => S - [s, s2]
+```
+
+- add one or more shared fields to an enum
+
+```arcana
+enum E {
+    v: Int,
+    V
+}
+
+type T => T + v2: Int
+type T2 => T + [v2: Int, v3: Int]
+```
+
+- remove one or more shared fields from an enum
+
+```arcana
+enum E {
+    v: Int,
+    v2: Int,
+    V
+}
+
+type T => E - v
+type T2 => E - [v, v2]
+```
+
+- add one or more variants to an enum
+
+```arcana
+enum E {
+    V
+}
+
+type T => E + V2
+type T2 => E + V2 { v: Int }
+type T3 => E + [V2, V3 { v: Int }]
+```
+
+- remove one or more variants from an enum
+
+```arcana
+enum E {
+    V,
+    V2 {
+        v: Int
+    }
+}
+
+type T => E - V
+type T2 => E - [V, V2]
 ```
 
 ## Type Parameters (Generics)

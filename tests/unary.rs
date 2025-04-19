@@ -4,8 +4,8 @@ use common::{create_typed_ast, StatementExt, VecStatementExt};
 
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
-    ast::{Literal, Typed, TypedExpression, UnaryOperator},
-    Type,
+    ast::{Typed, TypedExpression, UnaryOperator, ValueLiteral},
+    LiteralType, Type,
 };
 
 #[test]
@@ -22,13 +22,7 @@ fn identity_is_identity() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert!(matches!(
-        expression,
-        TypedExpression::Unary {
-            operator: UnaryOperator::Identity,
-            ..
-        }
-    ));
+    assert_eq!(expression, TypedExpression::Literal(ValueLiteral::Int(1)));
 }
 
 #[test]
@@ -45,7 +39,7 @@ fn negate_is_negate() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression, TypedExpression::Literal(Literal::Int(-1)));
+    assert_eq!(expression, TypedExpression::Literal(ValueLiteral::Int(-1)));
 }
 
 #[test]
@@ -108,7 +102,13 @@ fn identity_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Int);
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "1".to_owned(),
+            type_: Box::new(LiteralType::IntValue(1))
+        }
+    );
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn negate_has_correct_type() {
         expression.get_type(),
         Type::Literal {
             name: "-1".to_owned(),
-            type_: Box::new(Type::Int)
+            type_: Box::new(LiteralType::IntValue(-1))
         }
     );
 }

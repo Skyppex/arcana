@@ -9,17 +9,18 @@ mod scope;
 mod statements;
 
 pub use full_name::*;
+use num_traits::Zero;
 pub use type_checker::*;
 pub use type_environment::*;
 
-use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc, str::FromStr};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, hash::Hash, rc::Rc, str::FromStr};
 
 use crate::{
-    parser::{self, Expression},
+    parser,
     types::{GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };
 
-use ast::EmbeddedStruct;
+use ast::{EmbeddedStruct, ValueLiteral};
 
 use self::statements::check_type_annotation;
 
@@ -225,7 +226,7 @@ pub enum Type {
     Function(Function),
     Literal {
         name: String, // String representation of the literal
-        type_: Box<Type>,
+        type_: Box<LiteralType>,
     },
     Tuple(Vec<Type>),
 }
@@ -342,35 +343,32 @@ impl Type {
         })
     }
 
-    pub fn from_literal(literal: &parser::Literal) -> Result<Type, String> {
+    pub fn from_value_literal(literal: &parser::ValueLiteral) -> Result<Type, String> {
         match literal {
-            parser::Literal::Unit => Ok(Type::Literal {
-                name: Type::Unit.to_string(),
-                type_: Box::new(Type::Unit),
-            }),
-            parser::Literal::Int(v) => Ok(Type::Literal {
+            parser::ValueLiteral::Unit => Ok(Type::Unit),
+            parser::ValueLiteral::Int(v) => Ok(Type::Literal {
                 name: v.to_string(),
-                type_: Box::new(Type::Int),
+                type_: Box::new(LiteralType::IntValue(*v)),
             }),
-            parser::Literal::UInt(v) => Ok(Type::Literal {
+            parser::ValueLiteral::UInt(v) => Ok(Type::Literal {
                 name: v.to_string(),
-                type_: Box::new(Type::UInt),
+                type_: Box::new(LiteralType::UInt),
             }),
-            parser::Literal::Float(v) => Ok(Type::Literal {
+            parser::ValueLiteral::Float(v) => Ok(Type::Literal {
                 name: v.to_string(),
-                type_: Box::new(Type::Float),
+                type_: Box::new(LiteralType::Float),
             }),
-            parser::Literal::Char(v) => Ok(Type::Literal {
+            parser::ValueLiteral::Char(v) => Ok(Type::Literal {
                 name: format!("'{}'", v),
-                type_: Box::new(Type::Char),
+                type_: Box::new(LiteralType::Char),
             }),
-            parser::Literal::String(v) => Ok(Type::Literal {
+            parser::ValueLiteral::String(v) => Ok(Type::Literal {
                 name: format!("\"{}\"", v),
-                type_: Box::new(Type::String),
+                type_: Box::new(LiteralType::String),
             }),
-            parser::Literal::Bool(v) => Ok(Type::Literal {
+            parser::ValueLiteral::Bool(v) => Ok(Type::Literal {
                 name: v.to_string(),
-                type_: Box::new(Type::Bool),
+                type_: Box::new(LiteralType::Bool),
             }),
             _ => Err(format!("Cannot convert literal {:?} to type", literal)),
         }
@@ -425,9 +423,7 @@ impl Type {
             Type::Function(f) => f
                 .type_annotation()
                 .unwrap_or_else(|| panic!("Closure has no type annotation")),
-            Type::Literal { type_, .. } => {
-                TypeAnnotation::Literal(Box::new((*type_.clone()).into()))
-            }
+            Type::Literal { type_, .. } => TypeAnnotation::Literal(Box::new(*type_.clone())),
             _ => panic!("Cannot get type annotation for type {}", self.full_name()),
         }
     }
@@ -790,7 +786,7 @@ impl FullName for Type {
             Type::Union(u) => u.full_name(),
             Type::TypeAlias(t) => t.full_name(),
             Type::Function(f) => f.full_name(),
-            Type::Literal { name, type_ } => format!("#{}: {}", type_.full_name(), name),
+            Type::Literal { type_, .. } => type_.full_name(),
             Type::Tuple(e) => format!(
                 "({})",
                 e.iter()
@@ -803,18 +799,19 @@ impl FullName for Type {
     }
 }
 
-impl From<Type> for parser::Literal {
+impl From<Type> for parser::ValueLiteral {
     fn from(val: Type) -> Self {
         match val {
-            Type::Void => parser::Literal::Unit,
-            Type::Unit => parser::Literal::Unit,
-            Type::Int => parser::Literal::Int(0),
-            Type::UInt => parser::Literal::UInt(0),
-            Type::Float => parser::Literal::Float(0.0),
-            Type::String => parser::Literal::String("".to_string()),
-            Type::Char => parser::Literal::Char(' '),
-            Type::Bool => parser::Literal::Bool(false),
-            _ => panic!("Cannot convert type {} to literal", val.full_name()),
+            Type::Literal { type_, .. } => match *type_ {
+                LiteralType::BoolValue(v) => parser::ValueLiteral::Bool(v),
+                LiteralType::IntValue(v) => parser::ValueLiteral::Int(v),
+                LiteralType::UIntValue(v) => parser::ValueLiteral::UInt(v),
+                LiteralType::FloatValue(v) => parser::ValueLiteral::Float(v),
+                LiteralType::CharValue(v) => parser::ValueLiteral::Char(v.parse().unwrap()),
+                LiteralType::StringValue(v) => parser::ValueLiteral::String(v),
+                _ => panic!("Cannot convert literal type to value literal"),
+            },
+            other => panic!("Cannot convert type {} to literal", other.full_name()),
         }
     }
 }
@@ -849,6 +846,236 @@ impl ToKey for Type {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum LiteralType {
+    Bool,
+    BoolValue(bool),
+    Int,
+    IntValue(i64),
+    UInt,
+    UIntValue(u64),
+    Float,
+    FloatValue(f64),
+    Char,
+    CharValue(String),
+    String,
+    StringValue(String),
+}
+
+impl LiteralType {
+    pub fn get_runtime_type(&self) -> Type {
+        match self {
+            LiteralType::Bool => Type::Bool,
+            LiteralType::BoolValue(_) => Type::Bool,
+            LiteralType::Int => Type::Int,
+            LiteralType::IntValue(_) => Type::Int,
+            LiteralType::UInt => Type::UInt,
+            LiteralType::UIntValue(_) => Type::UInt,
+            LiteralType::Float => Type::Float,
+            LiteralType::FloatValue(_) => Type::Float,
+            LiteralType::Char => Type::Char,
+            LiteralType::CharValue(_) => Type::Char,
+            LiteralType::String => Type::String,
+            LiteralType::StringValue(_) => Type::String,
+        }
+    }
+
+    pub fn get_type(&self) -> Type {
+        match self {
+            LiteralType::Bool => Type::Literal {
+                name: "Bool".to_string(),
+                type_: Box::new(LiteralType::Bool),
+            },
+            LiteralType::BoolValue(v) => Type::Literal {
+                name: format!("{}", v),
+                type_: Box::new(LiteralType::BoolValue(*v)),
+            },
+            LiteralType::Int => Type::Literal {
+                name: "Int".to_string(),
+                type_: Box::new(LiteralType::Int),
+            },
+            LiteralType::IntValue(v) => Type::Literal {
+                name: format!("{}", v),
+                type_: Box::new(LiteralType::IntValue(*v)),
+            },
+            LiteralType::UInt => Type::Literal {
+                name: "UInt".to_string(),
+                type_: Box::new(LiteralType::UInt),
+            },
+            LiteralType::UIntValue(v) => Type::Literal {
+                name: format!("{}", v),
+                type_: Box::new(LiteralType::UIntValue(*v)),
+            },
+            LiteralType::Float => Type::Literal {
+                name: "Float".to_string(),
+                type_: Box::new(LiteralType::Float),
+            },
+            LiteralType::FloatValue(v) => Type::Literal {
+                name: format!("{}", v),
+                type_: Box::new(LiteralType::FloatValue(*v)),
+            },
+            LiteralType::Char => Type::Literal {
+                name: "Char".to_string(),
+                type_: Box::new(LiteralType::Char),
+            },
+            LiteralType::CharValue(v) => Type::Literal {
+                name: format!("'{}'", v),
+                type_: Box::new(LiteralType::CharValue(v.clone())),
+            },
+            LiteralType::String => Type::Literal {
+                name: "String".to_string(),
+                type_: Box::new(LiteralType::String),
+            },
+            LiteralType::StringValue(v) => Type::Literal {
+                name: format!("\"{}\"", v),
+                type_: Box::new(LiteralType::StringValue(v.clone())),
+            },
+        }
+    }
+}
+
+impl FullName for LiteralType {
+    fn full_name(&self) -> String {
+        match self {
+            LiteralType::Bool => "#Bool".to_string(),
+            LiteralType::BoolValue(v) => format!("#{}", v),
+            LiteralType::Int => "#Int".to_string(),
+            LiteralType::IntValue(v) => format!("#{}", v),
+            LiteralType::UInt => "#UInt".to_string(),
+            LiteralType::UIntValue(v) => format!("#{}", v),
+            LiteralType::Float => "#Float".to_string(),
+            LiteralType::FloatValue(v) => format!("#{}", v),
+            LiteralType::Char => "#Char".to_string(),
+            LiteralType::CharValue(v) => format!("#'{}'", v),
+            LiteralType::String => "#String".to_string(),
+            LiteralType::StringValue(v) => format!("#\"{}\"", v),
+        }
+    }
+}
+
+impl FromStr for LiteralType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Bool" => Ok(LiteralType::Bool),
+            "Int" => Ok(LiteralType::Int),
+            "UInt" => Ok(LiteralType::UInt),
+            "Float" => Ok(LiteralType::Float),
+            "Char" => Ok(LiteralType::Char),
+            "String" => Ok(LiteralType::String),
+            _ => Err(format!("Cannot convert string {} to literal type", s)),
+        }
+    }
+}
+
+impl From<ValueLiteral> for LiteralType {
+    fn from(value: ValueLiteral) -> Self {
+        match value {
+            ValueLiteral::Bool(v) => LiteralType::BoolValue(v),
+            ValueLiteral::Int(v) => LiteralType::IntValue(v),
+            ValueLiteral::UInt(v) => LiteralType::UIntValue(v),
+            ValueLiteral::Float(v) => LiteralType::FloatValue(v),
+            ValueLiteral::Char(v) => LiteralType::CharValue(v.to_string()),
+            ValueLiteral::String(v) => LiteralType::StringValue(v),
+            _ => panic!("Cannot convert value literal to literal type"),
+        }
+    }
+}
+
+impl From<parser::ValueLiteral> for LiteralType {
+    fn from(value: parser::ValueLiteral) -> Self {
+        match value {
+            parser::ValueLiteral::Bool(v) => LiteralType::BoolValue(v),
+            parser::ValueLiteral::Int(v) => LiteralType::IntValue(v),
+            parser::ValueLiteral::UInt(v) => LiteralType::UIntValue(v),
+            parser::ValueLiteral::Float(v) => LiteralType::FloatValue(v),
+            parser::ValueLiteral::Char(v) => LiteralType::CharValue(v.to_string()),
+            parser::ValueLiteral::String(v) => LiteralType::StringValue(v),
+            _ => panic!("Cannot convert value literal to literal type"),
+        }
+    }
+}
+
+impl Hash for LiteralType {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            LiteralType::Bool => state.write_u8(0),
+            LiteralType::BoolValue(_) => state.write_u8(1),
+            LiteralType::Int => state.write_u8(2),
+            LiteralType::IntValue(int_literal) => {
+                state.write_u8(3);
+                int_literal.hash(state);
+            }
+            LiteralType::UInt => state.write_u8(4),
+            LiteralType::UIntValue(int_literal) => {
+                state.write_u8(5);
+                int_literal.hash(state);
+            }
+            LiteralType::Float => state.write_u8(6),
+            LiteralType::FloatValue(float_literal) => {
+                state.write_u8(7);
+
+                if float_literal.is_zero() {
+                    0f64.to_bits().hash(state);
+                } else {
+                    float_literal.to_bits().hash(state);
+                }
+            }
+            LiteralType::Char => state.write_u8(8),
+            LiteralType::CharValue(char_literal) => {
+                state.write_u8(9);
+                char_literal.hash(state);
+            }
+            LiteralType::String => state.write_u8(10),
+            LiteralType::StringValue(string_literal) => {
+                state.write_u8(11);
+                string_literal.hash(state);
+            }
+        }
+    }
+}
+
+impl Eq for LiteralType {}
+
+impl ToKey for LiteralType {
+    fn to_key(&self) -> String {
+        match self {
+            LiteralType::Bool => "#Bool".to_string(),
+            LiteralType::BoolValue(v) => format!("#{}", v),
+            LiteralType::Int => "#Int".to_string(),
+            LiteralType::IntValue(v) => format!("#{}", v),
+            LiteralType::UInt => "#UInt".to_string(),
+            LiteralType::UIntValue(v) => format!("#{}", v),
+            LiteralType::Float => "#Float".to_string(),
+            LiteralType::FloatValue(v) => format!("#{}", v),
+            LiteralType::Char => "#Char".to_string(),
+            LiteralType::CharValue(v) => format!("#'{}'", v),
+            LiteralType::String => "#String".to_string(),
+            LiteralType::StringValue(v) => format!("#\"{}\"", v),
+        }
+    }
+}
+
+impl Display for LiteralType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LiteralType::Bool => write!(f, "#Bool"),
+            LiteralType::BoolValue(value) => write!(f, "#{}", value),
+            LiteralType::Int => write!(f, "#Int"),
+            LiteralType::IntValue(value) => write!(f, "#{}", value),
+            LiteralType::UInt => write!(f, "#UInt"),
+            LiteralType::UIntValue(value) => write!(f, "#{}", value),
+            LiteralType::Float => write!(f, "#Float"),
+            LiteralType::FloatValue(value) => write!(f, "#{}", value),
+            LiteralType::Char => write!(f, "#Char"),
+            LiteralType::CharValue(value) => write!(f, "#'{}'", value),
+            LiteralType::String => write!(f, "#String"),
+            LiteralType::StringValue(value) => write!(f, "#\"{}\"", value),
+        }
+    }
+}
+
 /// Check if two types are equal
 /// The logic is as follows:
 /// - The 'left' type can be made from the 'right' type
@@ -856,9 +1083,13 @@ impl ToKey for Type {
 ///
 /// # Examples
 /// ```
-/// use crate::types::{Type, type_equals};
+/// use crate::shared::type_checker::{type_equals, LiteralType, Type};
 ///
-/// let literal_int = Type::Literal(Literal::Int(0));
+/// let literal_int = Type::Literal {
+///     name: "0".to_string(),
+///     type_: Box::new(LiteralType::IntValue(0))
+/// };
+///
 /// let int = Type::Int;
 ///
 /// // Left type is stricter than right type.
@@ -872,21 +1103,21 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
     match (left, right) {
         (Type::Substitution { actual_type, .. }, right) => type_equals(actual_type, right),
         (left, Type::Substitution { actual_type, .. }) => type_equals(left, actual_type),
-        (Type::UInt, Type::Literal { name, type_ }) if matches!(**type_, Type::Int) => {
+        (Type::UInt, Type::Literal { name, type_ })
+            if matches!(**type_, LiteralType::Int | LiteralType::IntValue(_)) =>
+        {
             name.parse::<u64>().is_ok()
         }
-        (Type::Int, Type::Literal { name, type_ }) if matches!(**type_, Type::UInt) => {
+        (Type::Int, Type::Literal { name, type_ })
+            if matches!(**type_, LiteralType::UInt | LiteralType::UIntValue(_)) =>
+        {
             name.parse::<i64>().is_ok()
         }
         (Type::Union(Union { literals, .. }), Type::Literal { .. }) => literals.contains(right),
         (other, Type::Union(Union { literal_type, .. })) => type_equals(other, literal_type),
-        (
-            Type::Literal { name, type_ },
-            Type::Literal {
-                name: name_2,
-                type_: type_2,
-            },
-        ) => name == name_2 && type_equals(type_, type_2),
+        (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
+            literal_type_equals(type_.as_ref(), type_2.as_ref())
+        }
         (
             Type::TypeAlias(TypeAlias { types: left, .. }),
             Type::TypeAlias(TypeAlias { types: right, .. }),
@@ -905,7 +1136,9 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
         (other, Type::TypeAlias(TypeAlias { types, .. })) => {
             types.iter().all(|t| type_equals(other, t))
         }
-        (other, Type::Literal { type_, .. }) => type_equals(other, type_),
+        (other, Type::Literal { type_, .. }) => {
+            type_equals(other, &type_.as_ref().get_runtime_type())
+        }
         (Type::Function(fl), Type::Function(fr)) => {
             type_equals(fl.return_type.as_ref(), fr.return_type.as_ref())
                 && fl
@@ -950,16 +1183,46 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
 
 pub fn type_equals_coerce(left: &Type, right: &Type) -> bool {
     match (left, right) {
-        (Type::UInt, Type::Literal { name, type_ }) if matches!(**type_, Type::Int) => {
-            name.parse::<u64>().is_ok()
+        (Type::UInt, Type::Literal { type_, .. })
+            if matches!(**type_, LiteralType::IntValue(_)) =>
+        {
+            let LiteralType::IntValue(ref v) = type_.as_ref() else {
+                unreachable!();
+            };
+
+            *v >= 0
         }
-        (Type::Int, Type::Literal { name, type_ }) if matches!(**type_, Type::UInt) => {
-            name.parse::<i64>().is_ok()
+        (Type::Int, Type::Literal { type_, .. })
+            if matches!(**type_, LiteralType::UIntValue(_)) =>
+        {
+            let LiteralType::UIntValue(ref v) = type_.as_ref() else {
+                unreachable!();
+            };
+
+            *v <= i64::MAX as u64
         }
         (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
-            type_equals(type_, type_2)
+            type_equals_coerce(&type_.get_runtime_type(), &type_2.get_runtime_type())
         }
         _ => type_equals(left, right),
+    }
+}
+
+pub fn literal_type_equals(left: &LiteralType, right: &LiteralType) -> bool {
+    match (left, right) {
+        (LiteralType::Bool, LiteralType::Bool | LiteralType::BoolValue(_)) => true,
+        (LiteralType::BoolValue(l), LiteralType::BoolValue(r)) => l == r,
+        (LiteralType::Int, LiteralType::Int | LiteralType::IntValue(_)) => true,
+        (LiteralType::IntValue(l), LiteralType::IntValue(r)) => l == r,
+        (LiteralType::UInt, LiteralType::UInt | LiteralType::UIntValue(_)) => true,
+        (LiteralType::UIntValue(l), LiteralType::UIntValue(r)) => l == r,
+        (LiteralType::Float, LiteralType::Float | LiteralType::FloatValue(_)) => true,
+        (LiteralType::FloatValue(l), LiteralType::FloatValue(r)) => l == r,
+        (LiteralType::Char, LiteralType::Char | LiteralType::CharValue(_)) => true,
+        (LiteralType::CharValue(l), LiteralType::CharValue(r)) => l == r,
+        (LiteralType::String, LiteralType::String | LiteralType::StringValue(_)) => true,
+        (LiteralType::StringValue(l), LiteralType::StringValue(r)) => l == r,
+        _ => false,
     }
 }
 
