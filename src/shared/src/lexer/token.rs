@@ -247,16 +247,10 @@ impl IdentifierType for str {
     }
 
     fn is_function_identifier_name(&self) -> bool {
-        dbg!(self);
         let regex = regex::Regex::new(r"^[_a-z][_a-z\d]*$");
 
-        dbg!(&regex);
-
         match regex {
-            Ok(re) => {
-                dbg!(re.is_match(self));
-                re.is_match(self)
-            }
+            Ok(re) => re.is_match(self),
             Err(_) => false,
         }
     }

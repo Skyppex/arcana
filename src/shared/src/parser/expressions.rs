@@ -331,7 +331,6 @@ fn parse_struct_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
 ) -> Result<Expression, String> {
-    println!("struct literal");
     if cursor.first().kind != TokenKind::OpenBrace {
         return Ok(Expression::Literal(ValueLiteral::Struct {
             type_annotation,
@@ -385,7 +384,6 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
 
     cursor.bump()?; // Consume the identifier
     cursor.bump()?; // Consume the :
-    println!("hellooooo");
 
     let initializer = parse_expression(cursor)?;
 
@@ -399,7 +397,6 @@ fn parse_enum_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
 ) -> Result<Expression, String> {
-    println!("enum literal");
     if cursor.first().kind != TokenKind::OpenBrace {
         return Ok(Expression::Literal(ValueLiteral::Enum {
             type_annotation: type_annotation.clone(),

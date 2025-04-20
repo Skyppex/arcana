@@ -14,8 +14,8 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    type_equals, DiscoveredEmbeddedStruct, EmbeddedStruct, Enum, Function, Parameter, Protocol,
-    Rcrc, Struct, StructField, Type, TypeAlias, Union,
+    type_equals, type_equals_coerce, DiscoveredEmbeddedStruct, EmbeddedStruct, Enum, Function,
+    Parameter, Protocol, Rcrc, Struct, StructField, Type, TypeAlias, Union,
 };
 
 pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
@@ -265,14 +265,10 @@ pub fn check_type(
                         ));
                     }
 
-                    dbg!(&field_initializers);
-                    dbg!(&field);
-
                     let default_value = field_initializers
                         .iter()
                         .find(|f| f.identifier == field.field_name)
                         .map(|f| {
-                            dbg!(&f);
                             expressions::check_type(
                                 &f.initializer,
                                 discovered_types,
@@ -281,8 +277,6 @@ pub fn check_type(
                             )
                         })
                         .transpose()?;
-
-                    dbg!(&default_value);
 
                     fields.insert(
                         0,
@@ -296,8 +290,6 @@ pub fn check_type(
                     );
                 }
             }
-
-            dbg!(&fields);
 
             let mut recursive_embedded_structs = embedded_structs.clone();
 
@@ -659,18 +651,21 @@ pub fn check_type(
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
-            let literal_type = literal_types.iter().try_fold(Type::Void, |acc, t| {
-                if type_equals(&acc.clone(), &Type::Void) {
-                    Ok(t.clone())
-                } else if !type_equals(&acc.clone(), t) {
-                    Err(format!(
+            let literal_type = literal_types
+                .iter()
+                .map(|t| t.to_union_compatible_type())
+                .try_fold(Type::Void, |acc, t| {
+                    if type_equals(&acc.clone(), &Type::Void) {
+                        Ok(t.clone())
+                    } else if !type_equals_coerce(&acc.clone(), &t) {
+                        Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
                         acc, t
                     ))
-                } else {
-                    Ok(acc)
-                }
-            })?;
+                    } else {
+                        Ok(acc)
+                    }
+                })?;
 
             let type_ = Type::Union(Union {
                 type_identifier: type_identifier.clone(),
@@ -1275,18 +1270,21 @@ fn check_type_identifier(
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
-            let literal_type = literal_types.iter().try_fold(Type::Void, |acc, t| {
-                if type_equals(&acc.clone(), &Type::Void) {
-                    Ok(t.clone())
-                } else if type_equals(&acc.clone(), t) {
-                    Err(format!(
+            let literal_type = literal_types
+                .iter()
+                .map(|t| t.to_union_compatible_type())
+                .try_fold(Type::Void, |acc, t| {
+                    if type_equals(&acc.clone(), &Type::Void) {
+                        Ok(t.clone())
+                    } else if type_equals_coerce(&acc.clone(), &t) {
+                        Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
                         acc, t
                     ))
-                } else {
-                    Ok(acc)
-                }
-            })?;
+                    } else {
+                        Ok(acc)
+                    }
+                })?;
 
             Ok(Type::Union(Union {
                 type_identifier: type_identifier.clone(),
@@ -1564,18 +1562,21 @@ pub fn check_type_annotation(
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
-            let literal_type = literal_types.iter().try_fold(Type::Void, |acc, t| {
-                if type_equals(&acc.clone(), &Type::Void) {
-                    Ok(t.clone())
-                } else if !type_equals(&acc.clone(), t) {
-                    Err(format!(
+            let literal_type = literal_types
+                .iter()
+                .map(|t| t.to_union_compatible_type())
+                .try_fold(Type::Void, |acc, t| {
+                    if type_equals(&acc.clone(), &Type::Void) {
+                        Ok(t.clone())
+                    } else if !type_equals_coerce(&acc.clone(), &t) {
+                        Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
                         acc, t
                     ))
-                } else {
-                    Ok(acc)
-                }
-            })?;
+                    } else {
+                        Ok(acc)
+                    }
+                })?;
 
             Ok(Type::Union(Union {
                 type_identifier: type_identifier.clone(),

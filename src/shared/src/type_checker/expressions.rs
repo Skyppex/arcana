@@ -269,10 +269,6 @@ pub fn check_type(
                         .borrow()
                         .get_type_from_annotation(type_annotation)?;
 
-                    println!("100");
-                    dbg!(&type_);
-                    println!("100");
-
                     if !type_equals(&type_, &initializer.get_type()) {
                         return Err(format!(
                             "Initializer type {} does not match variable type {}",
@@ -293,10 +289,6 @@ pub fn check_type(
 
                     type_ = initializer.get_type();
 
-                    println!("101");
-                    dbg!(&type_);
-                    println!("101");
-
                     if *mutable {
                         if let Type::Literal {
                             type_: literal_type,
@@ -310,14 +302,9 @@ pub fn check_type(
                     Some(initializer)
                 }
                 (None, Some(type_annotation)) => {
-                    dbg!(type_annotation);
                     type_ = type_environment
                         .borrow()
                         .get_type_from_annotation(type_annotation)?;
-
-                    println!("102");
-                    dbg!(&type_);
-                    println!("102");
 
                     None
                 }
@@ -331,10 +318,6 @@ pub fn check_type(
                 type_environment.clone(),
                 Some(type_.clone()),
             )?;
-
-            println!("10001");
-            dbg!(&type_);
-            println!("10001");
 
             Ok(TypedExpression::VariableDeclaration {
                 mutable: *mutable,
@@ -479,11 +462,7 @@ pub fn check_type(
 
             let mut member_type = member.get_type();
 
-            dbg!(&member_type);
-
-            println!("checking member_type");
             if member_type == Type::Unknown {
-                println!("member_type is unknown");
                 member_type = initializer.get_deep_type();
 
                 type_environment
@@ -666,9 +645,6 @@ pub fn check_type(
                     .iter()
                     .map(|fi| (fi.identifier.clone(), fi.initializer.clone()))
                     .collect();
-
-                dbg!(&fields);
-                dbg!(&field_initializer_map);
 
                 for (field, initializer) in fields
                     .iter()
@@ -1635,7 +1611,6 @@ fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, Strin
             ) =>
         {
             let mut buf = String::new();
-            println!("120934alksdjalksjdalskjdhalkdsj");
             buf.push_str(name);
 
             Ok(Type::Literal {
@@ -1653,7 +1628,6 @@ fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, Strin
             ) =>
         {
             let mut buf = String::new();
-            println!("alksdjalksjdalskjdhalkdsj");
             buf.push('-');
             buf.push_str(name);
 

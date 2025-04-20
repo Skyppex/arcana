@@ -764,6 +764,46 @@ impl Type {
             )),
         }
     }
+
+    /// Converts the type to a union-compatible type.
+    /// Some types don't make sense for a union to exist as such as a value literal type.
+    /// Each value must be a value literal type, but can have different values.
+    /// We use the literal type shared between each value literal type for the union itself.
+    pub fn to_union_compatible_type(&self) -> Type {
+        match self {
+            Type::Literal { name, type_ } => match type_.as_ref() {
+                LiteralType::BoolValue(_) => Type::Literal {
+                    name: "Bool".to_string(),
+                    type_: Box::new(LiteralType::Bool),
+                },
+                LiteralType::IntValue(_) => Type::Literal {
+                    name: "Int".to_string(),
+                    type_: Box::new(LiteralType::Int),
+                },
+                LiteralType::UIntValue(_) => Type::Literal {
+                    name: "UInt".to_string(),
+                    type_: Box::new(LiteralType::UInt),
+                },
+                LiteralType::FloatValue(_) => Type::Literal {
+                    name: "Float".to_string(),
+                    type_: Box::new(LiteralType::Float),
+                },
+                LiteralType::CharValue(_) => Type::Literal {
+                    name: "Char".to_string(),
+                    type_: Box::new(LiteralType::Char),
+                },
+                LiteralType::StringValue(_) => Type::Literal {
+                    name: "String".to_string(),
+                    type_: Box::new(LiteralType::String),
+                },
+                other => Type::Literal {
+                    name: name.to_string(),
+                    type_: Box::new(other.clone()),
+                },
+            },
+            other => other.clone(),
+        }
+    }
 }
 
 impl FullName for Type {
