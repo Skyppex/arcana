@@ -1,6 +1,5 @@
-fun zip<T>(a: [T], b: [T]): [(T, T)] {
-    let mut zipped: [(T, T)] = [];
-    let mut i = 0;
-}
+fun zip<T1, T2>(a: T1, b: T2): (T1, T2) => (a, b) 
 
-zip::<Int>(2, 3)
+let mut x = zip::<Int, String>(100, "hello")
+
+x = (200, "world")

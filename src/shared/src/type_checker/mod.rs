@@ -438,16 +438,23 @@ impl Type {
         context: Option<HashMap<&GenericType, &TypeAnnotation>>,
     ) -> Result<Type, String> {
         match self {
-            Type::Generic(_) => {
-                assert!(concrete_types.len() == 1);
-                check_type_annotation(&concrete_types[0], &vec![], type_environment.clone())
+            Type::Generic(generic) => {
+                assert!(context.is_some());
+                check_type_annotation(
+                    context
+                        .unwrap()
+                        .get(generic)
+                        .ok_or("No concrete type found")?,
+                    &vec![],
+                    type_environment.clone(),
+                )
             }
             Type::Tuple(types) => {
                 let cloned_types = types
                     .iter()
                     .map(|t| {
                         t.clone_with_concrete_types(
-                            concrete_types.clone(),
+                            vec![],
                             type_environment.clone(),
                             context.clone(),
                         )
@@ -1222,6 +1229,16 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 .any(|k| k == left_type_identifier.to_key());
 
             e
+        }
+        (Type::Tuple(left_types), Type::Tuple(right_types)) => {
+            if left_types.len() != right_types.len() {
+                return false;
+            }
+
+            left_types
+                .iter()
+                .zip(right_types.iter())
+                .all(|(l, r)| type_equals(l, r))
         }
         _ => left.to_key() == right.to_key(),
     }
