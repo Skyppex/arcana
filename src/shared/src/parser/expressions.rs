@@ -294,9 +294,13 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
 }
 
 fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
-    let TokenKind::Identifier(_) = cursor.first().kind else {
+    let TokenKind::Identifier(identifier) = cursor.first().kind else {
         return parse_range(cursor);
     };
+
+    if !identifier.is_type_identifier_name() {
+        return parse_range(cursor);
+    }
 
     match (cursor.second().kind, cursor.third().kind) {
         (kind, _)
@@ -1164,6 +1168,7 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
     match cursor.first().kind {
         TokenKind::Identifier(identifier) => {
             cursor.bump()?; // Consume the identifier
+
             Ok(Expression::Member(Member::Identifier {
                 symbol: identifier,
                 generics: None,

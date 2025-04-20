@@ -260,6 +260,14 @@ impl TypeIdentifier {
         }
     }
 
+    pub fn is_function_identifier(&self) -> bool {
+        self.name().is_function_identifier_name()
+    }
+
+    pub fn is_type_identifier(&self) -> bool {
+        self.name().is_type_identifier_name()
+    }
+
     pub fn eq_names(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Type(name_left), Self::Type(name_right)) => name_left == name_right,

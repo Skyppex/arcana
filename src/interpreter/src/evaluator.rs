@@ -42,7 +42,7 @@ pub fn evaluate(
             ..
         } => evaluate_implementation_declaration(environment, type_annotation, functions),
         TypedStatement::FunctionDeclaration {
-            identifier,
+            type_identifier: identifier,
             param,
             body,
             ..

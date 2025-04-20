@@ -760,7 +760,7 @@ pub fn check_type(
                 .iter()
                 .map(|f| match f {
                     TypedStatement::FunctionDeclaration {
-                        identifier,
+                        type_identifier: identifier,
                         param,
                         return_type,
                         ..
@@ -996,7 +996,7 @@ pub fn check_type(
                 type_environment.borrow_mut().add_type(type_.clone())?;
 
                 return Ok(TypedStatement::FunctionDeclaration {
-                    identifier: type_identifier.clone(),
+                    type_identifier: type_identifier.clone(),
                     param: param.map(|p| TypedParameter {
                         identifier: p.identifier,
                         type_annotation: p.type_.type_annotation(),
@@ -1018,7 +1018,7 @@ pub fn check_type(
 
             let Some(body_typed_expression) = body_typed_expression else {
                 return Ok(TypedStatement::FunctionDeclaration {
-                    identifier: type_identifier.clone(),
+                    type_identifier: type_identifier.clone(),
                     param: param.map(|p| TypedParameter {
                         identifier: p.identifier,
                         type_annotation: p.type_.type_annotation(),
@@ -1044,7 +1044,7 @@ pub fn check_type(
             type_environment.borrow_mut().add_type(type_.clone())?;
 
             Ok(TypedStatement::FunctionDeclaration {
-                identifier: type_identifier.clone(),
+                type_identifier: type_identifier.clone(),
                 param: param.map(|p| TypedParameter {
                     identifier: p.identifier,
                     type_annotation: p.type_.type_annotation(),

@@ -518,6 +518,7 @@ pub fn check_type(
                                     .clone_with_concrete_types(
                                         generics.iter().map(|g| g.type_annotation()).collect(),
                                         type_environment.clone(),
+                                        None,
                                     )
                                     .expect("Failed to clone type with concrete types"),
                             ),

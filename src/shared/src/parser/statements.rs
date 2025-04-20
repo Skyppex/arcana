@@ -239,7 +239,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
 
     let type_identifier = parse_type_identifier(cursor, false)?;
 
-    if !type_identifier.name().is_function_identifier_name() {
+    if !type_identifier.is_function_identifier() {
         return Err(format!("Invalid function name: {}", type_identifier.name()));
     }
 

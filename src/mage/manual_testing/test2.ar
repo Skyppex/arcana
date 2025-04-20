@@ -1,25 +1,6 @@
-enum Expr {
-    Identifier { name: String },
-    BinaryExpr { left: Box<Expr>, operator: BinaryOperator, right: Box<Expr> },
-    UnaryExpr { name: String },
-    UnaryExpr { name: String },
+fun zip<T>(a: [T], b: [T]): [(T, T)] {
+    let mut zipped: [(T, T)] = [];
+    let mut i = 0;
 }
 
-enum BinaryOperator {
-    Plus,
-    Minus,
-    Multiply,
-    Divide,
-    Modulus,
-}
-
-type TypedExpr = Expr && type_: Type;
-
-// becomes
-// enum TypedExpr {
-//     type_: Type,
-//     Identifier { name: String },
-//     BinaryExpr { left: Box<Expr>, operator: BinaryOperator, right: Box<Expr> },
-//     UnaryExpr { name: String },
-//     UnaryExpr { name: String },
-// }
+zip::<Int>(2, 3)

@@ -237,6 +237,7 @@ impl TypeEnvironment {
                     t.clone_with_concrete_types(
                         concrete_types.clone(),
                         Rc::new(RefCell::new(self.clone())),
+                        None,
                     )
                 } else if let Some(parent) = &self.parent {
                     parent.borrow().get_type_from_annotation(type_annotation)

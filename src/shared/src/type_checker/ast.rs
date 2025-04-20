@@ -65,7 +65,7 @@ pub enum TypedStatement {
         type_: Type,
     },
     FunctionDeclaration {
-        identifier: TypeIdentifier,
+        type_identifier: TypeIdentifier,
         param: Option<TypedParameter>,
         return_type: Type,
         body: Option<TypedExpression>,
@@ -255,7 +255,7 @@ impl Display for TypedStatement {
                     .join(" | ")
             ),
             TypedStatement::FunctionDeclaration {
-                identifier,
+                type_identifier: identifier,
                 param,
                 return_type,
                 body,

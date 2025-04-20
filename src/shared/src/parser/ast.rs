@@ -502,15 +502,7 @@ impl ToKey for Member {
         match self {
             Member::Identifier { symbol, generics } => {
                 if let Some(generics) = generics {
-                    format!(
-                        "{}<{}>",
-                        symbol,
-                        generics
-                            .iter()
-                            .map(|g| g.to_key())
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    )
+                    format!("{}<{}>", symbol, generics.len())
                 } else {
                     symbol.to_string()
                 }

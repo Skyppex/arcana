@@ -424,6 +424,9 @@ impl Type {
                 .type_annotation()
                 .unwrap_or_else(|| panic!("Closure has no type annotation")),
             Type::Literal { type_, .. } => TypeAnnotation::Literal(Box::new(*type_.clone())),
+            Type::Tuple(types) => {
+                TypeAnnotation::Tuple(types.iter().map(|t| t.type_annotation()).collect())
+            }
             _ => panic!("Cannot get type annotation for type {}", self.full_name()),
         }
     }
@@ -432,8 +435,27 @@ impl Type {
         &self,
         concrete_types: Vec<TypeAnnotation>,
         type_environment: Rc<RefCell<TypeEnvironment>>,
+        context: Option<HashMap<&GenericType, &TypeAnnotation>>,
     ) -> Result<Type, String> {
         match self {
+            Type::Generic(_) => {
+                assert!(concrete_types.len() == 1);
+                check_type_annotation(&concrete_types[0], &vec![], type_environment.clone())
+            }
+            Type::Tuple(types) => {
+                let cloned_types = types
+                    .iter()
+                    .map(|t| {
+                        t.clone_with_concrete_types(
+                            concrete_types.clone(),
+                            type_environment.clone(),
+                            context.clone(),
+                        )
+                    })
+                    .collect::<Result<Vec<Type>, String>>()?;
+
+                Ok(Type::Tuple(cloned_types))
+            }
             Type::Struct(s) if !matches!(s.type_identifier, TypeIdentifier::MemberType(_, _)) => {
                 let TypeIdentifier::GenericType(name, generics) = s.type_identifier.clone() else {
                     return Err(format!(
@@ -493,14 +515,14 @@ impl Type {
             Type::Struct(s) if matches!(s.type_identifier, TypeIdentifier::MemberType(_, _)) => {
                 let TypeIdentifier::MemberType(enum_name, _) = s.type_identifier.clone() else {
                     return Err(format!(
-                        "Cannot clone concrete types for enum {}",
+                        "Cannot clone concrete types for struct {}",
                         self.full_name()
                     ));
                 };
 
                 let TypeIdentifier::GenericType(name, generics) = *enum_name else {
                     return Err(format!(
-                        "Cannot clone concrete types for enum {}",
+                        "Cannot clone concrete types for struct {}",
                         self.full_name()
                     ));
                 };
@@ -693,69 +715,53 @@ impl Type {
                 param,
                 return_type,
             }) => {
-                let Some(TypeIdentifier::GenericType(name, generics)) = identifier else {
-                    return Err(format!(
-                        "Cannot clone concrete types for enum {}",
-                        self.full_name()
-                    ));
+                let (name, type_map) = if let Some(context) = context {
+                    let name = if let Some(TypeIdentifier::GenericType(name, _)) = identifier {
+                        Some(name)
+                    } else {
+                        None
+                    };
+
+                    (name, context)
+                } else {
+                    let Some(TypeIdentifier::GenericType(name, generics)) = identifier else {
+                        return Err(format!(
+                            "Cannot clone concrete types for function {}",
+                            self.full_name()
+                        ));
+                    };
+
+                    (Some(name), generics.iter().zip(&concrete_types).collect())
                 };
-
-                let mut type_map = HashMap::new();
-
-                for (ta, gt) in concrete_types.iter().zip(generics) {
-                    type_map.insert(gt, ta);
-                }
 
                 let cloned_param = match param {
                     Some(Parameter { identifier, type_ }) => {
-                        if let Type::Generic(generic) = *type_.clone() {
-                            let concrete_type = type_map.get(&generic).ok_or(format!(
-                                "No concrete type found for generic type {}",
-                                generic.type_name
-                            ))?;
+                        let concrete_type = type_.clone_with_concrete_types(
+                            concrete_types.clone(),
+                            type_environment.clone(),
+                            Some(type_map.clone()),
+                        )?;
 
-                            let concrete_type = check_type_annotation(
-                                concrete_type,
-                                &vec![],
-                                type_environment.clone(),
-                            )?;
-
-                            Some(Parameter {
-                                identifier: identifier.clone(),
-                                type_: Box::new(concrete_type),
-                            })
-                        } else {
-                            None
-                        }
+                        Some(Parameter {
+                            identifier: identifier.clone(),
+                            type_: Box::new(concrete_type),
+                        })
                     }
                     None => None,
                 };
 
-                let cloned_return_type = if let Type::Generic(generic) = *return_type.clone() {
-                    let concrete_type = type_map.get(&generic).ok_or(format!(
-                        "No concrete type found for generic type {}",
-                        generic.type_name
-                    ))?;
-
-                    let concrete_type =
-                        check_type_annotation(concrete_type, &vec![], type_environment.clone())?;
-
-                    Box::new(concrete_type)
-                } else {
-                    return_type.clone()
-                };
+                let cloned_return_type = return_type.clone_with_concrete_types(
+                    concrete_types.clone(),
+                    type_environment,
+                    Some(type_map.clone()),
+                )?;
 
                 Ok(Type::Function(Function {
-                    identifier: if identifier.is_some() {
-                        Some(TypeIdentifier::ConcreteType(
-                            name.clone(),
-                            concrete_types.clone(),
-                        ))
-                    } else {
-                        None
-                    },
+                    identifier: name.map(|name| {
+                        TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone())
+                    }),
                     param: cloned_param,
-                    return_type: cloned_return_type,
+                    return_type: Box::new(cloned_return_type),
                 }))
             }
             _ => Err(format!(

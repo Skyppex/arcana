@@ -767,14 +767,16 @@ impl IndentDisplay for Expression {
             Expression::Tuple(e) => {
                 let mut result = String::new();
                 result.push_str("<tuple>");
+                indent.increase_leaf();
                 result.push_str(
                     format!(
                         "\n{}{}",
-                        indent.dash(),
+                        indent.dash_end(),
                         indent_display_slice(e, "elements", "element", indent).as_str()
                     )
                     .as_str(),
                 );
+                indent.decrease();
 
                 result
             }
@@ -2140,7 +2142,7 @@ impl IndentDisplay for TypedStatement {
                 result
             }
             TypedStatement::FunctionDeclaration {
-                identifier,
+                type_identifier: identifier,
                 param,
                 return_type,
                 body,
@@ -2347,16 +2349,20 @@ impl IndentDisplay for TypedExpression {
             TypedExpression::Literal(l) => l.indent_display(indent),
             TypedExpression::Tuple { elements, type_ } => {
                 let mut result = String::new();
-                result.push_str(format!("<tuple>: ({})", type_).as_str());
+                result.push_str(format!("<tuple>: {}", type_).as_str());
+
+                indent.increase_leaf();
 
                 result.push_str(
                     format!(
                         "\n{}{}",
-                        indent.dash(),
+                        indent.dash_end(),
                         indent_display_slice(elements, "elements", "element", indent)
                     )
                     .as_str(),
                 );
+
+                indent.decrease();
 
                 result
             }
