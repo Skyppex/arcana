@@ -1,0 +1,7 @@
+use funcs::{add, sub, mul, div, dispatch};
+
+print(2f:add(3f):sub(1f):mul(5f):div(2f))
+
+let func = "add";
+
+dispatch(func, 2f, 3f)

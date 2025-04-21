@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use crate::{
     parser::{
-        self, ImplementationDeclaration, ModuleDeclaration, ProtocolDeclaration, Statement,
-        StructData, UnionDeclaration, Use,
+        self, ImplementationDeclaration, ModPath, ModuleDeclaration, ProtocolDeclaration,
+        Statement, StructData, UnionDeclaration, Use, UseItem,
     },
     types::{ToKey, TypeAnnotation, TypeIdentifier},
 };
@@ -30,7 +30,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             Ok(discovered_types)
         }
         Statement::ModuleDeclaration(_) => Ok(vec![]),
-        Statement::Use(_) => Ok(vec![]),
+        Statement::Use(Use { use_item }) => discover_types_from_use_item(use_item, ModPath::root()),
         Statement::StructDeclaration(parser::StructDeclaration {
             body:
                 StructData {
@@ -164,6 +164,47 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
     }
 }
 
+fn discover_types_from_use_item(
+    use_item: &parser::UseItem,
+    mod_path: ModPath,
+) -> Result<Vec<DiscoveredType>, String> {
+    match use_item {
+        parser::UseItem::Item(item_name) => {
+            let mut type_identifier = None;
+
+            for component in mod_path.components() {
+                let comp_ident = TypeIdentifier::Type(component.to_key());
+
+                if let Some(ti) = type_identifier {
+                    type_identifier =
+                        Some(TypeIdentifier::ModType(Box::new(ti), Box::new(comp_ident)));
+                } else {
+                    type_identifier = Some(comp_ident);
+                }
+            }
+
+            let item_ident = TypeIdentifier::Type(item_name.clone());
+
+            let type_identifier = match type_identifier {
+                Some(ti) => TypeIdentifier::ModType(Box::new(ti), Box::new(item_ident)),
+                None => item_ident,
+            };
+
+            Ok(vec![DiscoveredType::UseItem { type_identifier }])
+        }
+        parser::UseItem::Navigation(mod_name, use_item) => {
+            discover_types_from_use_item(use_item, mod_path.join(mod_name))
+        }
+        parser::UseItem::List(use_items) => Ok(use_items
+            .iter()
+            .map(|use_item| discover_types_from_use_item(use_item, mod_path.clone()))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()),
+    }
+}
+
 pub fn check_type(
     statement: &Statement,
     discovered_types: &Vec<DiscoveredType>,
@@ -190,10 +231,9 @@ pub fn check_type(
             module_path: module_path.clone(),
             type_: Type::Void,
         }),
-        Statement::Use(Use { use_item }) => Ok(TypedStatement::Use {
-            use_item: use_item.clone(),
-            type_: Type::Void,
-        }),
+        Statement::Use(Use { use_item }) => {
+            check_use_item(use_item, ModPath::root(), type_environment.clone())
+        }
         Statement::StructDeclaration(parser::StructDeclaration {
             access_modifier: _,
             body:
@@ -1069,6 +1109,36 @@ pub fn check_type(
     }
 }
 
+fn check_use_item(
+    use_item: &UseItem,
+    mod_path: ModPath,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<TypedStatement, String> {
+    match use_item {
+        UseItem::Item(item_name) => {
+            type_environment
+                .borrow_mut()
+                .add_symbol(mod_path, item_name)?;
+        }
+        UseItem::Navigation(mod_name, use_item) => {
+            check_use_item(use_item, mod_path.join(mod_name), type_environment)?;
+        }
+        UseItem::List(use_items) => {
+            use_items
+                .iter()
+                .map(|use_item| {
+                    check_use_item(use_item, mod_path.clone(), type_environment.clone())
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+        }
+    }
+
+    Ok(TypedStatement::Use {
+        use_item: use_item.clone(),
+        type_: Type::Void,
+    })
+}
+
 #[allow(dead_code)]
 fn check_type_identifier(
     type_identifier: &TypeIdentifier,
@@ -1102,6 +1172,9 @@ fn check_type_identifier(
             DiscoveredType::Function {
                 type_identifier: name,
                 ..
+            } => name == type_identifier,
+            DiscoveredType::UseItem {
+                type_identifier: name,
             } => name == type_identifier,
         }) {
         Some(DiscoveredType::Struct {
@@ -1355,6 +1428,9 @@ fn check_type_identifier(
                 )?),
             }))
         }
+        Some(DiscoveredType::UseItem { type_identifier }) => {
+            todo!()
+        }
         None => type_environment
             .borrow()
             .get_type_from_identifier(type_identifier)
@@ -1395,6 +1471,9 @@ pub fn check_type_annotation(
             DiscoveredType::Function {
                 type_identifier, ..
             } => type_identifier.name() == type_annotation.name(),
+            DiscoveredType::UseItem { type_identifier } => {
+                type_identifier.name() == type_annotation.name()
+            }
         }) {
         Some(DiscoveredType::Struct {
             type_identifier,
@@ -1642,6 +1721,9 @@ pub fn check_type_annotation(
                     type_environment,
                 )?),
             }))
+        }
+        Some(DiscoveredType::UseItem { type_identifier }) => {
+            todo!()
         }
         None => type_environment
             .borrow()

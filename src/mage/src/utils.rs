@@ -32,7 +32,7 @@ pub fn get_path(path: &str) -> Result<PathBuf> {
             current_dir.join(path)
         }
         p if p.starts_with('.') => {
-            if p == "." || p == "./" {
+            if p == "." || p == "./" || p == ".\\" {
                 std::env::current_dir()?
             } else {
                 std::env::current_dir()?.join(&p[2..])
@@ -41,7 +41,11 @@ pub fn get_path(path: &str) -> Result<PathBuf> {
         p => Path::new(&p).to_path_buf(),
     };
 
-    Ok(path)
+    Ok(normalize_path(path))
+}
+
+pub fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    path.as_ref().components().collect()
 }
 
 #[cfg(test)]

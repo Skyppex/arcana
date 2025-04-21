@@ -1,14 +1,22 @@
+mod cli;
+mod config;
 mod interactive;
-mod mage_args;
 mod utils;
 
 use clap::Parser;
-use glob::{glob, Paths};
-use utils::get_path;
+use config::SpellConfig;
+use glob::glob;
+use utils::{get_path, normalize_path};
 
-use std::{cell::RefCell, fs, rc::Rc, thread};
+use std::{
+    cell::RefCell,
+    fs,
+    path::{Path, PathBuf},
+    rc::Rc,
+    thread,
+};
 
-use crate::mage_args::MageArgs;
+use crate::cli::Cli;
 use interpreter::Environment;
 
 use shared::{
@@ -24,24 +32,15 @@ fn main() -> std::io::Result<()> {
     let child = thread::Builder::new().stack_size(STACK_SIZE).spawn(run)?;
 
     // Wait for thread to join
-    child.join().unwrap();
+    child.join().unwrap()?;
     Ok(())
 }
 
-fn run() {
-    let args = crate::mage_args::MageArgs::parse();
-
-    let spell = get_path("spell.toml").map_err(|e| e.to_string()).ok();
-
-    let mut spell_toml = None;
-    let mut project_files = None;
-    if let Some(s) = spell {
-        spell_toml = std::fs::read_to_string(s).ok();
-        project_files = glob("*.ar").ok();
-    }
+fn run() -> std::io::Result<()> {
+    let args = crate::cli::Cli::parse();
 
     let result = if let Some(ref source) = args.source {
-        run_source(source, spell_toml, project_files, &args)
+        run_source(source, &args)
     } else {
         crate::interactive::interactive(&args)
     };
@@ -49,24 +48,153 @@ fn run() {
     if let Err(error) = result {
         eprintln!("Fatal: {}", error);
     }
+
+    Ok(())
 }
 
-pub fn run_source(
-    source: &str,
-    spell: Option<String>,
-    project_files: Option<Paths>,
-    args: &MageArgs,
+pub fn run_source(source: &str, args: &Cli) -> Result<(), String> {
+    let source = get_path(source).map_err(|e| e.to_string())?;
+
+    let glob_pattern = format!("{}/**/*.ar", source.to_string_lossy()).replace('\\', "/");
+    let project_files = glob(&glob_pattern).ok();
+
+    let project_files = project_files
+        .map(|paths| {
+            paths
+                .into_iter()
+                .map(|path| path.map(normalize_path))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| e.to_string())
+        })
+        .transpose()?;
+
+    if source.is_dir() {
+        let spell = source.join("spell.toml");
+
+        if !spell.exists() {
+            return Err("spell.toml not found".to_string());
+        }
+
+        let Some(project_files) = project_files else {
+            return Err("No files with extension .ar found in workspace".to_string());
+        };
+
+        let spell_content = std::fs::read_to_string(spell).map_err(|e| format!("{}", e))?;
+
+        let spell_config = toml::from_str::<SpellConfig>(&spell_content)
+            .map_err(|e| format!("Failed to parse spell.toml: {}", e))?;
+
+        return run_spell(spell_config, project_files, &source, args);
+    }
+
+    if source.extension().is_none_or(|ext| ext != "ar") {
+        return Err("source must be a folder or a file with the .ar extension".to_string());
+    }
+
+    run_script(source, project_files, args)
+}
+
+fn run_spell(
+    spell: SpellConfig,
+    project_files: Vec<PathBuf>,
+    source: &Path,
+    args: &Cli,
 ) -> Result<(), String> {
-    let source = get_path(source)
+    let main = spell
+        .main
+        .map(|m| get_path(&m))
+        .transpose()
+        .map_err(|e| e.to_string())?
+        .map(|p| source.join(&p))
+        .unwrap_or(source.join("main.ar"));
+
+    let project_files = project_files
+        .into_iter()
+        .filter(|path| path != &main)
+        .collect::<Vec<_>>();
+
+    let exe = std::env::current_exe()
+        .and_then(fs::canonicalize)
+        .expect("Failed to get current executable")
+        .parent()
+        .expect("Failed to get parent directory of executable")
+        .parent()
+        .expect("Failed to get parent directory of executable")
+        .parent()
+        .expect("Failed to get parent directory of executable")
+        .to_str()
+        .expect("Failed to convert path to string")
+        .to_string();
+
+    let lib_path = format!("{}/lib/lib.ar", exe).replace('\\', "/");
+
+    let lib = get_path(&lib_path)
         .map_err(|e| e.to_string())?
         .to_str()
         .ok_or_else(|| "Failed to convert path to string".to_string())?
         .to_string();
 
-    if !source.trim().ends_with(".ar") {
-        return Err("Mage cannot cast a spell yet, it can only interpret arcana.".to_string());
+    let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
+        args.behavior.override_types,
+    )));
+
+    let environment = Rc::new(RefCell::new(Environment::new()));
+
+    register_modules(project_files, type_environment.clone(), environment.clone())?;
+
+    if let Ok(lib) = std::fs::read_to_string(lib) {
+        read_input(
+            lib,
+            type_environment.clone(),
+            environment.clone(),
+            args,
+            false,
+        )?
     }
 
+    let main_content = std::fs::read_to_string(main.clone())
+        .map_err(|error| format!("Failed to read main file: {}", error))?;
+
+    let result = read_input(
+        main_content,
+        type_environment.clone(),
+        environment.clone(),
+        args,
+        true,
+    );
+
+    if args.variables {
+        if args.label {
+            println!("// Variables:");
+        }
+
+        for (name, variable) in environment.borrow().get_variables() {
+            println!("{}: {}", name, variable.clone().borrow().value);
+        }
+    }
+
+    if args.variables && args.types {
+        println!();
+    }
+
+    if args.types {
+        if args.label {
+            println!("// Types:");
+        }
+
+        for (.., type_) in type_environment.borrow().get_types() {
+            println!("{}", type_);
+        }
+    }
+
+    result
+}
+
+fn run_script(
+    source: PathBuf,
+    project_files: Option<Vec<PathBuf>>,
+    args: &Cli,
+) -> Result<(), String> {
     let source = std::fs::read_to_string(source)
         .map_err(|error| format!("Failed to read file: {}", error))?;
 
@@ -83,7 +211,7 @@ pub fn run_source(
         .expect("Failed to convert path to string")
         .to_string();
 
-    let lib_path = format!("{}\\lib\\lib.ar", exe).replace('\\', "/");
+    let lib_path = format!("{}/lib/lib.ar", exe).replace('\\', "/");
 
     let lib = get_path(&lib_path)
         .map_err(|e| e.to_string())?
@@ -97,7 +225,7 @@ pub fn run_source(
 
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    if let (Some(_), Some(project_files)) = (spell, project_files) {
+    if let Some(project_files) = project_files {
         register_modules(project_files, type_environment.clone(), environment.clone())?;
     }
 
@@ -150,7 +278,7 @@ pub fn read_input(
     input: String,
     type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>,
-    args: &MageArgs,
+    args: &Cli,
     print_result: bool,
 ) -> Result<(), String> {
     let print_tokens = args.logging.log_flags.tokens;
@@ -186,26 +314,36 @@ pub fn read_input(
 }
 
 pub fn register_modules(
-    project_files: Paths,
+    project_files: Vec<PathBuf>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>,
 ) -> Result<(), String> {
     for project_file in project_files {
-        let project_file = project_file.map_err(|e| e.to_string())?;
-
         let source = std::fs::read_to_string(project_file)
             .map_err(|error| format!("Failed to read file: {}", error))?;
 
         let module_info = parser::discover_module(shared::lexer::tokenize(&source)?)?;
 
-        if let Some((_, module_path)) = module_info {
+        if let Some((_, module_path, module)) = module_info {
+            let mod_type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
+                type_environment.borrow().allow_override_types,
+            )));
+
+            let typed_module = create_typed_ast(module, mod_type_environment.clone())?;
+
+            let mod_environment = Rc::new(RefCell::new(Environment::new()));
+
             type_environment
                 .borrow_mut()
-                .add_module(module_path.clone());
+                .add_module(module_path.clone(), mod_type_environment.clone());
 
-            environment.borrow_mut().add_module(module_path);
+            let value = interpreter::evaluate(typed_module, mod_environment.clone())?;
+
+            environment
+                .borrow_mut()
+                .add_module(module_path, value, mod_environment.clone());
         }
     }
 
-    todo!()
+    Ok(())
 }

@@ -68,7 +68,10 @@ impl From<TypeIdentifier> for TypeAnnotation {
                 TypeAnnotation::ConcreteType(name, generics)
             }
             TypeIdentifier::MemberType(parent, member) => {
-                TypeAnnotation::from(format!("{}::{}", parent, member).as_str())
+                TypeAnnotation::from(format!("{}::{}", parent.to_key(), member.to_key()).as_str())
+            }
+            TypeIdentifier::ModType(parent, member) => {
+                TypeAnnotation::from(format!("{}::{}", parent.to_key(), member.to_key()).as_str())
             }
         }
     }
@@ -248,6 +251,7 @@ pub enum TypeIdentifier {
     GenericType(String, Vec<GenericType>),
     ConcreteType(String, Vec<TypeAnnotation>),
     MemberType(Box<TypeIdentifier>, String),
+    ModType(Box<TypeIdentifier>, Box<TypeIdentifier>),
 }
 
 impl TypeIdentifier {
@@ -257,6 +261,7 @@ impl TypeIdentifier {
             TypeIdentifier::GenericType(name, _) => name,
             TypeIdentifier::ConcreteType(name, _) => name,
             TypeIdentifier::MemberType(_, name) => name,
+            TypeIdentifier::ModType(_, name) => name.name(),
         }
     }
 
@@ -354,6 +359,7 @@ impl Display for TypeIdentifier {
                 )
             }
             TypeIdentifier::MemberType(parent, member) => write!(f, "{}::{}", parent, member),
+            TypeIdentifier::ModType(parent, member) => write!(f, "{}::{}", parent, member),
         }
     }
 }
@@ -368,6 +374,9 @@ impl ToKey for TypeIdentifier {
             }
             TypeIdentifier::MemberType(identifier, member_name) => {
                 format!("{}.{}", identifier.to_key(), member_name)
+            }
+            TypeIdentifier::ModType(identifier, member_name) => {
+                format!("{}::{}", identifier.to_key(), member_name.to_key())
             }
         }
     }

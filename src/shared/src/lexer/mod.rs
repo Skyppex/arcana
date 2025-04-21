@@ -332,8 +332,11 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
     match string {
         // Access modifiers
         "pub" => Some(TokenKind::Keyword(Keyword::Pub)),
-        "mod" => Some(TokenKind::Keyword(Keyword::Mod)),
         "sup" => Some(TokenKind::Keyword(Keyword::Sup)),
+
+        // Modules
+        "mod" => Some(TokenKind::Keyword(Keyword::Mod)),
+        "use" => Some(TokenKind::Keyword(Keyword::Use)),
 
         // Variable declarations
         "let" => Some(TokenKind::Keyword(Keyword::Let)),

@@ -37,6 +37,9 @@ pub enum DiscoveredType {
         param: Option<Parameter>,
         return_type_annotation: TypeAnnotation,
     },
+    UseItem {
+        type_identifier: TypeIdentifier,
+    },
 }
 
 pub fn create_typed_ast(

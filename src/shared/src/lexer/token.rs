@@ -95,7 +95,6 @@ impl TokenKind {
         match self {
             TokenKind::Keyword(Keyword::Pub) => Some(AccessModifier::Public),
             TokenKind::Keyword(Keyword::Sup) => Some(AccessModifier::Super),
-            TokenKind::Keyword(Keyword::Mod) => Some(AccessModifier::Module),
             _ => None,
         }
     }

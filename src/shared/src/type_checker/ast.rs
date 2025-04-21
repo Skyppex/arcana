@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::hash::Hash;
 
 use crate::display::{Indent, IndentDisplay};
-use crate::parser::{AssociatedType, Expression, UseItem};
+use crate::parser::{AssociatedType, Expression, ModPath, UseItem};
 use crate::pretty_print::PrettyPrint;
 use crate::types::{GenericType, ToKey};
 use crate::{
@@ -26,7 +26,7 @@ pub enum TypedStatement {
     },
     ModuleDeclaration {
         access_modifier: Option<AccessModifier>,
-        module_path: Vec<String>,
+        module_path: ModPath,
         type_: Type,
     },
     Use {
@@ -143,7 +143,7 @@ impl Display for TypedStatement {
                     .join(", ")
             ),
             TypedStatement::ModuleDeclaration { module_path, .. } => {
-                write!(f, "mod {}", module_path.join("::"))
+                write!(f, "mod {}", module_path)
             }
             TypedStatement::Use { use_item, .. } => write!(f, "use {}", use_item),
             TypedStatement::StructDeclaration(StructData {

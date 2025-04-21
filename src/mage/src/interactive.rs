@@ -7,14 +7,14 @@ use std::{
     rc::Rc,
 };
 
-use crate::{mage_args::MageArgs, read_input, utils::get_path};
+use crate::{cli::Cli, read_input, utils::get_path};
 use interpreter::Environment;
 use shared::{
     type_checker::{Type, TypeEnvironment},
     types::ToKey,
 };
 
-pub(crate) fn interactive(args: &MageArgs) -> Result<(), String> {
+pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
     let exe = std::env::current_exe()
         .and_then(fs::canonicalize)
         .expect("Failed to get current executable")

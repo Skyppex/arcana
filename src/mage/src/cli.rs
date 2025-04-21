@@ -17,12 +17,12 @@ use clap::{ArgGroup, Parser};
         .requires("src")
         .args(&["label"])
 ))]
-pub struct MageArgs {
-    /// Path to a folder containing a spell.toml file or path to the spell.toml file itself
-    /// If this option is not specified, mage will run interactively in your terminal
-    /// If the 'main' file isn't specified in the spell.toml file, it will look for main.ar or lib.ar in the same directory
-    /// If the spell isn't a library, it will look for a main function in the main.ar file
-    /// If the source is a file with the .ar extension, it will be run as a script
+pub struct Cli {
+    /// Path to a folder containing a spell.toml file.
+    /// If this option is not specified, mage will run interactively in your terminal.
+    /// If the 'main' file isn't specified in the spell.toml file, it will look for main.ar or lib.ar in the same directory.
+    /// If the spell isn't a library, it will look for a main.ar file and run it.
+    /// If the source is a file with the .ar extension, it will be run as a script.
     #[arg(group = "src")]
     pub source: Option<String>,
 

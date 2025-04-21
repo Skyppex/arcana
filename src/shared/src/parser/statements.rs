@@ -9,14 +9,14 @@ use crate::{
 use super::{
     cursor::Cursor, expressions, fat_arrow_expr_or_block_expr, AccessModifier, AssociatedType,
     Closure, EmbeddedStruct, EnumDeclaration, Expression, FunctionDeclaration,
-    ImplementationDeclaration, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement,
-    StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration, Use,
-    UseItem, ValueLiteral,
+    ImplementationDeclaration, ModPath, ModuleDeclaration, Parameter, ProtocolDeclaration,
+    Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration,
+    Use, UseItem, ValueLiteral,
 };
 
-pub fn parse_module_only(
+pub fn parse_module(
     cursor: &mut Cursor,
-) -> Result<Option<(Option<AccessModifier>, Vec<String>)>, String> {
+) -> Result<Option<(Option<AccessModifier>, ModPath, Statement)>, String> {
     let mut access_modifier = None;
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
@@ -66,7 +66,13 @@ pub fn parse_module_only(
 
     cursor.expect(TokenKind::Semicolon)?;
 
-    Ok(Some((access_modifier, module_path)))
+    let module = parse_statements(cursor)?;
+
+    Ok(Some((
+        access_modifier,
+        ModPath::new(module_path),
+        Statement::Program { statements: module },
+    )))
 }
 
 pub fn parse_file(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
@@ -131,10 +137,17 @@ fn parse_mod_statement(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
 
     let module_declaration = Statement::ModuleDeclaration(ModuleDeclaration {
         access_modifier,
-        module_path,
+        module_path: ModPath::new(module_path),
     });
 
-    let mut statements = vec![module_declaration];
+    let mut statements = parse_statements(cursor)?;
+    statements.insert(0, module_declaration);
+
+    Ok(statements)
+}
+
+pub fn parse_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
+    let mut statements = vec![];
 
     while !cursor.is_end_of_file() {
         statements.push(parse_statement(cursor)?);
@@ -173,10 +186,6 @@ fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, String> {
     match cursor.first().kind {
         TokenKind::Identifier(module_name) => {
             cursor.bump()?; // Consume the identifier
-
-            if !module_name.is_module_identifier_name() {
-                return Err(format!("Invalid module name: {}", module_name));
-            }
 
             if cursor.first().kind == TokenKind::DoubleColon {
                 cursor.bump()?; // Consume the ::

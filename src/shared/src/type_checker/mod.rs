@@ -1167,7 +1167,9 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
             name.parse::<i64>().is_ok()
         }
         (Type::Union(Union { literals, .. }), Type::Literal { .. }) => literals.contains(right),
-        (other, Type::Union(Union { literal_type, .. })) => type_equals(other, literal_type),
+        (other, Type::Union(Union { literal_type, .. })) if !matches!(other, Type::Union(_)) => {
+            type_equals(other, literal_type)
+        }
         (Type::Literal { type_, .. }, Type::Literal { type_: type_2, .. }) => {
             literal_type_equals(type_.as_ref(), type_2.as_ref())
         }

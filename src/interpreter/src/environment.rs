@@ -1,6 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt::{self, Debug},
+    rc::Rc,
+};
 
 use shared::{
+    parser::ModPath,
     type_checker::ast::Member,
     types::{ToKey, TypeAnnotation},
 };
@@ -12,10 +18,10 @@ use super::{
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Clone, PartialEq, Default)]
 pub struct Environment {
     pub parent: Option<Rcrc<Environment>>,
-    pub modules: Vec<Vec<String>>,
+    pub modules: HashMap<ModPath, (Value, Rcrc<Environment>)>,
     pub variables: HashMap<String, Rcrc<Variable>>,
     pub functions: HashMap<String, Rcrc<Variable>>,
     pub static_members: HashMap<TypeAnnotation, HashMap<String, Rcrc<Variable>>>,
@@ -26,7 +32,7 @@ impl Environment {
     pub fn new() -> Self {
         Self {
             parent: None,
-            modules: Vec::new(),
+            modules: HashMap::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
             static_members: HashMap::new(),
@@ -37,7 +43,7 @@ impl Environment {
     pub fn new_parent(parent: Rcrc<Environment>) -> Self {
         Self {
             parent: Some(parent),
-            modules: Vec::new(),
+            modules: HashMap::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
             static_members: HashMap::new(),
@@ -55,7 +61,7 @@ impl Environment {
     ) -> Self {
         Self {
             parent: Some(parent),
-            modules: Vec::new(),
+            modules: HashMap::new(),
             variables: HashMap::new(),
             functions: HashMap::new(),
             static_members: HashMap::new(),
@@ -111,8 +117,24 @@ impl Environment {
         Ok(())
     }
 
-    pub fn add_module(&mut self, module_path: Vec<String>) {
-        self.modules.push(module_path);
+    pub fn add_module(
+        &mut self,
+        module_path: ModPath,
+        value: Value,
+        environment: Rcrc<Environment>,
+    ) {
+        self.modules.insert(module_path, (value, environment));
+    }
+
+    pub fn get_module<M: AsRef<ModPath>>(
+        &self,
+        module_path: M,
+    ) -> Option<(Value, Rcrc<Environment>)> {
+        self.modules.get(module_path.as_ref()).cloned().or_else(|| {
+            self.parent
+                .as_ref()
+                .and_then(|p| p.borrow().get_module(module_path))
+        })
     }
 
     pub fn add_variable<K: ToKey>(&mut self, key: K, value: Value, mutable: bool) {
@@ -241,5 +263,19 @@ impl Environment {
         } else {
             None
         }
+    }
+}
+
+impl Debug for Environment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let modules = self.modules.keys().collect::<Vec<_>>();
+
+        f.debug_struct("Environment")
+            .field("parent", &self.parent)
+            .field("modules", &modules)
+            .field("static_members", &self.static_members)
+            .field("variables", &self.variables)
+            .field("scopes", &self.scopes)
+            .finish()
     }
 }

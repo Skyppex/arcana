@@ -20,9 +20,9 @@ pub fn create_ast(tokens: Vec<Token>, verbose: bool) -> Result<Statement, String
 
 pub fn discover_module(
     tokens: Vec<Token>,
-) -> Result<Option<(Option<AccessModifier>, Vec<String>)>, String> {
+) -> Result<Option<(Option<AccessModifier>, ModPath, Statement)>, String> {
     let mut cursor = Cursor::new(tokens, false);
-    let module = statements::parse_module_only(&mut cursor)?;
+    let module = statements::parse_module(&mut cursor)?;
     Ok(module)
 }
 

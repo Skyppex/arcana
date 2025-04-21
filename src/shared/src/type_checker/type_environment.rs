@@ -1,6 +1,13 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, str::FromStr};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt::{self, Debug},
+    rc::Rc,
+    str::FromStr,
+};
 
 use crate::{
+    parser::ModPath,
     type_checker::Protocol,
     types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };
@@ -12,22 +19,22 @@ use super::{
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
-    modules: Vec<Vec<String>>,
+    modules: HashMap<ModPath, Rcrc<TypeEnvironment>>,
     types: HashMap<String, Type>,
     static_members: HashMap<TypeAnnotation, HashMap<String, Type>>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
-    allow_override_types: bool,
+    pub allow_override_types: bool,
 }
 
 impl TypeEnvironment {
     pub fn new(allow_override_types: bool) -> Self {
         Self {
             parent: None,
-            modules: Vec::new(),
+            modules: HashMap::new(),
             types: HashMap::from([
                 ("Void".to_string(), Type::Void),
                 ("Unit".to_string(), Type::Unit),
@@ -50,7 +57,7 @@ impl TypeEnvironment {
 
         Self {
             parent: Some(parent),
-            modules: Vec::new(),
+            modules: HashMap::new(),
             types: HashMap::new(),
             static_members: HashMap::new(),
             variables: HashMap::new(),
@@ -71,7 +78,7 @@ impl TypeEnvironment {
 
         Self {
             parent: Some(parent),
-            modules: Vec::new(),
+            modules: HashMap::new(),
             variables: HashMap::new(),
             types: HashMap::new(),
             static_members: HashMap::new(),
@@ -122,8 +129,37 @@ impl TypeEnvironment {
         Ok(())
     }
 
-    pub fn add_module(&mut self, module_path: Vec<String>) {
-        self.modules.push(module_path)
+    pub fn add_module(&mut self, module_path: ModPath, type_environment: Rcrc<Self>) {
+        self.modules.insert(module_path, type_environment);
+    }
+
+    pub fn get_module<M: AsRef<ModPath>>(&self, module_path: M) -> Option<Rcrc<Self>> {
+        self.modules.get(module_path.as_ref()).cloned().or_else(|| {
+            self.parent
+                .as_ref()
+                .and_then(|p| p.borrow().get_module(module_path))
+        })
+    }
+
+    pub fn add_symbol(
+        &mut self,
+        mod_path: impl AsRef<ModPath>,
+        item_name: impl ToKey,
+    ) -> Result<(), String> {
+        let mod_path = mod_path.as_ref();
+        let item_name = item_name.to_key();
+
+        let mod_type_environment = self
+            .get_module(mod_path)
+            .ok_or(format!("Module '{}' not found", mod_path))?;
+
+        let type_ = mod_type_environment.borrow().get_type(&item_name);
+
+        let Some(type_) = type_ else {
+            return Err(format!("Type '{}' not found", item_name))?;
+        };
+
+        self.add_type(type_)
     }
 
     pub fn add_type(&mut self, type_: Type) -> Result<(), String> {
@@ -307,6 +343,11 @@ impl TypeEnvironment {
                         member_name.to_key()
                     ))
                 }),
+            TypeIdentifier::ModType(type_identifier, member_name) => self.get_type(format!(
+                "{}::{}",
+                type_identifier.to_key(),
+                member_name.to_key()
+            )),
         }
     }
 
@@ -368,5 +409,21 @@ impl TypeEnvironment {
                 .parent
                 .as_ref()
                 .is_some_and(|parent| parent.borrow().lookup_type_str(type_name))
+    }
+}
+
+impl Debug for TypeEnvironment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let modules = self.modules.keys().collect::<Vec<_>>();
+
+        f.debug_struct("TypeEnvironment")
+            .field("parent", &self.parent)
+            .field("modules", &modules)
+            .field("types", &self.types)
+            .field("static_members", &self.static_members)
+            .field("variables", &self.variables)
+            .field("scopes", &self.scopes)
+            .field("allow_override_types", &self.allow_override_types)
+            .finish()
     }
 }

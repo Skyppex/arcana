@@ -72,7 +72,7 @@ impl PrettyPrint for Expression {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModuleDeclaration {
     pub access_modifier: Option<AccessModifier>,
-    pub module_path: Vec<String>,
+    pub module_path: ModPath,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -102,6 +102,71 @@ impl Display for UseItem {
                     .join(", ")
             ),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ModPath {
+    // NOTE: This MUST be the only field in the struct
+    path: String,
+}
+
+impl ModPath {
+    pub fn new(path: Vec<String>) -> Self {
+        Self {
+            path: path.join("::"),
+        }
+    }
+
+    fn new_from_string(path: &String) -> &Self {
+        unsafe { &*(path as *const String as *const ModPath) }
+    }
+
+    pub fn root() -> Self {
+        Self {
+            path: String::new(),
+        }
+    }
+
+    pub fn join<M: AsRef<ModPath>>(&self, other: M) -> Self {
+        let mut new_path = self.path.clone();
+
+        if !new_path.is_empty() {
+            new_path.push_str("::");
+        }
+
+        new_path.push_str(&other.as_ref().path);
+        Self { path: new_path }
+    }
+
+    pub fn base(&self) -> String {
+        self.path
+            .split("::")
+            .last()
+            .unwrap_or(&self.path)
+            .to_string()
+    }
+
+    pub fn components(&self) -> Vec<String> {
+        self.path.split("::").map(|s| s.to_string()).collect()
+    }
+}
+
+impl AsRef<ModPath> for ModPath {
+    fn as_ref(&self) -> &ModPath {
+        self
+    }
+}
+
+impl AsRef<ModPath> for String {
+    fn as_ref(&self) -> &ModPath {
+        ModPath::new_from_string(self)
+    }
+}
+
+impl Display for ModPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.path)
     }
 }
 

@@ -1,6 +1,8 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use shared::{
+    lexer::token::IdentifierType,
+    parser::{ModPath, UseItem},
     type_checker::{
         ast::*,
         decision_tree::{Accessor, Constructor, Decision, FieldPattern, Pattern},
@@ -8,6 +10,8 @@ use shared::{
     },
     types::{ToKey, TypeAnnotation, TypeIdentifier},
 };
+
+use crate::value::Variable;
 
 use super::{
     environment::{Environment, Rcrc},
@@ -24,12 +28,20 @@ pub fn evaluate(
     match typed_statement {
         TypedStatement::None => Ok(Value::Void),
         TypedStatement::Program { statements } => evaluate_program(statements, environment),
-        TypedStatement::ModuleDeclaration { module_path, .. } => {
-            environment.borrow_mut().add_module(module_path);
+        TypedStatement::ModuleDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::Use { use_item, .. } => {
+            let imports = evaluate_use_item(use_item, ModPath::root(), environment.clone())?;
+
+            for import in imports {
+                let borrow = import.borrow();
+                environment.borrow_mut().add_variable(
+                    borrow.identifier.clone(),
+                    borrow.value.clone(),
+                    false,
+                );
+            }
+
             Ok(Value::Void)
-        }
-        TypedStatement::Use { .. } => {
-            todo!("Use statement evaluation")
         }
         TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
         TypedStatement::EnumDeclaration { .. } => Ok(Value::Void),
@@ -55,13 +67,51 @@ pub fn evaluate(
     }
 }
 
+fn evaluate_use_item(
+    use_item: UseItem,
+    module_path: ModPath,
+    environment: Rcrc<Environment>,
+) -> Result<Vec<Rcrc<Variable>>, String> {
+    match use_item {
+        UseItem::Item(item_name) => {
+            if item_name.is_type_identifier_name() {
+                return Ok(vec![]);
+            }
+
+            let (_, mod_environment) = environment
+                .borrow()
+                .get_module(&module_path)
+                .ok_or(format!("Module '{}' not found", module_path))?;
+
+            let function = mod_environment
+                .borrow()
+                .get_function(&item_name)
+                .ok_or(format!("Couldn't find function '{}'", item_name))?;
+
+            Ok(vec![function])
+        }
+        UseItem::Navigation(mod_name, use_item) => {
+            evaluate_use_item(*use_item, module_path.join(mod_name), environment)
+        }
+        UseItem::List(use_items) => Ok(use_items
+            .iter()
+            .map(|use_item| {
+                evaluate_use_item(use_item.clone(), module_path.clone(), environment.clone())
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()),
+    }
+}
+
 fn evaluate_implementation_declaration(
     environment: Rc<RefCell<Environment>>,
     type_annotation: TypeAnnotation,
     functions: Vec<(String, TypedStatement)>,
 ) -> Result<Value, String> {
     for (function_name, function) in functions {
-        evaluate(function, environment.clone())?;
+        let _ = evaluate(function, environment.clone())?;
 
         let variable = environment
             .borrow()
