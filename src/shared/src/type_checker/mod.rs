@@ -194,6 +194,11 @@ impl FullName for Function {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Meta {
+    Ident,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Parameter {
     pub identifier: String,
     pub type_: Box<Type>,
@@ -229,6 +234,8 @@ pub enum Type {
         type_: Box<LiteralType>,
     },
     Tuple(Vec<Type>),
+    Any,        // not directly available in the language, but used for some built-ins
+    Meta(Meta), // not directly available in the language, but used for some built-ins
 }
 
 impl Type {
@@ -848,6 +855,10 @@ impl FullName for Type {
                     .join(", ")
             ),
             Type::Protocol(t) => t.full_name(),
+            Type::Any => "Any".to_string(),
+            Type::Meta(meta) => match meta {
+                Meta::Ident => "Meta::Ident".to_string(),
+            },
         }
     }
 }
@@ -1156,6 +1167,8 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
     match (left, right) {
         (Type::Substitution { actual_type, .. }, right) => type_equals(actual_type, right),
         (left, Type::Substitution { actual_type, .. }) => type_equals(left, actual_type),
+        (Type::Any, _) => true,
+        (other, Type::Any) if other != &Type::Any => false,
         (Type::UInt, Type::Literal { name, type_ })
             if matches!(**type_, LiteralType::Int | LiteralType::IntValue(_)) =>
         {
@@ -1242,6 +1255,7 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 .zip(right_types.iter())
                 .all(|(l, r)| type_equals(l, r))
         }
+        (Type::Array(left), Type::Array(right)) => type_equals(left, right),
         _ => left.to_key() == right.to_key(),
     }
 }

@@ -105,6 +105,8 @@ impl From<Type> for TypeAnnotation {
             Type::TypeAlias(_) => todo!(),
             Type::Protocol(_) => todo!(),
             Type::Literal { .. } => todo!(),
+            Type::Any => panic!("Cannot convert Any type to type annotation"),
+            Type::Meta(_) => panic!("Cannot convert meta type to type annotation"),
         }
     }
 }

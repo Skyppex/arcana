@@ -1,6 +1,7 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use shared::{
+    built_in::BuiltInFunction,
     lexer::token::IdentifierType,
     parser::{ModPath, UseItem},
     type_checker::{
@@ -11,7 +12,7 @@ use shared::{
     types::{ToKey, TypeAnnotation, TypeIdentifier},
 };
 
-use crate::value::Variable;
+use crate::value::{get_built_in_function_value, FunctionBody, Variable};
 
 use super::{
     environment::{Environment, Rcrc},
@@ -141,7 +142,7 @@ fn evaluate_function_declaration(
 
     let function = Value::Function {
         param_name: param.map(|p| p.identifier),
-        body,
+        body: FunctionBody::Expr(body),
         environment: function_environment.clone(),
     };
 
@@ -213,24 +214,6 @@ fn evaluate_expression(
             ..
         } => evaluate_binary(left, operator, right, environment),
         TypedExpression::Block(Block { statements, .. }) => evaluate_block(statements, environment),
-        TypedExpression::Print { value } => {
-            let value = evaluate_expression(*value, environment)?;
-            println!("{}", value);
-            Ok(Value::Void)
-        }
-        TypedExpression::Drop { identifier, .. } => evaluate_drop(identifier, environment),
-        TypedExpression::Input { value } => {
-            let value = evaluate_expression(*value, environment)?;
-            println!("{}", value);
-
-            let mut buf = String::new();
-
-            std::io::stdin()
-                .read_line(&mut buf)
-                .expect("Failed to read line");
-
-            Ok(Value::String(buf))
-        }
         TypedExpression::Loop { body, .. } => evaluate_loop(body, environment),
         TypedExpression::While {
             condition,
@@ -962,7 +945,8 @@ fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Val
         Member::Identifier { symbol, .. } => Ok(environment
             .borrow()
             .get_variable(symbol)
-            .or(environment.borrow().get_function(&member))
+            .or_else(|| get_built_in_function(symbol, environment.clone()))
+            .or_else(|| environment.borrow().get_function(&member))
             .ok_or(format!("Variable '{}' not found", &member))?
             .borrow()
             .value
@@ -974,6 +958,9 @@ fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Val
         } => evaluate_static_member_access(type_annotation.clone(), environment, member.clone()),
         Member::MemberAccess { object, member, .. } => {
             evaluate_member_access(object.clone(), environment, member.clone())
+        }
+        Member::BuiltInFunction(built_in_function) => {
+            Ok(evaluate_built_in_function(built_in_function, environment))
         }
     }
 }
@@ -1022,6 +1009,9 @@ fn evaluate_member_access(
             Member::MemberAccess { object, member, .. } => {
                 evaluate_member_access(object, environment, member)
             }
+            Member::BuiltInFunction(_) => {
+                panic!("Cannot access members on a built-in function")
+            }
         },
         Value::Enum(Enum {
             enum_member: Struct { type_name, fields },
@@ -1044,6 +1034,9 @@ fn evaluate_member_access(
             )),
             Member::MemberAccess { object, member, .. } => {
                 evaluate_member_access(object, environment, member)
+            }
+            Member::BuiltInFunction(_) => {
+                panic!("Cannot access members on a built-in function")
             }
         },
         _ => Err(format!("Cannot access member value: '{}'", value)),
@@ -1127,7 +1120,7 @@ fn evaluate_closure(
 ) -> Result<Value, String> {
     Ok(Value::Function {
         param_name: param.map(|p| p.identifier),
-        body,
+        body: FunctionBody::Expr(body),
         environment,
     })
 }
@@ -1144,59 +1137,60 @@ fn evaluate_call(
         .map(|arg| evaluate_expression(*arg, environment.clone()))
         .transpose()?;
 
-    match callee_value {
-        Value::Function {
-            param_name,
-            body,
-            environment,
-        } => {
-            let function_environment = Rc::new(RefCell::new(Environment::new_scope(
-                environment.clone(),
-                ScopeType::Return,
-            )));
+    let Value::Function {
+        param_name,
+        body,
+        environment,
+    } = callee_value
+    else {
+        return Err(format!("Cannot call non-function value '{}'", callee_value));
+    };
 
-            if let Some(evaluated_arg) = evaluated_arg {
-                function_environment.borrow_mut().add_variable(
-                    param_name.clone().unwrap(),
-                    evaluated_arg.clone(),
-                    false,
-                );
-            }
+    let function_environment = Rc::new(RefCell::new(Environment::new_scope(
+        environment.clone(),
+        ScopeType::Return,
+    )));
 
-            let mut value = evaluate_expression(body, function_environment.clone())?;
-
-            if let Some(Scope::Return(v)) =
-                function_environment.borrow().get_scope(&ScopeType::Return)
-            {
-                match v {
-                    Some(v) => {
-                        if type_ == Type::Void {
-                            return Err("Cannot return a value from a void function".to_string());
-                        }
-
-                        value = v.clone();
-                    }
-                    None => {
-                        if type_ != Type::Void {
-                            return Err(format!(
-                                "Cannot return void from a non-void function. Expected type '{}', found type 'void'",
-                                type_
-                            ));
-                        }
-
-                        value = Value::Void;
-                    }
-                }
-            }
-
-            if type_ == Type::Void {
-                return Ok(Value::Void);
-            }
-
-            Ok(value)
-        }
-        _ => Err(format!("Cannot call non-function value '{}'", callee_value)),
+    if let Some(evaluated_arg) = &evaluated_arg {
+        function_environment.borrow_mut().add_variable(
+            param_name.clone().unwrap(),
+            evaluated_arg.clone(),
+            false,
+        );
     }
+
+    let mut value = match body {
+        FunctionBody::Expr(body) => evaluate_expression(body, function_environment.clone())?,
+        FunctionBody::Fn(function) => function(evaluated_arg),
+    };
+
+    if let Some(Scope::Return(v)) = function_environment.borrow().get_scope(&ScopeType::Return) {
+        match v {
+            Some(v) => {
+                if type_ == Type::Void {
+                    return Err("Cannot return a value from a void function".to_string());
+                }
+
+                value = v.clone();
+            }
+            None => {
+                if type_ != Type::Void {
+                    return Err(format!(
+                        "Cannot return void from a non-void function. Expected type '{}', found type 'void'",
+                        type_
+                    ));
+                }
+
+                value = Value::Void;
+            }
+        }
+    }
+
+    if type_ == Type::Void {
+        return Ok(Value::Void);
+    }
+
+    Ok(value)
 }
 
 fn evaluate_index(
@@ -1310,16 +1304,6 @@ fn evaluate_block(
         }
     }
 
-    Ok(value)
-}
-
-fn evaluate_drop(identifier: String, environment: Rcrc<Environment>) -> Result<Value, String> {
-    let variable = environment
-        .borrow_mut()
-        .remove_variable(&identifier)
-        .ok_or(format!("Variable '{}' not found", identifier))?;
-
-    let value = variable.borrow().value.clone();
     Ok(value)
 }
 
@@ -1600,4 +1584,25 @@ fn evaluate_return(
             Ok(Value::Void)
         }
     }
+}
+
+fn evaluate_built_in_function(
+    built_in_function: &BuiltInFunction,
+    environment: Rc<RefCell<Environment>>,
+) -> Value {
+    get_built_in_function_value(&built_in_function.function_type, environment)
+}
+
+fn get_built_in_function(
+    key: impl ToKey,
+    environment: Rcrc<Environment>,
+) -> Option<Rcrc<Variable>> {
+    BuiltInFunction::new(&key.to_key()).map(|b| {
+        let value = get_built_in_function_value(&b.function_type, environment);
+        Rc::new(RefCell::new(Variable::new(
+            b.type_identifier.to_key(),
+            value,
+            false,
+        )))
+    })
 }

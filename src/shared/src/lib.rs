@@ -1,3 +1,4 @@
+pub mod built_in;
 pub mod display;
 pub mod lexer;
 pub mod parser;

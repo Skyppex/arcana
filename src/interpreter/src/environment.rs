@@ -6,10 +6,13 @@ use std::{
 };
 
 use shared::{
+    built_in::BuiltInFunction,
     parser::ModPath,
     type_checker::ast::Member,
     types::{ToKey, TypeAnnotation},
 };
+
+use crate::value::get_built_in_function_value;
 
 use super::{
     scope::{Scope, ScopeState, ScopeType},
@@ -238,6 +241,9 @@ impl Environment {
             Member::MemberAccess { member, .. } => {
                 self.set_variable(*member.clone(), value.clone())
             }
+            Member::BuiltInFunction(BuiltInFunction {
+                type_identifier, ..
+            }) => panic!("cannot assign to built-in function '{:?}'", type_identifier),
         }
     }
 

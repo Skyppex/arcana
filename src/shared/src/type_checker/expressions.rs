@@ -153,12 +153,18 @@ pub fn check_type(
             })
         }
         Expression::Call(call) => {
-            let callee = check_type(
-                &call.callee,
-                discovered_types,
-                type_environment.clone(),
-                context.clone(),
-            )?;
+            let callee =
+                if let Some(built_in_function) = call.callee.get_built_in_function_identifier() {
+                    // turn the callee into a TypedExpression which is the build-in function
+                    TypedExpression::Member(Member::BuiltInFunction(built_in_function))
+                } else {
+                    check_type(
+                        &call.callee,
+                        discovered_types,
+                        type_environment.clone(),
+                        context.clone(),
+                    )?
+                };
 
             let callee_type = callee.get_type();
 
@@ -891,24 +897,6 @@ pub fn check_type(
                 type_,
             }))
         }
-        Expression::Print(e) => Ok(TypedExpression::Print {
-            value: Box::new(check_type(e, discovered_types, type_environment, None)?),
-        }),
-        Expression::Drop(symbol) => {
-            let type_ = type_environment
-                .borrow()
-                .get_variable(symbol)
-                .ok_or_else(|| format!("Unexpected variable: {}", symbol))?
-                .clone();
-
-            Ok(TypedExpression::Drop {
-                identifier: symbol.clone(),
-                type_,
-            })
-        }
-        Expression::Input(e) => Ok(TypedExpression::Input {
-            value: Box::new(check_type(e, discovered_types, type_environment, None)?),
-        }),
         Expression::Loop(body) => {
             let loop_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
                 type_environment,
@@ -1753,35 +1741,15 @@ fn get_binop_type(
 
             Ok(acc)
         }
-        // (Type::Literal { type_, name }, BinaryOperator::Range, Type::UInt)
-        //     if **type_ == Type::Int && name.parse::<u64>().is_ok() =>
-        // {
-        //     Ok(Type::Array(Box::new(Type::UInt)))
-        // }
-        // (Type::Literal { type_, name }, BinaryOperator::Range, Type::Int)
-        //     if **type_ == Type::UInt && name.parse::<i64>().is_ok() =>
-        // {
-        //     Ok(Type::Array(Box::new(Type::Int)))
-        // }
-        // (Type::Int, BinaryOperator::RangeInclusive, Type::Int) => {
-        //     Ok(Type::Array(Box::new(Type::Int)))
-        // }
-        // (Type::UInt, BinaryOperator::RangeInclusive, Type::UInt) => {
-        //     Ok(Type::Array(Box::new(Type::UInt)))
-        // }
-        // (Type::Char, BinaryOperator::RangeInclusive, Type::Char) => {
-        //     Ok(Type::Array(Box::new(Type::Char)))
-        // }
-        // (Type::Literal { type_, name }, BinaryOperator::RangeInclusive, Type::Int)
-        //     if **type_ == Type::UInt && name.parse::<i64>().is_ok() =>
-        // {
-        //     Ok(Type::Array(Box::new(Type::Int)))
-        // }
-        // (Type::Literal { type_, name }, BinaryOperator::RangeInclusive, Type::UInt)
-        //     if **type_ == Type::Int && name.parse::<u64>().is_ok() =>
-        // {
-        //     Ok(Type::Array(Box::new(Type::UInt)))
-        // }
+        (Type::Int, BinaryOperator::RangeInclusive, Type::Int) => {
+            Ok(Type::Array(Box::new(Type::Int)))
+        }
+        (Type::UInt, BinaryOperator::RangeInclusive, Type::UInt) => {
+            Ok(Type::Array(Box::new(Type::UInt)))
+        }
+        (Type::Char, BinaryOperator::RangeInclusive, Type::Char) => {
+            Ok(Type::Array(Box::new(Type::Char)))
+        }
         (Type::Literal { type_, .. }, operator, Type::Int)
             if matches!(**type_, LiteralType::UIntValue(_)) =>
         {

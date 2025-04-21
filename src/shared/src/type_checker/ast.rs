@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::hash::Hash;
 
+use crate::built_in::BuiltInFunction;
 use crate::display::{Indent, IndentDisplay};
 use crate::parser::{AssociatedType, Expression, ModPath, UseItem};
 use crate::pretty_print::PrettyPrint;
@@ -434,19 +435,6 @@ pub enum TypedExpression {
         type_: Type,
     },
     Block(Block),
-    #[cfg(feature = "interpreter")]
-    Print {
-        value: Box<TypedExpression>,
-    },
-    #[cfg(feature = "interpreter")]
-    Drop {
-        identifier: String,
-        type_: Type,
-    },
-    #[cfg(feature = "interpreter")]
-    Input {
-        value: Box<TypedExpression>,
-    },
     Loop {
         body: Box<TypedExpression>,
         type_: Type,
@@ -489,9 +477,6 @@ impl Typed for TypedExpression {
             TypedExpression::Loop { type_, .. } => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
             TypedExpression::For { type_, .. } => type_.clone(),
-            TypedExpression::Print { .. } => Type::Void,
-            TypedExpression::Drop { type_, .. } => type_.clone(),
-            TypedExpression::Input { .. } => Type::String,
             TypedExpression::Break(_) => Type::Void,
             TypedExpression::Continue => Type::Void,
             TypedExpression::Return(_) => Type::Void,
@@ -518,9 +503,6 @@ impl Typed for TypedExpression {
             TypedExpression::Loop { type_, .. } => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
             TypedExpression::For { type_, .. } => type_.clone(),
-            TypedExpression::Print { .. } => Type::Void,
-            TypedExpression::Drop { type_, .. } => type_.clone(),
-            TypedExpression::Input { .. } => Type::String,
             TypedExpression::Break(_) => Type::Void,
             TypedExpression::Continue => Type::Void,
             TypedExpression::Return(_) => Type::Void,
@@ -641,9 +623,6 @@ impl Display for TypedExpression {
                 ..
             } => write!(f, "{} {} {}", left, operator, right),
             TypedExpression::Block(block) => write!(f, "{}", block),
-            TypedExpression::Drop { identifier, .. } => write!(f, "drop {}", identifier),
-            TypedExpression::Print { value, .. } => write!(f, "print {}", value),
-            TypedExpression::Input { value, .. } => write!(f, "input {}", value),
             TypedExpression::Loop { body, .. } => write!(f, "loop {}", body),
             TypedExpression::While {
                 condition,
@@ -1004,6 +983,7 @@ pub enum Member {
         symbol: String,
         type_: Type,
     },
+    BuiltInFunction(BuiltInFunction),
 }
 
 impl Member {
@@ -1012,6 +992,9 @@ impl Member {
             Member::Identifier { symbol, .. } => symbol,
             Member::StaticMemberAccess { symbol, .. } => symbol,
             Member::MemberAccess { symbol, .. } => symbol,
+            Member::BuiltInFunction(BuiltInFunction {
+                type_identifier, ..
+            }) => type_identifier.name(),
             // Member::MemberFunctionAccess { symbol, .. } => symbol,
         }
     }
@@ -1023,6 +1006,7 @@ impl Typed for Member {
             Member::Identifier { type_, .. } => type_.clone(),
             Member::StaticMemberAccess { type_, .. } => type_.clone(),
             Member::MemberAccess { type_, .. } => type_.clone(),
+            Member::BuiltInFunction(BuiltInFunction { type_, .. }) => type_.clone(),
             // Member::MemberFunctionAccess { type_, .. } => type_.clone(),
         }
     }
@@ -1032,6 +1016,7 @@ impl Typed for Member {
             Member::Identifier { type_, .. } => type_.clone(),
             Member::StaticMemberAccess { member, .. } => member.get_deep_type(),
             Member::MemberAccess { member, .. } => member.get_deep_type(),
+            Member::BuiltInFunction(BuiltInFunction { type_, .. }) => type_.clone(),
             // Member::MemberFunctionAccess { member, .. } => member.get_deep_type(),
         }
     }
@@ -1047,6 +1032,9 @@ impl Display for Member {
                 ..
             } => write!(f, "{}.{}", type_annotation, member),
             Member::MemberAccess { object, member, .. } => write!(f, "{}.{}", object, member),
+            Member::BuiltInFunction(BuiltInFunction {
+                type_identifier, ..
+            }) => write!(f, "{}", type_identifier),
             // Member::MemberFunctionAccess { object, member, .. } => {
             //     write!(f, "{}.{}", object, member)
             // }
@@ -1167,5 +1155,15 @@ pub struct TypedMatchArm {
 impl Display for TypedMatchArm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} => {:?}", self.pattern, self.expression)
+    }
+}
+
+impl Expression {
+    pub fn get_built_in_function_identifier(&self) -> Option<BuiltInFunction> {
+        let Expression::Member(parser::Member::Identifier { symbol, .. }) = self else {
+            return None;
+        };
+
+        BuiltInFunction::new(symbol)
     }
 }

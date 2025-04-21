@@ -1428,9 +1428,7 @@ fn check_type_identifier(
                 )?),
             }))
         }
-        Some(DiscoveredType::UseItem { type_identifier }) => {
-            todo!()
-        }
+        Some(DiscoveredType::UseItem { .. }) => Ok(Type::Void),
         None => type_environment
             .borrow()
             .get_type_from_identifier(type_identifier)
@@ -1722,9 +1720,7 @@ pub fn check_type_annotation(
                 )?),
             }))
         }
-        Some(DiscoveredType::UseItem { type_identifier }) => {
-            todo!()
-        }
+        Some(DiscoveredType::UseItem { .. }) => Ok(Type::Void),
         None => type_environment
             .borrow()
             .get_type_from_annotation(type_annotation),

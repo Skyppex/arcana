@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::{
+    built_in::BuiltInFunction,
     parser::ModPath,
     type_checker::Protocol,
     types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier},
@@ -229,11 +230,13 @@ impl TypeEnvironment {
         Ok(())
     }
 
-    pub fn get_type<K: ToKey>(&self, key: K) -> Option<Type> {
-        self.types
-            .get(&key.to_key())
-            .cloned()
-            .or_else(|| self.parent.as_ref().and_then(|p| p.borrow().get_type(key)))
+    pub fn get_type(&self, key: impl ToKey) -> Option<Type> {
+        self.get_built_in_function(&key).or_else(|| {
+            self.types
+                .get(&key.to_key())
+                .cloned()
+                .or_else(|| self.parent.as_ref().and_then(|p| p.borrow().get_type(key)))
+        })
     }
 
     pub fn get_type_from_annotation(
@@ -409,6 +412,10 @@ impl TypeEnvironment {
                 .parent
                 .as_ref()
                 .is_some_and(|parent| parent.borrow().lookup_type_str(type_name))
+    }
+
+    pub fn get_built_in_function(&self, key: impl ToKey) -> Option<Type> {
+        BuiltInFunction::new(&key.to_key()).map(|b| b.type_)
     }
 }
 

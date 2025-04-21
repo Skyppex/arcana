@@ -376,13 +376,6 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "true" => Some(TokenKind::Literal(Literal::Bool(true))),
         "false" => Some(TokenKind::Literal(Literal::Bool(false))),
 
-        #[cfg(feature = "interpreter")]
-        "drop" => Some(TokenKind::Keyword(Keyword::Drop)),
-        #[cfg(feature = "interpreter")]
-        "print" => Some(TokenKind::Keyword(Keyword::Print)),
-        #[cfg(feature = "interpreter")]
-        "input" => Some(TokenKind::Keyword(Keyword::Input)),
-
         _ => None,
     }
 }

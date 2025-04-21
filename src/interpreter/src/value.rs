@@ -1,6 +1,10 @@
 use std::fmt::Display;
 
-use shared::type_checker::ast::TypedExpression;
+use shared::{
+    built_in::{BuiltInFunction, BuiltInFunctionType},
+    type_checker::ast::TypedExpression,
+    types::ToKey,
+};
 
 use crate::{environment::Rcrc, Environment};
 
@@ -19,7 +23,7 @@ pub enum Value {
     Enum(Enum),
     Function {
         param_name: Option<String>,
-        body: TypedExpression,
+        body: FunctionBody,
         environment: Rcrc<Environment>,
     },
 }
@@ -61,7 +65,7 @@ impl Display for Value {
             Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),
             Value::Char(character) => write!(f, "'{}'", character),
-            Value::String(string) => write!(f, "{}", string),
+            Value::String(string) => write!(f, "\"{}\"", string),
             Value::Array(values) => {
                 write!(f, "[")?;
 
@@ -131,6 +135,12 @@ impl Display for Value {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum FunctionBody {
+    Expr(TypedExpression),
+    Fn(fn(Option<Value>) -> Value),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Number {
     Int(i64),
     UInt(u64),
@@ -189,5 +199,93 @@ impl Display for Variable {
             "{} = {} -> {:?}",
             self.identifier, self.value, self.value
         )
+    }
+}
+
+pub fn get_built_in_function_value(
+    function_type: &BuiltInFunctionType,
+    environment: Rcrc<Environment>,
+) -> Value {
+    match function_type {
+        BuiltInFunctionType::Input => Value::Function {
+            param_name: Some("prompt".to_string()),
+            body: FunctionBody::Fn(|value| {
+                let Some(value) = value else {
+                    unreachable!("Type is known after type checking, this should never happen")
+                };
+
+                println!("{}", value);
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input).unwrap();
+                Value::String(input.trim().to_string())
+            }),
+            environment,
+        },
+        BuiltInFunctionType::Print => Value::Function {
+            param_name: Some("value".to_string()),
+            body: FunctionBody::Fn(|value| {
+                let Some(value) = value else {
+                    return Value::Void;
+                };
+
+                print!("{}", value);
+                Value::Void
+            }),
+            environment,
+        },
+        BuiltInFunctionType::PrintLn => Value::Function {
+            param_name: Some("value".to_string()),
+            body: FunctionBody::Fn(|value| {
+                let Some(value) = value else {
+                    println!();
+                    return Value::Void;
+                };
+
+                println!("{}", value);
+                Value::Void
+            }),
+            environment,
+        },
+        BuiltInFunctionType::EPrint => Value::Function {
+            param_name: Some("value".to_string()),
+            body: FunctionBody::Fn(|value| {
+                let Some(value) = value else {
+                    return Value::Void;
+                };
+
+                eprint!("{}", value);
+                Value::Void
+            }),
+            environment,
+        },
+        BuiltInFunctionType::EPrintLn => Value::Function {
+            param_name: Some("value".to_string()),
+            body: FunctionBody::Fn(|value| {
+                let Some(value) = value else {
+                    eprintln!();
+                    return Value::Void;
+                };
+
+                eprintln!("{}", value);
+                Value::Void
+            }),
+            environment,
+        },
+        BuiltInFunctionType::Drop => Value::Function {
+            param_name: Some("var".to_string()),
+            body: FunctionBody::Fn(|_| todo!()),
+            environment,
+        },
+        BuiltInFunctionType::Len => Value::Function {
+            param_name: Some("arr".to_string()),
+            body: FunctionBody::Fn(|value| {
+                let Some(Value::Array(arr)) = value else {
+                    unreachable!("Type is known after type checking, this should never happen")
+                };
+
+                Value::Number(Number::UInt(arr.len() as u64))
+            }),
+            environment,
+        },
     }
 }

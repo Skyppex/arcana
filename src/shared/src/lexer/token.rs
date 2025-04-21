@@ -206,16 +206,6 @@ pub enum Keyword {
     Return,
     Break,
     Continue,
-
-    // Interpreter specific
-    #[cfg(feature = "interpreter")]
-    Drop,
-
-    #[cfg(feature = "interpreter")]
-    Print,
-
-    #[cfg(feature = "interpreter")]
-    Input,
 }
 
 pub trait IdentifierType {

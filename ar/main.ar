@@ -1,7 +1,10 @@
 use funcs::{add, sub, mul, div, dispatch};
 
-print(2f:add(3f):sub(1f):mul(5f):div(2f))
+let arr = 0..100;
+len(arr):println
 
-let func = "add";
+2f:add(3f):sub(1f):mul(5f):div(2f):println
 
-dispatch(func, 2f, 3f)
+let func = "sub";
+
+dispatch(func, 3f, 2f)

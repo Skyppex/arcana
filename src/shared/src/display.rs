@@ -1,4 +1,5 @@
 use crate::{
+    built_in::BuiltInFunction,
     parser::{
         AccessModifier, Assignment, AssociatedType, Binary, BinaryOperator, Call, ClosureParameter,
         EmbeddedStruct, EnumDeclaration, EnumMember, EnumMemberField, Expression, FieldInitializer,
@@ -902,35 +903,6 @@ impl IndentDisplay for Expression {
                 }
 
                 indent.decrease();
-                result
-            }
-            Expression::Print(value) => {
-                let mut result = String::new();
-                result.push_str(
-                    format!(
-                        "{}<print> {}",
-                        indent.dash_end(),
-                        value.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                result
-            }
-            Expression::Drop(identifier) => {
-                let mut result = String::new();
-                result.push_str(format!("<drop> {}", identifier).as_str());
-                result
-            }
-            Expression::Input(value) => {
-                let mut result = String::new();
-                result.push_str(
-                    format!(
-                        "{}<input> {}",
-                        indent.dash_end(),
-                        value.indent_display(indent)
-                    )
-                    .as_str(),
-                );
                 result
             }
             Expression::Loop(body) => {
@@ -2511,21 +2483,6 @@ impl IndentDisplay for TypedExpression {
                 indent.decrease();
                 result
             }
-            TypedExpression::Print { value } => {
-                let mut result = String::new();
-                result.push_str(format!("<print> {}: {}", value, Type::Void).as_str());
-                result
-            }
-            TypedExpression::Drop { identifier, type_ } => {
-                let mut result = String::new();
-                result.push_str(format!("<drop> {}: {}", identifier, type_).as_str());
-                result
-            }
-            TypedExpression::Input { value } => {
-                let mut result = String::new();
-                result.push_str(format!("<input> {}: {}", value, Type::String).as_str());
-                result
-            }
             TypedExpression::Loop { body, type_ } => {
                 let mut result = String::new();
                 result.push_str(format!("<loop>: {}", type_).as_str());
@@ -2796,6 +2753,28 @@ impl IndentDisplay for type_checker::ast::Member {
                 );
                 indent.end_current();
                 result.push_str(format!("{}symbol: {}", indent.dash_end(), symbol).as_str());
+                indent.decrease();
+                result
+            }
+            type_checker::ast::Member::BuiltInFunction(BuiltInFunction {
+                type_identifier,
+                function_type,
+                type_,
+            }) => {
+                let mut result = String::new();
+                result.push_str(format!("<built-in function>: {}\n", type_).as_str());
+                indent.increase();
+                result.push_str(
+                    format!(
+                        "{}type_identifier: {}",
+                        indent.dash(),
+                        type_identifier.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+                result.push_str(
+                    format!("{}function_type: {}", indent.dash(), function_type).as_str(),
+                );
                 indent.decrease();
                 result
             }
