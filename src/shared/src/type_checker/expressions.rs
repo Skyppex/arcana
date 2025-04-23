@@ -319,7 +319,7 @@ pub fn check_type(
 
             check_type_pattern(
                 pattern,
-                &initializer,
+                initializer.as_ref().map(|i| i.get_type()).as_ref(),
                 discovered_types,
                 type_environment.clone(),
                 Some(type_.clone()),
@@ -586,6 +586,8 @@ pub fn check_type(
                             check_type(value, discovered_types, type_environment.clone(), None)?;
 
                         let type_ = value.get_deep_type();
+
+                        dbg!(&type_, &previous_type);
 
                         if !type_equals(&previous_type, &Type::Void)
                             && !type_equals(&type_, &previous_type)
@@ -991,7 +993,7 @@ pub fn check_type(
             })
         }
         Expression::For(For {
-            identifier,
+            pattern,
             iterable,
             body,
             else_body,
@@ -1018,9 +1020,17 @@ pub fn check_type(
                 ));
             };
 
-            for_environment
-                .borrow_mut()
-                .add_variable(identifier.clone(), *inner_type);
+            check_type_pattern(
+                pattern,
+                Some(inner_type.as_ref()),
+                discovered_types,
+                for_environment.clone(),
+                context.clone(),
+            )?;
+
+            // for_environment
+            //     .borrow_mut()
+            //     .add_variable(identifier.clone(), *inner_type);
 
             let body = check_type(body, discovered_types, for_environment.clone(), None)?;
 
@@ -1063,7 +1073,7 @@ pub fn check_type(
             };
 
             Ok(TypedExpression::For {
-                identifier: identifier.clone(),
+                pattern: pattern.clone(),
                 iterable: Box::new(iterable),
                 body: Box::new(body),
                 else_body: else_body.map(Box::new),
@@ -1116,11 +1126,11 @@ fn check_type_static_member_access(
         check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
 
     match member.clone() {
-        parser::Member::Identifier { symbol, .. } => match object_type {
+        parser::Member::Identifier { symbol, .. } => match &object_type {
             Type::Struct(struct_) => {
                 let Some(static_member_type) = type_environment
                     .borrow()
-                    .get_static_member(struct_.type_annotation(), &symbol)
+                    .get_static_member(&object_type, &symbol)
                 else {
                     return Err(format!(
                         "Struct '{}' does not have a static member called '{}'",
@@ -1143,7 +1153,7 @@ fn check_type_static_member_access(
             Type::Enum(enum_) => {
                 let Some(static_member_type) = type_environment
                     .borrow()
-                    .get_static_member(enum_.type_annotation(), &symbol)
+                    .get_static_member(&object_type, &symbol)
                 else {
                     return Err(format!(
                         "EnumMember '{}' does not have a static member called '{}'",
@@ -1341,7 +1351,7 @@ fn check_type_param_propagation(
     let member_type = type_environment.borrow().get_type(member).or_else(|| {
         type_environment
             .borrow()
-            .get_static_member(object_type.type_annotation(), member)
+            .get_static_member(&object_type, member)
     });
 
     let Some(Type::Function(Function { param, .. })) = member_type else {
@@ -1385,7 +1395,7 @@ fn check_type_param_propagation_recurse(
                 .or_else(|| {
                     type_environment
                         .borrow()
-                        .get_static_member(object_type.type_annotation(), &symbol)
+                        .get_static_member(&object_type, &symbol)
                 })
                 .ok_or_else(|| {
                     format!(
@@ -1454,7 +1464,7 @@ fn check_type_param_propagation_recurse(
 
 fn check_type_pattern(
     pattern: &Pattern,
-    initializer: &Option<TypedExpression>,
+    initializer_type: Option<&Type>,
     _discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
@@ -1471,9 +1481,7 @@ fn check_type_pattern(
                 return Ok(());
             }
 
-            if let Some(initializer) = initializer {
-                let initializer_type = initializer.get_type();
-
+            if let Some(initializer_type) = initializer_type {
                 type_environment
                     .borrow_mut()
                     .add_variable(identifier.clone(), initializer_type.clone());
@@ -1491,11 +1499,10 @@ fn check_type_pattern(
             type_annotation,
             field_patterns,
         }) => {
-            let Some(initializer) = initializer else {
+            let Some(initializer_type) = initializer_type else {
                 return Err("Expected initializer for constructor pattern".to_string());
             };
 
-            let initializer_type = initializer.get_type();
             let mut is_enum_member = false;
 
             match &initializer_type {
@@ -1577,15 +1584,39 @@ fn check_type_pattern(
 
                 check_type_pattern(
                     &field_pattern.pattern,
-                    &Some(TypedExpression::Member(Member::MemberAccess {
-                        object: Box::new(initializer.clone()),
-                        member: Box::new(Member::Identifier {
-                            symbol: field_name.clone(),
-                            type_: field_type.clone(),
-                        }),
-                        symbol: field_name.clone(),
-                        type_: field_type.clone(),
-                    })),
+                    Some(&field_type),
+                    _discovered_types,
+                    type_environment.clone(),
+                    context.clone(),
+                )?;
+            }
+
+            Ok(())
+        }
+        Pattern::Tuple(patterns) => {
+            let Some(initializer_type) = initializer_type else {
+                return Err("Expected initializer for tuple pattern".to_string());
+            };
+
+            let Type::Tuple(types) = initializer_type else {
+                return Err(format!(
+                    "Expected tuple type but got {}",
+                    initializer_type.full_name()
+                ));
+            };
+
+            if patterns.len() != types.len() {
+                return Err(format!(
+                    "Expected {} patterns but got {}",
+                    types.len(),
+                    patterns.len()
+                ));
+            }
+
+            for (pattern, type_) in patterns.iter().zip(types) {
+                check_type_pattern(
+                    pattern,
+                    Some(&type_),
                     _discovered_types,
                     type_environment.clone(),
                     context.clone(),

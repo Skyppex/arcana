@@ -68,11 +68,11 @@ impl FromStr for LogFlags {
             typed_ast: false,
         };
 
-        for flag in s.split(',') {
-            match flag.trim() {
-                "tokens" | "k" => flags.tokens = true,
-                "ast" | "a" => flags.ast = true,
-                "typed-ast" | "typed" | "t" => flags.typed_ast = true,
+        for flag in s.chars() {
+            match flag {
+                'k' => flags.tokens = true,
+                'a' => flags.ast = true,
+                't' => flags.typed_ast = true,
                 _ => {}
             }
         }

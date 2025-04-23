@@ -375,7 +375,7 @@ pub struct While {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct For {
-    pub identifier: String,
+    pub pattern: Pattern,
     pub iterable: Box<Expression>,
     pub body: Box<Expression>,
     pub else_body: Option<Box<Expression>>,

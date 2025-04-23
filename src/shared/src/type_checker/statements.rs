@@ -693,7 +693,7 @@ pub fn check_type(
 
             let literal_type = literal_types
                 .iter()
-                .map(|t| t.to_union_compatible_type())
+                .map(|t| t.unstrict())
                 .try_fold(Type::Void, |acc, t| {
                     if type_equals(&acc.clone(), &Type::Void) {
                         Ok(t.clone())
@@ -864,7 +864,12 @@ pub fn check_type(
                     if !implementation_type_environment
                         .borrow()
                         .lookup_type(&generic_type)
-                    {}
+                    {
+                        return Err(format!(
+                            "Generic type '{}' not found in protocol annotation",
+                            generic_type
+                        ));
+                    }
                 }
             }
 
@@ -880,7 +885,12 @@ pub fn check_type(
                     if !implementation_type_environment
                         .borrow()
                         .lookup_type(&generic_type)
-                    {}
+                    {
+                        return Err(format!(
+                            "Generic type '{}' not found in type annotation",
+                            generic_type
+                        ));
+                    }
                 }
             }
 
@@ -892,7 +902,7 @@ pub fn check_type(
                 .borrow_mut()
                 .add_type(Type::Substitution {
                     type_identifier: TypeIdentifier::Type("Self".to_owned()),
-                    actual_type: Box::new(imp_type),
+                    actual_type: Box::new(imp_type.clone()),
                 })?;
 
             let protocol_type = implementation_type_environment
@@ -937,7 +947,7 @@ pub fn check_type(
                 let function_name = protocol_function_identifier.name().to_owned();
 
                 type_environment.borrow_mut().add_static_member(
-                    type_annotation.clone(),
+                    imp_type.clone(),
                     function_name.clone(),
                     typed_function.get_type(),
                 )?;
@@ -1345,7 +1355,7 @@ fn check_type_identifier(
 
             let literal_type = literal_types
                 .iter()
-                .map(|t| t.to_union_compatible_type())
+                .map(|t| t.unstrict())
                 .try_fold(Type::Void, |acc, t| {
                     if type_equals(&acc.clone(), &Type::Void) {
                         Ok(t.clone())
@@ -1641,7 +1651,7 @@ pub fn check_type_annotation(
 
             let literal_type = literal_types
                 .iter()
-                .map(|t| t.to_union_compatible_type())
+                .map(|t| t.unstrict())
                 .try_fold(Type::Void, |acc, t| {
                     if type_equals(&acc.clone(), &Type::Void) {
                         Ok(t.clone())

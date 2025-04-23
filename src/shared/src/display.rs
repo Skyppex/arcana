@@ -965,7 +965,7 @@ impl IndentDisplay for Expression {
                 result
             }
             Expression::For(For {
-                identifier,
+                pattern: identifier,
                 iterable,
                 body,
                 else_body,
@@ -1689,6 +1689,21 @@ impl IndentDisplay for Pattern {
                 indent.increase();
                 result.push_str(
                     format!("\n{}value: {}", indent.dash(), v.indent_display(indent)).as_str(),
+                );
+                indent.decrease();
+                result
+            }
+            Pattern::Tuple(patterns) => {
+                let mut result = String::new();
+                result.push_str("<tuple pattern>");
+                indent.increase_leaf();
+                result.push_str(
+                    format!(
+                        "\n{}{}",
+                        indent.dash_end(),
+                        indent_display_slice(patterns, "patterns", "pattern", indent)
+                    )
+                    .as_str(),
                 );
                 indent.decrease();
                 result
@@ -2542,7 +2557,7 @@ impl IndentDisplay for TypedExpression {
                 result
             }
             TypedExpression::For {
-                identifier,
+                pattern: identifier,
                 iterable,
                 body,
                 else_body,

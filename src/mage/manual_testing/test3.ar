@@ -1,3 +1,22 @@
-let a = 0..10;
+proto P {
+    fun p(self: Self): Float;
+}
 
-for i in a { print(i) }
+struct S {
+    s: Float
+}
+
+struct Super {
+    S,
+    super: Int,
+}
+
+imp P for S {
+    fun p(self: Self): Float => self.s * 3f;
+}
+
+let s = S { s: 4f };
+s:p():println()
+
+let super = Super { s: 2f, super: 5 };
+super:p()

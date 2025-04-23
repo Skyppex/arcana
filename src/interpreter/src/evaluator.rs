@@ -222,12 +222,12 @@ fn evaluate_expression(
             ..
         } => evaluate_while(condition, body, else_body, environment),
         TypedExpression::For {
-            identifier,
+            pattern,
             iterable,
             body,
             else_body,
             ..
-        } => evaluate_for(identifier, iterable, body, else_body, environment),
+        } => evaluate_for(pattern, iterable, body, else_body, environment),
         TypedExpression::Break(e) => evaluate_break(e, environment),
         TypedExpression::Continue => evaluate_continue(environment),
         TypedExpression::Return(e) => evaluate_return(e, environment),
@@ -273,7 +273,7 @@ fn evaluate_variable_declaration(
         None => Value::Uninitialized,
     };
 
-    if let Some(bindings) = evaluate_pattern(pattern, &value, environment.clone())? {
+    if let Some(bindings) = evaluate_pattern(&pattern, &value, environment.clone())? {
         for (identifier, value) in bindings {
             environment
                 .borrow_mut()
@@ -401,7 +401,7 @@ fn evaluate_decision_tree(
                     }
                 }
 
-                if let Some(bindings) = evaluate_pattern(pattern, &value, environment.clone())? {
+                if let Some(bindings) = evaluate_pattern(&pattern, &value, environment.clone())? {
                     for (identifier, value) in bindings {
                         case_environment
                             .borrow_mut()
@@ -418,7 +418,7 @@ fn evaluate_decision_tree(
 }
 
 fn evaluate_pattern(
-    pattern: Pattern,
+    pattern: &Pattern,
     value: &Value,
     environment: Rcrc<Environment>,
 ) -> Result<Option<Vec<(String, Value)>>, String> {
@@ -430,7 +430,7 @@ fn evaluate_pattern(
         },
         Pattern::Bool(v) => match value {
             Value::Bool(v2) => {
-                if v == *v2 {
+                if *v == *v2 {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
@@ -440,7 +440,7 @@ fn evaluate_pattern(
         },
         Pattern::Int(v) => match value {
             Value::Number(Number::Int(v2)) => {
-                if v == *v2 {
+                if *v == *v2 {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
@@ -450,7 +450,7 @@ fn evaluate_pattern(
         },
         Pattern::UInt(v) => match value {
             Value::Number(Number::UInt(v2)) => {
-                if v == *v2 {
+                if *v == *v2 {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
@@ -460,7 +460,7 @@ fn evaluate_pattern(
         },
         Pattern::Float(v) => match value {
             Value::Number(Number::Float(v2)) => {
-                if v == *v2 {
+                if *v == *v2 {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
@@ -470,7 +470,7 @@ fn evaluate_pattern(
         },
         Pattern::Char(v) => match value {
             Value::Char(v2) => {
-                if v == *v2 {
+                if *v == *v2 {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
@@ -480,7 +480,7 @@ fn evaluate_pattern(
         },
         Pattern::String(v) => match value {
             Value::String(v2) => {
-                if v == *v2 {
+                if *v == *v2 {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
@@ -488,7 +488,7 @@ fn evaluate_pattern(
             }
             _ => Err(format!("Expected string, found '{}'", value)),
         },
-        Pattern::Variable(v) => Ok(Some(vec![(v, value.clone())])),
+        Pattern::Variable(v) => Ok(Some(vec![(v.clone(), value.clone())])),
         Pattern::Constructor(Constructor::Struct {
             type_annotation,
             field_patterns,
@@ -510,7 +510,7 @@ fn evaluate_pattern(
                 }) => {
                     let member_type_annotation = TypeAnnotation::Type(type_name.clone());
 
-                    if !type_annotation_equals(&member_type_annotation, &type_annotation) {
+                    if !type_annotation_equals(&member_type_annotation, type_annotation) {
                         return Err(format!(
                             "Expected enum '{}', found '{}'",
                             type_annotation, type_name
@@ -532,7 +532,7 @@ fn evaluate_pattern(
                 let field_value =
                     fields
                         .iter()
-                        .find(|f| f.identifier == identifier)
+                        .find(|f| &f.identifier == identifier)
                         .ok_or(format!(
                             "Field '{}' not found in struct '{}'",
                             identifier, type_annotation
@@ -548,16 +548,16 @@ fn evaluate_pattern(
 
             Ok(Some(bindings))
         }
-        Pattern::LessThan(v) => match (*v, value) {
+        Pattern::LessThan(v) => match (v.as_ref(), value) {
             (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
-                if *v2 < v {
+                if *v2 < *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -572,14 +572,14 @@ fn evaluate_pattern(
                 }
             }
             (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
-                if *v2 < v {
+                if *v2 < *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -594,14 +594,14 @@ fn evaluate_pattern(
                 }
             }
             (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
-                if *v2 < v {
+                if *v2 < *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -617,16 +617,16 @@ fn evaluate_pattern(
             }
             other => Err(format!("Unexpected pattern: '{:?}'", other)),
         },
-        Pattern::GreaterThan(v) => match (*v, value) {
+        Pattern::GreaterThan(v) => match (v.as_ref(), value) {
             (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
-                if *v2 > v {
+                if *v2 > *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -641,14 +641,14 @@ fn evaluate_pattern(
                 }
             }
             (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
-                if *v2 > v {
+                if *v2 > *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -663,14 +663,14 @@ fn evaluate_pattern(
                 }
             }
             (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
-                if *v2 > v {
+                if *v2 > *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -686,16 +686,16 @@ fn evaluate_pattern(
             }
             other => Err(format!("Unexpected pattern: '{:?}'", other)),
         },
-        Pattern::LessThanOrEqual(v) => match (*v, value) {
+        Pattern::LessThanOrEqual(v) => match (v.as_ref(), value) {
             (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
-                if *v2 <= v {
+                if *v2 <= *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -710,14 +710,14 @@ fn evaluate_pattern(
                 }
             }
             (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
-                if *v2 <= v {
+                if *v2 <= *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -732,14 +732,14 @@ fn evaluate_pattern(
                 }
             }
             (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
-                if *v2 <= v {
+                if *v2 <= *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -755,16 +755,16 @@ fn evaluate_pattern(
             }
             other => Err(format!("Unexpected pattern: '{:?}'", other)),
         },
-        Pattern::GreaterThanOrEqual(v) => match (*v, value) {
+        Pattern::GreaterThanOrEqual(v) => match (v.as_ref(), value) {
             (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
-                if *v2 >= v {
+                if *v2 >= *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -779,14 +779,14 @@ fn evaluate_pattern(
                 }
             }
             (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
-                if *v2 >= v {
+                if *v2 >= *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -801,14 +801,14 @@ fn evaluate_pattern(
                 }
             }
             (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
-                if *v2 >= v {
+                if *v2 >= *v {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
             (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(&v) else {
+                let Some(variable) = environment.borrow().get_variable(v) else {
                     return Err(format!("Variable '{}' not found", v));
                 };
 
@@ -824,15 +824,33 @@ fn evaluate_pattern(
             }
             other => Err(format!("Unexpected pattern: '{:?}'", other)),
         },
+        Pattern::Tuple(patterns) => {
+            let Value::Tuple(values) = value else {
+                return Err(format!("Expected tuple, found '{}'", value));
+            };
+
+            let mut bindings = vec![];
+
+            for (pattern, value) in patterns.iter().zip(values) {
+                let Some(new_bindings) = evaluate_pattern(pattern, value, environment.clone())?
+                else {
+                    return Ok(None);
+                };
+
+                bindings.extend(new_bindings);
+            }
+
+            Ok(Some(bindings))
+        }
         Pattern::Range(left, right, inclusive) => {
-            let left = match *left {
-                Pattern::Int(v) => Value::Number(Number::Int(v)),
-                Pattern::UInt(v) => Value::Number(Number::UInt(v)),
-                Pattern::Float(v) => Value::Number(Number::Float(v)),
+            let left = match left.as_ref() {
+                Pattern::Int(v) => Value::Number(Number::Int(*v)),
+                Pattern::UInt(v) => Value::Number(Number::UInt(*v)),
+                Pattern::Float(v) => Value::Number(Number::Float(*v)),
                 Pattern::Variable(v) => {
                     let variable = environment
                         .borrow()
-                        .get_variable(&v)
+                        .get_variable(v)
                         .ok_or(format!("Variable '{}' not found in env", v))?;
 
                     let value = variable.borrow().value.clone();
@@ -846,14 +864,14 @@ fn evaluate_pattern(
                 other => return Err(format!("Unexpected pattern: '{:?}'", other)),
             };
 
-            let right = match *right {
-                Pattern::Int(v) => Value::Number(Number::Int(v)),
-                Pattern::UInt(v) => Value::Number(Number::UInt(v)),
-                Pattern::Float(v) => Value::Number(Number::Float(v)),
+            let right = match right.as_ref() {
+                Pattern::Int(v) => Value::Number(Number::Int(*v)),
+                Pattern::UInt(v) => Value::Number(Number::UInt(*v)),
+                Pattern::Float(v) => Value::Number(Number::Float(*v)),
                 Pattern::Variable(v) => {
                     let variable = environment
                         .borrow()
-                        .get_variable(&v)
+                        .get_variable(v)
                         .ok_or(format!("Variable '{}' not found in env", v))?;
 
                     let value = variable.borrow().value.clone();
@@ -873,7 +891,7 @@ fn evaluate_pattern(
                     Value::Number(Number::Int(v)),
                     Value::Number(Number::Int(right)),
                 ) => {
-                    if inclusive {
+                    if *inclusive {
                         if *v >= left && *v <= right {
                             Ok(Some(Vec::new()))
                         } else {
@@ -890,7 +908,7 @@ fn evaluate_pattern(
                     Value::Number(Number::UInt(v)),
                     Value::Number(Number::UInt(right)),
                 ) => {
-                    if inclusive {
+                    if *inclusive {
                         if *v >= left && *v <= right {
                             Ok(Some(Vec::new()))
                         } else {
@@ -907,7 +925,7 @@ fn evaluate_pattern(
                     Value::Number(Number::Float(v)),
                     Value::Number(Number::Float(right)),
                 ) => {
-                    if inclusive {
+                    if *inclusive {
                         if *v >= left && *v <= right {
                             Ok(Some(Vec::new()))
                         } else {
@@ -1422,7 +1440,7 @@ fn evaluate_while(
 }
 
 fn evaluate_for(
-    identifier: String,
+    pattern: Pattern,
     iterable: Box<TypedExpression>,
     body: Box<TypedExpression>,
     else_body: Option<Box<TypedExpression>>,
@@ -1492,9 +1510,13 @@ fn evaluate_for(
 
         index += 1;
 
-        for_environment
-            .borrow_mut()
-            .add_variable(identifier.clone(), value.clone(), false);
+        if let Some(bindings) = evaluate_pattern(&pattern, &value, for_environment.clone())? {
+            for (identifier, value) in bindings {
+                for_environment
+                    .borrow_mut()
+                    .add_variable(identifier.clone(), value.clone(), false);
+            }
+        }
 
         evaluate_expression(*body.clone(), for_environment.clone())?;
 

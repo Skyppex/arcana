@@ -58,14 +58,20 @@ impl TypeAnnotation {
 
 impl From<TypeIdentifier> for TypeAnnotation {
     fn from(type_identifier: TypeIdentifier) -> Self {
+        (&type_identifier).into()
+    }
+}
+
+impl From<&TypeIdentifier> for TypeAnnotation {
+    fn from(type_identifier: &TypeIdentifier) -> Self {
         match type_identifier {
-            TypeIdentifier::Type(name) => TypeAnnotation::Type(name),
+            TypeIdentifier::Type(name) => TypeAnnotation::Type(name.clone()),
             TypeIdentifier::GenericType(name, generics) => TypeAnnotation::ConcreteType(
-                name,
-                generics.into_iter().map(|g| g.type_annotation()).collect(),
+                name.clone(),
+                generics.iter().map(|g| g.type_annotation()).collect(),
             ),
             TypeIdentifier::ConcreteType(name, generics) => {
-                TypeAnnotation::ConcreteType(name, generics)
+                TypeAnnotation::ConcreteType(name.clone(), generics.clone())
             }
             TypeIdentifier::MemberType(parent, member) => {
                 TypeAnnotation::from(format!("{}::{}", parent.to_key(), member.to_key()).as_str())

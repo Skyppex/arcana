@@ -1,10 +1,6 @@
 use std::fmt::Display;
 
-use shared::{
-    built_in::{BuiltInFunction, BuiltInFunctionType},
-    type_checker::ast::TypedExpression,
-    types::ToKey,
-};
+use shared::{built_in::BuiltInFunctionType, type_checker::ast::TypedExpression};
 
 use crate::{environment::Rcrc, Environment};
 
@@ -64,8 +60,8 @@ impl Display for Value {
             Value::Unit => write!(f, "unit"),
             Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),
-            Value::Char(character) => write!(f, "'{}'", character),
-            Value::String(string) => write!(f, "\"{}\"", string),
+            Value::Char(character) => write!(f, "{}", character),
+            Value::String(string) => write!(f, "{}", string),
             Value::Array(values) => {
                 write!(f, "[")?;
 

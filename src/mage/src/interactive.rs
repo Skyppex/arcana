@@ -88,6 +88,21 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
         }
 
         if input.trim() == "types" {
+            println!("Static members");
+
+            for (type_, members) in type_environment.borrow().get_static_members() {
+                for (ident, member_type) in members {
+                    if let Type::Function(..) = member_type {
+                        println!("{}::{} -> {}", type_, ident, member_type);
+                    } else {
+                        println!("{}::{}", type_, member_type);
+                    }
+                }
+            }
+
+            println!();
+            println!("Types");
+
             for (ident, type_) in type_environment.borrow().get_types() {
                 if let Type::Function(..) = type_ {
                     println!("{} -> {}", ident, type_);
@@ -95,6 +110,7 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
                     println!("{}", type_);
                 }
             }
+
             continue;
         }
 

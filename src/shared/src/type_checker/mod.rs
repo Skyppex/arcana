@@ -33,7 +33,7 @@ pub struct Struct {
 
 impl Struct {
     pub fn type_annotation(&self) -> TypeAnnotation {
-        TypeAnnotation::from(self.type_identifier.clone())
+        TypeAnnotation::from(&self.type_identifier)
     }
 }
 
@@ -82,7 +82,7 @@ pub struct Enum {
 
 impl Enum {
     pub fn type_annotation(&self) -> TypeAnnotation {
-        TypeAnnotation::from(self.type_identifier.clone())
+        self.type_identifier.clone().into()
     }
 }
 
@@ -101,7 +101,7 @@ pub struct Union {
 
 impl Union {
     pub fn type_annotation(&self) -> TypeAnnotation {
-        TypeAnnotation::from(self.type_identifier.clone())
+        self.type_identifier.clone().into()
     }
 }
 
@@ -127,7 +127,7 @@ pub struct TypeAlias {
 
 impl TypeAlias {
     pub fn type_annotation(&self) -> TypeAnnotation {
-        TypeAnnotation::from(self.type_identifier.clone())
+        self.type_identifier.clone().into()
     }
 }
 
@@ -151,6 +151,12 @@ pub struct Protocol {
     pub functions: Vec<(TypeIdentifier, Type)>,
 }
 
+impl Protocol {
+    pub fn type_annotation(&self) -> TypeAnnotation {
+        self.type_identifier.clone().into()
+    }
+}
+
 impl FullName for Protocol {
     fn full_name(&self) -> String {
         self.type_identifier.to_string()
@@ -166,17 +172,14 @@ pub struct Function {
 
 impl Function {
     pub fn type_annotation(&self) -> Option<TypeAnnotation> {
-        self.identifier
-            .clone()
-            .map(|id| TypeAnnotation::from(id.clone()))
-            .or_else(|| {
-                Some(TypeAnnotation::Function(
-                    self.param
-                        .clone()
-                        .map(|p| Box::new(p.type_.type_annotation())),
-                    Some(Box::new(self.return_type.type_annotation())),
-                ))
-            })
+        self.identifier.clone().map(|id| id.into()).or_else(|| {
+            Some(TypeAnnotation::Function(
+                self.param
+                    .clone()
+                    .map(|p| Box::new(p.type_.type_annotation())),
+                Some(Box::new(self.return_type.type_annotation())),
+            ))
+        })
     }
 }
 
@@ -412,7 +415,9 @@ impl Type {
         match self {
             // NOTE: Uncomment this line if you want to see the underlying errors related to unknown types in protocols.
             // Type::Unknown => TypeAnnotation::Type("{unknown}".to_string())
-            Type::Substitution { actual_type, .. } => actual_type.type_annotation(),
+            Type::Substitution {
+                type_identifier, ..
+            } => type_identifier.into(),
             Type::Generic(name) => TypeAnnotation::Type(name.type_name.clone()),
             Type::Void => TypeAnnotation::Type("Void".to_string()),
             Type::Unit => TypeAnnotation::Type("Unit".to_string()),
@@ -425,6 +430,7 @@ impl Type {
             Type::Array(type_) => TypeAnnotation::Array(Box::new(type_.type_annotation())),
             Type::Struct(s) => s.type_annotation(),
             Type::Enum(e) => e.type_annotation(),
+            Type::Protocol(p) => p.type_annotation(),
             Type::Union(u) => u.type_annotation(),
             Type::TypeAlias(u) => u.type_annotation(),
             Type::Function(f) => f
@@ -785,11 +791,9 @@ impl Type {
         }
     }
 
-    /// Converts the type to a union-compatible type.
-    /// Some types don't make sense for a union to exist as such as a value literal type.
-    /// Each value must be a value literal type, but can have different values.
-    /// We use the literal type shared between each value literal type for the union itself.
-    pub fn to_union_compatible_type(&self) -> Type {
+    /// Makes the type less strict
+    /// Basically turns value literal types into literal types
+    pub fn unstrict(&self) -> Type {
         match self {
             Type::Literal { name, type_ } => match type_.as_ref() {
                 LiteralType::BoolValue(_) => Type::Literal {
@@ -1250,14 +1254,20 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 return false;
             }
 
+            dbg!(left_types, right_types);
+
             left_types
                 .iter()
                 .zip(right_types.iter())
-                .all(|(l, r)| type_equals(l, r))
+                .all(|(l, r)| type_equals_unstrict(l, r))
         }
         (Type::Array(left), Type::Array(right)) => type_equals(left, right),
         _ => left.to_key() == right.to_key(),
     }
+}
+
+pub fn type_equals_unstrict(left: &Type, right: &Type) -> bool {
+    type_equals(&left.unstrict(), &right.unstrict())
 }
 
 pub fn type_equals_coerce(left: &Type, right: &Type) -> bool {

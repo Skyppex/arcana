@@ -446,7 +446,7 @@ pub enum TypedExpression {
         type_: Type,
     },
     For {
-        identifier: String,
+        pattern: Pattern,
         iterable: Box<TypedExpression>,
         body: Box<TypedExpression>,
         else_body: Option<Box<TypedExpression>>,
@@ -637,7 +637,7 @@ impl Display for TypedExpression {
                 Ok(())
             }
             TypedExpression::For {
-                identifier,
+                pattern: identifier,
                 iterable,
                 body,
                 else_body,

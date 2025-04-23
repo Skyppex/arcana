@@ -15,7 +15,7 @@ use crate::{
 
 use super::{
     scope::{Scope, ScopeType},
-    FullName, Parameter, Type,
+    FullName, Parameter, Struct, Type,
 };
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
@@ -25,7 +25,7 @@ pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
     modules: HashMap<ModPath, Rcrc<TypeEnvironment>>,
     types: HashMap<String, Type>,
-    static_members: HashMap<TypeAnnotation, HashMap<String, Type>>,
+    static_members: HashMap<String, HashMap<String, Type>>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
     pub allow_override_types: bool,
@@ -178,15 +178,17 @@ impl TypeEnvironment {
 
     pub fn add_static_member(
         &mut self,
-        type_annotation: TypeAnnotation,
+        type_: Type,
         name: String,
         member_type: Type,
     ) -> Result<(), String> {
-        if let Some(members) = self.static_members.get_mut(&type_annotation) {
+        let key = type_.to_key();
+
+        if let Some(members) = self.static_members.get_mut(&key) {
             if !self.allow_override_types && members.contains_key(&name) {
                 return Err(format!(
                     "Static member {} already exists in type {}",
-                    name, type_annotation
+                    name, type_
                 ));
             }
 
@@ -194,7 +196,7 @@ impl TypeEnvironment {
         } else {
             let mut members = HashMap::new();
             members.insert(name, member_type);
-            self.static_members.insert(type_annotation, members);
+            self.static_members.insert(key, members);
         }
 
         Ok(())
@@ -219,7 +221,7 @@ impl TypeEnvironment {
                     let name = function_identifier.name();
 
                     self.add_static_member(
-                        generic_annotation.clone(),
+                        self.get_type_from_annotation(&generic_annotation)?,
                         name.to_owned(),
                         function_type,
                     )?;
@@ -364,6 +366,10 @@ impl TypeEnvironment {
         }
     }
 
+    pub fn get_static_members(&self) -> &HashMap<String, HashMap<String, Type>> {
+        &self.static_members
+    }
+
     pub fn get_types(&self) -> &HashMap<String, Type> {
         &self.types
     }
@@ -372,32 +378,47 @@ impl TypeEnvironment {
         &self.variables
     }
 
-    pub fn get_static_member<K: ToKey>(
-        &self,
-        type_annotation: TypeAnnotation,
-        member_key: K,
-    ) -> Option<Type> {
+    pub fn get_static_member<K: ToKey>(&self, type_: &Type, member_key: K) -> Option<Type> {
+        let member_key = member_key.to_key();
         self.static_members
-            .get(&type_annotation)
-            .and_then(|members| members.get(&member_key.to_key()))
+            .get(&type_.to_key())
+            .and_then(|members| members.get(&member_key))
             .cloned()
             .or_else(|| {
-                if type_annotation.has_double_colon() {
-                    let type_annotation_name = &type_annotation.to_string();
+                let Type::Struct(Struct {
+                    embedded_structs, ..
+                }) = &type_
+                else {
+                    return None;
+                };
+
+                embedded_structs.iter().fold(None, |acc, es| {
+                    if let Some(members) = self.static_members.get(&es.to_key()) {
+                        members.get(&member_key).cloned()
+                    } else {
+                        acc
+                    }
+                })
+            })
+            .or_else(|| {
+                println!("123");
+                if type_.type_annotation().has_double_colon() {
+                    let type_annotation_name = &type_.to_string();
                     let parts = type_annotation_name.split("::").collect::<Vec<_>>();
                     let type_name = parts[0];
 
                     self.static_members
-                        .get(&TypeAnnotation::Type(type_name.to_owned()))
-                        .and_then(|members| members.get(&member_key.to_key()))
+                        .get(type_name)
+                        .and_then(|members| members.get(&member_key))
                         .cloned()
                 } else {
                     self.parent
                         .as_ref()
-                        .and_then(|p| p.borrow().get_static_member(type_annotation, member_key))
+                        .and_then(|p| p.borrow().get_static_member(type_, member_key))
                 }
             })
     }
+
     pub fn lookup_type(&self, type_: &Type) -> bool {
         self.types.values().any(|t| t == type_)
             || self

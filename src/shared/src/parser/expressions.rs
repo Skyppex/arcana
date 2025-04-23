@@ -158,14 +158,7 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the for
 
-    let TokenKind::Identifier(identifier) = cursor.first().kind else {
-        return Err(format!(
-            "Expected identifier but found {:?}",
-            cursor.first().kind
-        ));
-    };
-
-    cursor.bump()?; // Consume the identifier
+    let pattern = parse_pattern(cursor)?;
 
     cursor.expect(TokenKind::Keyword(Keyword::In))?;
 
@@ -174,7 +167,7 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
         return Ok(Expression::For(For {
-            identifier,
+            pattern,
             iterable: Box::new(iterable),
             body: Box::new(body),
             else_body: None,
@@ -186,7 +179,7 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
     let else_block = fat_arrow_expr_or_block_expr(cursor)?;
 
     Ok(Expression::For(For {
-        identifier,
+        pattern,
         iterable: Box::new(iterable),
         body: Box::new(body),
         else_body: Some(Box::new(else_block)),
@@ -1294,6 +1287,21 @@ fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
             cursor.bump()?; // Consume the >=
             let pattern = parse_pattern(cursor)?;
             Ok(Pattern::GreaterThanOrEqual(Box::new(pattern)))
+        }
+        TokenKind::OpenParen => {
+            cursor.bump()?; // Consume the (
+            let mut patterns = vec![];
+
+            while cursor.first().kind != TokenKind::CloseParen {
+                patterns.push(parse_pattern(cursor)?);
+
+                if cursor.first().kind == TokenKind::Comma {
+                    cursor.bump()?; // Consume the ,
+                }
+            }
+
+            cursor.expect(TokenKind::CloseParen)?;
+            Ok(Pattern::Tuple(patterns))
         }
         _ => Err(format!(
             "Unknown start of pattern: {:?}",

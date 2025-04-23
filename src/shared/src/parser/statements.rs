@@ -868,6 +868,7 @@ fn parse_implementation_declaration(cursor: &mut Cursor) -> Result<Statement, St
         functions.push(function);
     }
 
+    cursor.optional_bump(TokenKind::Semicolon)?;
     cursor.expect(TokenKind::CloseBrace)?;
 
     Ok(Statement::ImplementationDeclaration(

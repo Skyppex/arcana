@@ -39,6 +39,7 @@ pub enum Pattern {
     GreaterThan(Box<Pattern>),
     LessThanOrEqual(Box<Pattern>),
     GreaterThanOrEqual(Box<Pattern>),
+    Tuple(Vec<Pattern>),
     Range(Box<Pattern>, Box<Pattern>, bool),
 }
 
@@ -71,8 +72,17 @@ impl Display for Pattern {
             Pattern::GreaterThan(p) => write!(f, ">{}", p),
             Pattern::LessThanOrEqual(p) => write!(f, "<={}", p),
             Pattern::GreaterThanOrEqual(p) => write!(f, ">={}", p),
+            Pattern::Tuple(patterns) => write!(
+                f,
+                "({})",
+                patterns
+                    .iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
             Pattern::Range(p1, p2, inclusive) => {
-                write!(f, "{}..{}{}", p1, p2, if *inclusive { "=" } else { "" })
+                write!(f, "{}..{}{}", p1, if *inclusive { "=" } else { "" }, p2)
             }
         }
     }
@@ -1054,6 +1064,92 @@ pub fn create_decision_tree(
             };
 
             Ok(decision)
+        }
+        Pattern::Tuple(patterns) => {
+            let matchee_type = matchee.get_type();
+
+            if let Type::Tuple(types) = &matchee_type {
+                if types.len() != patterns.len() {
+                    return Err(format!(
+                        "Expected tuple of length {} but got {}",
+                        patterns.len(),
+                        types.len()
+                    ));
+                }
+
+                let mut conditions = Vec::new();
+                let mut consequences = Vec::new();
+
+                for (i, pattern) in patterns.into_iter().enumerate() {
+                    let sub_expression = TypedExpression::Member(Member::MemberAccess {
+                        object: Box::new(matchee.clone()),
+                        member: Box::new(Member::Identifier {
+                            symbol: format!("{}", i),
+                            type_: types[i].clone(),
+                        }),
+                        symbol: format!("{}", i),
+                        type_: types[i].clone(),
+                    });
+
+                    let sub_arm = TypedMatchArm {
+                        pattern,
+                        expression: arm.expression.clone(),
+                        type_environment: arm.type_environment.clone(),
+                    };
+
+                    let sub_decision = create_decision_tree(
+                        sub_expression,
+                        vec![sub_arm],
+                        discovered_types,
+                        body_type.clone(),
+                    )?;
+
+                    if let Decision::Guard {
+                        condition,
+                        consequence,
+                        ..
+                    } = sub_decision
+                    {
+                        conditions.push(condition);
+                        consequences.push(consequence);
+                    } else {
+                        return Err("Expected a guard decision".to_string());
+                    }
+                }
+
+                let combined_condition = conditions
+                    .into_iter()
+                    .reduce(|acc, cond| {
+                        Box::new(TypedExpression::Binary {
+                            left: acc,
+                            operator: BinaryOperator::LogicalAnd,
+                            right: cond,
+                            type_: Type::Bool,
+                        })
+                    })
+                    .expect("Expected at least one condition");
+
+                let combined_consequence = consequences
+                    .into_iter()
+                    .last()
+                    .expect("Expected at least one consequence");
+
+                let alternative = create_decision_tree(
+                    matchee.clone(),
+                    arms.into_iter().skip(1).collect(),
+                    discovered_types,
+                    body_type.clone(),
+                )?;
+
+                Ok(Decision::Guard {
+                    condition: combined_condition,
+                    consequence: combined_consequence,
+                    alternative: Box::new(alternative),
+                    type_: body_type.unwrap_or_else(|| matchee_type),
+                })
+            } else {
+                Err(format!("Expected tuple type but got {:?}", matchee_type))
+            }
         }
         Pattern::Range(left, right, inclusive) => {
             if !matches!(

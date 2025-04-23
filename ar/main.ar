@@ -1,11 +1,29 @@
-use funcs::{add, sub, mul, div, dispatch, binop};
+proto P {
+    fun p(self: Self): Float;
+}
 
-2f:add(3f):sub(1f):mul(5f):div(2f):println()
+struct S {
+    s: Float
+}
 
-let func = "sub";
+struct Super {
+    S,
+    super: Int,
+}
 
-dispatch(func, 3f, 2f):println()
+imp P for S {
+    fun p(self: Self): Float => self.s;
+}
 
-let arr = 0..100;
-arr:len():println()
+let s = Super { s: 4f, super: 5 };
 
+s:p():println()
+
+// let arr = [1, 2, 3, 4, 5]
+let arr = [(1, 2), (2, 3), (3, 4), (4, 5), (5, 6)]
+
+for (a, b) in arr {
+    print(a)
+    print(" & ")
+    println(b)
+}

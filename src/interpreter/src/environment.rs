@@ -12,8 +12,6 @@ use shared::{
     types::{ToKey, TypeAnnotation},
 };
 
-use crate::value::get_built_in_function_value;
-
 use super::{
     scope::{Scope, ScopeState, ScopeType},
     value::{Value, Variable},
