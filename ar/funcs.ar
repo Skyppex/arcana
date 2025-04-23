@@ -19,3 +19,5 @@ pub fun dispatch(func: Func, a: Float, b: Float): Float {
     | "mul" => mul(a, b),
     | "div" => div(a, b),
 }
+
+pub fun binop(a: Float, b: Float, op: fun(Float, Float): Float): Float => op(a, b) 

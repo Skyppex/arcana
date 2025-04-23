@@ -1,10 +1,11 @@
-use funcs::{add, sub, mul, div, dispatch};
+use funcs::{add, sub, mul, div, dispatch, binop};
 
-let arr = 0..100;
-len(arr):println
-
-2f:add(3f):sub(1f):mul(5f):div(2f):println
+2f:add(3f):sub(1f):mul(5f):div(2f):println()
 
 let func = "sub";
 
-dispatch(func, 3f, 2f)
+dispatch(func, 3f, 2f):println()
+
+let arr = 0..100;
+arr:len():println()
+

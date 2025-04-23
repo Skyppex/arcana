@@ -1395,7 +1395,10 @@ fn check_type_param_propagation_recurse(
                     )
                 })?;
 
-            let Type::Function(Function { param, .. }) = type_.clone() else {
+            let Type::Function(Function {
+                param, return_type, ..
+            }) = type_.clone()
+            else {
                 return Err(format!("{} is not a function", symbol));
             };
 
@@ -1413,18 +1416,35 @@ fn check_type_param_propagation_recurse(
                 ))?
             }
 
-            let Type::Function(Function { return_type, .. }) = type_.clone() else {
-                return Err(format!("{} is not a function", symbol));
-            };
-
-            Ok(TypedExpression::Call {
-                callee: Box::new(TypedExpression::Member(Member::Identifier {
-                    symbol: symbol.clone(),
-                    type_: type_.clone(),
-                })),
-                argument: Some(Box::new(object_typed_expression)),
-                type_: *return_type,
+            // This version will return a function requiring parens for it to be called
+            // 16:sqrt will produce a closure that needs to be called. 16:sqrt() will produce 4
+            Ok(TypedExpression::Closure {
+                param: None,
+                return_type: *return_type.clone(),
+                body: Box::new(TypedExpression::Call {
+                    callee: Box::new(TypedExpression::Member(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: type_.clone(),
+                    })),
+                    argument: Some(Box::new(object_typed_expression)),
+                    type_: *return_type.clone(),
+                }),
+                type_: Type::Function(Function {
+                    identifier: None,
+                    param: None,
+                    return_type,
+                }),
             })
+
+            // // This version will call a function without requiring parens. 16:sqrt will just produce 4
+            // Ok(TypedExpression::Call {
+            //     callee: Box::new(TypedExpression::Member(Member::Identifier {
+            //         symbol: symbol.clone(),
+            //         type_: type_.clone(),
+            //     })),
+            //     argument: Some(Box::new(object_typed_expression)),
+            //     type_: *return_type,
+            // })
         }
         parser::Member::StaticMemberAccess { .. } => todo!("Static member access"),
         parser::Member::MemberAccess { .. } => todo!("Member access"),
