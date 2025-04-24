@@ -1131,7 +1131,7 @@ pub fn create_decision_tree(
 
                 let combined_consequence = consequences
                     .into_iter()
-                    .last()
+                    .next_back()
                     .expect("Expected at least one consequence");
 
                 let alternative = create_decision_tree(
@@ -1145,7 +1145,7 @@ pub fn create_decision_tree(
                     condition: combined_condition,
                     consequence: combined_consequence,
                     alternative: Box::new(alternative),
-                    type_: body_type.unwrap_or_else(|| matchee_type),
+                    type_: body_type.unwrap_or(matchee_type),
                 })
             } else {
                 Err(format!("Expected tuple type but got {:?}", matchee_type))

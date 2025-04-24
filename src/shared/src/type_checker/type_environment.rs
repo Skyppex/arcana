@@ -15,7 +15,7 @@ use crate::{
 
 use super::{
     scope::{Scope, ScopeType},
-    FullName, Parameter, Struct, Type,
+    DiscoveredType, FullName, Parameter, Struct, Type,
 };
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
@@ -25,6 +25,7 @@ pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
     modules: HashMap<ModPath, Rcrc<TypeEnvironment>>,
     types: HashMap<String, Type>,
+    discovered_types: Vec<DiscoveredType>,
     static_members: HashMap<String, HashMap<String, Type>>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
@@ -46,6 +47,7 @@ impl TypeEnvironment {
                 ("Char".to_string(), Type::Char),
                 ("String".to_string(), Type::String),
             ]),
+            discovered_types: Vec::new(),
             static_members: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
@@ -60,11 +62,16 @@ impl TypeEnvironment {
             parent: Some(parent),
             modules: HashMap::new(),
             types: HashMap::new(),
+            discovered_types: Vec::new(),
             static_members: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
             allow_override_types,
         }
+    }
+
+    pub fn set_discovered_types(&mut self, discovered_types: Vec<DiscoveredType>) {
+        self.discovered_types = discovered_types;
     }
 
     pub fn new_scope<T: Into<Scope>>(parent: Rcrc<Self>, scope: T) -> Self {
@@ -82,6 +89,7 @@ impl TypeEnvironment {
             modules: HashMap::new(),
             variables: HashMap::new(),
             types: HashMap::new(),
+            discovered_types: Vec::new(),
             static_members: HashMap::new(),
             scopes: scopes
                 .into_iter()
@@ -273,10 +281,20 @@ impl TypeEnvironment {
             }
             TypeAnnotation::ConcreteType(type_name, concrete_types) => {
                 if let Some((_, t)) = self.types.iter().find(|(k, _)| {
-                    **k == TypeIdentifier::GenericType(type_name.clone(), vec![]).to_key()
+                    **k == TypeIdentifier::GenericType(
+                        type_name.clone(),
+                        vec![
+                            GenericType {
+                                type_name: "T".to_string()
+                            };
+                            concrete_types.len()
+                        ],
+                    )
+                    .to_key()
                 }) {
                     t.clone_with_concrete_types(
                         concrete_types.clone(),
+                        &self.discovered_types,
                         Rc::new(RefCell::new(self.clone())),
                         None,
                     )
@@ -401,7 +419,6 @@ impl TypeEnvironment {
                 })
             })
             .or_else(|| {
-                println!("123");
                 if type_.type_annotation().has_double_colon() {
                     let type_annotation_name = &type_.to_string();
                     let parts = type_annotation_name.split("::").collect::<Vec<_>>();

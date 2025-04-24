@@ -447,6 +447,7 @@ impl Type {
     pub fn clone_with_concrete_types(
         &self,
         concrete_types: Vec<TypeAnnotation>,
+        discovered_types: &Vec<DiscoveredType>,
         type_environment: Rc<RefCell<TypeEnvironment>>,
         context: Option<HashMap<&GenericType, &TypeAnnotation>>,
     ) -> Result<Type, String> {
@@ -468,6 +469,7 @@ impl Type {
                     .map(|t| {
                         t.clone_with_concrete_types(
                             vec![],
+                            discovered_types,
                             type_environment.clone(),
                             context.clone(),
                         )
@@ -515,8 +517,11 @@ impl Type {
                         generic.type_name
                     ))?;
 
-                    let concrete_type =
-                        check_type_annotation(concrete_type, &vec![], type_environment.clone())?;
+                    let concrete_type = check_type_annotation(
+                        concrete_type,
+                        discovered_types,
+                        type_environment.clone(),
+                    )?;
 
                     fields.push(StructField {
                         struct_name: struct_name.clone(),
@@ -577,8 +582,11 @@ impl Type {
                         generic.type_name
                     ))?;
 
-                    let concrete_type =
-                        check_type_annotation(concrete_type, &vec![], type_environment.clone())?;
+                    let concrete_type = check_type_annotation(
+                        concrete_type,
+                        discovered_types,
+                        type_environment.clone(),
+                    )?;
 
                     cloned_fields.push(StructField {
                         struct_name: struct_name.clone(),
@@ -644,8 +652,11 @@ impl Type {
                         generic.type_name
                     ))?;
 
-                    let concrete_type =
-                        check_type_annotation(concrete_type, &vec![], type_environment.clone())?;
+                    let concrete_type = check_type_annotation(
+                        concrete_type,
+                        discovered_types,
+                        type_environment.clone(),
+                    )?;
 
                     shared_fields.push(StructField {
                         struct_name: struct_name.clone(),
@@ -695,7 +706,7 @@ impl Type {
 
                         let concrete_type = check_type_annotation(
                             concrete_type,
-                            &vec![],
+                            discovered_types,
                             type_environment.clone(),
                         )?;
 
@@ -758,6 +769,7 @@ impl Type {
                     Some(Parameter { identifier, type_ }) => {
                         let concrete_type = type_.clone_with_concrete_types(
                             concrete_types.clone(),
+                            discovered_types,
                             type_environment.clone(),
                             Some(type_map.clone()),
                         )?;
@@ -772,6 +784,7 @@ impl Type {
 
                 let cloned_return_type = return_type.clone_with_concrete_types(
                     concrete_types.clone(),
+                    discovered_types,
                     type_environment,
                     Some(type_map.clone()),
                 )?;
@@ -1253,8 +1266,6 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
             if left_types.len() != right_types.len() {
                 return false;
             }
-
-            dbg!(left_types, right_types);
 
             left_types
                 .iter()

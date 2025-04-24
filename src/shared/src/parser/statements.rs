@@ -1016,7 +1016,17 @@ fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<EmbeddedStruct>, St
     loop {
         if let TokenKind::Identifier(identifier) = cursor.first().kind {
             if identifier.is_type_identifier_name() {
-                cursor.bump()?; // Consume the identifier
+                let type_annotation = parse_type_annotation(cursor, false)?;
+
+                if !matches!(
+                    type_annotation,
+                    TypeAnnotation::Type(_) | TypeAnnotation::ConcreteType(_, _)
+                ) {
+                    return Err(format!(
+                        "Expected type annotation for a struct but found {:?}",
+                        type_annotation
+                    ));
+                }
 
                 let field_initializers = if cursor.first().kind == TokenKind::OpenBrace {
                     cursor.bump()?; // Consume the {
@@ -1028,7 +1038,7 @@ fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<EmbeddedStruct>, St
                 };
 
                 embedded_structs.push(EmbeddedStruct {
-                    type_annotation: TypeAnnotation::Type(identifier),
+                    type_annotation,
                     field_initializers,
                 });
 

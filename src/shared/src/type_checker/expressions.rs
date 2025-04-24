@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     parser::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
-    type_checker::{ast::ValueLiteral, type_annotation_equals, StructField},
+    type_checker::{ast::ValueLiteral, type_annotation_equals, type_equals_unstrict, StructField},
     types::{TypeAnnotation, TypeIdentifier},
 };
 
@@ -320,7 +320,6 @@ pub fn check_type(
             check_type_pattern(
                 pattern,
                 initializer.as_ref().map(|i| i.get_type()).as_ref(),
-                discovered_types,
                 type_environment.clone(),
                 Some(type_.clone()),
             )?;
@@ -523,6 +522,7 @@ pub fn check_type(
                                 type_
                                     .clone_with_concrete_types(
                                         generics.iter().map(|g| g.type_annotation()).collect(),
+                                        discovered_types,
                                         type_environment.clone(),
                                         None,
                                     )
@@ -586,8 +586,6 @@ pub fn check_type(
                             check_type(value, discovered_types, type_environment.clone(), None)?;
 
                         let type_ = value.get_deep_type();
-
-                        dbg!(&type_, &previous_type);
 
                         if !type_equals(&previous_type, &Type::Void)
                             && !type_equals(&type_, &previous_type)
@@ -888,7 +886,7 @@ pub fn check_type(
             for statement in typed_statements.clone() {
                 match statement {
                     TypedStatement::Expression(e) => {
-                        type_ = e.get_deep_type();
+                        type_ = e.get_type();
                     }
                     _ => continue,
                 }
@@ -969,7 +967,9 @@ pub fn check_type(
                 Some(else_body) => {
                     let else_type = else_body.get_type();
 
-                    if !type_equals(&type_, &Type::Void) && !type_equals(&type_, &else_type) {
+                    if !type_equals(&type_, &Type::Void)
+                        && !type_equals_unstrict(&type_, &else_type)
+                    {
                         return Err(format!("While block breaks with value of type {} which does not match else blocks type {}", type_, else_body.get_type()));
                     }
 
@@ -1023,7 +1023,6 @@ pub fn check_type(
             check_type_pattern(
                 pattern,
                 Some(inner_type.as_ref()),
-                discovered_types,
                 for_environment.clone(),
                 context.clone(),
             )?;
@@ -1055,7 +1054,7 @@ pub fn check_type(
                     let else_type = else_body.get_type();
 
                     if !type_equals(&type_, &Type::Void)
-                        && !type_equals(&type_, &else_body.get_type())
+                        && !type_equals_unstrict(&type_, &else_body.get_type())
                     {
                         return Err(format!("For block breaks with value of type {} which does not match else blocks type {}", type_, else_body.get_type()));
                     }
@@ -1465,7 +1464,6 @@ fn check_type_param_propagation_recurse(
 fn check_type_pattern(
     pattern: &Pattern,
     initializer_type: Option<&Type>,
-    _discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
 ) -> Result<(), String> {
@@ -1585,7 +1583,6 @@ fn check_type_pattern(
                 check_type_pattern(
                     &field_pattern.pattern,
                     Some(&field_type),
-                    _discovered_types,
                     type_environment.clone(),
                     context.clone(),
                 )?;
@@ -1616,8 +1613,7 @@ fn check_type_pattern(
             for (pattern, type_) in patterns.iter().zip(types) {
                 check_type_pattern(
                     pattern,
-                    Some(&type_),
-                    _discovered_types,
+                    Some(type_),
                     type_environment.clone(),
                     context.clone(),
                 )?;

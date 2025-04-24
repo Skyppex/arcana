@@ -7,13 +7,13 @@ use crate::{
 
 use super::{ast::TypedStatement, statements, type_environment::TypeEnvironment, Rcrc};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DiscoveredEmbeddedStruct {
     pub type_annotation: TypeAnnotation,
     pub initialized_fields: Vec<(String, Expression)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DiscoveredType {
     Struct {
         type_identifier: TypeIdentifier,
@@ -48,6 +48,10 @@ pub fn create_typed_ast(
 ) -> Result<TypedStatement, String> {
     // Discover user-defined types. Only store their names and fields with type names.
     let discovered_types = statements::discover_user_defined_types(&program)?;
+
+    type_environment
+        .borrow_mut()
+        .set_discovered_types(discovered_types.clone());
 
     // Then check the types of the entire AST.
     statements::check_type(&program, &discovered_types, type_environment)

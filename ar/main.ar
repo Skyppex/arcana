@@ -1,29 +1,24 @@
-proto P {
-    fun p(self: Self): Float;
+struct Request {
+    id: String,
+    method: String,
 }
 
-struct S {
-    s: Float
+struct Params<T> {
+    params: T
 }
 
-struct Super {
-    S,
-    super: Int,
+struct InitializeRequest {
+    Request { method: "initialize" },
+    Params<InitializeRequestParams>,
 }
 
-imp P for S {
-    fun p(self: Self): Float => self.s;
+struct InitializeRequestParams {
+    client_id: Int
 }
 
-let s = Super { s: 4f, super: 5 };
-
-s:p():println()
-
-// let arr = [1, 2, 3, 4, 5]
-let arr = [(1, 2), (2, 3), (3, 4), (4, 5), (5, 6)]
-
-for (a, b) in arr {
-    print(a)
-    print(" & ")
-    println(b)
+let init_req = InitializeRequest {
+    id: "12345678",
+    params: InitializeRequestParams {
+        client_id: 0
+    }
 }

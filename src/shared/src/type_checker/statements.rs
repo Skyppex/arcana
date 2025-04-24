@@ -691,21 +691,22 @@ pub fn check_type(
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
-            let literal_type = literal_types
-                .iter()
-                .map(|t| t.unstrict())
-                .try_fold(Type::Void, |acc, t| {
-                    if type_equals(&acc.clone(), &Type::Void) {
-                        Ok(t.clone())
-                    } else if !type_equals_coerce(&acc.clone(), &t) {
-                        Err(format!(
+            let literal_type =
+                literal_types
+                    .iter()
+                    .map(|t| t.unstrict())
+                    .try_fold(Type::Void, |acc, t| {
+                        if type_equals(&acc.clone(), &Type::Void) {
+                            Ok(t.clone())
+                        } else if !type_equals_coerce(&acc.clone(), &t) {
+                            Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
                         acc, t
                     ))
-                    } else {
-                        Ok(acc)
-                    }
-                })?;
+                        } else {
+                            Ok(acc)
+                        }
+                    })?;
 
             let type_ = Type::Union(Union {
                 type_identifier: type_identifier.clone(),
@@ -1353,21 +1354,22 @@ fn check_type_identifier(
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
-            let literal_type = literal_types
-                .iter()
-                .map(|t| t.unstrict())
-                .try_fold(Type::Void, |acc, t| {
-                    if type_equals(&acc.clone(), &Type::Void) {
-                        Ok(t.clone())
-                    } else if type_equals_coerce(&acc.clone(), &t) {
-                        Err(format!(
+            let literal_type =
+                literal_types
+                    .iter()
+                    .map(|t| t.unstrict())
+                    .try_fold(Type::Void, |acc, t| {
+                        if type_equals(&acc.clone(), &Type::Void) {
+                            Ok(t.clone())
+                        } else if type_equals_coerce(&acc.clone(), &t) {
+                            Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
                         acc, t
                     ))
-                    } else {
-                        Ok(acc)
-                    }
-                })?;
+                        } else {
+                            Ok(acc)
+                        }
+                    })?;
 
             Ok(Type::Union(Union {
                 type_identifier: type_identifier.clone(),
@@ -1649,21 +1651,22 @@ pub fn check_type_annotation(
                 })
                 .collect::<Result<Vec<Type>, String>>()?;
 
-            let literal_type = literal_types
-                .iter()
-                .map(|t| t.unstrict())
-                .try_fold(Type::Void, |acc, t| {
-                    if type_equals(&acc.clone(), &Type::Void) {
-                        Ok(t.clone())
-                    } else if !type_equals_coerce(&acc.clone(), &t) {
-                        Err(format!(
+            let literal_type =
+                literal_types
+                    .iter()
+                    .map(|t| t.unstrict())
+                    .try_fold(Type::Void, |acc, t| {
+                        if type_equals(&acc.clone(), &Type::Void) {
+                            Ok(t.clone())
+                        } else if !type_equals_coerce(&acc.clone(), &t) {
+                            Err(format!(
                         "All literals in a union must have the same type. Expected {}, found {}",
                         acc, t
                     ))
-                    } else {
-                        Ok(acc)
-                    }
-                })?;
+                        } else {
+                            Ok(acc)
+                        }
+                    })?;
 
             Ok(Type::Union(Union {
                 type_identifier: type_identifier.clone(),
