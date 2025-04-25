@@ -7,6 +7,22 @@ struct Params<T> {
     params: T
 }
 
+proto Id {
+    fun id(self: Self): String;
+}
+
+proto Method {
+    fun method(self: Self): String;
+}
+
+imp Id for Request {
+    fun id(self: Self): String => self.id;
+}
+
+imp Method for Request {
+    fun method(self: Self): String => self.method;
+}
+
 struct InitializeRequest {
     Request { method: "initialize" },
     Params<InitializeRequestParams>,
@@ -22,3 +38,9 @@ let init_req = InitializeRequest {
         client_id: 0
     }
 }
+
+let id = init_req:id();
+let method = init_req:method();
+
+println(id);
+method

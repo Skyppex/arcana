@@ -158,6 +158,8 @@ impl TypeEnvironment {
         let mod_path = mod_path.as_ref();
         let item_name = item_name.to_key();
 
+        dbg!(&self);
+
         let mod_type_environment = self
             .get_module(mod_path)
             .ok_or(format!("Module '{}' not found", mod_path))?;

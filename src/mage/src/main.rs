@@ -22,7 +22,7 @@ use interpreter::Environment;
 use shared::{
     parser::{self, create_ast},
     pretty_print::PrettyPrint,
-    type_checker::{create_typed_ast, TypeEnvironment},
+    type_checker::{create_typed_ast, discover_user_defined_types, TypeEnvironment},
 };
 
 const STACK_SIZE: usize = 4 * 1024 * 1024;
@@ -318,32 +318,54 @@ pub fn register_modules(
     type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>,
 ) -> Result<(), String> {
-    for project_file in project_files {
-        let source = std::fs::read_to_string(project_file)
-            .map_err(|error| format!("Failed to read file: {}", error))?;
+    let source_files = project_files
+        .iter()
+        .map(|project_file| {
+            std::fs::read_to_string(project_file)
+                .map_err(|error| format!("Failed to read file: {}", error))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-        let module_info = parser::discover_module(shared::lexer::tokenize(&source)?)?;
+    let token_batches = source_files
+        .into_iter()
+        .map(|source| shared::lexer::tokenize(&source))
+        .collect::<Result<Vec<_>, _>>()?;
 
-        if let Some((_, module_path, module)) = module_info {
+    let module_infos = token_batches
+        .into_iter()
+        .map(|tokens| parser::discover_module(tokens))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let discovery = module_infos
+        .into_iter()
+        .filter_map(|module_info| module_info)
+        .map(|(_, module_path, module)| {
             let mod_type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
                 type_environment.borrow().allow_override_types,
             )));
 
-            let typed_module = create_typed_ast(module, mod_type_environment.clone())?;
+            let discovered_types =
+                discover_user_defined_types(module.clone(), mod_type_environment.clone())?;
 
-            let mod_environment = Rc::new(RefCell::new(Environment::new()));
+            Ok((discovered_types, module, module_path, mod_type_environment))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-            type_environment
-                .borrow_mut()
-                .add_module(module_path.clone(), mod_type_environment.clone());
+    for (discovered_types, module, module_path, mod_type_environment) in discovery {
+        let mod_environment = Rc::new(RefCell::new(Environment::new()));
 
-            let value = interpreter::evaluate(typed_module, mod_environment.clone())?;
+        type_environment
+            .borrow_mut()
+            .add_module(module_path.clone(), mod_type_environment.clone());
 
-            environment
-                .borrow_mut()
-                .add_module(module_path, value, mod_environment.clone());
-        }
+        let value = interpreter::evaluate(typed_module, mod_environment.clone())?;
+
+        environment
+            .borrow_mut()
+            .add_module(module_path, value, mod_environment.clone());
     }
+
+    let typed_module = create_typed_ast(module, mod_type_environment.clone())?;
 
     Ok(())
 }

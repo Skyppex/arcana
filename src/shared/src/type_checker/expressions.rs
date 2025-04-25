@@ -181,7 +181,7 @@ pub fn check_type(
                     return Err(format!(
                         "Expected function type, found {}",
                         callee.get_type()
-                    ))
+                    ));
                 }
             };
 
