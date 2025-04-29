@@ -1,3 +1,35 @@
-let x = 100
+struct Request {
+    id: String,
+    method: String,
+    params: Option<T>
+}
 
-drop(x)
+struct Params<T> {
+    params: T
+}
+
+struct InitializeRequest {
+    Request { method: "initialize" },
+    Params<InitializeRequestParams>,
+}
+
+struct InitializeRequestParams {
+    client_id: Int
+}
+
+proto Method {
+    fun method(self: Self): String;
+}
+
+imp Method for Request {
+    fun method(self: Self): String => self.method
+}
+
+let init_req = InitializeRequest {
+    id: "12345678",
+    params: InitializeRequestParams {
+        client_id: 0
+    }
+}
+
+init_req:method()

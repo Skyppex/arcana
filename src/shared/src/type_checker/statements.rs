@@ -784,6 +784,14 @@ pub fn check_type(
                     actual_type: Box::new(Type::Unknown),
                 })?;
 
+            if let TypeIdentifier::GenericType(_, generics) = type_identifier {
+                for generic in generics {
+                    protocol_type_environment
+                        .borrow_mut()
+                        .add_type(Type::Generic(generic.clone()))?;
+                }
+            }
+
             let functions: Result<Vec<TypedStatement>, String> = functions
                 .clone()
                 .into_iter()
@@ -1465,24 +1473,24 @@ pub fn check_type_annotation(
         .find(|discovered_type| match discovered_type {
             DiscoveredType::Struct {
                 type_identifier, ..
-            } => type_identifier.name() == type_annotation.name(),
+            } => type_identifier.to_key() == type_annotation.to_key(),
             DiscoveredType::Enum {
                 type_identifier, ..
-            } => type_identifier.name() == type_annotation.name(),
+            } => type_identifier.to_key() == type_annotation.to_key(),
             DiscoveredType::Union(type_identifier, ..) => {
-                type_identifier.name() == type_annotation.name()
+                type_identifier.to_key() == type_annotation.to_key()
             }
             DiscoveredType::TypeAlias(type_identifier, ..) => {
-                type_identifier.name() == type_annotation.name()
+                type_identifier.to_key() == type_annotation.to_key()
             }
             DiscoveredType::Protocol {
                 type_identifier, ..
-            } => type_identifier.name() == type_annotation.name(),
+            } => type_identifier.to_key() == type_annotation.to_key(),
             DiscoveredType::Function {
                 type_identifier, ..
-            } => type_identifier.name() == type_annotation.name(),
+            } => type_identifier.to_key() == type_annotation.to_key(),
             DiscoveredType::UseItem { type_identifier } => {
-                type_identifier.name() == type_annotation.name()
+                type_identifier.to_key() == type_annotation.to_key()
             }
         }) {
         Some(DiscoveredType::Struct {

@@ -452,6 +452,23 @@ impl Type {
         context: Option<HashMap<&GenericType, &TypeAnnotation>>,
     ) -> Result<Type, String> {
         match self {
+            Type::Unknown => Ok(Type::Unknown),
+            Type::Substitution {
+                type_identifier,
+                actual_type,
+            } => {
+                let actual_type = actual_type.clone_with_concrete_types(
+                    concrete_types.clone(),
+                    discovered_types,
+                    type_environment.clone(),
+                    context.clone(),
+                )?;
+
+                Ok(Type::Substitution {
+                    type_identifier: type_identifier.clone(),
+                    actual_type: Box::new(actual_type),
+                })
+            }
             Type::Generic(generic) => {
                 assert!(context.is_some());
                 check_type_annotation(
@@ -611,13 +628,31 @@ impl Type {
                 Ok(member_type)
             }
             Type::Enum(r#enum) => {
-                let TypeIdentifier::GenericType(name, generics) = r#enum.type_identifier.clone()
-                else {
-                    return Err(format!(
+                let tuple = if let TypeIdentifier::GenericType(name, generics) =
+                    r#enum.type_identifier.clone()
+                {
+                    Ok((
+                        name,
+                        generics
+                            .into_iter()
+                            .map(|gt| gt.type_name)
+                            .collect::<Vec<_>>(),
+                    ))
+                } else if let TypeIdentifier::ConcreteType(name, generics) =
+                    r#enum.type_identifier.clone()
+                {
+                    Ok((
+                        name,
+                        generics.into_iter().map(|gt| gt.name()).collect::<Vec<_>>(),
+                    ))
+                } else {
+                    Err(format!(
                         "Cannot clone concrete types for enum {}",
                         self.full_name()
-                    ));
+                    ))
                 };
+
+                let (name, generics) = tuple?;
 
                 let mut type_map = HashMap::new();
 
@@ -647,7 +682,7 @@ impl Type {
                         continue;
                     };
 
-                    let concrete_type = type_map.get(&generic).ok_or(format!(
+                    let concrete_type = type_map.get(&generic.type_name).ok_or(format!(
                         "No concrete type found for generic type {}",
                         generic.type_name
                     ))?;
@@ -699,7 +734,7 @@ impl Type {
                             continue;
                         };
 
-                        let concrete_type = type_map.get(&generic).ok_or(format!(
+                        let concrete_type = type_map.get(&generic.type_name).ok_or(format!(
                             "No concrete type found for generic type {}",
                             generic.type_name
                         ))?;
@@ -797,6 +832,80 @@ impl Type {
                     return_type: Box::new(cloned_return_type),
                 }))
             }
+            Type::Protocol(Protocol {
+                type_identifier,
+                functions,
+            }) => {
+                let TypeIdentifier::GenericType(name, generics) = type_identifier.clone() else {
+                    return Err(format!(
+                        "Cannot clone concrete types for protocol {}",
+                        self.full_name()
+                    ));
+                };
+
+                let mut type_map = HashMap::new();
+
+                for (ta, gt) in concrete_types.iter().zip(&generics) {
+                    type_map.insert(gt, ta);
+                }
+
+                let type_identifier =
+                    TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone());
+
+                let mut cloned_functions = vec![];
+
+                for (ident_from_protocol, function_type) in functions {
+                    let Type::Function(Function {
+                        param, return_type, ..
+                    }) = function_type
+                    else {
+                        unreachable!("Protocol functions must be of type Function");
+                    };
+
+                    let cloned_param = match param {
+                        Some(Parameter { identifier, type_ }) => {
+                            let concrete_type = type_.clone_with_concrete_types(
+                                concrete_types.clone(),
+                                discovered_types,
+                                type_environment.clone(),
+                                Some(type_map.clone()),
+                            )?;
+
+                            Some(Parameter {
+                                identifier: identifier.clone(),
+                                type_: Box::new(concrete_type),
+                            })
+                        }
+                        None => None,
+                    };
+
+                    let cloned_return_type = return_type.clone_with_concrete_types(
+                        concrete_types.clone(),
+                        discovered_types,
+                        type_environment.clone(),
+                        Some(type_map.clone()),
+                    )?;
+
+                    cloned_functions.push((
+                        ident_from_protocol.clone(),
+                        Type::Function(Function {
+                            identifier: Some(TypeIdentifier::ConcreteType(
+                                name.clone(),
+                                concrete_types.clone(),
+                            )),
+                            param: cloned_param,
+                            return_type: Box::new(cloned_return_type),
+                        }),
+                    ));
+                }
+
+                let protocol = Type::Protocol(Protocol {
+                    type_identifier,
+                    functions: cloned_functions,
+                });
+
+                Ok(protocol)
+            }
             _ => Err(format!(
                 "Cannot clone concrete types for type {}",
                 self.full_name()
@@ -840,6 +949,12 @@ impl Type {
             },
             other => other.clone(),
         }
+    }
+}
+
+impl AsRef<Type> for Type {
+    fn as_ref(&self) -> &Self {
+        self
     }
 }
 

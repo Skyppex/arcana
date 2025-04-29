@@ -43,11 +43,11 @@ pub enum DiscoveredType {
 }
 
 pub fn discover_user_defined_types(
-    program: Statement,
+    program: &Statement,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<Vec<DiscoveredType>, String> {
     // Discover user-defined types. Only store their names and fields with type names.
-    let discovered_types = statements::discover_user_defined_types(&program)?;
+    let discovered_types = statements::discover_user_defined_types(program)?;
 
     type_environment
         .borrow_mut()
@@ -68,13 +68,6 @@ pub fn create_typed_ast(
     program: Statement,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<TypedStatement, String> {
-    // Discover user-defined types. Only store their names and fields with type names.
-    let discovered_types = statements::discover_user_defined_types(&program)?;
-
-    type_environment
-        .borrow_mut()
-        .set_discovered_types(discovered_types.clone());
-
-    // Then check the types of the entire AST.
-    statements::check_type(&program, &discovered_types, type_environment)
+    let discovered_types = discover_user_defined_types(&program, type_environment.clone())?;
+    type_check_program(&program, &discovered_types, type_environment)
 }

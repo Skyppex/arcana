@@ -1,35 +1,31 @@
-struct Request {
+struct Request<T> {
     id: String,
     method: String,
-}
-
-struct Params<T> {
     params: T
 }
 
-proto Id {
-    fun id(self: Self): String;
+struct InitializeRequest {
+    Request<InitializeRequestParams> { method: "initialize" },
+}
+
+struct InitializeRequestParams {
+    client_id: Int
 }
 
 proto Method {
     fun method(self: Self): String;
 }
 
-imp Id for Request {
-    fun id(self: Self): String => self.id;
+imp<T> Method for Request<T> {
+    fun method(self: Self): String => self.method
 }
 
-imp Method for Request {
-    fun method(self: Self): String => self.method;
+proto Params<T> {
+    fun params(self: Self): T;
 }
 
-struct InitializeRequest {
-    Request { method: "initialize" },
-    Params<InitializeRequestParams>,
-}
-
-struct InitializeRequestParams {
-    client_id: Int
+imp<T> Params<T> for Request<T> {
+    fun params(self: Self): T => self.params;
 }
 
 let init_req = InitializeRequest {
@@ -39,8 +35,5 @@ let init_req = InitializeRequest {
     }
 }
 
-let id = init_req:id();
-let method = init_req:method();
-
-println(id);
-method
+init_req:method():println()
+init_req:params()

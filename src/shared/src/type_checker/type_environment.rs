@@ -25,7 +25,7 @@ pub struct TypeEnvironment {
     parent: Option<Rcrc<TypeEnvironment>>,
     modules: HashMap<ModPath, Rcrc<TypeEnvironment>>,
     types: HashMap<String, Type>,
-    discovered_types: Vec<DiscoveredType>,
+    discovered_types: Option<Vec<DiscoveredType>>,
     static_members: HashMap<String, HashMap<String, Type>>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
@@ -47,7 +47,7 @@ impl TypeEnvironment {
                 ("Char".to_string(), Type::Char),
                 ("String".to_string(), Type::String),
             ]),
-            discovered_types: Vec::new(),
+            discovered_types: None,
             static_members: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
@@ -62,7 +62,7 @@ impl TypeEnvironment {
             parent: Some(parent),
             modules: HashMap::new(),
             types: HashMap::new(),
-            discovered_types: Vec::new(),
+            discovered_types: None,
             static_members: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
@@ -71,7 +71,18 @@ impl TypeEnvironment {
     }
 
     pub fn set_discovered_types(&mut self, discovered_types: Vec<DiscoveredType>) {
-        self.discovered_types = discovered_types;
+        self.discovered_types = Some(discovered_types);
+    }
+
+    pub fn get_discovered_types(&self) -> Vec<DiscoveredType> {
+        self.discovered_types
+            .clone()
+            .or_else(|| {
+                self.parent
+                    .as_ref()
+                    .map(|p| p.borrow().get_discovered_types())
+            })
+            .expect("Discovered types not set")
     }
 
     pub fn new_scope<T: Into<Scope>>(parent: Rcrc<Self>, scope: T) -> Self {
@@ -89,7 +100,7 @@ impl TypeEnvironment {
             modules: HashMap::new(),
             variables: HashMap::new(),
             types: HashMap::new(),
-            discovered_types: Vec::new(),
+            discovered_types: None,
             static_members: HashMap::new(),
             scopes: scopes
                 .into_iter()
@@ -157,8 +168,6 @@ impl TypeEnvironment {
     ) -> Result<(), String> {
         let mod_path = mod_path.as_ref();
         let item_name = item_name.to_key();
-
-        dbg!(&self);
 
         let mod_type_environment = self
             .get_module(mod_path)
@@ -257,26 +266,8 @@ impl TypeEnvironment {
     ) -> Result<Type, String> {
         match type_annotation {
             TypeAnnotation::Type(type_name) => {
-                if let Some(t) = self.types.get(type_name) {
+                if let Some(t) = self.resolve_type_no_recurse(type_name) {
                     Ok(t.clone())
-                } else if type_name.contains("::") {
-                    let parts: Vec<&str> = type_name.split("::").collect();
-                    let type_name = parts[0];
-                    let variant_name = parts[1];
-
-                    let Some(t) = self.types.get(
-                        &TypeIdentifier::MemberType(
-                            Box::new(TypeIdentifier::Type(type_name.to_string())),
-                            variant_name.to_string(),
-                        )
-                        .to_key(),
-                    ) else {
-                        return Err(format!("Type {} not found", type_name));
-                    };
-
-                    Ok(t.clone())
-                } else if let Some(parent) = &self.parent {
-                    parent.borrow().get_type_from_annotation(type_annotation)
                 } else {
                     Err(format!("Type {} not found", type_name))
                 }
@@ -294,17 +285,26 @@ impl TypeEnvironment {
                     )
                     .to_key()
                 }) {
-                    t.clone_with_concrete_types(
+                    return t.clone_with_concrete_types(
                         concrete_types.clone(),
-                        &self.discovered_types,
+                        &self.get_discovered_types(),
                         Rc::new(RefCell::new(self.clone())),
                         None,
-                    )
+                    );
                 } else if let Some(parent) = &self.parent {
-                    parent.borrow().get_type_from_annotation(type_annotation)
-                } else {
-                    Err(format!("Type {} not found", type_name))
+                    let type_ = parent.borrow().resolve_type_no_recurse(type_annotation);
+
+                    if let Some(t) = type_ {
+                        return t.clone_with_concrete_types(
+                            concrete_types.clone(),
+                            &self.get_discovered_types(),
+                            Rc::new(RefCell::new(self.clone())),
+                            None,
+                        );
+                    }
                 }
+
+                Err(format!("Type {} not found", type_name))
             }
             TypeAnnotation::Array(type_annotation) => self
                 .get_type_from_annotation(type_annotation)
@@ -348,6 +348,14 @@ impl TypeEnvironment {
                 }))
             }
         }
+    }
+
+    fn resolve_type_no_recurse(&self, key: impl ToKey) -> Option<Type> {
+        self.types.get(&key.to_key()).cloned().or_else(|| {
+            self.parent
+                .as_ref()
+                .and_then(|p| p.borrow().resolve_type_no_recurse(key))
+        })
     }
 
     pub fn get_type_from_identifier(&self, type_identifier: &TypeIdentifier) -> Option<Type> {
@@ -439,7 +447,11 @@ impl TypeEnvironment {
     }
 
     pub fn lookup_type(&self, type_: &Type) -> bool {
-        self.types.values().any(|t| t == type_)
+        if Self::is_built_in_type(type_) {
+            return true;
+        }
+
+        self.types.values().any(|t| t.to_key() == type_.to_key())
             || self
                 .parent
                 .as_ref()
@@ -456,6 +468,33 @@ impl TypeEnvironment {
 
     pub fn get_built_in_function(&self, key: impl ToKey) -> Option<Type> {
         BuiltInFunction::new(&key.to_key()).map(|b| b.type_)
+    }
+
+    pub fn is_built_in_type(type_: impl AsRef<Type>) -> bool {
+        match type_.as_ref() {
+            Type::Substitution { actual_type, .. } => Self::is_built_in_type(actual_type),
+            Type::Unknown => false,
+            Type::Generic(_) => false,
+            Type::Void => true,
+            Type::Unit => true,
+            Type::Int => true,
+            Type::UInt => true,
+            Type::Float => true,
+            Type::String => true,
+            Type::Char => true,
+            Type::Bool => true,
+            Type::Array(inner) => Self::is_built_in_type(inner),
+            Type::Struct(_) => false,
+            Type::Enum(_) => false,
+            Type::Union(union) => Self::is_built_in_type(&union.literal_type),
+            Type::TypeAlias(_) => false,
+            Type::Protocol(_) => false,
+            Type::Function(_) => true,
+            Type::Literal { type_, .. } => Self::is_built_in_type(type_.get_type()),
+            Type::Tuple(items) => items.iter().all(Self::is_built_in_type),
+            Type::Any => false,
+            Type::Meta(_) => false,
+        }
     }
 }
 
