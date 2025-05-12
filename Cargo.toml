@@ -17,6 +17,7 @@ members = [
     "src/mage",
     "src/interpreter",
     "src/runesmith",
+    "src/quill",
 ]
 
 [dependencies]
