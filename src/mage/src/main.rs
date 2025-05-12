@@ -333,12 +333,12 @@ pub fn register_modules(
 
     let module_infos = token_batches
         .into_iter()
-        .map(|tokens| parser::discover_module(tokens))
+        .map(ast::discover_module)
         .collect::<Result<Vec<_>, _>>()?;
 
     let discovery = module_infos
         .into_iter()
-        .filter_map(|module_info| module_info)
+        .flatten()
         .map(|(_, module_path, module)| {
             let mod_type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
                 type_environment.borrow().allow_override_types,
@@ -349,14 +349,20 @@ pub fn register_modules(
 
             Ok((discovered_types, module, module_path, mod_type_environment))
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, String>>()?;
 
     for (discovered_types, module, module_path, mod_type_environment) in discovery {
         let mod_environment = Rc::new(RefCell::new(Environment::new()));
 
+        mod_type_environment
+            .borrow_mut()
+            .set_discovered_types(discovered_types.clone());
+
         type_environment
             .borrow_mut()
             .add_module(module_path.clone(), mod_type_environment.clone());
+
+        let typed_module = create_typed_ast(module, mod_type_environment.clone())?;
 
         let value = interpreter::evaluate(typed_module, mod_environment.clone())?;
 
@@ -364,8 +370,6 @@ pub fn register_modules(
             .borrow_mut()
             .add_module(module_path, value, mod_environment.clone());
     }
-
-    let typed_module = create_typed_ast(module, mod_type_environment.clone())?;
 
     Ok(())
 }
