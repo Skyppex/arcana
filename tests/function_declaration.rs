@@ -1,7 +1,7 @@
 use common::{create_typed_ast, StatementExt, VecStatementExt};
 use shared::{
     type_checker::{
-        ast::{Typed, TypedStatement},
+        model::{Typed, TypedStatement},
         Function, Parameter, Type,
     },
     types::TypeIdentifier,

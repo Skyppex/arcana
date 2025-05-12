@@ -3,7 +3,7 @@ mod common;
 use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
-    ast::{Typed, TypedExpression},
+    model::{Typed, TypedExpression},
     Function, Parameter, Type,
 };
 

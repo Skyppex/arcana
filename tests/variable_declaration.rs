@@ -4,8 +4,8 @@ use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, Ve
 
 use interpreter::Value;
 use shared::type_checker::{
-    ast::{Typed, TypedExpression, ValueLiteral},
     decision_tree::Pattern,
+    model::{Typed, TypedExpression, ValueLiteral},
     LiteralType, Type,
 };
 

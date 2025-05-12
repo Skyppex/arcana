@@ -1,4 +1,4 @@
-use shared::type_checker::ast::BinaryOperator;
+use shared::type_checker::model::BinaryOperator;
 
 use crate::value::Enum;
 

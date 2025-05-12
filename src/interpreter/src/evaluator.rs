@@ -1,12 +1,12 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use shared::{
+    ast::{ModPath, UseItem},
     built_in::BuiltInFunction,
     lexer::token::IdentifierType,
-    parser::{ModPath, UseItem},
     type_checker::{
-        ast::*,
         decision_tree::{Accessor, Constructor, Decision, FieldPattern, Pattern},
+        model::*,
         type_annotation_equals, Type,
     },
     types::{ToKey, TypeAnnotation, TypeIdentifier},

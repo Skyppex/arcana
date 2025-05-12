@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use shared::{built_in::BuiltInFunctionType, type_checker::ast::TypedExpression};
+use shared::{built_in::BuiltInFunctionType, type_checker::model::TypedExpression};
 
 use crate::{environment::Rcrc, Environment};
 

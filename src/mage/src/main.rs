@@ -20,7 +20,7 @@ use crate::cli::Cli;
 use interpreter::Environment;
 
 use shared::{
-    parser::{self, create_ast},
+    ast::{self, create_ast},
     pretty_print::PrettyPrint,
     type_checker::{create_typed_ast, discover_user_defined_types, TypeEnvironment},
 };

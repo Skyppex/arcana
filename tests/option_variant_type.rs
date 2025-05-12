@@ -4,7 +4,7 @@ use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, Ve
 
 use interpreter::{value::Enum, Value};
 use shared::{
-    type_checker::{ast::Typed, Struct, StructField, Type},
+    type_checker::{model::Typed, Struct, StructField, Type},
     types::TypeIdentifier,
 };
 

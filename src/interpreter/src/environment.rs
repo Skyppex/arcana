@@ -6,9 +6,9 @@ use std::{
 };
 
 use shared::{
+    ast::ModPath,
     built_in::BuiltInFunction,
-    parser::ModPath,
-    type_checker::ast::Member,
+    type_checker::model::Member,
     types::{ToKey, TypeAnnotation},
 };
 

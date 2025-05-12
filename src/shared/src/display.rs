@@ -1,6 +1,5 @@
 use crate::{
-    built_in::BuiltInFunction,
-    parser::{
+    ast::{
         AccessModifier, Assignment, AssociatedType, Binary, BinaryOperator, Call, ClosureParameter,
         EmbeddedStruct, EnumDeclaration, EnumMember, EnumMemberField, Expression, FieldInitializer,
         FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration, Match, MatchArm,
@@ -8,13 +7,14 @@ use crate::{
         StructDeclaration, StructField, TypeAliasDeclaration, Unary, UnaryOperator,
         UnionDeclaration, Use, UseItem, ValueLiteral, VariableDeclaration, While,
     },
+    built_in::BuiltInFunction,
     type_checker::{
         self,
-        ast::{
+        decision_tree::{Case, Constructor, Decision, FieldPattern, Pattern, Variable},
+        model::{
             Block, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
             TypedStatement,
         },
-        decision_tree::{Case, Constructor, Decision, FieldPattern, Pattern, Variable},
         FullName, LiteralType, Type,
     },
     types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
@@ -1806,7 +1806,7 @@ impl IndentDisplay for TypedStatement {
                 indent.decrease();
                 result
             }
-            TypedStatement::StructDeclaration(type_checker::ast::StructData {
+            TypedStatement::StructDeclaration(type_checker::model::StructData {
                 type_identifier,
                 embedded_structs,
                 fields,
@@ -2703,15 +2703,15 @@ impl IndentDisplay for TypedClosureParameter {
     }
 }
 
-impl IndentDisplay for type_checker::ast::Member {
+impl IndentDisplay for type_checker::model::Member {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::Member::Identifier { symbol, type_ } => {
+            type_checker::model::Member::Identifier { symbol, type_ } => {
                 let mut result = String::new();
                 result.push_str(format!("<identifier> {}: {}", symbol, type_).as_str());
                 result
             }
-            type_checker::ast::Member::StaticMemberAccess {
+            type_checker::model::Member::StaticMemberAccess {
                 type_annotation,
                 member,
                 symbol,
@@ -2741,7 +2741,7 @@ impl IndentDisplay for type_checker::ast::Member {
                 indent.decrease();
                 result
             }
-            type_checker::ast::Member::MemberAccess {
+            type_checker::model::Member::MemberAccess {
                 object,
                 member,
                 symbol,
@@ -2771,7 +2771,7 @@ impl IndentDisplay for type_checker::ast::Member {
                 indent.decrease();
                 result
             }
-            type_checker::ast::Member::BuiltInFunction(BuiltInFunction {
+            type_checker::model::Member::BuiltInFunction(BuiltInFunction {
                 type_identifier,
                 function_type,
                 type_,
@@ -2797,18 +2797,18 @@ impl IndentDisplay for type_checker::ast::Member {
     }
 }
 
-impl IndentDisplay for type_checker::ast::ValueLiteral {
+impl IndentDisplay for type_checker::model::ValueLiteral {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::ValueLiteral::Void => "Void".to_string(),
-            type_checker::ast::ValueLiteral::Unit => "Unit".to_string(),
-            type_checker::ast::ValueLiteral::Int(v) => format!("#{}", v),
-            type_checker::ast::ValueLiteral::UInt(v) => format!("#{}", v),
-            type_checker::ast::ValueLiteral::Float(v) => format!("#{}", v),
-            type_checker::ast::ValueLiteral::String(s) => format!("#\"{}\"", s),
-            type_checker::ast::ValueLiteral::Char(c) => format!("#'{}'", c),
-            type_checker::ast::ValueLiteral::Bool(b) => format!("#{}", b),
-            type_checker::ast::ValueLiteral::Array { values, type_ } => {
+            type_checker::model::ValueLiteral::Void => "Void".to_string(),
+            type_checker::model::ValueLiteral::Unit => "Unit".to_string(),
+            type_checker::model::ValueLiteral::Int(v) => format!("#{}", v),
+            type_checker::model::ValueLiteral::UInt(v) => format!("#{}", v),
+            type_checker::model::ValueLiteral::Float(v) => format!("#{}", v),
+            type_checker::model::ValueLiteral::String(s) => format!("#\"{}\"", s),
+            type_checker::model::ValueLiteral::Char(c) => format!("#'{}'", c),
+            type_checker::model::ValueLiteral::Bool(b) => format!("#{}", b),
+            type_checker::model::ValueLiteral::Array { values, type_ } => {
                 let mut result = String::new();
                 result.push_str(format!("<array>: {}", type_).as_str());
                 indent.increase();
@@ -2835,7 +2835,7 @@ impl IndentDisplay for type_checker::ast::ValueLiteral {
                 indent.decrease();
                 result
             }
-            type_checker::ast::ValueLiteral::Struct {
+            type_checker::model::ValueLiteral::Struct {
                 type_annotation: type_identifier,
                 field_initializers,
                 type_,
@@ -2869,7 +2869,7 @@ impl IndentDisplay for type_checker::ast::ValueLiteral {
                 indent.decrease();
                 result
             }
-            type_checker::ast::ValueLiteral::Enum {
+            type_checker::model::ValueLiteral::Enum {
                 type_annotation: type_identifier,
                 member,
                 field_initializers,
@@ -2904,7 +2904,7 @@ impl IndentDisplay for type_checker::ast::ValueLiteral {
     }
 }
 
-impl IndentDisplay for type_checker::ast::StructField {
+impl IndentDisplay for type_checker::model::StructField {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
         result.push_str(format!("<struct field> {}: {}\n", self.identifier, self.type_).as_str());
@@ -2915,7 +2915,7 @@ impl IndentDisplay for type_checker::ast::StructField {
     }
 }
 
-impl IndentDisplay for type_checker::ast::StructData {
+impl IndentDisplay for type_checker::model::StructData {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
         result.push_str(format!("<struct data> {}", self.type_).as_str());
@@ -2939,55 +2939,55 @@ impl IndentDisplay for type_checker::ast::StructData {
     }
 }
 
-impl IndentDisplay for type_checker::ast::UnaryOperator {
+impl IndentDisplay for type_checker::model::UnaryOperator {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::UnaryOperator::Identity => "+".to_string(),
-            type_checker::ast::UnaryOperator::Negate => "-".to_string(),
-            type_checker::ast::UnaryOperator::LogicalNot => "!".to_string(),
-            type_checker::ast::UnaryOperator::BitwiseNot => "~".to_string(),
+            type_checker::model::UnaryOperator::Identity => "+".to_string(),
+            type_checker::model::UnaryOperator::Negate => "-".to_string(),
+            type_checker::model::UnaryOperator::LogicalNot => "!".to_string(),
+            type_checker::model::UnaryOperator::BitwiseNot => "~".to_string(),
         }
     }
 }
 
-impl IndentDisplay for type_checker::ast::BinaryOperator {
+impl IndentDisplay for type_checker::model::BinaryOperator {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::BinaryOperator::Add => "+".to_string(),
-            type_checker::ast::BinaryOperator::Subtract => "-".to_string(),
-            type_checker::ast::BinaryOperator::Multiply => "*".to_string(),
-            type_checker::ast::BinaryOperator::Divide => "/".to_string(),
-            type_checker::ast::BinaryOperator::Modulo => "%".to_string(),
-            type_checker::ast::BinaryOperator::BitwiseAnd => "&".to_string(),
-            type_checker::ast::BinaryOperator::BitwiseOr => "|".to_string(),
-            type_checker::ast::BinaryOperator::BitwiseXor => "^".to_string(),
-            type_checker::ast::BinaryOperator::BitwiseLeftShift => "<<".to_string(),
-            type_checker::ast::BinaryOperator::BitwiseRightShift => ">>".to_string(),
-            type_checker::ast::BinaryOperator::LogicalAnd => "&&".to_string(),
-            type_checker::ast::BinaryOperator::LogicalOr => "||".to_string(),
-            type_checker::ast::BinaryOperator::Equal => "==".to_string(),
-            type_checker::ast::BinaryOperator::NotEqual => "!=".to_string(),
-            type_checker::ast::BinaryOperator::LessThan => "<".to_string(),
-            type_checker::ast::BinaryOperator::LessThanOrEqual => "<=".to_string(),
-            type_checker::ast::BinaryOperator::GreaterThan => ">".to_string(),
-            type_checker::ast::BinaryOperator::GreaterThanOrEqual => ">=".to_string(),
-            type_checker::ast::BinaryOperator::Range => "..".to_string(),
-            type_checker::ast::BinaryOperator::RangeInclusive => "..=".to_string(),
+            type_checker::model::BinaryOperator::Add => "+".to_string(),
+            type_checker::model::BinaryOperator::Subtract => "-".to_string(),
+            type_checker::model::BinaryOperator::Multiply => "*".to_string(),
+            type_checker::model::BinaryOperator::Divide => "/".to_string(),
+            type_checker::model::BinaryOperator::Modulo => "%".to_string(),
+            type_checker::model::BinaryOperator::BitwiseAnd => "&".to_string(),
+            type_checker::model::BinaryOperator::BitwiseOr => "|".to_string(),
+            type_checker::model::BinaryOperator::BitwiseXor => "^".to_string(),
+            type_checker::model::BinaryOperator::BitwiseLeftShift => "<<".to_string(),
+            type_checker::model::BinaryOperator::BitwiseRightShift => ">>".to_string(),
+            type_checker::model::BinaryOperator::LogicalAnd => "&&".to_string(),
+            type_checker::model::BinaryOperator::LogicalOr => "||".to_string(),
+            type_checker::model::BinaryOperator::Equal => "==".to_string(),
+            type_checker::model::BinaryOperator::NotEqual => "!=".to_string(),
+            type_checker::model::BinaryOperator::LessThan => "<".to_string(),
+            type_checker::model::BinaryOperator::LessThanOrEqual => "<=".to_string(),
+            type_checker::model::BinaryOperator::GreaterThan => ">".to_string(),
+            type_checker::model::BinaryOperator::GreaterThanOrEqual => ">=".to_string(),
+            type_checker::model::BinaryOperator::Range => "..".to_string(),
+            type_checker::model::BinaryOperator::RangeInclusive => "..=".to_string(),
         }
     }
 }
 
-impl IndentDisplay for type_checker::ast::AccessModifier {
+impl IndentDisplay for type_checker::model::AccessModifier {
     fn indent_display(&self, _indent: &mut Indent) -> String {
         match self {
-            type_checker::ast::AccessModifier::Public => "public".to_string(),
-            type_checker::ast::AccessModifier::Module => "module".to_string(),
-            type_checker::ast::AccessModifier::Super => "super".to_string(),
+            type_checker::model::AccessModifier::Public => "public".to_string(),
+            type_checker::model::AccessModifier::Module => "module".to_string(),
+            type_checker::model::AccessModifier::Super => "super".to_string(),
         }
     }
 }
 
-impl IndentDisplay for type_checker::ast::FieldInitializer {
+impl IndentDisplay for type_checker::model::FieldInitializer {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
         result.push_str("<field initializer>\n");

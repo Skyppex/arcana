@@ -2,16 +2,16 @@ use std::fmt::Display;
 
 use crate::{
     type_checker::{
-        ast::{BinaryOperator, Member, Typed},
         expressions::check_type,
-        get_field_by_name, type_annotation_equals, type_equals, type_equals_coerce, Enum, Struct,
-        Type,
+        get_field_by_name,
+        model::{BinaryOperator, Member, Typed},
+        type_annotation_equals, type_equals, type_equals_coerce, Enum, Struct, Type,
     },
     types::{TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
-    ast::{TypedExpression, TypedMatchArm},
+    model::{TypedExpression, TypedMatchArm},
     DiscoveredType,
 };
 
@@ -246,7 +246,7 @@ pub fn create_decision_tree(
                     left: Box::new(matchee),
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal(
-                        crate::type_checker::ast::ValueLiteral::Unit,
+                        crate::type_checker::model::ValueLiteral::Unit,
                     )),
                     type_: Type::Bool,
                 }),
@@ -294,7 +294,7 @@ pub fn create_decision_tree(
                     left: Box::new(matchee),
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal(
-                        crate::type_checker::ast::ValueLiteral::Bool(v),
+                        crate::type_checker::model::ValueLiteral::Bool(v),
                     )),
                     type_: Type::Bool,
                 }),
@@ -341,7 +341,7 @@ pub fn create_decision_tree(
                     left: Box::new(matchee),
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal(
-                        crate::type_checker::ast::ValueLiteral::Int(v),
+                        crate::type_checker::model::ValueLiteral::Int(v),
                     )),
                     type_: Type::Bool,
                 }),
@@ -388,7 +388,7 @@ pub fn create_decision_tree(
                     left: Box::new(matchee),
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal(
-                        crate::type_checker::ast::ValueLiteral::UInt(v),
+                        crate::type_checker::model::ValueLiteral::UInt(v),
                     )),
                     type_: Type::Bool,
                 }),
@@ -435,7 +435,7 @@ pub fn create_decision_tree(
                     left: Box::new(matchee),
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal(
-                        crate::type_checker::ast::ValueLiteral::Float(v),
+                        crate::type_checker::model::ValueLiteral::Float(v),
                     )),
                     type_: Type::Bool,
                 }),
@@ -482,7 +482,7 @@ pub fn create_decision_tree(
                     left: Box::new(matchee),
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal(
-                        crate::type_checker::ast::ValueLiteral::Char(v),
+                        crate::type_checker::model::ValueLiteral::Char(v),
                     )),
                     type_: Type::Bool,
                 }),
@@ -529,7 +529,7 @@ pub fn create_decision_tree(
                     left: Box::new(matchee),
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal(
-                        crate::type_checker::ast::ValueLiteral::String(v.clone()),
+                        crate::type_checker::model::ValueLiteral::String(v.clone()),
                     )),
                     type_: Type::Bool,
                 }),
@@ -685,7 +685,7 @@ pub fn create_decision_tree(
                         left: Box::new(matchee),
                         operator: BinaryOperator::Equal,
                         right: Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Enum {
+                            crate::type_checker::model::ValueLiteral::Enum {
                                 type_annotation: TypeAnnotation::from(
                                     format!(
                                         "{}::{}",
@@ -706,7 +706,7 @@ pub fn create_decision_tree(
                         left: Box::new(matchee),
                         operator: BinaryOperator::Equal,
                         right: Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Struct {
+                            crate::type_checker::model::ValueLiteral::Struct {
                                 type_annotation: type_annotation.clone(),
                                 field_initializers: vec![],
                                 type_: matchee_type.clone(),
@@ -823,13 +823,13 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::LessThan,
                     right: match *value {
                         Pattern::Int(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Int(v),
+                            crate::type_checker::model::ValueLiteral::Int(v),
                         )),
                         Pattern::UInt(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::UInt(v),
+                            crate::type_checker::model::ValueLiteral::UInt(v),
                         )),
                         Pattern::Float(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Float(v),
+                            crate::type_checker::model::ValueLiteral::Float(v),
                         )),
                         Pattern::Variable(v) => {
                             let variable_type = type_environment
@@ -892,13 +892,13 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::GreaterThan,
                     right: match *value {
                         Pattern::Int(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Int(v),
+                            crate::type_checker::model::ValueLiteral::Int(v),
                         )),
                         Pattern::UInt(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::UInt(v),
+                            crate::type_checker::model::ValueLiteral::UInt(v),
                         )),
                         Pattern::Float(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Float(v),
+                            crate::type_checker::model::ValueLiteral::Float(v),
                         )),
                         Pattern::Variable(v) => {
                             let variable_type = type_environment
@@ -961,13 +961,13 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::LessThanOrEqual,
                     right: match *value {
                         Pattern::Int(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Int(v),
+                            crate::type_checker::model::ValueLiteral::Int(v),
                         )),
                         Pattern::UInt(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::UInt(v),
+                            crate::type_checker::model::ValueLiteral::UInt(v),
                         )),
                         Pattern::Float(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Float(v),
+                            crate::type_checker::model::ValueLiteral::Float(v),
                         )),
                         Pattern::Variable(v) => {
                             let variable_type = type_environment
@@ -1030,13 +1030,13 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::GreaterThanOrEqual,
                     right: match *value {
                         Pattern::Int(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Int(v),
+                            crate::type_checker::model::ValueLiteral::Int(v),
                         )),
                         Pattern::UInt(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::UInt(v),
+                            crate::type_checker::model::ValueLiteral::UInt(v),
                         )),
                         Pattern::Float(v) => Box::new(TypedExpression::Literal(
-                            crate::type_checker::ast::ValueLiteral::Float(v),
+                            crate::type_checker::model::ValueLiteral::Float(v),
                         )),
                         Pattern::Variable(v) => {
                             let variable_type = type_environment
@@ -1195,13 +1195,13 @@ pub fn create_decision_tree(
                         operator: BinaryOperator::GreaterThanOrEqual,
                         right: match *left {
                             Pattern::Int(v) => Box::new(TypedExpression::Literal(
-                                crate::type_checker::ast::ValueLiteral::Int(v),
+                                crate::type_checker::model::ValueLiteral::Int(v),
                             )),
                             Pattern::UInt(v) => Box::new(TypedExpression::Literal(
-                                crate::type_checker::ast::ValueLiteral::UInt(v),
+                                crate::type_checker::model::ValueLiteral::UInt(v),
                             )),
                             Pattern::Float(v) => Box::new(TypedExpression::Literal(
-                                crate::type_checker::ast::ValueLiteral::Float(v),
+                                crate::type_checker::model::ValueLiteral::Float(v),
                             )),
                             Pattern::Variable(v) => {
                                 let variable_type = type_environment
@@ -1230,13 +1230,13 @@ pub fn create_decision_tree(
                         },
                         right: match *right {
                             Pattern::Int(v) => Box::new(TypedExpression::Literal(
-                                crate::type_checker::ast::ValueLiteral::Int(v),
+                                crate::type_checker::model::ValueLiteral::Int(v),
                             )),
                             Pattern::UInt(v) => Box::new(TypedExpression::Literal(
-                                crate::type_checker::ast::ValueLiteral::UInt(v),
+                                crate::type_checker::model::ValueLiteral::UInt(v),
                             )),
                             Pattern::Float(v) => Box::new(TypedExpression::Literal(
-                                crate::type_checker::ast::ValueLiteral::Float(v),
+                                crate::type_checker::model::ValueLiteral::Float(v),
                             )),
                             Pattern::Variable(v) => {
                                 let variable_type = type_environment

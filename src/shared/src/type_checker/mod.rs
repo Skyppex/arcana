@@ -1,6 +1,6 @@
-pub mod ast;
 pub mod decision_tree;
 pub mod full_name;
+pub mod model;
 pub mod type_checker;
 pub mod type_environment;
 
@@ -16,11 +16,11 @@ pub use type_environment::*;
 use std::{cell::RefCell, collections::HashMap, fmt::Display, hash::Hash, rc::Rc, str::FromStr};
 
 use crate::{
-    parser,
+    ast,
     types::{GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };
 
-use ast::{EmbeddedStruct, ValueLiteral};
+use model::{EmbeddedStruct, ValueLiteral};
 
 use self::statements::check_type_annotation;
 
@@ -353,30 +353,30 @@ impl Type {
         })
     }
 
-    pub fn from_value_literal(literal: &parser::ValueLiteral) -> Result<Type, String> {
+    pub fn from_value_literal(literal: &model::ValueLiteral) -> Result<Type, String> {
         match literal {
-            parser::ValueLiteral::Unit => Ok(Type::Unit),
-            parser::ValueLiteral::Int(v) => Ok(Type::Literal {
+            model::ValueLiteral::Unit => Ok(Type::Unit),
+            model::ValueLiteral::Int(v) => Ok(Type::Literal {
                 name: v.to_string(),
                 type_: Box::new(LiteralType::IntValue(*v)),
             }),
-            parser::ValueLiteral::UInt(v) => Ok(Type::Literal {
+            model::ValueLiteral::UInt(v) => Ok(Type::Literal {
                 name: v.to_string(),
                 type_: Box::new(LiteralType::UInt),
             }),
-            parser::ValueLiteral::Float(v) => Ok(Type::Literal {
+            model::ValueLiteral::Float(v) => Ok(Type::Literal {
                 name: v.to_string(),
                 type_: Box::new(LiteralType::Float),
             }),
-            parser::ValueLiteral::Char(v) => Ok(Type::Literal {
+            model::ValueLiteral::Char(v) => Ok(Type::Literal {
                 name: format!("'{}'", v),
                 type_: Box::new(LiteralType::Char),
             }),
-            parser::ValueLiteral::String(v) => Ok(Type::Literal {
+            model::ValueLiteral::String(v) => Ok(Type::Literal {
                 name: format!("\"{}\"", v),
                 type_: Box::new(LiteralType::String),
             }),
-            parser::ValueLiteral::Bool(v) => Ok(Type::Literal {
+            model::ValueLiteral::Bool(v) => Ok(Type::Literal {
                 name: v.to_string(),
                 type_: Box::new(LiteralType::Bool),
             }),
@@ -880,22 +880,22 @@ impl FullName for Type {
     }
 }
 
-impl From<Type> for parser::ValueLiteral {
-    fn from(val: Type) -> Self {
-        match val {
-            Type::Literal { type_, .. } => match *type_ {
-                LiteralType::BoolValue(v) => parser::ValueLiteral::Bool(v),
-                LiteralType::IntValue(v) => parser::ValueLiteral::Int(v),
-                LiteralType::UIntValue(v) => parser::ValueLiteral::UInt(v),
-                LiteralType::FloatValue(v) => parser::ValueLiteral::Float(v),
-                LiteralType::CharValue(v) => parser::ValueLiteral::Char(v.parse().unwrap()),
-                LiteralType::StringValue(v) => parser::ValueLiteral::String(v),
-                _ => panic!("Cannot convert literal type to value literal"),
-            },
-            other => panic!("Cannot convert type {} to literal", other.full_name()),
-        }
-    }
-}
+// impl From<Type> for model::ValueLiteral {
+//     fn from(val: Type) -> Self {
+//         match val {
+//             Type::Literal { type_, .. } => match *type_ {
+//                 LiteralType::BoolValue(v) => model::ValueLiteral::Bool(v),
+//                 LiteralType::IntValue(v) => model::ValueLiteral::Int(v),
+//                 LiteralType::UIntValue(v) => model::ValueLiteral::UInt(v),
+//                 LiteralType::FloatValue(v) => model::ValueLiteral::Float(v),
+//                 LiteralType::CharValue(v) => model::ValueLiteral::Char(v.parse().unwrap()),
+//                 LiteralType::StringValue(v) => model::ValueLiteral::String(v),
+//                 _ => panic!("Cannot convert literal type to value literal"),
+//             },
+//             other => panic!("Cannot convert type {} to literal", other.full_name()),
+//         }
+//     }
+// }
 
 impl FromStr for Type {
     type Err = String;
@@ -1064,15 +1064,15 @@ impl From<ValueLiteral> for LiteralType {
     }
 }
 
-impl From<parser::ValueLiteral> for LiteralType {
-    fn from(value: parser::ValueLiteral) -> Self {
+impl From<ast::ValueLiteral> for LiteralType {
+    fn from(value: ast::ValueLiteral) -> Self {
         match value {
-            parser::ValueLiteral::Bool(v) => LiteralType::BoolValue(v),
-            parser::ValueLiteral::Int(v) => LiteralType::IntValue(v),
-            parser::ValueLiteral::UInt(v) => LiteralType::UIntValue(v),
-            parser::ValueLiteral::Float(v) => LiteralType::FloatValue(v),
-            parser::ValueLiteral::Char(v) => LiteralType::CharValue(v.to_string()),
-            parser::ValueLiteral::String(v) => LiteralType::StringValue(v),
+            ast::ValueLiteral::Bool(v) => LiteralType::BoolValue(v),
+            ast::ValueLiteral::Int(v) => LiteralType::IntValue(v),
+            ast::ValueLiteral::UInt(v) => LiteralType::UIntValue(v),
+            ast::ValueLiteral::Float(v) => LiteralType::FloatValue(v),
+            ast::ValueLiteral::Char(v) => LiteralType::CharValue(v.to_string()),
+            ast::ValueLiteral::String(v) => LiteralType::StringValue(v),
             _ => panic!("Cannot convert value literal to literal type"),
         }
     }

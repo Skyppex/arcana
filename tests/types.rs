@@ -1,6 +1,6 @@
 mod common;
 use common::{create_typed_ast, StatementExt, VecStatementExt};
-use shared::type_checker::{ast::Typed, LiteralType, Type};
+use shared::type_checker::{model::Typed, LiteralType, Type};
 
 #[test]
 fn literal_type_annotation_works() {

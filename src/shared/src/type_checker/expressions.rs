@@ -1,18 +1,20 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    parser::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
-    type_checker::{ast::ValueLiteral, type_annotation_equals, type_equals_unstrict, StructField},
+    ast::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
+    type_checker::{
+        model::ValueLiteral, type_annotation_equals, type_equals_unstrict, StructField,
+    },
     types::{TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
-    ast::{
+    decision_tree::{create_decision_tree, Constructor, Pattern},
+    get_field_by_name,
+    model::{
         BinaryOperator, Block, FieldInitializer, Member, Typed, TypedClosureParameter,
         TypedExpression, TypedMatchArm, TypedStatement, UnaryOperator,
     },
-    decision_tree::{create_decision_tree, Constructor, Pattern},
-    get_field_by_name,
     scope::ScopeType,
     statements::{self, check_type_annotation},
     type_equals, type_equals_coerce, DiscoveredType, Enum, FullName, Function, LiteralType, Rcrc,
@@ -508,7 +510,7 @@ pub fn check_type(
             })
         }
         Expression::Member(member) => match member {
-            crate::parser::Member::Identifier { symbol, generics } => {
+            crate::ast::Member::Identifier { symbol, generics } => {
                 let type_ = type_environment
                     .borrow()
                     .get_variable(symbol)
@@ -538,7 +540,7 @@ pub fn check_type(
                     type_,
                 }))
             }
-            crate::parser::Member::StaticMemberAccess {
+            crate::ast::Member::StaticMemberAccess {
                 type_annotation,
                 member,
                 ..
@@ -549,14 +551,14 @@ pub fn check_type(
                 member,
                 context,
             ),
-            crate::parser::Member::MemberAccess { object, member, .. } => check_type_member_access(
+            crate::ast::Member::MemberAccess { object, member, .. } => check_type_member_access(
                 object,
                 discovered_types,
                 type_environment,
                 member,
                 context,
             ),
-            crate::parser::Member::ParamPropagation { object, member, .. } => {
+            crate::ast::Member::ParamPropagation { object, member, .. } => {
                 check_type_param_propagation(
                     object,
                     member,
@@ -567,16 +569,16 @@ pub fn check_type(
             }
         },
         Expression::Literal(l) => match l {
-            parser::ValueLiteral::Unit => Ok(TypedExpression::Literal(ValueLiteral::Unit)),
-            parser::ValueLiteral::Int(v) => Ok(TypedExpression::Literal(ValueLiteral::Int(*v))),
-            parser::ValueLiteral::UInt(v) => Ok(TypedExpression::Literal(ValueLiteral::UInt(*v))),
-            parser::ValueLiteral::Float(v) => Ok(TypedExpression::Literal(ValueLiteral::Float(*v))),
-            parser::ValueLiteral::String(v) => {
+            ast::ValueLiteral::Unit => Ok(TypedExpression::Literal(ValueLiteral::Unit)),
+            ast::ValueLiteral::Int(v) => Ok(TypedExpression::Literal(ValueLiteral::Int(*v))),
+            ast::ValueLiteral::UInt(v) => Ok(TypedExpression::Literal(ValueLiteral::UInt(*v))),
+            ast::ValueLiteral::Float(v) => Ok(TypedExpression::Literal(ValueLiteral::Float(*v))),
+            ast::ValueLiteral::String(v) => {
                 Ok(TypedExpression::Literal(ValueLiteral::String(v.clone())))
             }
-            parser::ValueLiteral::Char(v) => Ok(TypedExpression::Literal(ValueLiteral::Char(*v))),
-            parser::ValueLiteral::Bool(v) => Ok(TypedExpression::Literal(ValueLiteral::Bool(*v))),
-            parser::ValueLiteral::Array(values) => {
+            ast::ValueLiteral::Char(v) => Ok(TypedExpression::Literal(ValueLiteral::Char(*v))),
+            ast::ValueLiteral::Bool(v) => Ok(TypedExpression::Literal(ValueLiteral::Bool(*v))),
+            ast::ValueLiteral::Array(values) => {
                 let v: Result<(Vec<TypedExpression>, Type), String> = {
                     let mut v_: Vec<TypedExpression> = vec![];
                     let mut previous_type = Type::Void;
@@ -617,7 +619,7 @@ pub fn check_type(
                     type_: target_type,
                 }))
             }
-            parser::ValueLiteral::Struct {
+            ast::ValueLiteral::Struct {
                 type_annotation,
                 field_initializers,
             } => {
@@ -703,7 +705,7 @@ pub fn check_type(
                     type_,
                 }))
             }
-            parser::ValueLiteral::Enum {
+            ast::ValueLiteral::Enum {
                 type_annotation,
                 member,
                 field_initializers,
@@ -711,7 +713,7 @@ pub fn check_type(
                 let field_initializers: Result<Vec<FieldInitializer>, String> = {
                     let mut fis = Vec::new();
 
-                    for parser::ast::FieldInitializer {
+                    for ast::model::FieldInitializer {
                         identifier,
                         initializer,
                     } in field_initializers
@@ -827,10 +829,10 @@ pub fn check_type(
             let type_ = expression.get_deep_type();
 
             let operator = match unary.operator {
-                parser::UnaryOperator::Identity => UnaryOperator::Identity,
-                parser::UnaryOperator::Negate => UnaryOperator::Negate,
-                parser::UnaryOperator::LogicalNot => UnaryOperator::LogicalNot,
-                parser::UnaryOperator::BitwiseNot => UnaryOperator::BitwiseNot,
+                ast::UnaryOperator::Identity => UnaryOperator::Identity,
+                ast::UnaryOperator::Negate => UnaryOperator::Negate,
+                ast::UnaryOperator::LogicalNot => UnaryOperator::LogicalNot,
+                ast::UnaryOperator::BitwiseNot => UnaryOperator::BitwiseNot,
             };
 
             let type_ = get_unop_type(&operator, &type_)?;
@@ -1118,14 +1120,14 @@ fn check_type_static_member_access(
     type_annotation: &TypeAnnotation,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-    member: &parser::Member,
+    member: &ast::Member,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
     let object_type =
         check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
 
     match member.clone() {
-        parser::Member::Identifier { symbol, .. } => match &object_type {
+        ast::Member::Identifier { symbol, .. } => match &object_type {
             Type::Struct(struct_) => {
                 let Some(static_member_type) = type_environment
                     .borrow()
@@ -1185,7 +1187,7 @@ fn check_type_static_member_access(
                 object_type.full_name()
             )),
         },
-        parser::Member::StaticMemberAccess {
+        ast::Member::StaticMemberAccess {
             type_annotation,
             member,
             ..
@@ -1196,14 +1198,14 @@ fn check_type_static_member_access(
             &member,
             context,
         ),
-        parser::Member::MemberAccess { object, member, .. } => check_type_member_access(
+        ast::Member::MemberAccess { object, member, .. } => check_type_member_access(
             &object,
             discovered_types,
             type_environment,
             &member,
             context,
         ),
-        parser::Member::ParamPropagation { object, member, .. } => check_type_param_propagation(
+        ast::Member::ParamPropagation { object, member, .. } => check_type_param_propagation(
             &object,
             &member,
             discovered_types,
@@ -1217,7 +1219,7 @@ fn check_type_member_access(
     object: &Expression,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-    member: &parser::Member,
+    member: &ast::Member,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
     let object_type_expression =
@@ -1235,14 +1237,14 @@ fn check_type_member_access(
 
 fn check_type_member_access_recurse(
     object_type: Type,
-    member: &parser::Member,
+    member: &ast::Member,
     type_environment: Rcrc<TypeEnvironment>,
     object_typed_expression: TypedExpression,
     discovered_types: &Vec<DiscoveredType>,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
     match member.clone() {
-        parser::Member::Identifier { symbol, .. } => match object_type {
+        ast::Member::Identifier { symbol, .. } => match object_type {
             Type::Struct(struct_) => {
                 let field_type = get_field_by_name(&struct_.fields, &symbol)
                     .ok_or(format!(
@@ -1303,7 +1305,7 @@ fn check_type_member_access_recurse(
                 object_type.full_name()
             )),
         },
-        parser::Member::StaticMemberAccess {
+        ast::Member::StaticMemberAccess {
             type_annotation,
             member,
             ..
@@ -1314,14 +1316,14 @@ fn check_type_member_access_recurse(
             &member,
             context,
         ),
-        parser::Member::MemberAccess { object, member, .. } => check_type_member_access(
+        ast::Member::MemberAccess { object, member, .. } => check_type_member_access(
             &object,
             discovered_types,
             type_environment,
             &member,
             context,
         ),
-        parser::Member::ParamPropagation { object, member, .. } => check_type_param_propagation(
+        ast::Member::ParamPropagation { object, member, .. } => check_type_param_propagation(
             &object,
             &member,
             discovered_types,
@@ -1333,12 +1335,12 @@ fn check_type_member_access_recurse(
 
 fn check_type_param_propagation(
     object: &Expression,
-    member: &parser::Member,
+    member: &ast::Member,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
 ) -> Result<TypedExpression, String> {
-    let parser::Member::Identifier { .. } = member.clone() else {
+    let ast::Member::Identifier { .. } = member.clone() else {
         return Err("Param propagation must be followed by a member access".to_string());
     };
 
@@ -1381,12 +1383,12 @@ fn check_type_param_propagation(
 
 fn check_type_param_propagation_recurse(
     object_type: Type,
-    member: &parser::Member,
+    member: &ast::Member,
     type_environment: Rcrc<TypeEnvironment>,
     object_typed_expression: TypedExpression,
 ) -> Result<TypedExpression, String> {
     match member.clone() {
-        parser::Member::Identifier { symbol, .. } => {
+        ast::Member::Identifier { symbol, .. } => {
             let type_ = type_environment
                 .borrow()
                 .get_variable(&symbol)
@@ -1455,9 +1457,9 @@ fn check_type_param_propagation_recurse(
             //     type_: *return_type,
             // })
         }
-        parser::Member::StaticMemberAccess { .. } => todo!("Static member access"),
-        parser::Member::MemberAccess { .. } => todo!("Member access"),
-        parser::Member::ParamPropagation { .. } => todo!("Param propagation"),
+        ast::Member::StaticMemberAccess { .. } => todo!("Static member access"),
+        ast::Member::MemberAccess { .. } => todo!("Member access"),
+        ast::Member::ParamPropagation { .. } => todo!("Param propagation"),
     }
 }
 

@@ -3,10 +3,10 @@ use std::{cell::RefCell, rc::Rc};
 
 use interpreter::{Environment, Value};
 use shared::{
-    lexer, parser,
+    ast, lexer,
     type_checker::{
         self,
-        ast::{TypedExpression, TypedStatement},
+        model::{TypedExpression, TypedStatement},
     },
 };
 
@@ -16,7 +16,7 @@ pub fn tokenize(input: &str) -> Vec<lexer::token::Token> {
 
 pub fn create_typed_ast(input: &str) -> TypedStatement {
     let tokens = lexer::tokenize(input).unwrap();
-    let ast = parser::create_ast(tokens, false).unwrap();
+    let ast = ast::create_ast(tokens, false).unwrap();
     let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new(false)));
 
     type_checker::create_typed_ast(ast, type_environment).unwrap()
@@ -28,7 +28,7 @@ pub fn evaluate_expression(
     unwrap_semi: bool,
 ) -> Value {
     let tokens = lexer::tokenize(input).unwrap();
-    let ast = parser::create_ast(tokens, false).unwrap();
+    let ast = ast::create_ast(tokens, false).unwrap();
     let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new(false)));
     let typed_ast = type_checker::create_typed_ast(ast, type_environment).unwrap();
 

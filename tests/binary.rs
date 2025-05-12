@@ -4,7 +4,7 @@ use common::{create_typed_ast, StatementExt, VecStatementExt};
 
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
-    ast::{BinaryOperator, Typed, TypedExpression},
+    model::{BinaryOperator, Typed, TypedExpression},
     Type,
 };
 

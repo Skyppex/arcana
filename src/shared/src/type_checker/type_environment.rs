@@ -7,8 +7,8 @@ use std::{
 };
 
 use crate::{
+    ast::ModPath,
     built_in::BuiltInFunction,
-    parser::ModPath,
     type_checker::Protocol,
     types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };

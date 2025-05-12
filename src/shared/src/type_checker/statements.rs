@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use crate::{
-    parser::{
+    ast::{
         self, ImplementationDeclaration, ModPath, ModuleDeclaration, ProtocolDeclaration,
         Statement, StructData, UnionDeclaration, Use, UseItem,
     },
@@ -9,8 +9,8 @@ use crate::{
 };
 
 use super::{
-    ast::{self, FieldInitializer, Typed, TypedExpression, TypedParameter, TypedStatement},
     expressions,
+    model::{self, FieldInitializer, Typed, TypedExpression, TypedParameter, TypedStatement},
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
@@ -31,7 +31,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
         }
         Statement::ModuleDeclaration(_) => Ok(vec![]),
         Statement::Use(Use { use_item }) => discover_types_from_use_item(use_item, ModPath::root()),
-        Statement::StructDeclaration(parser::StructDeclaration {
+        Statement::StructDeclaration(ast::StructDeclaration {
             body:
                 StructData {
                     type_identifier,
@@ -58,7 +58,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
                 .collect(),
         }]),
-        Statement::EnumDeclaration(parser::EnumDeclaration {
+        Statement::EnumDeclaration(ast::EnumDeclaration {
             type_identifier,
             shared_fields,
             members,
@@ -109,7 +109,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
 
             Ok(enum_members.into_iter().chain(Some(enum_)).collect())
         }
-        Statement::UnionDeclaration(parser::UnionDeclaration {
+        Statement::UnionDeclaration(ast::UnionDeclaration {
             access_modifier: _,
             type_identifier,
             literals,
@@ -120,7 +120,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .map(|literal| TypeAnnotation::Literal(Box::new(literal.clone().into())))
                 .collect(),
         )]),
-        Statement::TypeAliasDeclaration(parser::TypeAliasDeclaration {
+        Statement::TypeAliasDeclaration(ast::TypeAliasDeclaration {
             access_modifier: _,
             type_identifier,
             type_annotations,
@@ -147,7 +147,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .collect(),
         }]),
         Statement::ImplementationDeclaration(ImplementationDeclaration { .. }) => Ok(vec![]),
-        Statement::FunctionDeclaration(parser::FunctionDeclaration {
+        Statement::FunctionDeclaration(ast::FunctionDeclaration {
             type_identifier,
             param,
             return_type_annotation,
@@ -165,11 +165,11 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
 }
 
 fn discover_types_from_use_item(
-    use_item: &parser::UseItem,
+    use_item: &ast::UseItem,
     mod_path: ModPath,
 ) -> Result<Vec<DiscoveredType>, String> {
     match use_item {
-        parser::UseItem::Item(item_name) => {
+        ast::UseItem::Item(item_name) => {
             let mut type_identifier = None;
 
             for component in mod_path.components() {
@@ -192,10 +192,10 @@ fn discover_types_from_use_item(
 
             Ok(vec![DiscoveredType::UseItem { type_identifier }])
         }
-        parser::UseItem::Navigation(mod_name, use_item) => {
+        ast::UseItem::Navigation(mod_name, use_item) => {
             discover_types_from_use_item(use_item, mod_path.join(mod_name))
         }
-        parser::UseItem::List(use_items) => Ok(use_items
+        ast::UseItem::List(use_items) => Ok(use_items
             .iter()
             .map(|use_item| discover_types_from_use_item(use_item, mod_path.clone()))
             .collect::<Result<Vec<_>, _>>()?
@@ -234,7 +234,7 @@ pub fn check_type(
         Statement::Use(Use { use_item }) => {
             check_use_item(use_item, ModPath::root(), type_environment.clone())
         }
-        Statement::StructDeclaration(parser::StructDeclaration {
+        Statement::StructDeclaration(ast::StructDeclaration {
             access_modifier: _,
             body:
                 StructData {
@@ -270,7 +270,7 @@ pub fn check_type(
 
             let embedded_structs = embedded_structs?;
 
-            let fields: Result<Vec<ast::StructField>, String> = fields
+            let fields: Result<Vec<model::StructField>, String> = fields
                 .iter()
                 .map(|field| {
                     match check_type_annotation(
@@ -278,7 +278,7 @@ pub fn check_type(
                         discovered_types,
                         struct_type_environment.clone(),
                     ) {
-                        Ok(t) => Ok(ast::StructField {
+                        Ok(t) => Ok(model::StructField {
                             struct_identifier: type_identifier.clone(),
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
@@ -320,7 +320,7 @@ pub fn check_type(
 
                     fields.insert(
                         0,
-                        ast::StructField {
+                        model::StructField {
                             struct_identifier: type_identifier.clone(),
                             mutable: false,
                             identifier: field.field_name.clone(),
@@ -417,14 +417,16 @@ pub fn check_type(
 
             type_environment.borrow_mut().add_type(type_.clone())?;
 
-            Ok(TypedStatement::StructDeclaration(super::ast::StructData {
-                type_identifier: type_identifier.clone(),
-                embedded_structs,
-                fields,
-                type_,
-            }))
+            Ok(TypedStatement::StructDeclaration(
+                super::model::StructData {
+                    type_identifier: type_identifier.clone(),
+                    embedded_structs,
+                    fields,
+                    type_,
+                },
+            ))
         }
-        Statement::EnumDeclaration(parser::EnumDeclaration {
+        Statement::EnumDeclaration(ast::EnumDeclaration {
             access_modifier: _,
             type_identifier,
             shared_fields,
@@ -442,7 +444,7 @@ pub fn check_type(
                 }
             }
 
-            let shared_fields: Result<Vec<ast::StructField>, String> = shared_fields
+            let shared_fields: Result<Vec<model::StructField>, String> = shared_fields
                 .iter()
                 .map(|field| {
                     match check_type_annotation(
@@ -450,7 +452,7 @@ pub fn check_type(
                         discovered_types,
                         enum_type_environment.clone(),
                     ) {
-                        Ok(t) => Ok(ast::StructField {
+                        Ok(t) => Ok(model::StructField {
                             struct_identifier: type_identifier.clone(),
                             mutable: field.mutable,
                             identifier: field.identifier.clone(),
@@ -462,7 +464,7 @@ pub fn check_type(
                 })
                 .collect();
 
-            let members: Result<Vec<ast::StructData>, String> = members
+            let members: Result<Vec<model::StructData>, String> = members
                 .iter()
                 .map(|member| {
                     let embedded_structs: Result<Vec<_>, String> = member
@@ -481,7 +483,7 @@ pub fn check_type(
 
                     let embedded_structs = embedded_structs?;
 
-                    let fields: Result<Vec<ast::StructField>, String> = member
+                    let fields: Result<Vec<model::StructField>, String> = member
                         .fields
                         .iter()
                         .map(|field| {
@@ -490,7 +492,7 @@ pub fn check_type(
                                 discovered_types,
                                 enum_type_environment.clone(),
                             ) {
-                                Ok(t) => Ok(ast::StructField {
+                                Ok(t) => Ok(model::StructField {
                                     struct_identifier: type_identifier.clone(),
                                     mutable: field.mutable,
                                     identifier: field.identifier.clone(),
@@ -532,7 +534,7 @@ pub fn check_type(
 
                             fields.insert(
                                 0,
-                                ast::StructField {
+                                model::StructField {
                                     struct_identifier: type_identifier.clone(),
                                     mutable: false,
                                     identifier: field.field_name.clone(),
@@ -623,7 +625,7 @@ pub fn check_type(
                         .borrow_mut()
                         .add_type(enum_member.clone())?;
 
-                    Ok(ast::StructData {
+                    Ok(model::StructData {
                         type_identifier: TypeIdentifier::MemberType(
                             Box::new(type_identifier.clone()),
                             member.type_identifier.to_key(),
@@ -726,7 +728,7 @@ pub fn check_type(
                 type_,
             })
         }
-        Statement::TypeAliasDeclaration(parser::TypeAliasDeclaration {
+        Statement::TypeAliasDeclaration(ast::TypeAliasDeclaration {
             access_modifier: _,
             type_identifier,
             type_annotations,
@@ -965,7 +967,7 @@ pub fn check_type(
                 type_: Type::Void,
             })
         }
-        Statement::FunctionDeclaration(parser::FunctionDeclaration {
+        Statement::FunctionDeclaration(ast::FunctionDeclaration {
             access_modifier: _,
             type_identifier,
             param,
@@ -1276,7 +1278,7 @@ fn check_type_identifier(
                 {
                     let mut fields_map = Vec::new();
 
-                    for parser::ast::StructField {
+                    for ast::model::StructField {
                         identifier,
                         type_annotation,
                         ..
@@ -1573,7 +1575,7 @@ pub fn check_type_annotation(
                 {
                     let mut fields_map = Vec::new();
 
-                    for parser::ast::StructField {
+                    for ast::model::StructField {
                         identifier,
                         type_annotation,
                         ..
@@ -1609,7 +1611,7 @@ pub fn check_type_annotation(
                                     .map(|e| {
                                         let mut field_initializers = vec![];
 
-                                        for parser::ast::FieldInitializer {
+                                        for ast::model::FieldInitializer {
                                             identifier,
                                             initializer,
                                         } in &e.field_initializers

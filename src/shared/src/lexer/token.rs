@@ -4,7 +4,7 @@ use regex;
 
 use num_traits::int::PrimInt;
 
-use crate::{parser::AccessModifier, pretty_print::PrettyPrint};
+use crate::{ast::AccessModifier, pretty_print::PrettyPrint};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {

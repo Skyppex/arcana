@@ -1,13 +1,13 @@
 use std::fmt::Display;
 use std::hash::Hash;
 
+use crate::ast::{AssociatedType, Expression, ModPath, UseItem};
 use crate::built_in::BuiltInFunction;
 use crate::display::{Indent, IndentDisplay};
-use crate::parser::{AssociatedType, Expression, ModPath, UseItem};
 use crate::pretty_print::PrettyPrint;
 use crate::types::{GenericType, ToKey};
 use crate::{
-    parser,
+    ast,
     types::{TypeAnnotation, TypeIdentifier},
 };
 
@@ -751,12 +751,12 @@ pub enum AccessModifier {
     Super,
 }
 
-impl From<parser::AccessModifier> for AccessModifier {
-    fn from(val: parser::AccessModifier) -> Self {
+impl From<ast::AccessModifier> for AccessModifier {
+    fn from(val: ast::AccessModifier) -> Self {
         match val {
-            parser::AccessModifier::Public => AccessModifier::Public,
-            parser::AccessModifier::Super => AccessModifier::Super,
-            parser::AccessModifier::Module => AccessModifier::Module,
+            ast::AccessModifier::Public => AccessModifier::Public,
+            ast::AccessModifier::Super => AccessModifier::Super,
+            ast::AccessModifier::Module => AccessModifier::Module,
         }
     }
 }
@@ -1091,29 +1091,29 @@ pub enum BinaryOperator {
     RangeInclusive,
 }
 
-impl From<parser::BinaryOperator> for BinaryOperator {
-    fn from(value: parser::BinaryOperator) -> Self {
+impl From<ast::BinaryOperator> for BinaryOperator {
+    fn from(value: ast::BinaryOperator) -> Self {
         match value {
-            parser::BinaryOperator::Add => BinaryOperator::Add,
-            parser::BinaryOperator::Subtract => BinaryOperator::Subtract,
-            parser::BinaryOperator::Multiply => BinaryOperator::Multiply,
-            parser::BinaryOperator::Divide => BinaryOperator::Divide,
-            parser::BinaryOperator::Modulo => BinaryOperator::Modulo,
-            parser::BinaryOperator::BitwiseAnd => BinaryOperator::BitwiseAnd,
-            parser::BinaryOperator::BitwiseOr => BinaryOperator::BitwiseOr,
-            parser::BinaryOperator::BitwiseXor => BinaryOperator::BitwiseXor,
-            parser::BinaryOperator::BitwiseLeftShift => BinaryOperator::BitwiseLeftShift,
-            parser::BinaryOperator::BitwiseRightShift => BinaryOperator::BitwiseRightShift,
-            parser::BinaryOperator::LogicalAnd => BinaryOperator::LogicalAnd,
-            parser::BinaryOperator::LogicalOr => BinaryOperator::LogicalOr,
-            parser::BinaryOperator::Equal => BinaryOperator::Equal,
-            parser::BinaryOperator::NotEqual => BinaryOperator::NotEqual,
-            parser::BinaryOperator::LessThan => BinaryOperator::LessThan,
-            parser::BinaryOperator::LessThanOrEqual => BinaryOperator::LessThanOrEqual,
-            parser::BinaryOperator::GreaterThan => BinaryOperator::GreaterThan,
-            parser::BinaryOperator::GreaterThanOrEqual => BinaryOperator::GreaterThanOrEqual,
-            parser::BinaryOperator::Range => BinaryOperator::Range,
-            parser::BinaryOperator::RangeInclusive => BinaryOperator::RangeInclusive,
+            ast::BinaryOperator::Add => BinaryOperator::Add,
+            ast::BinaryOperator::Subtract => BinaryOperator::Subtract,
+            ast::BinaryOperator::Multiply => BinaryOperator::Multiply,
+            ast::BinaryOperator::Divide => BinaryOperator::Divide,
+            ast::BinaryOperator::Modulo => BinaryOperator::Modulo,
+            ast::BinaryOperator::BitwiseAnd => BinaryOperator::BitwiseAnd,
+            ast::BinaryOperator::BitwiseOr => BinaryOperator::BitwiseOr,
+            ast::BinaryOperator::BitwiseXor => BinaryOperator::BitwiseXor,
+            ast::BinaryOperator::BitwiseLeftShift => BinaryOperator::BitwiseLeftShift,
+            ast::BinaryOperator::BitwiseRightShift => BinaryOperator::BitwiseRightShift,
+            ast::BinaryOperator::LogicalAnd => BinaryOperator::LogicalAnd,
+            ast::BinaryOperator::LogicalOr => BinaryOperator::LogicalOr,
+            ast::BinaryOperator::Equal => BinaryOperator::Equal,
+            ast::BinaryOperator::NotEqual => BinaryOperator::NotEqual,
+            ast::BinaryOperator::LessThan => BinaryOperator::LessThan,
+            ast::BinaryOperator::LessThanOrEqual => BinaryOperator::LessThanOrEqual,
+            ast::BinaryOperator::GreaterThan => BinaryOperator::GreaterThan,
+            ast::BinaryOperator::GreaterThanOrEqual => BinaryOperator::GreaterThanOrEqual,
+            ast::BinaryOperator::Range => BinaryOperator::Range,
+            ast::BinaryOperator::RangeInclusive => BinaryOperator::RangeInclusive,
         }
     }
 }
@@ -1160,7 +1160,7 @@ impl Display for TypedMatchArm {
 
 impl Expression {
     pub fn get_built_in_function_identifier(&self) -> Option<BuiltInFunction> {
-        let Expression::Member(parser::Member::Identifier { symbol, .. }) = self else {
+        let Expression::Member(ast::Member::Identifier { symbol, .. }) = self else {
             return None;
         };
 

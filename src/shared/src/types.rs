@@ -2,7 +2,7 @@ use std::{fmt::Display, hash::Hash, ops::Deref, str::FromStr};
 
 use crate::{
     lexer::token::{self, IdentifierType, Keyword, TokenKind},
-    parser::cursor::Cursor,
+    ast::cursor::Cursor,
     type_checker::{Function, LiteralType, Type},
 };
 

@@ -1,10 +1,10 @@
-pub(crate) mod ast;
 pub mod cursor;
 mod expressions;
+pub(crate) mod model;
 mod statements;
 
-pub use ast::*;
 use expressions::{parse_block, parse_expression};
+pub use model::*;
 
 use crate::lexer::token::{Token, TokenKind};
 

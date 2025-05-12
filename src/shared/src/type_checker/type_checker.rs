@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use crate::{
-    parser::{Expression, Parameter, Statement, StructData},
+    ast::{Expression, Parameter, Statement, StructData},
     types::{TypeAnnotation, TypeIdentifier},
 };
 
-use super::{ast::TypedStatement, statements, type_environment::TypeEnvironment, Rcrc};
+use super::{model::TypedStatement, statements, type_environment::TypeEnvironment, Rcrc};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiscoveredEmbeddedStruct {

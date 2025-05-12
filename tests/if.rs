@@ -4,7 +4,7 @@ use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementEx
 
 use interpreter::{value, Value};
 use shared::type_checker::{
-    ast::{Typed, TypedExpression},
+    model::{Typed, TypedExpression},
     Type,
 };
 
