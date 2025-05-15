@@ -1,46 +1,13 @@
-struct Request {
-    id: String,
-    method: String,
+proto Default {
+    fun default(): Self;
 }
 
-struct Params<T> {
-    params: T
+struct A {
+    a: Int,
 }
 
-proto Id {
-    fun id(self: Self): String;
+imp Default for A {
+    fun default(): Self => Self { a: 0 }
 }
 
-proto Method {
-    fun method(self: Self): String;
-}
-
-imp Id for Request {
-    fun id(self: Self): String => self.id;
-}
-
-imp Method for Request {
-    fun method(self: Self): String => self.method;
-}
-
-struct InitializeRequest {
-    Request { method: "initialize" },
-    Params<InitializeRequestParams>,
-}
-
-struct InitializeRequestParams {
-    client_id: Int
-}
-
-let init_req = InitializeRequest {
-    id: "12345678",
-    params: InitializeRequestParams {
-        client_id: 0
-    }
-}
-
-let id = init_req:id();
-let method = init_req:method();
-
-println(id);
-method
+// let a = A::default();

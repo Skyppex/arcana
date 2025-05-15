@@ -1,3 +1,13 @@
-let x = 100
+proto Default {
+    fun default(): Self;
+}
 
-drop(x)
+struct A {
+    a: Int,
+}
+
+imp Default for A {
+    fun default(): Self => Self { a: 0 }
+}
+
+// let a = A::default();
