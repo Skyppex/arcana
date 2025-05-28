@@ -1,9 +1,0 @@
-[submodule "src/runesmith"]
-	path = src/runesmith
-	url = git@github.com:Skyppex/runesmith.git
-[submodule "src/quill"]
-	path = src/quill
-	url = git@github.com:Skyppex/quill.git
-[submodule "tree-sitter-arcana"]
-	path = tree-sitter-arcana
-	url = git@github.com:Skyppex/tree-sitter-arcana.git
