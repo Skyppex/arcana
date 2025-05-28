@@ -1,39 +1,49 @@
-use shared::type_checker::model::BinaryOperator;
+use shared::type_checker::model::{BinaryOperator, TypedExpression};
 
-use crate::value::Enum;
+use crate::{environment::Rcrc, evaluator::evaluate_expression, value::Enum, Environment};
 
 use super::value::{Number, Value};
 
 pub(crate) fn evaluate_binop(
-    left: Value,
+    left: TypedExpression,
     operator: BinaryOperator,
-    right: Value,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     match operator {
-        BinaryOperator::Add => evaluate_add(left, right),
-        BinaryOperator::Subtract => evaluate_subtract(left, right),
-        BinaryOperator::Multiply => evaluate_multiply(left, right),
-        BinaryOperator::Divide => evaluate_divide(left, right),
-        BinaryOperator::Modulo => evaluate_modulo(left, right),
-        BinaryOperator::BitwiseAnd => evaluate_bitwise_and(left, right),
-        BinaryOperator::BitwiseOr => evaluate_bitwise_or(left, right),
-        BinaryOperator::BitwiseXor => evaluate_bitwise_xor(left, right),
-        BinaryOperator::BitwiseLeftShift => evaluate_bitwise_left_shift(left, right),
-        BinaryOperator::BitwiseRightShift => evaluate_bitwise_right_shift(left, right),
-        BinaryOperator::LogicalAnd => evaluate_boolean_logical_and(left, right),
-        BinaryOperator::LogicalOr => evaluate_boolean_logical_or(left, right),
-        BinaryOperator::Equal => evaluate_equal(left, right),
-        BinaryOperator::NotEqual => evaluate_not_equal(left, right),
-        BinaryOperator::LessThan => evaluate_less_than(left, right),
-        BinaryOperator::LessThanOrEqual => evaluate_less_than_or_equal(left, right),
-        BinaryOperator::GreaterThan => evaluate_greater_than(left, right),
-        BinaryOperator::GreaterThanOrEqual => evaluate_greater_than_or_equal(left, right),
-        BinaryOperator::Range => evaluate_range(left, right, false),
-        BinaryOperator::RangeInclusive => evaluate_range(left, right, true),
+        BinaryOperator::Add => evaluate_add(left, right, environment),
+        BinaryOperator::Subtract => evaluate_subtract(left, right, environment),
+        BinaryOperator::Multiply => evaluate_multiply(left, right, environment),
+        BinaryOperator::Divide => evaluate_divide(left, right, environment),
+        BinaryOperator::Modulo => evaluate_modulo(left, right, environment),
+        BinaryOperator::BitwiseAnd => evaluate_bitwise_and(left, right, environment),
+        BinaryOperator::BitwiseOr => evaluate_bitwise_or(left, right, environment),
+        BinaryOperator::BitwiseXor => evaluate_bitwise_xor(left, right, environment),
+        BinaryOperator::BitwiseLeftShift => evaluate_bitwise_left_shift(left, right, environment),
+        BinaryOperator::BitwiseRightShift => evaluate_bitwise_right_shift(left, right, environment),
+        BinaryOperator::LogicalAnd => evaluate_boolean_logical_and(left, right, environment),
+        BinaryOperator::LogicalOr => evaluate_boolean_logical_or(left, right, environment),
+        BinaryOperator::Equal => evaluate_equal(left, right, environment),
+        BinaryOperator::NotEqual => evaluate_not_equal(left, right, environment),
+        BinaryOperator::LessThan => evaluate_less_than(left, right, environment),
+        BinaryOperator::LessThanOrEqual => evaluate_less_than_or_equal(left, right, environment),
+        BinaryOperator::GreaterThan => evaluate_greater_than(left, right, environment),
+        BinaryOperator::GreaterThanOrEqual => {
+            evaluate_greater_than_or_equal(left, right, environment)
+        }
+        BinaryOperator::Range => evaluate_range(left, right, false, environment),
+        BinaryOperator::RangeInclusive => evaluate_range(left, right, true, environment),
     }
 }
 
-fn evaluate_add(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_add(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left + right))),
@@ -56,7 +66,14 @@ fn evaluate_add(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_subtract(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_subtract(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left - right))),
@@ -72,7 +89,14 @@ fn evaluate_subtract(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_multiply(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_multiply(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left * right))),
@@ -88,7 +112,14 @@ fn evaluate_multiply(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_divide(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_divide(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left / right))),
@@ -104,7 +135,14 @@ fn evaluate_divide(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_modulo(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_modulo(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left % right))),
@@ -120,7 +158,14 @@ fn evaluate_modulo(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_bitwise_and(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_and(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left & right))),
@@ -133,7 +178,14 @@ fn evaluate_bitwise_and(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_bitwise_or(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_or(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left | right))),
@@ -146,7 +198,14 @@ fn evaluate_bitwise_or(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_bitwise_xor(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_xor(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Number(Number::Int(left ^ right))),
@@ -159,7 +218,14 @@ fn evaluate_bitwise_xor(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_bitwise_left_shift(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_left_shift(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => {
@@ -180,7 +246,14 @@ fn evaluate_bitwise_left_shift(left: Value, right: Value) -> Result<Value, Strin
     }
 }
 
-fn evaluate_bitwise_right_shift(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_bitwise_right_shift(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => {
@@ -201,27 +274,60 @@ fn evaluate_bitwise_right_shift(left: Value, right: Value) -> Result<Value, Stri
     }
 }
 
-fn evaluate_boolean_logical_and(left: Value, right: Value) -> Result<Value, String> {
-    match (left, right) {
-        (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left && right)),
-        (left, right) => Err(format!(
+fn evaluate_boolean_logical_and(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+
+    if let Value::Bool(false) = left {
+        return Ok(Value::Bool(false));
+    }
+
+    let right = evaluate_expression(right, environment)?;
+
+    match right {
+        Value::Bool(false) => Ok(Value::Bool(false)),
+        Value::Bool(true) => Ok(left),
+        _ => Err(format!(
             "Cannot boolean logical and {:?} and {:?}",
             left, right
         )),
     }
 }
 
-fn evaluate_boolean_logical_or(left: Value, right: Value) -> Result<Value, String> {
-    match (left, right) {
-        (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left || right)),
-        (left, right) => Err(format!(
+fn evaluate_boolean_logical_or(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+
+    if let Value::Bool(true) = left {
+        return Ok(Value::Bool(true));
+    }
+
+    let right = evaluate_expression(right, environment)?;
+
+    match right {
+        Value::Bool(true) => Ok(Value::Bool(true)),
+        Value::Bool(false) => Ok(left),
+        _ => Err(format!(
             "Cannot boolean logical or {:?} and {:?}",
             left, right
         )),
     }
 }
 
-fn evaluate_equal(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_equal(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Unit, Value::Unit) => Ok(Value::Bool(true)),
         (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left == right)),
@@ -247,7 +353,14 @@ fn evaluate_equal(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_not_equal(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_not_equal(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Unit, Value::Unit) => Ok(Value::Bool(false)),
         (Value::Bool(left), Value::Bool(right)) => Ok(Value::Bool(left != right)),
@@ -263,7 +376,14 @@ fn evaluate_not_equal(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_less_than(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_less_than(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left < right)),
@@ -275,7 +395,14 @@ fn evaluate_less_than(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_less_than_or_equal(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_less_than_or_equal(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left <= right)),
@@ -293,7 +420,14 @@ fn evaluate_less_than_or_equal(left: Value, right: Value) -> Result<Value, Strin
     }
 }
 
-fn evaluate_greater_than(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_greater_than(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left > right)),
@@ -305,7 +439,14 @@ fn evaluate_greater_than(left: Value, right: Value) -> Result<Value, String> {
     }
 }
 
-fn evaluate_greater_than_or_equal(left: Value, right: Value) -> Result<Value, String> {
+fn evaluate_greater_than_or_equal(
+    left: TypedExpression,
+    right: TypedExpression,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right) {
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left >= right)),
@@ -323,7 +464,15 @@ fn evaluate_greater_than_or_equal(left: Value, right: Value) -> Result<Value, St
     }
 }
 
-fn evaluate_range(left: Value, right: Value, inclusive: bool) -> Result<Value, String> {
+fn evaluate_range(
+    left: TypedExpression,
+    right: TypedExpression,
+    inclusive: bool,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let left = evaluate_expression(left, environment.clone())?;
+    let right = evaluate_expression(right, environment)?;
+
     match (left, right) {
         (Value::Number(left), Value::Number(right)) => match (left, right, inclusive) {
             (Number::Int(left), Number::Int(right), false) => Ok(Value::Array(

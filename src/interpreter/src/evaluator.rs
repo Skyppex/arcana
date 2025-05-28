@@ -157,7 +157,7 @@ fn evaluate_function_declaration(
     Ok(Value::Void)
 }
 
-fn evaluate_expression(
+pub(super) fn evaluate_expression(
     typed_expression: TypedExpression,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
@@ -1296,10 +1296,7 @@ fn evaluate_binary(
     right: Box<TypedExpression>,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
-    let left = evaluate_expression(*left, environment.clone())?;
-    let right = evaluate_expression(*right, environment)?;
-
-    evaluate_binop::evaluate_binop(left, operator, right)
+    evaluate_binop::evaluate_binop(*left, operator, *right, environment)
 }
 
 fn evaluate_block(
