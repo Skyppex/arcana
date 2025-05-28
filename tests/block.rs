@@ -38,5 +38,11 @@ fn block_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Int);
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "1".into(),
+            type_: Box::new(shared::type_checker::LiteralType::IntValue(1))
+        }
+    );
 }
