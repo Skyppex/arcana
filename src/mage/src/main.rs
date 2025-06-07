@@ -87,10 +87,6 @@ pub fn run_source(source: &str, args: &Cli) -> Result<(), String> {
         return run_spell(spell_config, project_files, &source, args);
     }
 
-    if source.extension().is_none_or(|ext| ext != "ar") {
-        return Err("source must be a folder or a file with the .ar extension".to_string());
-    }
-
     run_script(source, project_files, args)
 }
 
@@ -197,6 +193,18 @@ fn run_script(
 ) -> Result<(), String> {
     let source = std::fs::read_to_string(source)
         .map_err(|error| format!("Failed to read file: {}", error))?;
+
+    let mut lines = source.lines();
+
+    let source = if let Some(first_line) = lines.next() {
+        if first_line.starts_with("#!") {
+            lines.collect::<Vec<_>>().join("\n")
+        } else {
+            source
+        }
+    } else {
+        source
+    };
 
     let exe = std::env::current_exe()
         .and_then(fs::canonicalize)
