@@ -147,6 +147,17 @@ pub enum IntLiteralBase {
     Decimal = 10,
     Hexadecimal = 16,
 }
+impl IntLiteralBase {
+    pub(crate) fn radix(&self) -> u32 {
+        match self {
+            IntLiteralBase::None => 10,
+            IntLiteralBase::Binary => 2,
+            IntLiteralBase::Octal => 8,
+            IntLiteralBase::Decimal => 10,
+            IntLiteralBase::Hexadecimal => 16,
+        }
+    }
+}
 
 impl Display for IntLiteralBase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

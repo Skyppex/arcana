@@ -44,11 +44,11 @@ pub fn parse_numeric_literal(cursor: &mut Cursor) -> Token {
 
     let kind = match suffix {
         NumericLiteralType::Int => TokenKind::Literal(Literal::Int(IntLiteral::<i64> {
-            value: value.parse::<i64>().unwrap(),
+            value: i64::from_str_radix(&value, base.radix()).unwrap(),
             base,
         })),
         NumericLiteralType::UInt => TokenKind::Literal(Literal::UInt(IntLiteral::<u64> {
-            value: value.parse::<u64>().unwrap(),
+            value: u64::from_str_radix(&value, base.radix()).unwrap(),
             base,
         })),
         NumericLiteralType::Float => TokenKind::Literal(Literal::Float(
