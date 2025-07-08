@@ -158,8 +158,6 @@ impl TypeEnvironment {
         let mod_path = mod_path.as_ref();
         let item_name = item_name.to_key();
 
-        dbg!(&self);
-
         let mod_type_environment = self
             .get_module(mod_path)
             .ok_or(format!("Module '{}' not found", mod_path))?;
@@ -256,31 +254,36 @@ impl TypeEnvironment {
         type_annotation: &TypeAnnotation,
     ) -> Result<Type, String> {
         match type_annotation {
-            TypeAnnotation::Type(type_name) => {
-                if let Some(t) = self.types.get(type_name) {
-                    Ok(t.clone())
-                } else if type_name.contains("::") {
-                    let parts: Vec<&str> = type_name.split("::").collect();
-                    let type_name = parts[0];
-                    let variant_name = parts[1];
+            TypeAnnotation::Type(type_name) => self
+                .types
+                .get(type_name)
+                .cloned()
+                .or_else(|| {
+                    type_name
+                        .contains("::")
+                        .then(|| {
+                            let parts: Vec<&str> = type_name.split("::").collect();
+                            let type_name = parts[0];
+                            let variant_name = parts[1];
 
-                    let Some(t) = self.types.get(
-                        &TypeIdentifier::MemberType(
-                            Box::new(TypeIdentifier::Type(type_name.to_string())),
-                            variant_name.to_string(),
-                        )
-                        .to_key(),
-                    ) else {
-                        return Err(format!("Type {} not found", type_name));
-                    };
-
-                    Ok(t.clone())
-                } else if let Some(parent) = &self.parent {
-                    parent.borrow().get_type_from_annotation(type_annotation)
-                } else {
-                    Err(format!("Type {} not found", type_name))
-                }
-            }
+                            self.types
+                                .get(
+                                    &TypeIdentifier::MemberType(
+                                        Box::new(TypeIdentifier::Type(type_name.to_string())),
+                                        variant_name.to_string(),
+                                    )
+                                    .to_key(),
+                                )
+                                .cloned()
+                        })
+                        .flatten()
+                })
+                .or_else(|| {
+                    self.parent
+                        .as_ref()
+                        .and_then(|p| p.borrow().get_type_from_annotation(type_annotation).ok())
+                })
+                .ok_or_else(|| format!("Type {} not found", type_name)),
             TypeAnnotation::ConcreteType(type_name, concrete_types) => {
                 if let Some((_, t)) = self.types.iter().find(|(k, _)| {
                     **k == TypeIdentifier::GenericType(

@@ -108,6 +108,18 @@ impl BuiltInFunction {
                     return_type: Box::new(Type::UInt),
                 }),
             }),
+            BuiltInFunctionType::Rand => Some(Self {
+                type_identifier: type_identifier.clone(),
+                function_type: BuiltInFunctionType::Rand,
+                type_: Type::Function(Function {
+                    identifier: Some(type_identifier),
+                    param: Some(Parameter {
+                        identifier: "arr".to_string(),
+                        type_: Box::new(Type::Array(Box::new(Type::Any))),
+                    }),
+                    return_type: Box::new(Type::Any),
+                }),
+            }),
         }
     }
 }
@@ -121,6 +133,7 @@ pub enum BuiltInFunctionType {
     EPrintLn,
     Drop,
     Len,
+    Rand,
 }
 
 impl Display for BuiltInFunctionType {
@@ -133,6 +146,7 @@ impl Display for BuiltInFunctionType {
             BuiltInFunctionType::EPrintLn => write!(f, "println"),
             BuiltInFunctionType::Drop => write!(f, "drop"),
             BuiltInFunctionType::Len => write!(f, "len"),
+            BuiltInFunctionType::Rand => write!(f, "rand"),
         }
     }
 }
@@ -149,6 +163,7 @@ impl FromStr for BuiltInFunctionType {
             "eprintln" => Ok(BuiltInFunctionType::EPrintLn),
             "drop" => Ok(BuiltInFunctionType::Drop),
             "len" => Ok(BuiltInFunctionType::Len),
+            "rand" => Ok(BuiltInFunctionType::Rand),
             _ => Err(format!("Unknown built-in function type: {}", s)),
         }
     }

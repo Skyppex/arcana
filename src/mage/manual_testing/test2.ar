@@ -1,13 +1,10 @@
-proto Default {
-    fun default(): Self;
-}
-
 struct A {
     a: Int,
 }
 
-imp Default for A {
-    fun default(): Self => Self { a: 0 }
-}
+let aa = A { a: 100 }
 
-// let a = A::default();
+aa match
+| A { a: 100 } => "hello",
+| A { a: 200 } => "bye",
+| _ => "default"

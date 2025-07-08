@@ -540,6 +540,12 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
                 cursor.expect(TokenKind::OpenBrace)?; // Consume the {
                 members.push(parse_struct(TypeIdentifier::Type(identifier), cursor)?);
                 cursor.expect(TokenKind::CloseBrace)?; // Consume the }
+            } else {
+                members.push(StructData {
+                    type_identifier: TypeIdentifier::Type(identifier),
+                    embedded_structs: vec![],
+                    fields: vec![],
+                });
             }
         }
 

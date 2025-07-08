@@ -917,7 +917,103 @@ impl FromStr for Type {
 
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.full_name().fmt(f)
+        match self {
+            Type::Substitution {
+                type_identifier,
+                actual_type,
+            } => write!(f, "{} ==> {}", type_identifier, actual_type),
+            Type::Unknown => write!(f, "{{unknown}}"),
+            Type::Generic(generic_type) => write!(f, "{}", generic_type.type_name),
+            Type::Void => write!(f, "Void"),
+            Type::Unit => write!(f, "Unit"),
+            Type::Int => write!(f, "Int"),
+            Type::UInt => write!(f, "UInt"),
+            Type::Float => write!(f, "Float"),
+            Type::String => write!(f, "String"),
+            Type::Char => write!(f, "Char"),
+            Type::Bool => write!(f, "Bool"),
+            Type::Array(inner) => write!(f, "[{}]", inner),
+            Type::Struct(s) => {
+                if s.fields.is_empty() {
+                    write!(f, "{}", s.full_name(),)
+                } else {
+                    write!(
+                        f,
+                        "{} {{ {} }}",
+                        s.full_name(),
+                        s.fields
+                            .iter()
+                            .map(|f| f.field_name.clone())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                }
+            }
+            Type::Enum(e) => {
+                if e.members.is_empty() {
+                    write!(f, "{}", e.full_name())
+                } else {
+                    write!(
+                        f,
+                        "{} {{ {} }}",
+                        e.full_name(),
+                        e.members
+                            .values()
+                            .map(|v| format!("{}", v))
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                }
+            }
+            Type::Union(u) => {
+                if u.literals.is_empty() {
+                    write!(f, "{}", u.full_name())
+                } else {
+                    write!(
+                        f,
+                        "{} {{ {} }}",
+                        u.full_name(),
+                        u.literals
+                            .iter()
+                            .map(|l| format!("{}", l))
+                            .collect::<Vec<String>>()
+                            .join(" | ")
+                    )
+                }
+            }
+            Type::TypeAlias(ta) => write!(f, "{}", ta.full_name()),
+            Type::Protocol(p) => {
+                if p.functions.is_empty() {
+                    write!(f, "{}", p.full_name())
+                } else {
+                    write!(
+                        f,
+                        "{} {{ {} }}",
+                        p.full_name(),
+                        p.functions
+                            .iter()
+                            .map(|(_, type_)| format!("{}", type_))
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                }
+            }
+            Type::Function(fun) => write!(f, "{}", fun.full_name()),
+            Type::Literal { name, .. } => write!(f, "#{}", name),
+            Type::Tuple(items) => write!(
+                f,
+                "({})",
+                items
+                    .iter()
+                    .map(|t| format!("{}", t))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Type::Any => write!(f, "Any"),
+            Type::Meta(m) => match m {
+                Meta::Ident => write!(f, "Meta::Ident"),
+            },
+        }
     }
 }
 

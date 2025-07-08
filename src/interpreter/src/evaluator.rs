@@ -320,8 +320,8 @@ fn evaluate_match(
     decision_tree: Decision,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
+    let value = evaluate_expression(*expression, environment.clone())?;
     let match_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
-    let value = evaluate_expression(*expression, match_environment.clone())?;
 
     evaluate_decision_tree(decision_tree, value, match_environment)
 }
@@ -363,7 +363,18 @@ fn evaluate_decision_tree(
             type_: _,
         } => {
             let switch_value = match variable.accessor {
-                Accessor::Environment => value.clone(),
+                Accessor::Environment => {
+                    let Some(variable) = environment.borrow().get_variable(&variable.identifier)
+                    else {
+                        return Err(format!(
+                            "Variable '{}' not found in environment",
+                            variable.identifier
+                        ));
+                    };
+
+                    let value = variable.borrow().value.clone();
+                    value
+                }
                 Accessor::Expression(expression) => {
                     let argument_value = evaluate_expression(*expression, environment.clone())?;
 

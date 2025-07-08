@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 shared = { path = "../shared", features = ["interpreter"]}
+rand = "0.9.1"
 
 [features]
 default = []

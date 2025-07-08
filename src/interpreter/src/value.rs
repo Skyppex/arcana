@@ -283,5 +283,22 @@ pub fn get_built_in_function_value(
             }),
             environment,
         },
+        BuiltInFunctionType::Rand => Value::Function {
+            param_name: Some("arr".to_string()),
+            body: FunctionBody::Fn(|value| {
+                let Some(Value::Array(arr)) = value else {
+                    unreachable!("Type is known after type checking, this should never happen")
+                };
+
+                if arr.is_empty() {
+                    return Value::Void;
+                }
+
+                let random_index = rand::random_range(0..arr.len());
+
+                arr[random_index].clone()
+            }),
+            environment,
+        },
     }
 }

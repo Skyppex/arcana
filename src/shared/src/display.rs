@@ -1432,6 +1432,14 @@ impl IndentDisplay for StructData {
         let mut result = String::new();
         result.push_str("<struct data>");
         indent.increase();
+        result.push_str(
+            format!(
+                "\n{}type_identifier: {}",
+                indent.dash(),
+                self.type_identifier.indent_display(indent)
+            )
+            .as_str(),
+        );
 
         for (i, field) in self.fields.iter().enumerate() {
             if i < self.fields.len() - 1 {

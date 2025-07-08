@@ -1,4 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+    vec,
+};
 
 use crate::{
     ast::{
@@ -64,6 +69,38 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             members,
             ..
         }) => {
+            // check for duplicate field identifiers between shared fields and members
+            let mut shared_field_identifiers = HashSet::new();
+
+            for field in shared_fields {
+                if !shared_field_identifiers.insert(field.identifier.clone()) {
+                    return Err(format!(
+                        "Shared field '{}' previously defined in shared fields of enum '{}'",
+                        field.identifier, type_identifier
+                    ));
+                }
+            }
+
+            for member in members {
+                let mut field_identifiers = HashSet::new();
+
+                for field in &member.fields {
+                    if shared_field_identifiers.contains(&field.identifier) {
+                        return Err(format!(
+                            "Field '{}' previously defined in shared fields of enum '{}'",
+                            field.identifier, member.type_identifier
+                        ));
+                    }
+
+                    if !field_identifiers.insert(field.identifier.clone()) {
+                        return Err(format!(
+                            "Field '{}' previously defined in member '{}' of enum '{}'",
+                            field.identifier, member.type_identifier, type_identifier
+                        ));
+                    }
+                }
+            }
+
             let enum_ = DiscoveredType::Enum {
                 type_identifier: type_identifier.clone(),
                 shared_fields: shared_fields
@@ -464,6 +501,8 @@ pub fn check_type(
                 })
                 .collect();
 
+            let shared_fields = shared_fields?;
+
             let members: Result<Vec<model::StructData>, String> = members
                 .iter()
                 .map(|member| {
@@ -596,21 +635,11 @@ pub fn check_type(
 
                     let embedded_structs = embedded_structs?;
 
-                    let field_types: Result<Vec<StructField>, String> = fields
-                        .clone()
+                    let field_types = shared_fields
                         .iter()
-                        .map(|f| {
-                            Ok(StructField {
-                                struct_name: TypeIdentifier::MemberType(
-                                    Box::new(type_identifier.clone()),
-                                    member.type_identifier.to_key(),
-                                ),
-                                field_name: f.identifier.clone(),
-                                default_value: None,
-                                field_type: f.type_.clone(),
-                            })
-                        })
-                        .collect();
+                        .chain(fields.clone().iter())
+                        .cloned()
+                        .collect::<Vec<model::StructField>>();
 
                     let enum_member = Type::Struct(Struct {
                         type_identifier: TypeIdentifier::MemberType(
@@ -618,7 +647,15 @@ pub fn check_type(
                             member.type_identifier.to_key(),
                         ),
                         embedded_structs: embedded_structs.clone(),
-                        fields: field_types?,
+                        fields: field_types
+                            .iter()
+                            .map(|ft| StructField {
+                                struct_name: type_identifier.clone(),
+                                field_name: ft.identifier.clone(),
+                                default_value: ft.default_value.as_ref().map(|t| t.get_type()),
+                                field_type: ft.type_.clone(),
+                            })
+                            .collect(),
                     });
 
                     type_environment
@@ -640,13 +677,12 @@ pub fn check_type(
             let enum_type = Type::Enum(Enum {
                 type_identifier: type_identifier.clone(),
                 shared_fields: shared_fields
-                    .clone()?
                     .iter()
-                    .map(|f| StructField {
-                        struct_name: type_identifier.clone(),
-                        field_name: f.identifier.clone(),
-                        default_value: None,
-                        field_type: f.type_.clone(),
+                    .map(|sf| StructField {
+                        struct_name: sf.struct_identifier.clone(),
+                        field_name: sf.identifier.clone(),
+                        default_value: sf.default_value.clone().map(|t| t.get_type()),
+                        field_type: sf.type_.clone(),
                     })
                     .collect(),
                 members: members
@@ -660,7 +696,7 @@ pub fn check_type(
 
             Ok(TypedStatement::EnumDeclaration {
                 type_identifier: type_identifier.clone(),
-                shared_fields: shared_fields?,
+                shared_fields,
                 members: members?,
                 type_: enum_type,
             })
