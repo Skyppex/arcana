@@ -380,7 +380,7 @@ pub fn check_type(
 
             let type_ = if let Some(else_type) = else_type {
                 if !is_option(&else_type) {
-                    if !type_equals(&if_block_type, &else_type) {
+                    if !type_equals_unstrict(&if_block_type, &else_type) {
                         return Err(format!(
                             "If block type {:?} does not match else block type {:?}",
                             if_block_type, else_type
