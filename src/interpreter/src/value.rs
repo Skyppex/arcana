@@ -199,7 +199,7 @@ impl Display for Variable {
 }
 
 pub fn get_built_in_function_value(
-    function_type: &BuiltInFunctionType,
+    function_type: BuiltInFunctionType,
     environment: Rcrc<Environment>,
 ) -> Value {
     match function_type {

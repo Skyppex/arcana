@@ -241,7 +241,13 @@ impl Environment {
             }
             Member::BuiltInFunction(BuiltInFunction {
                 type_identifier, ..
-            }) => panic!("cannot assign to built-in function '{:?}'", type_identifier),
+            }) => Err(format!(
+                "cannot assign to built-in function '{:?}'",
+                type_identifier
+            )),
+            Member::Index { object, .. } => {
+                Err(format!("Cannot assign to indexed value of {}", object))
+            }
         }
     }
 

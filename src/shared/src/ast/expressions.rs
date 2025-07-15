@@ -894,26 +894,38 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
             TokenKind::Colon => {
                 cursor.bump()?; // Consume the :
 
-                let TokenKind::Identifier(identifier) = cursor.first().kind else {
-                    return Err(format!(
-                        "Expected identifier but found {:?}",
-                        cursor.first().kind
-                    ));
-                };
+                if cursor.first().kind == TokenKind::OpenBracket {
+                    cursor.bump()?; // Consume the [
 
-                let Expression::Member(member) = parse_primary(cursor)? else {
-                    return Err(format!(
-                        "Expected member but found {:?}",
-                        cursor.first().kind
-                    ));
-                };
+                    let index = parse_expression(cursor)?;
+                    cursor.expect(TokenKind::CloseBracket)?;
 
-                expression = Expression::Member(Member::ParamPropagation {
-                    object: Box::new(expression),
-                    member: Box::new(member),
-                    symbol: identifier,
-                    generics: None,
-                });
+                    expression = Expression::Member(Member::Index {
+                        object: Box::new(expression),
+                        index: Box::new(index),
+                    });
+                } else {
+                    let TokenKind::Identifier(identifier) = cursor.first().kind else {
+                        return Err(format!(
+                            "Expected identifier but found {:?}",
+                            cursor.first().kind
+                        ));
+                    };
+
+                    let Expression::Member(member) = parse_literal(cursor)? else {
+                        return Err(format!(
+                            "Expected member but found {:?}",
+                            cursor.first().kind
+                        ));
+                    };
+
+                    expression = Expression::Member(Member::ParamPropagation {
+                        object: Box::new(expression),
+                        member: Box::new(member),
+                        symbol: identifier,
+                        generics: None,
+                    });
+                }
             }
             _ => break,
         }
@@ -1049,26 +1061,38 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
     if let TokenKind::Colon = cursor.first().kind {
         cursor.bump()?; // Consume the :
 
-        let TokenKind::Identifier(identifier) = cursor.first().kind else {
-            return Err(format!(
-                "Expected identifier but found {:?}",
-                cursor.first().kind
-            ));
-        };
+        if cursor.first().kind == TokenKind::OpenBracket {
+            cursor.bump()?; // Consume the [
 
-        let Expression::Member(member) = parse_literal(cursor)? else {
-            return Err(format!(
-                "Expected member but found {:?}",
-                cursor.first().kind
-            ));
-        };
+            let index = parse_expression(cursor)?;
+            cursor.expect(TokenKind::CloseBracket)?;
 
-        object = Expression::Member(Member::ParamPropagation {
-            object: Box::new(object),
-            member: Box::new(member),
-            symbol: identifier,
-            generics: None,
-        });
+            object = Expression::Member(Member::Index {
+                object: Box::new(object),
+                index: Box::new(index),
+            });
+        } else {
+            let TokenKind::Identifier(identifier) = cursor.first().kind else {
+                return Err(format!(
+                    "Expected identifier but found {:?}",
+                    cursor.first().kind
+                ));
+            };
+
+            let Expression::Member(member) = parse_literal(cursor)? else {
+                return Err(format!(
+                    "Expected member but found {:?}",
+                    cursor.first().kind
+                ));
+            };
+
+            object = Expression::Member(Member::ParamPropagation {
+                object: Box::new(object),
+                member: Box::new(member),
+                symbol: identifier,
+                generics: None,
+            });
+        }
     }
 
     Ok(object)
@@ -1125,19 +1149,43 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
         TokenKind::OpenBracket => {
             cursor.bump()?; // Consume the [
 
-            let mut elements = vec![];
+            let first_expression = parse_expression(cursor)?;
 
-            while cursor.first().kind != TokenKind::CloseBracket {
-                elements.push(parse_expression(cursor)?);
+            match cursor.first().kind {
+                TokenKind::CloseBracket => {
+                    cursor.bump()?; // Consume the ]
 
-                if cursor.first().kind == TokenKind::Comma {
-                    cursor.bump()?; // Consume the ,
+                    Ok(Expression::Literal(ValueLiteral::Array(vec![
+                        first_expression,
+                    ])))
                 }
+                TokenKind::Comma => {
+                    cursor.bump()?; // Consume the ,
+                    let mut elements = vec![first_expression];
+
+                    while cursor.first().kind != TokenKind::CloseBracket {
+                        elements.push(parse_expression(cursor)?);
+
+                        if cursor.first().kind == TokenKind::Comma {
+                            cursor.bump()?; // Consume the ,
+                        }
+                    }
+
+                    cursor.bump()?; // Consume the ]
+                    Ok(Expression::Literal(ValueLiteral::Array(elements)))
+                }
+                TokenKind::Semicolon => {
+                    cursor.bump()?; // Consume the ;
+                    let index = parse_expression(cursor)?;
+
+                    cursor.bump()?; // Consume the ]
+                    Ok(Expression::Member(Member::Index {
+                        object: Box::new(first_expression),
+                        index: Box::new(index),
+                    }))
+                }
+                _ => Err(format!("Unexpected token {:?}", cursor.first().kind)),
             }
-
-            cursor.bump()?; // Consume the ]
-
-            Ok(Expression::Literal(ValueLiteral::Array(elements)))
         }
         _ => Err(format!(
             "Expected primary expression but found {:?}",

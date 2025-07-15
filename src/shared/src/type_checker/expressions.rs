@@ -567,6 +567,9 @@ pub fn check_type(
                     context,
                 )
             }
+            crate::ast::Member::Index { object, index } => {
+                check_type_index(object, index, discovered_types, type_environment, context)
+            }
         },
         Expression::Literal(l) => match l {
             ast::ValueLiteral::Unit => Ok(TypedExpression::Literal(ValueLiteral::Unit)),
@@ -1212,6 +1215,9 @@ fn check_type_static_member_access(
             type_environment,
             context,
         ),
+        ast::Member::Index { object, index } => {
+            check_type_index(&object, &index, discovered_types, type_environment, context)
+        }
     }
 }
 
@@ -1330,6 +1336,9 @@ fn check_type_member_access_recurse(
             type_environment,
             context,
         ),
+        ast::Member::Index { object, index } => {
+            check_type_index(&object, &index, discovered_types, type_environment, context)
+        }
     }
 }
 
@@ -1460,7 +1469,45 @@ fn check_type_param_propagation_recurse(
         ast::Member::StaticMemberAccess { .. } => todo!("Static member access"),
         ast::Member::MemberAccess { .. } => todo!("Member access"),
         ast::Member::ParamPropagation { .. } => todo!("Param propagation"),
+        ast::Member::Index { .. } => todo!("Index"),
     }
+}
+
+fn check_type_index(
+    object: &Expression,
+    index: &Expression,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rc<RefCell<TypeEnvironment>>,
+    context: Option<Type>,
+) -> Result<TypedExpression, String> {
+    let typed_object = check_type(
+        object,
+        discovered_types,
+        type_environment.clone(),
+        context.clone(),
+    )?;
+
+    let object_type = typed_object.get_type();
+
+    let Type::Array(inner_type) = object_type else {
+        return Err("Indexing can only be done on arrays".to_string());
+    };
+
+    let typed_index = check_type(index, discovered_types, type_environment, context)?;
+    let index_type = typed_index.get_type();
+
+    if !type_equals_coerce(&Type::UInt, &index_type) {
+        return Err(format!(
+            "Indexing requires an integer, found {}",
+            index_type.full_name()
+        ));
+    }
+
+    Ok(TypedExpression::Member(Member::Index {
+        object: Box::new(typed_object),
+        index: Box::new(typed_index),
+        type_: *inner_type,
+    }))
 }
 
 fn check_type_pattern(

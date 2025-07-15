@@ -199,9 +199,6 @@ pub(super) fn evaluate_expression(
             argument,
             type_,
         } => evaluate_call(callee, argument, type_, environment),
-        TypedExpression::Index {
-            callee, argument, ..
-        } => evaluate_index(callee, argument, environment),
         TypedExpression::Unary {
             operator,
             expression,
@@ -970,11 +967,11 @@ fn evaluate_assignment(
 }
 
 fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Value, String> {
-    match &member {
+    match member.clone() {
         Member::Identifier { symbol, .. } => Ok(environment
             .borrow()
-            .get_variable(symbol)
-            .or_else(|| get_built_in_function(symbol, environment.clone()))
+            .get_variable(&symbol)
+            .or_else(|| get_built_in_function(&symbol, environment.clone()))
             .or_else(|| environment.borrow().get_function(&member))
             .ok_or(format!("Variable '{}' not found", &member))?
             .borrow()
@@ -991,6 +988,7 @@ fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Val
         Member::BuiltInFunction(built_in_function) => {
             Ok(evaluate_built_in_function(built_in_function, environment))
         }
+        Member::Index { object, index, .. } => evaluate_index(object, index, environment),
     }
 }
 
@@ -1041,6 +1039,7 @@ fn evaluate_member_access(
             Member::BuiltInFunction(_) => {
                 panic!("Cannot access members on a built-in function")
             }
+            Member::Index { .. } => todo!("members on an indexed expression"),
         },
         Value::Enum(Enum {
             enum_member: Struct { type_name, fields },
@@ -1067,6 +1066,7 @@ fn evaluate_member_access(
             Member::BuiltInFunction(_) => {
                 panic!("Cannot access members on a built-in function")
             }
+            Member::Index { .. } => todo!("members on an indexed expression"),
         },
         _ => Err(format!("Cannot access member value: '{}'", value)),
     }
@@ -1220,32 +1220,6 @@ fn evaluate_call(
     }
 
     Ok(value)
-}
-
-fn evaluate_index(
-    callee: Box<TypedExpression>,
-    argument: Box<TypedExpression>,
-    environment: Rcrc<Environment>,
-) -> Result<Value, String> {
-    let callee_value = evaluate_expression(*callee, environment.clone())?;
-
-    let evaluated_argument = evaluate_expression(*argument, environment.clone())?;
-
-    let Value::Number(Number::UInt(index)) = evaluated_argument else {
-        unreachable!("Type is known after type checking, this should never happen")
-    };
-
-    match callee_value {
-        Value::Array(values) => {
-            let value = values
-                .get(index as usize)
-                .cloned()
-                .ok_or(format!("Index out of bounds '{}'", index))?;
-
-            Ok(value)
-        }
-        _ => Err(format!("Cannot index non-array value '{}'", callee_value)),
-    }
 }
 
 fn evaluate_unary(
@@ -1617,10 +1591,10 @@ fn evaluate_return(
 }
 
 fn evaluate_built_in_function(
-    built_in_function: &BuiltInFunction,
+    built_in_function: BuiltInFunction,
     environment: Rc<RefCell<Environment>>,
 ) -> Value {
-    get_built_in_function_value(&built_in_function.function_type, environment)
+    get_built_in_function_value(built_in_function.function_type, environment)
 }
 
 fn get_built_in_function(
@@ -1628,11 +1602,37 @@ fn get_built_in_function(
     environment: Rcrc<Environment>,
 ) -> Option<Rcrc<Variable>> {
     BuiltInFunction::new(&key.to_key()).map(|b| {
-        let value = get_built_in_function_value(&b.function_type, environment);
+        let value = get_built_in_function_value(b.function_type, environment);
         Rc::new(RefCell::new(Variable::new(
             b.type_identifier.to_key(),
             value,
             false,
         )))
     })
+}
+
+fn evaluate_index(
+    object: Box<TypedExpression>,
+    index: Box<TypedExpression>,
+    environment: Rcrc<Environment>,
+) -> Result<Value, String> {
+    let object_value = evaluate_expression(*object, environment.clone())?;
+
+    let index_value = evaluate_expression(*index, environment.clone())?;
+
+    let Value::Number(Number::UInt(index)) = index_value else {
+        unreachable!("Type is known after type checking, this should never happen")
+    };
+
+    match object_value {
+        Value::Array(values) => {
+            let value = values
+                .get(index as usize)
+                .cloned()
+                .ok_or(format!("Index out of bounds '{}'", index))?;
+
+            Ok(value)
+        }
+        _ => Err(format!("Cannot index non-array value '{}'", object_value)),
+    }
 }

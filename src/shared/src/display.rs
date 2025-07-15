@@ -1198,6 +1198,33 @@ impl IndentDisplay for Member {
                 indent.decrease();
                 result
             }
+            Member::Index { object, index } => {
+                let mut result = String::new();
+                result.push_str("<index>\n");
+                indent.increase();
+
+                result.push_str(
+                    format!(
+                        "{}object: {}\n",
+                        indent.dash(),
+                        object.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "{}index: {}\n",
+                        indent.dash_end(),
+                        index.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                indent.end_current();
+                indent.decrease();
+                result
+            }
         }
     }
 }
@@ -2392,33 +2419,6 @@ impl IndentDisplay for TypedExpression {
                 indent.decrease();
                 result
             }
-            TypedExpression::Index {
-                callee,
-                argument,
-                type_,
-            } => {
-                let mut result = String::new();
-                result.push_str(format!("<index>: {}\n", type_).as_str());
-                indent.increase_leaf();
-                result.push_str(
-                    format!(
-                        "{}callee: {}\n",
-                        indent.dash(),
-                        callee.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                result.push_str(
-                    format!(
-                        "{}index: {}",
-                        indent.dash_end(),
-                        argument.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-                indent.decrease();
-                result
-            }
             TypedExpression::Unary {
                 operator,
                 expression,
@@ -2798,6 +2798,37 @@ impl IndentDisplay for type_checker::model::Member {
                 result.push_str(
                     format!("{}function_type: {}", indent.dash(), function_type).as_str(),
                 );
+                indent.decrease();
+                result
+            }
+            type_checker::model::Member::Index {
+                object,
+                index,
+                type_,
+            } => {
+                let mut result = String::new();
+                result.push_str(format!("<index>: {}\n", type_).as_str());
+                indent.increase();
+
+                result.push_str(
+                    format!(
+                        "{}object: {}\n",
+                        indent.dash(),
+                        object.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                result.push_str(
+                    format!(
+                        "{}index: {}\n",
+                        indent.dash_end(),
+                        index.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+
+                indent.end_current();
                 indent.decrease();
                 result
             }

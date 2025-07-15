@@ -466,6 +466,10 @@ pub enum Member {
         symbol: String,
         generics: Option<Vec<GenericType>>,
     },
+    Index {
+        object: Box<Expression>,
+        index: Box<Expression>,
+    },
 }
 
 impl Member {
@@ -475,6 +479,9 @@ impl Member {
             Member::StaticMemberAccess { symbol, .. } => symbol.clone(),
             Member::MemberAccess { symbol, .. } => symbol.clone(),
             Member::ParamPropagation { symbol, .. } => symbol.clone(),
+            Member::Index { object, index } => {
+                format!("{}[{}]", object.prettify(), index.prettify())
+            }
         }
     }
 
@@ -517,6 +524,7 @@ impl Member {
                 symbol,
                 generics: Some(generics),
             },
+            Member::Index { object, index } => Member::Index { object, index },
         }
     }
 }
@@ -551,6 +559,9 @@ impl Display for Member {
             Member::ParamPropagation { member, .. } => {
                 write!(f, ":{}", member)
             }
+            Member::Index { object, index } => {
+                write!(f, "[{}; {}]", object.prettify(), index.prettify())
+            }
         }
     }
 }
@@ -575,6 +586,9 @@ impl ToKey for Member {
             }
             Member::ParamPropagation { member, .. } => {
                 format!(":{}", member.to_key())
+            }
+            Member::Index { .. } => {
+                panic!("Index member should not be used as a key",)
             }
         }
     }

@@ -418,11 +418,6 @@ pub enum TypedExpression {
         argument: Option<Box<TypedExpression>>,
         type_: Type,
     },
-    Index {
-        callee: Box<TypedExpression>,
-        argument: Box<TypedExpression>,
-        type_: Type,
-    },
     Unary {
         operator: UnaryOperator,
         expression: Box<TypedExpression>,
@@ -470,7 +465,6 @@ impl Typed for TypedExpression {
             TypedExpression::Tuple { type_, .. } => type_.clone(),
             TypedExpression::Closure { type_, .. } => type_.clone(),
             TypedExpression::Call { type_, .. } => type_.clone(),
-            TypedExpression::Index { type_, .. } => type_.clone(),
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
@@ -496,7 +490,6 @@ impl Typed for TypedExpression {
             TypedExpression::Tuple { type_, .. } => type_.clone(),
             TypedExpression::Closure { type_, .. } => type_.clone(),
             TypedExpression::Call { type_, .. } => type_.clone(),
-            TypedExpression::Index { type_, .. } => type_.clone(),
             TypedExpression::Unary { type_, .. } => type_.clone(),
             TypedExpression::Binary { type_, .. } => type_.clone(),
             TypedExpression::Block(Block { type_, .. }) => type_.clone(),
@@ -608,9 +601,6 @@ impl Display for TypedExpression {
                 callee,
                 argument.clone().map_or("".to_string(), |a| a.to_string())
             ),
-            TypedExpression::Index {
-                callee, argument, ..
-            } => write!(f, "{}[{}]", callee, argument),
             TypedExpression::Unary {
                 operator,
                 expression,
@@ -984,6 +974,11 @@ pub enum Member {
         type_: Type,
     },
     BuiltInFunction(BuiltInFunction),
+    Index {
+        object: Box<TypedExpression>,
+        index: Box<TypedExpression>,
+        type_: Type,
+    },
 }
 
 impl Member {
@@ -996,6 +991,7 @@ impl Member {
                 type_identifier, ..
             }) => type_identifier.name(),
             // Member::MemberFunctionAccess { symbol, .. } => symbol,
+            Member::Index { .. } => panic!("cannot get symbol for index"),
         }
     }
 }
@@ -1008,6 +1004,7 @@ impl Typed for Member {
             Member::MemberAccess { type_, .. } => type_.clone(),
             Member::BuiltInFunction(BuiltInFunction { type_, .. }) => type_.clone(),
             // Member::MemberFunctionAccess { type_, .. } => type_.clone(),
+            Member::Index { type_, .. } => type_.clone(),
         }
     }
 
@@ -1018,6 +1015,7 @@ impl Typed for Member {
             Member::MemberAccess { member, .. } => member.get_deep_type(),
             Member::BuiltInFunction(BuiltInFunction { type_, .. }) => type_.clone(),
             // Member::MemberFunctionAccess { member, .. } => member.get_deep_type(),
+            Member::Index { type_, .. } => type_.clone(),
         }
     }
 }
@@ -1038,6 +1036,7 @@ impl Display for Member {
             // Member::MemberFunctionAccess { object, member, .. } => {
             //     write!(f, "{}.{}", object, member)
             // }
+            Member::Index { object, index, .. } => write!(f, "[{}; {}]", object, index),
         }
     }
 }
