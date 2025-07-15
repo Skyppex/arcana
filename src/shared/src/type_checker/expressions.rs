@@ -590,7 +590,7 @@ pub fn check_type(
                         let type_ = value.get_deep_type();
 
                         if !type_equals(&previous_type, &Type::Void)
-                            && !type_equals(&type_, &previous_type)
+                            && !type_equals_unstrict(&type_, &previous_type)
                         {
                             return Err(format!(
                                 "Array element type {:?} does not match previous element type {:?}",
