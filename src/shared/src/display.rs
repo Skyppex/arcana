@@ -2,8 +2,8 @@ use crate::{
     ast::{
         AccessModifier, Assignment, AssociatedType, Binary, BinaryOperator, Call, ClosureParameter,
         EmbeddedStruct, EnumDeclaration, EnumMember, EnumMemberField, Expression, FieldInitializer,
-        FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration, Match, MatchArm,
-        Member, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData,
+        FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration, Index, Match,
+        MatchArm, Member, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData,
         StructDeclaration, StructField, TypeAliasDeclaration, Unary, UnaryOperator,
         UnionDeclaration, Use, UseItem, ValueLiteral, VariableDeclaration, While,
     },
@@ -1226,6 +1226,40 @@ impl IndentDisplay for Member {
                 result
             }
         }
+    }
+}
+
+impl IndentDisplay for Index {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<index>\n");
+        indent.increase();
+
+        match self {
+            Index::Value(e) => {
+                result.push_str(
+                    format!("{}value: {}", indent.dash_end(), e.indent_display(indent)).as_str(),
+                );
+            }
+            Index::Range {
+                start,
+                end,
+                inclusive,
+            } => {
+                result.push_str(
+                    format!("{}start: {}\n", indent.dash(), start.indent_display(indent)).as_str(),
+                );
+                result.push_str(
+                    format!("{}end: {}\n", indent.dash_end(), end.indent_display(indent)).as_str(),
+                );
+                result.push_str(format!("{}inclusive: {}", indent.dash_end(), inclusive).as_str());
+            }
+        }
+
+        indent.end_current();
+        indent.decrease();
+
+        result
     }
 }
 
@@ -2833,6 +2867,40 @@ impl IndentDisplay for type_checker::model::Member {
                 result
             }
         }
+    }
+}
+
+impl IndentDisplay for type_checker::model::Index {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<index>\n");
+        indent.increase();
+
+        match self {
+            type_checker::model::Index::Value(e) => {
+                result.push_str(
+                    format!("{}value: {}", indent.dash_end(), e.indent_display(indent)).as_str(),
+                );
+            }
+            type_checker::model::Index::Range {
+                start,
+                end,
+                inclusive,
+            } => {
+                result.push_str(
+                    format!("{}start: {}\n", indent.dash(), start.indent_display(indent)).as_str(),
+                );
+                result.push_str(
+                    format!("{}end: {}\n", indent.dash_end(), end.indent_display(indent)).as_str(),
+                );
+                result.push_str(format!("{}inclusive: {}", indent.dash_end(), inclusive).as_str());
+            }
+        }
+
+        indent.end_current();
+        indent.decrease();
+
+        result
     }
 }
 

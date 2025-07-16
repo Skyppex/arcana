@@ -1613,19 +1613,25 @@ fn get_built_in_function(
 
 fn evaluate_index(
     object: Box<TypedExpression>,
-    index: Box<TypedExpression>,
+    index: Index,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let object_value = evaluate_expression(*object, environment.clone())?;
 
-    let index_value = evaluate_expression(*index, environment.clone())?;
+    match index {
+        Index::Value(index) => {
+            let index_value = evaluate_expression(*index, environment.clone())?;
 
-    let Value::Number(Number::UInt(index)) = index_value else {
-        unreachable!("Type is known after type checking, this should never happen")
-    };
+            let index = match index_value {
+                Value::Number(Number::UInt(index)) => index as usize,
+                Value::Number(Number::Int(index)) => index as usize,
+                _ => unreachable!("Type is known after type checking, this should never happen"),
+            };
 
-    match object_value {
-        Value::Array(values) => {
+            let Value::Array(values) = object_value else {
+                return Err(format!("Cannot index non-array value '{}'", object_value));
+            };
+
             let value = values
                 .get(index as usize)
                 .cloned()
@@ -1633,6 +1639,76 @@ fn evaluate_index(
 
             Ok(value)
         }
-        _ => Err(format!("Cannot index non-array value '{}'", object_value)),
+        Index::Range {
+            start,
+            end,
+            inclusive,
+        } => {
+            let start_value = start
+                .map(|start| evaluate_expression(*start, environment.clone()))
+                .transpose()?;
+
+            let end_value = end
+                .map(|end| evaluate_expression(*end, environment.clone()))
+                .transpose()?;
+
+            // slice array allowing for start and/or end to be None
+            let Value::Array(values) = object_value else {
+                return Err(format!("Cannot index non-array value '{}'", object_value));
+            };
+
+            let start_index = match start_value {
+                Some(Value::Number(Number::UInt(index))) => index as usize,
+                Some(Value::Number(Number::Int(index))) => index as usize,
+                Some(_) => {
+                    return Err(format!(
+                        "Expected unsigned integer for start index, found '{}'",
+                        start_value.unwrap()
+                    ))
+                }
+                None => 0, // default to 0 if no start is provided
+            };
+
+            let end_index = match end_value {
+                Some(Value::Number(Number::UInt(index))) => index as usize,
+                Some(Value::Number(Number::Int(index))) => index as usize,
+                Some(_) => {
+                    return Err(format!(
+                        "Expected unsigned integer for end index, found '{}'",
+                        end_value.unwrap()
+                    ))
+                }
+                None => values.len(), // default to length of array if no end is provided
+            };
+
+            if start_index > end_index {
+                return Err(format!(
+                    "Start index '{}' cannot be greater than end index '{}'",
+                    start_index, end_index
+                ));
+            }
+
+            if inclusive {
+                if end_index >= values.len() {
+                    return Err(format!(
+                        "End index '{}' is out of bounds for array of length '{}'",
+                        end_index,
+                        values.len()
+                    ));
+                }
+
+                Ok(Value::Array(values[start_index..=end_index].to_vec()))
+            } else {
+                if end_index > values.len() {
+                    return Err(format!(
+                        "End index '{}' is out of bounds for array of length '{}'",
+                        end_index,
+                        values.len()
+                    ));
+                }
+
+                Ok(Value::Array(values[start_index..end_index].to_vec()))
+            }
+        }
     }
 }

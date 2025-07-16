@@ -976,7 +976,7 @@ pub enum Member {
     BuiltInFunction(BuiltInFunction),
     Index {
         object: Box<TypedExpression>,
-        index: Box<TypedExpression>,
+        index: Index,
         type_: Type,
     },
 }
@@ -1164,5 +1164,54 @@ impl Expression {
         };
 
         BuiltInFunction::new(symbol)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Index {
+    Value(Box<TypedExpression>),
+    Range {
+        start: Option<Box<TypedExpression>>,
+        end: Option<Box<TypedExpression>>,
+        inclusive: bool,
+    },
+}
+
+impl Typed for Index {
+    fn get_type(&self) -> Type {
+        match self {
+            Index::Value(value) => value.get_type(),
+            Index::Range {
+                start,
+                end,
+                inclusive,
+            } => Type::Range {
+                start: start.as_ref().map(|s| Box::new(s.get_type())),
+                end: end.as_ref().map(|e| Box::new(e.get_type())),
+                inclusive: *inclusive,
+            },
+        }
+    }
+    fn get_deep_type(&self) -> Type {
+        self.get_type()
+    }
+}
+
+impl Display for Index {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Index::Value(value) => write!(f, "{}", value),
+            Index::Range {
+                start,
+                end,
+                inclusive,
+            } => write!(
+                f,
+                "{}..{}{}",
+                start.as_ref().map_or("".to_string(), |s| s.to_string()),
+                end.as_ref().map_or("".to_string(), |e| e.to_string()),
+                if *inclusive { "=" } else { "" }
+            ),
+        }
     }
 }

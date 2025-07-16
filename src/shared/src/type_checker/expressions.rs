@@ -3,7 +3,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{
     ast::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
     type_checker::{
-        model::ValueLiteral, type_annotation_equals, type_equals_unstrict, StructField,
+        model::{Index, ValueLiteral},
+        type_annotation_equals, type_equals_unstrict, StructField,
     },
     types::{TypeAnnotation, TypeIdentifier},
 };
@@ -1475,7 +1476,7 @@ fn check_type_param_propagation_recurse(
 
 fn check_type_index(
     object: &Expression,
-    index: &Expression,
+    index: &ast::Index,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
     context: Option<Type>,
@@ -1489,24 +1490,91 @@ fn check_type_index(
 
     let object_type = typed_object.get_type();
 
-    let Type::Array(inner_type) = object_type else {
+    let Type::Array(ref inner_type) = object_type else {
         return Err("Indexing can only be done on arrays".to_string());
     };
 
-    let typed_index = check_type(index, discovered_types, type_environment, context)?;
-    let index_type = typed_index.get_type();
+    let (typed_index, return_type) = match index {
+        ast::Index::Value(expression) => {
+            let typed_index = check_type(expression, discovered_types, type_environment, context)?;
 
-    if !type_equals_coerce(&Type::UInt, &index_type) {
-        return Err(format!(
-            "Indexing requires an integer, found {}",
-            index_type.full_name()
-        ));
-    }
+            let index_type = typed_index.get_type();
+
+            if !type_equals_coerce(&Type::UInt, &index_type) {
+                return Err(format!(
+                    "Indexing requires an integer, found {}",
+                    index_type.full_name()
+                ));
+            }
+
+            (Index::Value(Box::new(typed_index)), *inner_type.clone())
+        }
+        ast::Index::Range {
+            start,
+            end,
+            inclusive,
+        } => {
+            let start = start
+                .clone()
+                .map(|start| {
+                    check_type(
+                        &start,
+                        discovered_types,
+                        type_environment.clone(),
+                        context.clone(),
+                    )
+                })
+                .transpose()?;
+
+            if let Some(start) = &start {
+                let index_type = start.get_type();
+
+                if !type_equals_coerce(&Type::UInt, &index_type) {
+                    return Err(format!(
+                        "Indexing requires an integer, found {}",
+                        index_type.full_name()
+                    ));
+                }
+            }
+
+            let end = end
+                .clone()
+                .map(|end| {
+                    check_type(
+                        &end,
+                        discovered_types,
+                        type_environment.clone(),
+                        context.clone(),
+                    )
+                })
+                .transpose()?;
+
+            if let Some(end) = &end {
+                let index_type = end.get_type();
+
+                if !type_equals_coerce(&Type::UInt, &index_type) {
+                    return Err(format!(
+                        "Indexing requires an integer, found {}",
+                        index_type.full_name()
+                    ));
+                }
+            }
+
+            (
+                Index::Range {
+                    start: start.map(Box::new),
+                    end: end.map(Box::new),
+                    inclusive: *inclusive,
+                },
+                object_type,
+            )
+        }
+    };
 
     Ok(TypedExpression::Member(Member::Index {
         object: Box::new(typed_object),
-        index: Box::new(typed_index),
-        type_: *inner_type,
+        index: typed_index,
+        type_: return_type,
     }))
 }
 

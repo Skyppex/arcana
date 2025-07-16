@@ -226,6 +226,11 @@ pub enum Type {
     Char,
     Bool,
     Array(Box<Type>),
+    Range {
+        start: Option<Box<Type>>, // Start of the range
+        end: Option<Box<Type>>,   // End of the range
+        inclusive: bool,
+    },
     Struct(Struct),
     Enum(Enum),
     Union(Union),
@@ -858,6 +863,20 @@ impl FullName for Type {
             Type::Char => "Char".to_string(),
             Type::Bool => "Bool".to_string(),
             Type::Array(t) => format!("[{}]", t.full_name()),
+            Type::Range {
+                start,
+                end,
+                inclusive,
+            } => {
+                let start_str = start.as_ref().map_or("None".to_string(), |s| s.full_name());
+                let end_str = end.as_ref().map_or("None".to_string(), |e| e.full_name());
+                format!(
+                    "Range({}, {}, {})",
+                    start_str,
+                    end_str,
+                    if *inclusive { "inclusive" } else { "exclusive" }
+                )
+            }
             Type::Struct(s) => s.full_name(),
             Type::Enum(u) => u.full_name(),
             Type::Union(u) => u.full_name(),
@@ -933,6 +952,21 @@ impl Display for Type {
             Type::Char => write!(f, "Char"),
             Type::Bool => write!(f, "Bool"),
             Type::Array(inner) => write!(f, "[{}]", inner),
+            Type::Range {
+                start,
+                end,
+                inclusive,
+            } => {
+                let start_str = start.as_ref().map_or("".to_string(), |s| s.to_string());
+                let end_str = end.as_ref().map_or("".to_string(), |e| e.to_string());
+                write!(
+                    f,
+                    "{}..{}{}",
+                    start_str,
+                    if *inclusive { "=" } else { "" },
+                    end_str,
+                )
+            }
             Type::Struct(s) => {
                 if s.fields.is_empty() {
                     write!(f, "{}", s.full_name(),)

@@ -14,6 +14,11 @@ use super::{
     Use, UseItem, ValueLiteral,
 };
 
+#[derive(Debug, Default, Clone)]
+pub struct ParseContext {
+    pub is_index: bool,
+}
+
 pub fn parse_module(
     cursor: &mut Cursor,
 ) -> Result<Option<(Option<AccessModifier>, ModPath, Statement)>, String> {
@@ -66,7 +71,8 @@ pub fn parse_module(
 
     cursor.expect(TokenKind::Semicolon)?;
 
-    let module = parse_statements(cursor)?;
+    let context = ParseContext::default();
+    let module = parse_statements(cursor, &context)?;
 
     Ok(Some((
         access_modifier,
@@ -75,16 +81,19 @@ pub fn parse_module(
     )))
 }
 
-pub fn parse_file(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
-    parse_mod_statement(cursor)
+pub fn parse_file(cursor: &mut Cursor, context: &ParseContext) -> Result<Vec<Statement>, String> {
+    parse_mod_statement(cursor, context)
 }
 
-fn parse_mod_statement(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
+fn parse_mod_statement(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Vec<Statement>, String> {
     let mut access_modifier = None;
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Mod) {
-            return parse_statement(cursor).map(|s| vec![s]);
+            return parse_statement(cursor, context).map(|s| vec![s]);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -95,7 +104,7 @@ fn parse_mod_statement(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
         let mut statements = vec![];
 
         while !cursor.is_end_of_file() {
-            statements.push(parse_statement(cursor)?);
+            statements.push(parse_statement(cursor, context)?);
         }
 
         return Ok(statements);
@@ -140,24 +149,28 @@ fn parse_mod_statement(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
         module_path: ModPath::new(module_path),
     });
 
-    let mut statements = parse_statements(cursor)?;
+    let context = ParseContext::default();
+    let mut statements = parse_statements(cursor, &context)?;
     statements.insert(0, module_declaration);
 
     Ok(statements)
 }
 
-pub fn parse_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
+pub fn parse_statements(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Vec<Statement>, String> {
     let mut statements = vec![];
 
     while !cursor.is_end_of_file() {
-        statements.push(parse_statement(cursor)?);
+        statements.push(parse_statement(cursor, context)?);
     }
 
     Ok(statements)
 }
 
-pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
-    match parse_use(cursor) {
+pub fn parse_statement(cursor: &mut Cursor, context: &ParseContext) -> Result<Statement, String> {
+    match parse_use(cursor, context) {
         Ok(s) => {
             if let TokenKind::Semicolon = cursor.first().kind {
                 cursor.bump()?; // Consume the ;
@@ -170,9 +183,9 @@ pub fn parse_statement(cursor: &mut Cursor) -> Result<Statement, String> {
     }
 }
 
-fn parse_use(cursor: &mut Cursor) -> Result<Statement, String> {
+fn parse_use(cursor: &mut Cursor, context: &ParseContext) -> Result<Statement, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Use) {
-        return parse_function_declaration_statement(cursor);
+        return parse_function_declaration_statement(cursor, context);
     }
 
     cursor.bump()?; // Consume the use keyword
@@ -228,12 +241,15 @@ fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, String> {
     }
 }
 
-fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
+fn parse_function_declaration_statement(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Statement, String> {
     let mut access_modifier = None;
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Fun) {
-            return parse_struct_declaration_statement(cursor);
+            return parse_struct_declaration_statement(cursor, context);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -241,7 +257,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Fun) {
-        return parse_struct_declaration_statement(cursor);
+        return parse_struct_declaration_statement(cursor, context);
     }
 
     cursor.bump()?; // Consume the fun keyword
@@ -293,7 +309,7 @@ fn parse_function_declaration_statement(cursor: &mut Cursor) -> Result<Statement
         }));
     }
 
-    let body = fat_arrow_expr_or_block_expr(cursor)?;
+    let body = fat_arrow_expr_or_block_expr(cursor, context)?;
 
     let body = unwrap_parameters(
         access_modifier,
@@ -391,12 +407,15 @@ fn unwrap_parameters_recurse(
     }
 }
 
-fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
+fn parse_struct_declaration_statement(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Statement, String> {
     let mut access_modifier = None;
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Struct) {
-            return parse_enum_declaration_statement(cursor);
+            return parse_enum_declaration_statement(cursor, context);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -404,7 +423,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Struct) {
-        return parse_enum_declaration_statement(cursor);
+        return parse_enum_declaration_statement(cursor, context);
     }
 
     cursor.bump()?; // Consume the struct keyword
@@ -428,7 +447,7 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 
     cursor.bump()?; // Consume the {
 
-    let body = parse_struct(type_identifier, cursor)?;
+    let body = parse_struct(type_identifier, cursor, context)?;
 
     cursor.bump()?; // Consume the }
 
@@ -441,8 +460,9 @@ fn parse_struct_declaration_statement(cursor: &mut Cursor) -> Result<Statement, 
 fn parse_struct(
     type_identifier: TypeIdentifier,
     cursor: &mut Cursor,
+    context: &ParseContext,
 ) -> Result<StructData, String> {
-    let embedded_structs = parse_embedded_structs(cursor)?;
+    let embedded_structs = parse_embedded_structs(cursor, context)?;
 
     let mut fields = vec![];
     let mut has_comma = true;
@@ -469,12 +489,15 @@ fn parse_struct(
     })
 }
 
-fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
+fn parse_enum_declaration_statement(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Statement, String> {
     let mut access_modifier = None;
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Enum) {
-            return parse_union_declaration_statement(cursor);
+            return parse_union_declaration_statement(cursor, context);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -482,7 +505,7 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Enum) {
-        return parse_union_declaration_statement(cursor);
+        return parse_union_declaration_statement(cursor, context);
     }
 
     cursor.bump()?; // Consume the enum keyword
@@ -538,7 +561,11 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
 
             if cursor.first().kind == TokenKind::OpenBrace {
                 cursor.expect(TokenKind::OpenBrace)?; // Consume the {
-                members.push(parse_struct(TypeIdentifier::Type(identifier), cursor)?);
+                members.push(parse_struct(
+                    TypeIdentifier::Type(identifier),
+                    cursor,
+                    context,
+                )?);
                 cursor.expect(TokenKind::CloseBrace)?; // Consume the }
             } else {
                 members.push(StructData {
@@ -566,12 +593,15 @@ fn parse_enum_declaration_statement(cursor: &mut Cursor) -> Result<Statement, St
     }))
 }
 
-fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, String> {
+fn parse_union_declaration_statement(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Statement, String> {
     let mut access_modifier = None;
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Union) {
-            return parse_type_alias_declaration(cursor);
+            return parse_type_alias_declaration(cursor, context);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -579,7 +609,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Union) {
-        return parse_type_alias_declaration(cursor);
+        return parse_type_alias_declaration(cursor, context);
     }
 
     cursor.bump()?; // Consume the union keyword
@@ -608,7 +638,7 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
         }
 
         has_comma = true;
-        literals.push(expressions::parse_literal(cursor)?);
+        literals.push(expressions::parse_literal(cursor, context)?);
 
         if cursor.first().kind == TokenKind::Comma {
             cursor.bump()?; // Consume the ,
@@ -634,11 +664,14 @@ fn parse_union_declaration_statement(cursor: &mut Cursor) -> Result<Statement, S
     }))
 }
 
-fn parse_type_alias_declaration(cursor: &mut Cursor) -> Result<Statement, String> {
+fn parse_type_alias_declaration(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Statement, String> {
     let mut access_modifier = None;
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Type) {
-            return parse_protocol_declaration(cursor);
+            return parse_protocol_declaration(cursor, context);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -646,7 +679,7 @@ fn parse_type_alias_declaration(cursor: &mut Cursor) -> Result<Statement, String
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Type) {
-        return parse_protocol_declaration(cursor);
+        return parse_protocol_declaration(cursor, context);
     }
 
     cursor.bump()?; // Consume the type keyword
@@ -678,12 +711,15 @@ fn parse_type_alias_declaration(cursor: &mut Cursor) -> Result<Statement, String
     }))
 }
 
-fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> {
+fn parse_protocol_declaration(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Statement, String> {
     let mut access_modifier = None;
 
     if let Some(am) = cursor.first().kind.is_access_modifier() {
         if cursor.second().kind != TokenKind::Keyword(Keyword::Proto) {
-            return parse_implementation_declaration(cursor);
+            return parse_implementation_declaration(cursor, context);
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -691,7 +727,7 @@ fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> 
     }
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Proto) {
-        return parse_implementation_declaration(cursor);
+        return parse_implementation_declaration(cursor, context);
     }
 
     cursor.bump()?; // Consume the proto keyword
@@ -763,7 +799,7 @@ fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> 
 
     while cursor.first().kind == TokenKind::Keyword(Keyword::Fun) {
         let Statement::FunctionDeclaration(function) =
-            parse_function_declaration_statement(cursor)?
+            parse_function_declaration_statement(cursor, context)?
         else {
             return Err(format!(
                 "Expected function declaration but found {:?}",
@@ -784,9 +820,12 @@ fn parse_protocol_declaration(cursor: &mut Cursor) -> Result<Statement, String> 
     }))
 }
 
-fn parse_implementation_declaration(cursor: &mut Cursor) -> Result<Statement, String> {
+fn parse_implementation_declaration(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Statement, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Imp) {
-        return parse_expression_map(cursor);
+        return parse_expression_map(cursor, context);
     }
 
     cursor.bump()?; // Consume the imp keyword
@@ -863,7 +902,7 @@ fn parse_implementation_declaration(cursor: &mut Cursor) -> Result<Statement, St
 
     while cursor.first().kind == TokenKind::Keyword(Keyword::Fun) {
         let Statement::FunctionDeclaration(function) =
-            parse_function_declaration_statement(cursor)?
+            parse_function_declaration_statement(cursor, context)?
         else {
             return Err(format!(
                 "Expected function declaration but found {:?}",
@@ -888,8 +927,8 @@ fn parse_implementation_declaration(cursor: &mut Cursor) -> Result<Statement, St
     ))
 }
 
-fn parse_expression_map(cursor: &mut Cursor) -> Result<Statement, String> {
-    match expressions::parse_expression(cursor) {
+fn parse_expression_map(cursor: &mut Cursor, context: &ParseContext) -> Result<Statement, String> {
+    match expressions::parse_expression(cursor, context) {
         Ok(e) => {
             if let TokenKind::Semicolon = cursor.first().kind {
                 cursor.bump()?; // Consume the ;
@@ -1016,7 +1055,10 @@ fn parse_struct_field(
     })
 }
 
-fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<EmbeddedStruct>, String> {
+fn parse_embedded_structs(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Vec<EmbeddedStruct>, String> {
     let mut embedded_structs = vec![];
 
     loop {
@@ -1036,7 +1078,7 @@ fn parse_embedded_structs(cursor: &mut Cursor) -> Result<Vec<EmbeddedStruct>, St
 
                 let field_initializers = if cursor.first().kind == TokenKind::OpenBrace {
                     cursor.bump()?; // Consume the {
-                    let fis = expressions::parse_field_initializers(cursor)?;
+                    let fis = expressions::parse_field_initializers(cursor, context)?;
                     cursor.bump()?; // Consume the }
                     fis
                 } else {

@@ -1,8 +1,8 @@
 use std::{fmt::Display, hash::Hash, ops::Deref, str::FromStr};
 
 use crate::{
-    lexer::token::{self, IdentifierType, Keyword, TokenKind},
     ast::cursor::Cursor,
+    lexer::token::{self, IdentifierType, Keyword, TokenKind},
     type_checker::{Function, LiteralType, Type},
 };
 
@@ -113,6 +113,7 @@ impl From<Type> for TypeAnnotation {
             Type::Literal { .. } => todo!(),
             Type::Any => panic!("Cannot convert Any type to type annotation"),
             Type::Meta(_) => panic!("Cannot convert meta type to type annotation"),
+            Type::Range { .. } => panic!("Cannot convert range type to type annotation"),
         }
     }
 }

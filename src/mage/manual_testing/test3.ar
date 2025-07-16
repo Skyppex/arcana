@@ -1,22 +1,15 @@
-proto P {
-    fun p(self: Self): Float;
-}
+let a = 0..10;
+a:[2u..8u]:[2u..4u]:println()
 
-struct S {
-    s: Float
-}
+[a; 3u]:println()
+[a; ..3u]:println()
+[a; 3u..]:println()
+[a; 3u..6u]:println()
+[a; 3u..=6u]:println()
 
-struct Super {
-    S,
-    super: Int,
-}
+a:[3u]:println()
+a:[..3u]:println()
+a:[3u..]:println()
+a:[3u..6u]:println()
+a:[3u..=6u]:println()
 
-imp P for S {
-    fun p(self: Self): Float => self.s * 3f;
-}
-
-let s = S { s: 4f };
-s:p():println()
-
-let super = Super { s: 2f, super: 5 };
-super:p()

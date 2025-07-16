@@ -468,7 +468,7 @@ pub enum Member {
     },
     Index {
         object: Box<Expression>,
-        index: Box<Expression>,
+        index: Index,
     },
 }
 
@@ -479,9 +479,7 @@ impl Member {
             Member::StaticMemberAccess { symbol, .. } => symbol.clone(),
             Member::MemberAccess { symbol, .. } => symbol.clone(),
             Member::ParamPropagation { symbol, .. } => symbol.clone(),
-            Member::Index { object, index } => {
-                format!("{}[{}]", object.prettify(), index.prettify())
-            }
+            Member::Index { .. } => panic!("Index member does not have a symbol"),
         }
     }
 
@@ -559,8 +557,8 @@ impl Display for Member {
             Member::ParamPropagation { member, .. } => {
                 write!(f, ":{}", member)
             }
-            Member::Index { object, index } => {
-                write!(f, "[{}; {}]", object.prettify(), index.prettify())
+            Member::Index { .. } => {
+                panic!("Index member should not be used as a display",)
             }
         }
     }
@@ -683,4 +681,14 @@ pub enum BinaryOperator {
     GreaterThanOrEqual,
     Range,
     RangeInclusive,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Index {
+    Value(Box<Expression>),
+    Range {
+        start: Option<Box<Expression>>,
+        end: Option<Box<Expression>>,
+        inclusive: bool,
+    },
 }

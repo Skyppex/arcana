@@ -1,10 +1,27 @@
-struct A {
-    a: Int,
+proto Ease {
+    fun ease(t: Float): Float;
 }
 
-let aa = A { a: 100 }
+struct Linear;
+struct Quadratic;
+struct Cubic;
 
-aa match
-| A { a: 100 } => "hello",
-| A { a: 200 } => "bye",
-| _ => "default"
+imp Ease for Linear {
+    fun ease(t: Float): Float => t
+}
+
+imp Ease for Quadratic {
+    fun ease(t: Float): Float => t * t
+}
+
+imp Ease for Cubic {
+    fun ease(t: Float): Float => t * t * t
+}
+
+let a = [0f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1f];
+
+let ease = Linear::ease;
+
+for t in a {
+    ease(t):println();
+}

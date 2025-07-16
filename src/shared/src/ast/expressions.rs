@@ -1,4 +1,5 @@
 use crate::{
+    ast::{statements::ParseContext, Index},
     lexer::token::{self, IdentifierType, Keyword, TokenKind},
     type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
     types::{parse_generics_in_type_name, parse_optional_type_annotation, ToKey, TypeAnnotation},
@@ -12,13 +13,13 @@ use super::{
 
 use crate::types::parse_type_annotation;
 
-pub fn parse_expression(cursor: &mut Cursor) -> Result<Expression, String> {
-    parse_break(cursor)
+pub fn parse_expression(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    parse_break(cursor, context)
 }
 
-fn parse_break(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_break(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Break) {
-        return parse_continue(cursor);
+        return parse_continue(cursor, context);
     }
 
     cursor.bump()?; // Consume the break
@@ -27,24 +28,24 @@ fn parse_break(cursor: &mut Cursor) -> Result<Expression, String> {
         cursor.bump()?;
         None
     } else {
-        Some(parse_expression(cursor)?)
+        Some(parse_expression(cursor, context)?)
     };
 
     Ok(Expression::Break(expression.map(Box::new)))
 }
 
-fn parse_continue(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_continue(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Continue) {
-        return parse_return(cursor);
+        return parse_return(cursor, context);
     }
 
     cursor.bump()?; // Consume the continue
     Ok(Expression::Continue)
 }
 
-fn parse_return(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_return(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Return) {
-        return parse_trailing_closure(cursor);
+        return parse_trailing_closure(cursor, context);
     }
 
     cursor.bump()?; // Consume the return
@@ -53,14 +54,17 @@ fn parse_return(cursor: &mut Cursor) -> Result<Expression, String> {
         cursor.bump()?; // Consume the ;
         None
     } else {
-        Some(parse_expression(cursor)?)
+        Some(parse_expression(cursor, context)?)
     };
 
     Ok(Expression::Return(expression.map(Box::new)))
 }
 
-fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_loop(cursor)?;
+fn parse_trailing_closure(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, String> {
+    let mut expression = parse_loop(cursor, context)?;
 
     while cursor.first().kind == TokenKind::Arrow {
         cursor.bump()?; // Consume the ->
@@ -82,7 +86,7 @@ fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
             None
         };
 
-        let body = parse_loop(cursor)?;
+        let body = parse_loop(cursor, context)?;
 
         let Some(params) = params else {
             expression = Expression::Call(Call {
@@ -109,28 +113,28 @@ fn parse_trailing_closure(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
-pub fn parse_loop(cursor: &mut Cursor) -> Result<Expression, String> {
+pub fn parse_loop(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Loop) {
-        return parse_while(cursor);
+        return parse_while(cursor, context);
     }
 
     cursor.bump()?; // Consume the loop
 
-    let body = fat_arrow_expr_or_block_expr(cursor)?;
+    let body = fat_arrow_expr_or_block_expr(cursor, context)?;
 
     Ok(Expression::Loop(Box::new(body)))
 }
 
-pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
+pub fn parse_while(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::While) {
-        return parse_for(cursor);
+        return parse_for(cursor, context);
     }
 
     cursor.bump()?; // Consume the while
 
-    let condition = parse_expression(cursor)?;
+    let condition = parse_expression(cursor, context)?;
 
-    let body = fat_arrow_expr_or_block_expr(cursor)?;
+    let body = fat_arrow_expr_or_block_expr(cursor, context)?;
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
         return Ok(Expression::While(While {
@@ -142,7 +146,7 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the else
 
-    let else_body = fat_arrow_expr_or_block_expr(cursor)?;
+    let else_body = fat_arrow_expr_or_block_expr(cursor, context)?;
 
     Ok(Expression::While(While {
         condition: Box::new(condition),
@@ -151,9 +155,9 @@ pub fn parse_while(cursor: &mut Cursor) -> Result<Expression, String> {
     }))
 }
 
-pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
+pub fn parse_for(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::For) {
-        return parse_block(cursor);
+        return parse_block(cursor, context);
     }
 
     cursor.bump()?; // Consume the for
@@ -162,8 +166,8 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.expect(TokenKind::Keyword(Keyword::In))?;
 
-    let iterable = parse_expression(cursor)?;
-    let body = fat_arrow_expr_or_block_expr(cursor)?;
+    let iterable = parse_expression(cursor, context)?;
+    let body = fat_arrow_expr_or_block_expr(cursor, context)?;
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Else) {
         return Ok(Expression::For(For {
@@ -176,7 +180,7 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.bump()?; // Consume the else
 
-    let else_block = fat_arrow_expr_or_block_expr(cursor)?;
+    let else_block = fat_arrow_expr_or_block_expr(cursor, context)?;
 
     Ok(Expression::For(For {
         pattern,
@@ -186,15 +190,18 @@ pub fn parse_for(cursor: &mut Cursor) -> Result<Expression, String> {
     }))
 }
 
-pub fn parse_block(cursor: &mut Cursor) -> Result<Expression, String> {
+pub fn parse_block(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::OpenBrace {
-        return parse_type_literal(cursor);
+        return parse_type_literal(cursor, context);
     }
 
-    parse_block_statements(cursor).map(Expression::Block)
+    parse_block_statements(cursor, context).map(Expression::Block)
 }
 
-pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, String> {
+pub fn parse_block_statements(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Vec<Statement>, String> {
     if cursor.first().kind != TokenKind::OpenBrace {
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
     }
@@ -204,7 +211,7 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
     let mut statements = vec![];
 
     while cursor.first().kind != TokenKind::CloseBrace {
-        statements.push(parse_statement(cursor)?);
+        statements.push(parse_statement(cursor, context)?);
     }
 
     cursor.bump()?; // Consume the }
@@ -212,13 +219,13 @@ pub fn parse_block_statements(cursor: &mut Cursor) -> Result<Vec<Statement>, Str
     Ok(statements)
 }
 
-fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_type_literal(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     let TokenKind::Identifier(identifier) = cursor.first().kind else {
-        return parse_range(cursor);
+        return parse_range(cursor, context);
     };
 
     if !identifier.is_type_identifier_name() {
-        return parse_range(cursor);
+        return parse_range(cursor, context);
     }
 
     match (cursor.second().kind, cursor.third().kind) {
@@ -228,15 +235,13 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
                 TokenKind::OpenBrace | TokenKind::DoubleColon | TokenKind::Less
             ) =>
         {
-            return parse_range(cursor);
+            return parse_range(cursor, context);
         }
         (_, TokenKind::Less) => {
-            return parse_range(cursor);
+            return parse_range(cursor, context);
         }
-        (TokenKind::DoubleColon, TokenKind::Identifier(name))
-            if name.is_function_identifier_name() =>
-        {
-            return parse_member_access(cursor);
+        (TokenKind::DoubleColon, TokenKind::Identifier(_)) => {
+            return parse_range(cursor, context);
         }
         _ => {}
     }
@@ -244,15 +249,16 @@ fn parse_type_literal(cursor: &mut Cursor) -> Result<Expression, String> {
     let type_annotation = parse_type_annotation(cursor, false)?;
 
     if type_annotation.has_double_colon() {
-        parse_enum_literal(cursor, type_annotation)
+        parse_enum_literal(cursor, type_annotation, context)
     } else {
-        parse_struct_literal(cursor, type_annotation)
+        parse_struct_literal(cursor, type_annotation, context)
     }
 }
 
 fn parse_struct_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
+    context: &ParseContext,
 ) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::OpenBrace {
         return Ok(Expression::Literal(ValueLiteral::Struct {
@@ -262,7 +268,7 @@ fn parse_struct_literal(
     }
 
     cursor.bump()?; // Consume the {
-    let field_initializers = parse_field_initializers(cursor)?;
+    let field_initializers = parse_field_initializers(cursor, context)?;
     cursor.bump()?; // Consume the }
 
     Ok(Expression::Literal(ValueLiteral::Struct {
@@ -271,7 +277,10 @@ fn parse_struct_literal(
     }))
 }
 
-pub fn parse_field_initializers(cursor: &mut Cursor) -> Result<Vec<FieldInitializer>, String> {
+pub fn parse_field_initializers(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Vec<FieldInitializer>, String> {
     let mut field_initializers = vec![];
     let mut has_comma = true;
 
@@ -281,7 +290,7 @@ pub fn parse_field_initializers(cursor: &mut Cursor) -> Result<Vec<FieldInitiali
         }
 
         has_comma = true;
-        field_initializers.push(parse_field_initializer(cursor)?);
+        field_initializers.push(parse_field_initializer(cursor, context)?);
 
         if cursor.first().kind == TokenKind::Comma {
             cursor.bump()?; // Consume the ,
@@ -293,7 +302,10 @@ pub fn parse_field_initializers(cursor: &mut Cursor) -> Result<Vec<FieldInitiali
     Ok(field_initializers)
 }
 
-fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, String> {
+fn parse_field_initializer(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<FieldInitializer, String> {
     let TokenKind::Identifier(identifier) = cursor.first().kind else {
         return Err(format!(
             "Expected identifier but found {:?}",
@@ -308,7 +320,7 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
     cursor.bump()?; // Consume the identifier
     cursor.bump()?; // Consume the :
 
-    let initializer = parse_expression(cursor)?;
+    let initializer = parse_expression(cursor, context)?;
 
     Ok(FieldInitializer {
         identifier,
@@ -319,6 +331,7 @@ fn parse_field_initializer(cursor: &mut Cursor) -> Result<FieldInitializer, Stri
 fn parse_enum_literal(
     cursor: &mut Cursor,
     type_annotation: TypeAnnotation,
+    context: &ParseContext,
 ) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::OpenBrace {
         return Ok(Expression::Literal(ValueLiteral::Enum {
@@ -334,7 +347,7 @@ fn parse_enum_literal(
     }
 
     cursor.expect(TokenKind::OpenBrace)?;
-    let field_initializers = parse_field_initializers(cursor)?;
+    let field_initializers = parse_field_initializers(cursor, context)?;
     cursor.expect(TokenKind::CloseBrace)?;
 
     Ok(Expression::Literal(ValueLiteral::Enum {
@@ -349,8 +362,12 @@ fn parse_enum_literal(
     }))
 }
 
-fn parse_range(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_assignment(cursor)?;
+fn parse_range(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    let mut expression = parse_assignment(cursor, context)?;
+
+    if context.is_index {
+        return Ok(expression);
+    }
 
     while cursor.first().kind == TokenKind::DoubleDot {
         let operator = cursor.bump()?.kind; // Consume the ..
@@ -361,7 +378,7 @@ fn parse_range(cursor: &mut Cursor) -> Result<Expression, String> {
             cursor.bump()?; // Consume the =
         }
 
-        let right = parse_assignment(cursor)?;
+        let right = parse_assignment(cursor, context)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
@@ -377,12 +394,12 @@ fn parse_range(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
-fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_compound_assignment(cursor)?;
+fn parse_assignment(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    let mut expression = parse_compound_assignment(cursor, context)?;
 
     while matches!(cursor.first().kind, TokenKind::Equal) {
         cursor.bump()?; // Consume the =
-        let initializer = parse_expression(cursor)?;
+        let initializer = parse_expression(cursor, context)?;
 
         let Expression::Member(member) = expression else {
             return Err(format!("Expected member but found {:?}", expression));
@@ -397,8 +414,11 @@ fn parse_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
-fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_closure(cursor)?;
+fn parse_compound_assignment(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, String> {
+    let mut expression = parse_closure(cursor, context)?;
 
     while matches!(
         cursor.first().kind,
@@ -412,7 +432,7 @@ fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> 
             | TokenKind::CaretEqual
     ) {
         let operator = cursor.bump()?.kind; // Consume the +=, -=, *=, /=, %=, &=, |=, ^=
-        let initializer = parse_expression(cursor)?;
+        let initializer = parse_expression(cursor, context)?;
 
         let Expression::Member(ref member) = expression else {
             return Err(format!("Expected member but found {:?}", expression));
@@ -444,9 +464,9 @@ fn parse_compound_assignment(cursor: &mut Cursor) -> Result<Expression, String> 
     Ok(expression)
 }
 
-fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_closure(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Pipe {
-        return parse_match(cursor);
+        return parse_match(cursor, context);
     }
 
     cursor.bump()?; // Consume the |
@@ -459,7 +479,7 @@ fn parse_closure(cursor: &mut Cursor) -> Result<Expression, String> {
 
     cursor.optional_bump(TokenKind::FatArrow)?;
 
-    let body = parse_expression(cursor)?;
+    let body = parse_expression(cursor, context)?;
 
     unwrap_arguments(params, return_type_annotation, body)
 }
@@ -548,8 +568,8 @@ fn unwrap_arguments_recurse(
     }
 }
 
-fn parse_match(cursor: &mut Cursor) -> Result<Expression, String> {
-    let expression = parse_boolean_logical(cursor)?;
+fn parse_match(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    let expression = parse_boolean_logical(cursor, context)?;
 
     if cursor.first().kind != TokenKind::Keyword(Keyword::Match) {
         return Ok(expression);
@@ -564,7 +584,7 @@ fn parse_match(cursor: &mut Cursor) -> Result<Expression, String> {
     loop {
         let pattern = parse_pattern(cursor)?;
         cursor.expect(TokenKind::FatArrow)?; // Consume the =>
-        let body = parse_expression(cursor)?;
+        let body = parse_expression(cursor, context)?;
 
         arms.push(MatchArm {
             pattern,
@@ -586,8 +606,11 @@ fn parse_match(cursor: &mut Cursor) -> Result<Expression, String> {
     }))
 }
 
-fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_comparison(cursor)?;
+fn parse_boolean_logical(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, String> {
+    let mut expression = parse_comparison(cursor, context)?;
 
     while matches!(
         (cursor.first().kind, cursor.second().kind),
@@ -599,7 +622,7 @@ fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
             cursor.bump()?; // Consume the second |
         }
 
-        let right = parse_comparison(cursor)?;
+        let right = parse_comparison(cursor, context)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
@@ -615,8 +638,8 @@ fn parse_boolean_logical(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
-fn parse_comparison(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_bitwise_logical(cursor)?;
+fn parse_comparison(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    let mut expression = parse_bitwise_logical(cursor, context)?;
 
     while matches!(
         cursor.first().kind,
@@ -628,7 +651,7 @@ fn parse_comparison(cursor: &mut Cursor) -> Result<Expression, String> {
             | TokenKind::LessEqual
     ) {
         let operator = cursor.bump()?.kind; // Consume the ==, !=, >, <, >=, or <=
-        let right = parse_additive(cursor)?;
+        let right = parse_additive(cursor, context)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
@@ -648,8 +671,11 @@ fn parse_comparison(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
-fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_additive(cursor)?;
+fn parse_bitwise_logical(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, String> {
+    let mut expression = parse_additive(cursor, context)?;
 
     while matches!(
         (cursor.first().kind, cursor.second().kind),
@@ -667,7 +693,7 @@ fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
             cursor.bump()?; // Consume the second > or <
         }
 
-        let right = parse_boolean_logical(cursor)?;
+        let right = parse_boolean_logical(cursor, context)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
@@ -686,12 +712,12 @@ fn parse_bitwise_logical(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
-fn parse_additive(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_multiplicative(cursor)?;
+fn parse_additive(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    let mut expression = parse_multiplicative(cursor, context)?;
 
     while matches!(cursor.first().kind, TokenKind::Plus | TokenKind::Minus) {
         let operator = cursor.bump()?.kind; // Consume the + or -
-        let right = parse_multiplicative(cursor)?;
+        let right = parse_multiplicative(cursor, context)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
@@ -707,15 +733,15 @@ fn parse_additive(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
-fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_variable_declaration(cursor)?;
+fn parse_multiplicative(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    let mut expression = parse_variable_declaration(cursor, context)?;
 
     while matches!(
         cursor.first().kind,
         TokenKind::Star | TokenKind::Slash | TokenKind::Percent
     ) {
         let operator = cursor.bump()?.kind; // Consume the *, /, or %
-        let right = parse_variable_declaration(cursor)?;
+        let right = parse_variable_declaration(cursor, context)?;
 
         expression = Expression::Binary(Binary {
             left: Box::new(expression),
@@ -732,9 +758,12 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expression, String> {
     Ok(expression)
 }
 
-fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_variable_declaration(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Let) {
-        return parse_if(cursor);
+        return parse_if(cursor, context);
     }
 
     cursor.bump()?; // Consume the let
@@ -753,7 +782,7 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
         TokenKind::Equal => {
             cursor.bump()?; // Consume the =
 
-            let initializer = parse_expression(cursor)?;
+            let initializer = parse_expression(cursor, context)?;
 
             Ok(Expression::VariableDeclaration(VariableDeclaration {
                 mutable,
@@ -775,15 +804,15 @@ fn parse_variable_declaration(cursor: &mut Cursor) -> Result<Expression, String>
     }
 }
 
-fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_if(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::If) {
-        return parse_unary(cursor);
+        return parse_unary(cursor, context);
     }
 
     cursor.bump()?; // Consume the if
 
-    let if_condition = parse_expression(cursor)?;
-    let if_block = fat_arrow_expr_or_block_expr(cursor)?;
+    let if_condition = parse_expression(cursor, context)?;
+    let if_block = fat_arrow_expr_or_block_expr(cursor, context)?;
 
     let mut r#else = None;
 
@@ -791,9 +820,9 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
         cursor.bump()?; // Consume the else
 
         if cursor.first().kind == TokenKind::Keyword(Keyword::If) {
-            r#else = Some(Box::new(parse_if(cursor)?));
+            r#else = Some(Box::new(parse_if(cursor, context)?));
         } else {
-            let else_expr = fat_arrow_expr_or_block_expr(cursor)?;
+            let else_expr = fat_arrow_expr_or_block_expr(cursor, context)?;
             r#else = Some(Box::new(else_expr));
         }
     }
@@ -805,13 +834,13 @@ fn parse_if(cursor: &mut Cursor) -> Result<Expression, String> {
     }))
 }
 
-fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_unary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if matches!(
         cursor.first().kind,
         TokenKind::Plus | TokenKind::Minus | TokenKind::Bang | TokenKind::Tilde
     ) {
         let operator = cursor.bump()?.kind; // Consume the +, -, !, or ~
-        let right = parse_unary(cursor)?;
+        let right = parse_unary(cursor, context)?;
 
         if matches!(operator, TokenKind::Minus)
             && matches!(
@@ -865,11 +894,14 @@ fn parse_unary(cursor: &mut Cursor) -> Result<Expression, String> {
         }));
     }
 
-    parse_call_or_param_propagation(cursor)
+    parse_call_or_param_propagation(cursor, context)
 }
 
-fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut expression = parse_member_access(cursor)?;
+fn parse_call_or_param_propagation(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, String> {
+    let mut expression = parse_member_access(cursor, context)?;
 
     if cursor.first().kind == TokenKind::DoubleColon && cursor.second().kind == TokenKind::Less {
         cursor.bump()?; // Consume the ::
@@ -888,7 +920,7 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
         match cursor.first().kind {
             // Call expression
             TokenKind::OpenParen => {
-                expression = parse_call_expression(expression, cursor)?;
+                expression = parse_call_expression(expression, cursor, context)?;
             }
             // Param propagation
             TokenKind::Colon => {
@@ -897,12 +929,12 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
                 if cursor.first().kind == TokenKind::OpenBracket {
                     cursor.bump()?; // Consume the [
 
-                    let index = parse_expression(cursor)?;
+                    let index = parse_index(cursor, context)?;
                     cursor.expect(TokenKind::CloseBracket)?;
 
                     expression = Expression::Member(Member::Index {
                         object: Box::new(expression),
-                        index: Box::new(index),
+                        index,
                     });
                 } else {
                     let TokenKind::Identifier(identifier) = cursor.first().kind else {
@@ -912,7 +944,7 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
                         ));
                     };
 
-                    let Expression::Member(member) = parse_literal(cursor)? else {
+                    let Expression::Member(member) = parse_literal(cursor, context)? else {
                         return Err(format!(
                             "Expected member but found {:?}",
                             cursor.first().kind
@@ -934,8 +966,12 @@ fn parse_call_or_param_propagation(cursor: &mut Cursor) -> Result<Expression, St
     Ok(expression)
 }
 
-fn parse_call_expression(callee: Expression, cursor: &mut Cursor) -> Result<Expression, String> {
-    let arguments = parse_args(cursor)?;
+fn parse_call_expression(
+    callee: Expression,
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, String> {
+    let arguments = parse_args(cursor, context)?;
     cursor.bump()?; // Consume the )
 
     let mut call = Expression::Call(Call {
@@ -951,13 +987,13 @@ fn parse_call_expression(callee: Expression, cursor: &mut Cursor) -> Result<Expr
     }
 
     if let TokenKind::OpenParen = cursor.first().kind {
-        call = parse_call_expression(call, cursor)?;
+        call = parse_call_expression(call, cursor, context)?;
     }
 
     Ok(call)
 }
 
-fn parse_args(cursor: &mut Cursor) -> Result<Vec<Expression>, String> {
+fn parse_args(cursor: &mut Cursor, context: &ParseContext) -> Result<Vec<Expression>, String> {
     let TokenKind::OpenParen = cursor.bump()?.kind else {
         return Err(format!("Expected ( but found {:?}", cursor.first().kind));
     };
@@ -965,24 +1001,24 @@ fn parse_args(cursor: &mut Cursor) -> Result<Vec<Expression>, String> {
     if let TokenKind::CloseParen = cursor.first().kind {
         Ok(vec![])
     } else {
-        parse_args_list(cursor)
+        parse_args_list(cursor, context)
     }
 }
 
-fn parse_args_list(cursor: &mut Cursor) -> Result<Vec<Expression>, String> {
-    let mut args = parse_expression(cursor).map(|e| vec![e])?;
+fn parse_args_list(cursor: &mut Cursor, context: &ParseContext) -> Result<Vec<Expression>, String> {
+    let mut args = parse_expression(cursor, context).map(|e| vec![e])?;
 
     while let TokenKind::Comma = cursor.first().kind {
         cursor.bump()?; // Consume the ,
-        let expression = parse_expression(cursor)?;
+        let expression = parse_expression(cursor, context)?;
         args.push(expression);
     }
 
     Ok(args)
 }
 
-fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
-    let mut object = parse_literal(cursor)?;
+fn parse_member_access(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    let mut object = parse_literal(cursor, context)?;
 
     while let TokenKind::DoubleColon = cursor.first().kind {
         let Expression::Member(Member::Identifier { symbol, generics }) = &object else {
@@ -1018,7 +1054,7 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
 
         cursor.bump()?; // Consume the ::
 
-        let Expression::Member(member) = parse_literal(cursor)? else {
+        let Expression::Member(member) = parse_literal(cursor, context)? else {
             return Err(format!(
                 "Expected member but found {:?}",
                 cursor.first().kind
@@ -1043,7 +1079,7 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
             ));
         };
 
-        let Expression::Member(member) = parse_literal(cursor)? else {
+        let Expression::Member(member) = parse_literal(cursor, context)? else {
             return Err(format!(
                 "Expected member but found {:?}",
                 cursor.first().kind
@@ -1058,56 +1094,19 @@ fn parse_member_access(cursor: &mut Cursor) -> Result<Expression, String> {
         });
     }
 
-    if let TokenKind::Colon = cursor.first().kind {
-        cursor.bump()?; // Consume the :
-
-        if cursor.first().kind == TokenKind::OpenBracket {
-            cursor.bump()?; // Consume the [
-
-            let index = parse_expression(cursor)?;
-            cursor.expect(TokenKind::CloseBracket)?;
-
-            object = Expression::Member(Member::Index {
-                object: Box::new(object),
-                index: Box::new(index),
-            });
-        } else {
-            let TokenKind::Identifier(identifier) = cursor.first().kind else {
-                return Err(format!(
-                    "Expected identifier but found {:?}",
-                    cursor.first().kind
-                ));
-            };
-
-            let Expression::Member(member) = parse_literal(cursor)? else {
-                return Err(format!(
-                    "Expected member but found {:?}",
-                    cursor.first().kind
-                ));
-            };
-
-            object = Expression::Member(Member::ParamPropagation {
-                object: Box::new(object),
-                member: Box::new(member),
-                symbol: identifier,
-                generics: None,
-            });
-        }
-    }
-
     Ok(object)
 }
 
-pub fn parse_literal(cursor: &mut Cursor) -> Result<Expression, String> {
+pub fn parse_literal(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     let TokenKind::Literal(literal) = cursor.first().kind else {
-        return parse_primary(cursor);
+        return parse_primary(cursor, context);
     };
 
     cursor.bump()?; // Consume the literal
     to_expression_literal(literal)
 }
 
-fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
+fn parse_primary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     match cursor.first().kind {
         TokenKind::Identifier(identifier) => {
             cursor.bump()?; // Consume the identifier
@@ -1120,7 +1119,8 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
         TokenKind::OpenParen => {
             cursor.bump()?; // Consume the (
 
-            let expression = parse_expression(cursor)?;
+            let context = &ParseContext::default();
+            let expression = parse_expression(cursor, context)?;
 
             match cursor.first().kind {
                 TokenKind::CloseParen => {
@@ -1133,7 +1133,7 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
                     while cursor.first().kind == TokenKind::Comma {
                         cursor.bump()?; // Consume the ,
 
-                        elements.push(parse_expression(cursor)?);
+                        elements.push(parse_expression(cursor, context)?);
                     }
 
                     cursor.expect(TokenKind::CloseParen)?;
@@ -1149,7 +1149,7 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
         TokenKind::OpenBracket => {
             cursor.bump()?; // Consume the [
 
-            let first_expression = parse_expression(cursor)?;
+            let first_expression = parse_expression(cursor, context)?;
 
             match cursor.first().kind {
                 TokenKind::CloseBracket => {
@@ -1164,7 +1164,7 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
                     let mut elements = vec![first_expression];
 
                     while cursor.first().kind != TokenKind::CloseBracket {
-                        elements.push(parse_expression(cursor)?);
+                        elements.push(parse_expression(cursor, context)?);
 
                         if cursor.first().kind == TokenKind::Comma {
                             cursor.bump()?; // Consume the ,
@@ -1176,12 +1176,12 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
                 }
                 TokenKind::Semicolon => {
                     cursor.bump()?; // Consume the ;
-                    let index = parse_expression(cursor)?;
+                    let index = parse_index(cursor, context)?;
 
-                    cursor.bump()?; // Consume the ]
+                    cursor.expect(TokenKind::CloseBracket)?;
                     Ok(Expression::Member(Member::Index {
                         object: Box::new(first_expression),
-                        index: Box::new(index),
+                        index,
                     }))
                 }
                 _ => Err(format!("Unexpected token {:?}", cursor.first().kind)),
@@ -1192,6 +1192,48 @@ fn parse_primary(cursor: &mut Cursor) -> Result<Expression, String> {
             cursor.first().kind
         )),
     }
+}
+
+fn parse_index(cursor: &mut Cursor, context: &ParseContext) -> Result<Index, String> {
+    let mut start = None;
+
+    let mut context = context.clone();
+    context.is_index = true;
+
+    if cursor.first().kind != TokenKind::DoubleDot {
+        let index = parse_expression(cursor, &context)?;
+
+        if cursor.first().kind != TokenKind::DoubleDot {
+            return Ok(Index::Value(Box::new(index)));
+        }
+
+        start = Some(Box::new(index));
+    }
+
+    cursor.expect(TokenKind::DoubleDot)?;
+
+    if cursor.first().kind == TokenKind::CloseBracket {
+        return Ok(Index::Range {
+            start,
+            end: None,
+            inclusive: false,
+        });
+    }
+
+    let inclusive = if cursor.first().kind == TokenKind::Equal {
+        cursor.bump()?; // Consume the =
+        true
+    } else {
+        false
+    };
+
+    let end = parse_expression(cursor, &context)?;
+
+    Ok(Index::Range {
+        start,
+        end: Some(Box::new(end)),
+        inclusive,
+    })
 }
 
 fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
