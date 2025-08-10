@@ -50,6 +50,10 @@ impl Value {
             },
         })
     }
+
+    pub fn is_void(&self) -> bool {
+        *self == Value::Void
+    }
 }
 
 impl Display for Value {

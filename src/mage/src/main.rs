@@ -314,7 +314,7 @@ pub fn read_input(
         eprintln!("{}", input);
     }
 
-    if print_result {
+    if print_result && !result.is_void() {
         println!("{}", result);
     }
 
