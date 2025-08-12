@@ -42,15 +42,19 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
 
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    match std::fs::read_to_string(lib) {
-        Ok(lib) => read_input(
-            lib,
-            type_environment.clone(),
-            environment.clone(),
-            args,
-            false,
-        )?,
-        Err(e) => panic!("Failed to read lib: {}", e),
+    let lib_exists = std::fs::exists(&lib).map_err(|e| e.to_string())?;
+
+    if lib_exists {
+        match std::fs::read_to_string(lib) {
+            Ok(lib) => read_input(
+                lib,
+                type_environment.clone(),
+                environment.clone(),
+                args,
+                false,
+            )?,
+            Err(e) => panic!("Failed to read lib: {}", e),
+        }
     }
 
     loop {
