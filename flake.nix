@@ -21,7 +21,7 @@
       in {
         # packages.default = arcanaPackage;
         packages.default = naerskLib.buildPackage {
-          src = ./.;
+          src = self;
           nativeBuildInputs = [ pkgs.pkg-config ];
         };
 
