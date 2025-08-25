@@ -28,7 +28,7 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
         .expect("Failed to convert path to string")
         .to_string();
 
-    let lib_path = format!("{}\\lib\\lib.ar", exe).replace('\\', "/");
+    let lib_path = format!("{exe}\\lib\\lib.ar").replace('\\', "/");
 
     let lib = get_path(&lib_path)
         .map_err(|e| e.to_string())?
@@ -53,7 +53,7 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
                 args,
                 false,
             )?,
-            Err(e) => panic!("Failed to read lib: {}", e),
+            Err(e) => panic!("Failed to read lib: {e}"),
         }
     }
 
@@ -80,12 +80,12 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
 
             let path = path.join(file_name).with_extension("ar");
 
-            println!("Reading file: {:?}", path);
+            println!("Reading file: {path:?}");
 
             match fs::read_to_string(path) {
                 Ok(source) => input = source,
                 Err(e) => {
-                    println!("Failed to read file: {}", e);
+                    println!("Failed to read file: {e}");
                     continue;
                 }
             }
@@ -97,9 +97,9 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
             for (type_, members) in type_environment.borrow().get_static_members() {
                 for (ident, member_type) in members {
                     if let Type::Function(..) = member_type {
-                        println!("{}::{} -> {}", type_, ident, member_type);
+                        println!("{type_}::{ident} -> {member_type}");
                     } else {
-                        println!("{}::{}", type_, member_type);
+                        println!("{type_}::{member_type}");
                     }
                 }
             }
@@ -109,9 +109,9 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
 
             for (ident, type_) in type_environment.borrow().get_types() {
                 if let Type::Function(..) = type_ {
-                    println!("{} -> {}", ident, type_);
+                    println!("{ident} -> {type_}");
                 } else {
-                    println!("{}", type_);
+                    println!("{type_}");
                 }
             }
 
@@ -122,7 +122,7 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
             println!("Type environment variables:");
 
             for (name, type_) in type_environment.borrow().get_variables() {
-                println!("{}: {}", name, type_);
+                println!("{name}: {type_}");
             }
 
             println!();
@@ -154,7 +154,7 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
 
         if input.trim() == "varsd" {
             for (name, variable) in type_environment.borrow().get_variables() {
-                println!("{}: {:?}", name, variable);
+                println!("{name}: {variable:?}");
             }
             continue;
         }
@@ -178,9 +178,9 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
             args,
             true,
         ) {
-            println!("Error: {}", message);
+            println!("Error: {message}");
             println!();
-            println!("{}", input);
+            println!("{input}");
         }
 
         println!()

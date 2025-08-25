@@ -70,10 +70,7 @@ fn assignment_has_correct_type() {
                 }
             );
         }
-        _ => panic!(
-            "Expected an assignment expression, but found {:?}",
-            expression
-        ),
+        _ => panic!("Expected an assignment expression, but found {expression:?}"),
     }
 }
 

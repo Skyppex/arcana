@@ -46,7 +46,7 @@ fn run() -> std::io::Result<()> {
     };
 
     if let Err(error) = result {
-        eprintln!("Fatal: {}", error);
+        eprintln!("Fatal: {error}");
     }
 
     Ok(())
@@ -79,10 +79,10 @@ pub fn run_source(source: &str, args: &Cli) -> Result<(), String> {
             return Err("No files with extension .ar found in workspace".to_string());
         };
 
-        let spell_content = std::fs::read_to_string(spell).map_err(|e| format!("{}", e))?;
+        let spell_content = std::fs::read_to_string(spell).map_err(|e| format!("{e}"))?;
 
         let spell_config = toml::from_str::<SpellConfig>(&spell_content)
-            .map_err(|e| format!("Failed to parse spell.toml: {}", e))?;
+            .map_err(|e| format!("Failed to parse spell.toml: {e}"))?;
 
         return run_spell(spell_config, project_files, &source, args);
     }
@@ -122,7 +122,7 @@ fn run_spell(
         .expect("Failed to convert path to string")
         .to_string();
 
-    let lib_path = format!("{}/lib/lib.ar", exe).replace('\\', "/");
+    let lib_path = format!("{exe}/lib/lib.ar").replace('\\', "/");
 
     let lib = get_path(&lib_path)
         .map_err(|e| e.to_string())?
@@ -149,7 +149,7 @@ fn run_spell(
     }
 
     let main_content = std::fs::read_to_string(main.clone())
-        .map_err(|error| format!("Failed to read main file: {}", error))?;
+        .map_err(|error| format!("Failed to read main file: {error}"))?;
 
     let result = read_input(
         main_content,
@@ -179,7 +179,7 @@ fn run_spell(
         }
 
         for (.., type_) in type_environment.borrow().get_types() {
-            println!("{}", type_);
+            println!("{type_}");
         }
     }
 
@@ -191,8 +191,8 @@ fn run_script(
     project_files: Option<Vec<PathBuf>>,
     args: &Cli,
 ) -> Result<(), String> {
-    let source = std::fs::read_to_string(source)
-        .map_err(|error| format!("Failed to read file: {}", error))?;
+    let source =
+        std::fs::read_to_string(source).map_err(|error| format!("Failed to read file: {error}"))?;
 
     let mut lines = source.lines();
 
@@ -219,7 +219,7 @@ fn run_script(
         .expect("Failed to convert path to string")
         .to_string();
 
-    let lib_path = format!("{}/lib/lib.ar", exe).replace('\\', "/");
+    let lib_path = format!("{exe}/lib/lib.ar").replace('\\', "/");
 
     let lib = get_path(&lib_path)
         .map_err(|e| e.to_string())?
@@ -275,7 +275,7 @@ fn run_script(
         }
 
         for (.., type_) in type_environment.borrow().get_types() {
-            println!("{}", type_);
+            println!("{type_}");
         }
     }
 
@@ -311,11 +311,11 @@ pub fn read_input(
     let result = interpreter::evaluate(typed_program, environment)?;
 
     if print_tokens | print_parser_ast || print_type_checker_ast {
-        eprintln!("{}", input);
+        eprintln!("{input}");
     }
 
     if print_result && !result.is_void() {
-        println!("{}", result);
+        println!("{result}");
     }
 
     Ok(())
@@ -330,7 +330,7 @@ pub fn register_modules(
         .iter()
         .map(|project_file| {
             std::fs::read_to_string(project_file)
-                .map_err(|error| format!("Failed to read file: {}", error))
+                .map_err(|error| format!("Failed to read file: {error}"))
         })
         .collect::<Result<Vec<_>, _>>()?;
 

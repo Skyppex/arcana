@@ -42,7 +42,7 @@ fn literal_has_correct_type() {
         TypedExpression::Literal(literal) => {
             assert!(matches!(literal, ValueLiteral::Int(_)));
         }
-        _ => panic!("Expected a literal expression, but found {:?}", expression),
+        _ => panic!("Expected a literal expression, but found {expression:?}"),
     }
 }
 

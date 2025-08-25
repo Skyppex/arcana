@@ -28,10 +28,7 @@ fn variable_declaration_is_immutable() {
         TypedExpression::VariableDeclaration { mutable, .. } => {
             assert!(!mutable);
         }
-        _ => panic!(
-            "Expected a variable declaration, but found {:?}",
-            expression
-        ),
+        _ => panic!("Expected a variable declaration, but found {expression:?}"),
     }
 }
 
@@ -54,10 +51,7 @@ fn variable_declaration_is_mutable() {
         TypedExpression::VariableDeclaration { mutable, .. } => {
             assert!(mutable);
         }
-        _ => panic!(
-            "Expected a variable declaration, but found {:?}",
-            expression
-        ),
+        _ => panic!("Expected a variable declaration, but found {expression:?}"),
     }
 }
 
@@ -80,10 +74,7 @@ fn variable_declaration_has_correct_identifier() {
         TypedExpression::VariableDeclaration { pattern, .. } => {
             assert_eq!(pattern, Pattern::Variable("x".to_owned()));
         }
-        _ => panic!(
-            "Expected a variable declaration, but found {:?}",
-            expression
-        ),
+        _ => panic!("Expected a variable declaration, but found {expression:?}"),
     }
 }
 
@@ -124,10 +115,7 @@ fn variable_declaration_has_no_initializer() {
         TypedExpression::VariableDeclaration { initializer, .. } => {
             assert_eq!(initializer, None);
         }
-        _ => panic!(
-            "Expected a variable declaration, but found {:?}",
-            expression
-        ),
+        _ => panic!("Expected a variable declaration, but found {expression:?}"),
     }
 }
 
@@ -156,10 +144,7 @@ fn variable_declaration_has_value() {
                 TypedExpression::Literal(ValueLiteral::Bool(true))
             );
         }
-        _ => panic!(
-            "Expected a variable declaration, but found {:?}",
-            expression
-        ),
+        _ => panic!("Expected a variable declaration, but found {expression:?}"),
     }
 }
 
