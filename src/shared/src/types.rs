@@ -532,7 +532,7 @@ pub(super) fn parse_type_annotation(
                     return Err(format!("Invalid variant name: {}", variant_name));
                 }
 
-                let type_name = format!("{}::{}", type_name, variant_name);
+                let type_name = format!("{type_name}::{variant_name}");
 
                 if let Some(generics) = generics {
                     return Ok(TypeAnnotation::ConcreteType(type_name, generics));
