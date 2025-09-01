@@ -5,6 +5,10 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nix-community/naersk";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
@@ -12,19 +16,45 @@
     nixpkgs,
     flake-utils,
     naersk,
+    fenix,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (system: let
       # system = "x86_64-linux";
       pkgs = import nixpkgs {inherit system;};
-      naerskLib = pkgs.callPackage naersk {};
+      fenixLib = fenix.packages.${system};
+      toolchain = with fenixLib;
+        combine [
+          (stable.withComponents [
+            "rustc"
+            "cargo"
+            "rustfmt"
+            "clippy"
+            "rust-src"
+          ])
+        ];
+
+      naerskLib = (pkgs.callPackage naersk {}).override {
+        cargo = toolchain;
+        rustc = toolchain;
+      };
 
       arcanaPackage = {release}:
         import ./default.nix {
+          src = self;
           naersk = naerskLib;
-          pkg-config = pkgs.pkg-config;
+          pkgConfig = pkgs.pkg-config;
           inherit release;
         };
+      checks = import ./checks.nix {
+        src = self;
+        naersk = naerskLib;
+        pkgs = pkgs;
+      };
+      apps = import ./apps.nix {
+        arcanaPackage = arcanaPackage;
+        pkgs = pkgs;
+      };
     in {
       packages = rec {
         default = debug;
@@ -33,57 +63,13 @@
       };
 
       devShells.default = pkgs.mkShell {
-        buildInputs = with pkgs; [cargo rustc rustfmt clippy rust-analyzer];
-        env.RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+        packages = [toolchain];
+        env.RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
       };
 
-      checks = {
-        cargo-check = naerskLib.buildPackage {
-          src = self;
-          mode = "check";
-        };
+      checks = checks;
 
-        cargo-test = naerskLib.buildPackage {
-          src = self;
-          mode = "test";
-        };
-
-        cargo-clippy = naerskLib.buildPackage {
-          src = self;
-          mode = "clippy";
-        };
-
-        cargo-fmt =
-          pkgs.runCommand "cargo-fmt-check" {
-            buildInputs = [pkgs.rustfmt pkgs.cargo];
-          } ''
-            cp -r ${self} ./source
-            chmod -R +w ./source
-            cd ./source
-            cargo fmt --all -- --check
-            touch $out
-          '';
-      };
-
-      apps = rec {
-        default = mage;
-
-        mage = {
-          type = "app";
-          program = "${arcanaPackage {release = false;}}/bin/mage";
-        };
-
-        fix = {
-          type = "app";
-          program = "${pkgs.writeShellApplication {
-            name = "cargo-fix";
-            runtimeInputs = [pkgs.cargo pkgs.clippy];
-            text = ''
-              cargo clippy --fix --allow-dirty --allow-staged --all-targets
-            '';
-          }}/bin/cargo-fix";
-        };
-      };
+      apps = apps;
 
       formatter = pkgs.writeShellApplication {
         name = "fmt";

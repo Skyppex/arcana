@@ -1,12 +1,13 @@
 {
+  src,
   naersk,
-  pkg-config,
+  pkgConfig,
   release ? false,
 }:
 naersk.buildPackage {
   name = "arcana";
-  src = ./.;
-  nativeBuildInputs = [pkg-config];
+  inherit src;
+  nativeBuildInputs = [pkgConfig];
   doCheck = false;
 
   cargoBuildFlags =
