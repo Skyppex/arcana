@@ -1,10 +1,19 @@
-{ naersk, pkg-config }:
-
+{
+  naersk,
+  pkg-config,
+  release ? false,
+}:
 naersk.buildPackage {
   name = "arcana";
   src = ./.;
-  nativeBuildInputs = [ pkg-config ];
+  nativeBuildInputs = [pkg-config];
   doCheck = false;
 
-  cargoBuildFlags = [ "--bin" "mage" ];
+  cargoBuildFlags =
+    ["--bin" "mage"]
+    ++ (
+      if release
+      then ["--release"]
+      else []
+    );
 }

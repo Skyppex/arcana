@@ -19,15 +19,17 @@
       pkgs = import nixpkgs {inherit system;};
       naerskLib = pkgs.callPackage naersk {};
 
-      arcanaPackage = import ./default.nix {
-        naersk = naerskLib;
-        pkg-config = pkgs.pkg-config;
-      };
+      arcanaPackage = {release}:
+        import ./default.nix {
+          naersk = naerskLib;
+          pkg-config = pkgs.pkg-config;
+          inherit release;
+        };
     in {
-      # packages.default = arcanaPackage;
-      packages.default = naerskLib.buildPackage {
-        src = self;
-        nativeBuildInputs = [pkgs.pkg-config];
+      packages = rec {
+        default = debug;
+        debug = arcanaPackage {release = false;};
+        release = arcanaPackage {release = true;};
       };
 
       devShells.default = pkgs.mkShell {
@@ -68,7 +70,7 @@
 
         mage = {
           type = "app";
-          program = "${arcanaPackage}/bin/mage";
+          program = "${arcanaPackage {release = false;}}/bin/mage";
         };
 
         fix = {
