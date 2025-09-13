@@ -31,7 +31,7 @@ pub enum Pattern {
     Int(i64),
     UInt(u64),
     Float(f64),
-    Char(char),
+    Rune(char),
     String(String),
     Variable(String),
     Constructor(Constructor),
@@ -52,7 +52,7 @@ impl Display for Pattern {
             Pattern::Int(v) => write!(f, "{}", v),
             Pattern::UInt(v) => write!(f, "{}", v),
             Pattern::Float(v) => write!(f, "{}", v),
-            Pattern::Char(v) => write!(f, "{}", v),
+            Pattern::Rune(v) => write!(f, "{}", v),
             Pattern::String(v) => write!(f, "{}", v),
             Pattern::Variable(v) => write!(f, "{}", v),
             Pattern::Constructor(Constructor::Struct {
@@ -449,12 +449,12 @@ pub fn create_decision_tree(
 
             Ok(decision)
         }
-        Pattern::Char(v) => {
-            if !type_equals(&Type::Char, &matchee.get_type()) {
+        Pattern::Rune(v) => {
+            if !type_equals(&Type::Rune, &matchee.get_type()) {
                 return Err(format!(
                     "Expected type {:?} but got {:?}",
                     matchee.get_type(),
-                    Type::Char,
+                    Type::Rune,
                 ));
             }
             let expression = &arm.expression;
@@ -482,7 +482,7 @@ pub fn create_decision_tree(
                     left: Box::new(matchee),
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal(
-                        crate::type_checker::model::ValueLiteral::Char(v),
+                        crate::type_checker::model::ValueLiteral::Rune(v),
                     )),
                     type_: Type::Bool,
                 }),

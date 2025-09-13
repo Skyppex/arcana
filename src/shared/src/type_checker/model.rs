@@ -797,7 +797,7 @@ pub enum ValueLiteral {
     UInt(u64),
     Float(f64),
     String(String),
-    Char(char),
+    Rune(char),
     Bool(bool),
     Array {
         values: Vec<TypedExpression>,
@@ -844,9 +844,9 @@ impl Typed for ValueLiteral {
                 name: format!("\"{}\"", v),
                 type_: Box::new(LiteralType::StringValue(v.clone())),
             },
-            ValueLiteral::Char(v) => Type::Literal {
+            ValueLiteral::Rune(v) => Type::Literal {
                 name: format!("'{}'", v),
-                type_: Box::new(LiteralType::CharValue(v.to_string())),
+                type_: Box::new(LiteralType::RuneValue(v.to_string())),
             },
             ValueLiteral::Bool(v) => Type::Literal {
                 name: v.to_string(),
@@ -866,7 +866,7 @@ impl Typed for ValueLiteral {
             ValueLiteral::UInt(_) => Type::UInt,
             ValueLiteral::Float(_) => Type::Float,
             ValueLiteral::String(_) => Type::String,
-            ValueLiteral::Char(_) => Type::Char,
+            ValueLiteral::Rune(_) => Type::Rune,
             ValueLiteral::Bool(_) => Type::Bool,
             ValueLiteral::Array { type_, .. } => type_.clone(),
             ValueLiteral::Struct { type_, .. } => type_.clone(),
@@ -888,8 +888,8 @@ impl TryFrom<Type> for ValueLiteral {
             LiteralType::UIntValue(value) => Ok(ValueLiteral::UInt(value)),
             LiteralType::FloatValue(value) => Ok(ValueLiteral::Float(value)),
             LiteralType::StringValue(value) => Ok(ValueLiteral::String(value)),
-            LiteralType::CharValue(value) => Ok(ValueLiteral::Char(
-                value.parse().map_err(|_| "Invalid char literal")?,
+            LiteralType::RuneValue(value) => Ok(ValueLiteral::Rune(
+                value.parse().map_err(|_| "Invalid rune literal")?,
             )),
             LiteralType::BoolValue(value) => Ok(ValueLiteral::Bool(value)),
             _ => Err("Invalid type for Literal".into()),
@@ -906,7 +906,7 @@ impl Display for ValueLiteral {
             ValueLiteral::UInt(v) => write!(f, "#{}", v),
             ValueLiteral::Float(v) => write!(f, "#{}", v),
             ValueLiteral::String(v) => write!(f, "#\"{}\"", v),
-            ValueLiteral::Char(v) => write!(f, "#'{}'", v),
+            ValueLiteral::Rune(v) => write!(f, "#'{}'", v),
             ValueLiteral::Bool(v) => write!(f, "#{}", v),
             ValueLiteral::Array { values, .. } => write!(
                 f,

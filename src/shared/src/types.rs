@@ -95,7 +95,7 @@ impl From<Type> for TypeAnnotation {
             Type::UInt => TypeAnnotation::Type("UInt".to_string()),
             Type::Float => TypeAnnotation::Type("Float".to_string()),
             Type::String => TypeAnnotation::Type("String".to_string()),
-            Type::Char => TypeAnnotation::Type("Char".to_string()),
+            Type::Rune => TypeAnnotation::Type("Rune".to_string()),
             Type::Bool => TypeAnnotation::Type("Bool".to_string()),
             Type::Array(t) => TypeAnnotation::Array(Box::new(t.deref().clone().into())),
             Type::Function(Function {
@@ -762,9 +762,9 @@ fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, String> {
             cursor.bump()?; // Consume the float
             Ok(LiteralType::FloatValue(value))
         }
-        TokenKind::Literal(token::Literal::Char(value)) => {
-            cursor.bump()?; // Consume the char
-            Ok(LiteralType::CharValue(value))
+        TokenKind::Literal(token::Literal::Rune(value)) => {
+            cursor.bump()?; // Consume the rune
+            Ok(LiteralType::RuneValue(value))
         }
         TokenKind::Literal(token::Literal::String(value)) => {
             cursor.bump()?; // Consume the string

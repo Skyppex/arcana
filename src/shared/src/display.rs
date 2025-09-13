@@ -1271,7 +1271,7 @@ impl IndentDisplay for ValueLiteral {
             ValueLiteral::UInt(v) => format!("#{}", v),
             ValueLiteral::Float(v) => format!("#{}", v),
             ValueLiteral::String(s) => format!("#\"{}\"", s),
-            ValueLiteral::Char(c) => format!("#'{}'", c),
+            ValueLiteral::Rune(c) => format!("#'{}'", c),
             ValueLiteral::Bool(b) => format!("#{}", b),
             ValueLiteral::Array(expressions) => {
                 let mut result = String::new();
@@ -1675,7 +1675,7 @@ impl IndentDisplay for Pattern {
             Pattern::Int(v) => v.to_string(),
             Pattern::UInt(v) => v.to_string(),
             Pattern::Float(v) => v.to_string(),
-            Pattern::Char(c) => c.to_string(),
+            Pattern::Rune(r) => r.to_string(),
             Pattern::String(s) => s.to_string(),
             Pattern::Variable(v) => v.to_string(),
             Pattern::Constructor(Constructor::Struct {
@@ -2913,7 +2913,7 @@ impl IndentDisplay for type_checker::model::ValueLiteral {
             type_checker::model::ValueLiteral::UInt(v) => format!("#{}", v),
             type_checker::model::ValueLiteral::Float(v) => format!("#{}", v),
             type_checker::model::ValueLiteral::String(s) => format!("#\"{}\"", s),
-            type_checker::model::ValueLiteral::Char(c) => format!("#'{}'", c),
+            type_checker::model::ValueLiteral::Rune(r) => format!("#'{}'", r),
             type_checker::model::ValueLiteral::Bool(b) => format!("#{}", b),
             type_checker::model::ValueLiteral::Array { values, type_ } => {
                 let mut result = String::new();
@@ -3592,13 +3592,13 @@ impl IndentDisplay for LiteralType {
             LiteralType::UInt => "#UInt".to_string(),
             LiteralType::Float => "#Float".to_string(),
             LiteralType::String => "#String".to_string(),
-            LiteralType::Char => "#Char".to_string(),
+            LiteralType::Rune => "#Rune".to_string(),
             LiteralType::Bool => "#Bool".to_string(),
             LiteralType::BoolValue(v) => format!("#{}", v),
             LiteralType::IntValue(v) => format!("#{}", v),
             LiteralType::UIntValue(v) => format!("#{}", v),
             LiteralType::FloatValue(v) => format!("#{}", v),
-            LiteralType::CharValue(v) => format!("#'{}'", v),
+            LiteralType::RuneValue(v) => format!("#'{}'", v),
             LiteralType::StringValue(v) => format!("#\"{}\"", v),
         }
     }

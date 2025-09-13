@@ -11,7 +11,7 @@ pub enum Value {
     Unit,
     Bool(bool),
     Number(Number),
-    Char(char),
+    Rune(char),
     String(String),
     Array(Vec<Value>),
     Tuple(Vec<Value>),
@@ -64,7 +64,7 @@ impl Display for Value {
             Value::Unit => write!(f, "unit"),
             Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),
-            Value::Char(character) => write!(f, "{}", character),
+            Value::Rune(character) => write!(f, "{}", character),
             Value::String(string) => write!(f, "{}", string),
             Value::Array(values) => {
                 write!(f, "[")?;

@@ -44,7 +44,7 @@ impl TypeEnvironment {
                 ("Int".to_string(), Type::Int),
                 ("UInt".to_string(), Type::UInt),
                 ("Float".to_string(), Type::Float),
-                ("Char".to_string(), Type::Char),
+                ("Rune".to_string(), Type::Rune),
                 ("String".to_string(), Type::String),
             ]),
             discovered_types: Vec::new(),

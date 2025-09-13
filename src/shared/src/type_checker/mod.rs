@@ -223,7 +223,7 @@ pub enum Type {
     UInt,
     Float,
     String,
-    Char,
+    Rune,
     Bool,
     Array(Box<Type>),
     Range {
@@ -373,9 +373,9 @@ impl Type {
                 name: v.to_string(),
                 type_: Box::new(LiteralType::Float),
             }),
-            model::ValueLiteral::Char(v) => Ok(Type::Literal {
+            model::ValueLiteral::Rune(v) => Ok(Type::Literal {
                 name: format!("'{}'", v),
-                type_: Box::new(LiteralType::Char),
+                type_: Box::new(LiteralType::Rune),
             }),
             model::ValueLiteral::String(v) => Ok(Type::Literal {
                 name: format!("\"{}\"", v),
@@ -401,7 +401,7 @@ impl Type {
             Type::UInt => TypeIdentifier::Type("UInt".to_string()),
             Type::Float => TypeIdentifier::Type("Float".to_string()),
             Type::String => TypeIdentifier::Type("String".to_string()),
-            Type::Char => TypeIdentifier::Type("Char".to_string()),
+            Type::Rune => TypeIdentifier::Type("Rune".to_string()),
             Type::Bool => TypeIdentifier::Type("Bool".to_string()),
             Type::Struct(s) => s.type_identifier.clone(),
             Type::Enum(u) => u.type_identifier.clone(),
@@ -430,7 +430,7 @@ impl Type {
             Type::UInt => TypeAnnotation::Type("UInt".to_string()),
             Type::Float => TypeAnnotation::Type("Float".to_string()),
             Type::String => TypeAnnotation::Type("String".to_string()),
-            Type::Char => TypeAnnotation::Type("Char".to_string()),
+            Type::Rune => TypeAnnotation::Type("Rune".to_string()),
             Type::Bool => TypeAnnotation::Type("Bool".to_string()),
             Type::Array(type_) => TypeAnnotation::Array(Box::new(type_.type_annotation())),
             Type::Struct(s) => s.type_annotation(),
@@ -830,9 +830,9 @@ impl Type {
                     name: "Float".to_string(),
                     type_: Box::new(LiteralType::Float),
                 },
-                LiteralType::CharValue(_) => Type::Literal {
-                    name: "Char".to_string(),
-                    type_: Box::new(LiteralType::Char),
+                LiteralType::RuneValue(_) => Type::Literal {
+                    name: "Rune".to_string(),
+                    type_: Box::new(LiteralType::Rune),
                 },
                 LiteralType::StringValue(_) => Type::Literal {
                     name: "String".to_string(),
@@ -860,7 +860,7 @@ impl FullName for Type {
             Type::UInt => "UInt".to_string(),
             Type::Float => "Float".to_string(),
             Type::String => "String".to_string(),
-            Type::Char => "Char".to_string(),
+            Type::Rune => "Rune".to_string(),
             Type::Bool => "Bool".to_string(),
             Type::Array(t) => format!("[{}]", t.full_name()),
             Type::Range {
@@ -907,7 +907,7 @@ impl FullName for Type {
 //                 LiteralType::IntValue(v) => model::ValueLiteral::Int(v),
 //                 LiteralType::UIntValue(v) => model::ValueLiteral::UInt(v),
 //                 LiteralType::FloatValue(v) => model::ValueLiteral::Float(v),
-//                 LiteralType::CharValue(v) => model::ValueLiteral::Char(v.parse().unwrap()),
+//                 LiteralType::RuneValue(v) => model::ValueLiteral::Rune(v.parse().unwrap()),
 //                 LiteralType::StringValue(v) => model::ValueLiteral::String(v),
 //                 _ => panic!("Cannot convert literal type to value literal"),
 //             },
@@ -927,7 +927,7 @@ impl FromStr for Type {
             "UInt" => Ok(Type::UInt),
             "Float" => Ok(Type::Float),
             "String" => Ok(Type::String),
-            "Char" => Ok(Type::Char),
+            "Rune" => Ok(Type::Rune),
             "Bool" => Ok(Type::Bool),
             _ => Err(format!("Cannot convert string {} to type", s)),
         }
@@ -949,7 +949,7 @@ impl Display for Type {
             Type::UInt => write!(f, "UInt"),
             Type::Float => write!(f, "Float"),
             Type::String => write!(f, "String"),
-            Type::Char => write!(f, "Char"),
+            Type::Rune => write!(f, "Rune"),
             Type::Bool => write!(f, "Bool"),
             Type::Array(inner) => write!(f, "[{}]", inner),
             Type::Range {
@@ -1067,8 +1067,8 @@ pub enum LiteralType {
     UIntValue(u64),
     Float,
     FloatValue(f64),
-    Char,
-    CharValue(String),
+    Rune,
+    RuneValue(String),
     String,
     StringValue(String),
 }
@@ -1084,8 +1084,8 @@ impl LiteralType {
             LiteralType::UIntValue(_) => Type::UInt,
             LiteralType::Float => Type::Float,
             LiteralType::FloatValue(_) => Type::Float,
-            LiteralType::Char => Type::Char,
-            LiteralType::CharValue(_) => Type::Char,
+            LiteralType::Rune => Type::Rune,
+            LiteralType::RuneValue(_) => Type::Rune,
             LiteralType::String => Type::String,
             LiteralType::StringValue(_) => Type::String,
         }
@@ -1125,13 +1125,13 @@ impl LiteralType {
                 name: format!("{}", v),
                 type_: Box::new(LiteralType::FloatValue(*v)),
             },
-            LiteralType::Char => Type::Literal {
-                name: "Char".to_string(),
-                type_: Box::new(LiteralType::Char),
+            LiteralType::Rune => Type::Literal {
+                name: "Rune".to_string(),
+                type_: Box::new(LiteralType::Rune),
             },
-            LiteralType::CharValue(v) => Type::Literal {
+            LiteralType::RuneValue(v) => Type::Literal {
                 name: format!("'{}'", v),
-                type_: Box::new(LiteralType::CharValue(v.clone())),
+                type_: Box::new(LiteralType::RuneValue(v.clone())),
             },
             LiteralType::String => Type::Literal {
                 name: "String".to_string(),
@@ -1156,8 +1156,8 @@ impl FullName for LiteralType {
             LiteralType::UIntValue(v) => format!("#{}", v),
             LiteralType::Float => "#Float".to_string(),
             LiteralType::FloatValue(v) => format!("#{}", v),
-            LiteralType::Char => "#Char".to_string(),
-            LiteralType::CharValue(v) => format!("#'{}'", v),
+            LiteralType::Rune => "#Rune".to_string(),
+            LiteralType::RuneValue(v) => format!("#'{}'", v),
             LiteralType::String => "#String".to_string(),
             LiteralType::StringValue(v) => format!("#\"{}\"", v),
         }
@@ -1173,7 +1173,7 @@ impl FromStr for LiteralType {
             "Int" => Ok(LiteralType::Int),
             "UInt" => Ok(LiteralType::UInt),
             "Float" => Ok(LiteralType::Float),
-            "Char" => Ok(LiteralType::Char),
+            "Rune" => Ok(LiteralType::Rune),
             "String" => Ok(LiteralType::String),
             _ => Err(format!("Cannot convert string {} to literal type", s)),
         }
@@ -1187,7 +1187,7 @@ impl From<ValueLiteral> for LiteralType {
             ValueLiteral::Int(v) => LiteralType::IntValue(v),
             ValueLiteral::UInt(v) => LiteralType::UIntValue(v),
             ValueLiteral::Float(v) => LiteralType::FloatValue(v),
-            ValueLiteral::Char(v) => LiteralType::CharValue(v.to_string()),
+            ValueLiteral::Rune(v) => LiteralType::RuneValue(v.to_string()),
             ValueLiteral::String(v) => LiteralType::StringValue(v),
             _ => panic!("Cannot convert value literal to literal type"),
         }
@@ -1201,7 +1201,7 @@ impl From<ast::ValueLiteral> for LiteralType {
             ast::ValueLiteral::Int(v) => LiteralType::IntValue(v),
             ast::ValueLiteral::UInt(v) => LiteralType::UIntValue(v),
             ast::ValueLiteral::Float(v) => LiteralType::FloatValue(v),
-            ast::ValueLiteral::Char(v) => LiteralType::CharValue(v.to_string()),
+            ast::ValueLiteral::Rune(v) => LiteralType::RuneValue(v.to_string()),
             ast::ValueLiteral::String(v) => LiteralType::StringValue(v),
             _ => panic!("Cannot convert value literal to literal type"),
         }
@@ -1233,8 +1233,8 @@ impl Hash for LiteralType {
                     float_literal.to_bits().hash(state);
                 }
             }
-            LiteralType::Char => state.write_u8(8),
-            LiteralType::CharValue(char_literal) => {
+            LiteralType::Rune => state.write_u8(8),
+            LiteralType::RuneValue(char_literal) => {
                 state.write_u8(9);
                 char_literal.hash(state);
             }
@@ -1260,8 +1260,8 @@ impl ToKey for LiteralType {
             LiteralType::UIntValue(v) => format!("#{}", v),
             LiteralType::Float => "#Float".to_string(),
             LiteralType::FloatValue(v) => format!("#{}", v),
-            LiteralType::Char => "#Char".to_string(),
-            LiteralType::CharValue(v) => format!("#'{}'", v),
+            LiteralType::Rune => "#Rune".to_string(),
+            LiteralType::RuneValue(v) => format!("#'{}'", v),
             LiteralType::String => "#String".to_string(),
             LiteralType::StringValue(v) => format!("#\"{}\"", v),
         }
@@ -1279,8 +1279,8 @@ impl Display for LiteralType {
             LiteralType::UIntValue(value) => write!(f, "#{}", value),
             LiteralType::Float => write!(f, "#Float"),
             LiteralType::FloatValue(value) => write!(f, "#{}", value),
-            LiteralType::Char => write!(f, "#Char"),
-            LiteralType::CharValue(value) => write!(f, "#'{}'", value),
+            LiteralType::Rune => write!(f, "#Rune"),
+            LiteralType::RuneValue(value) => write!(f, "#'{}'", value),
             LiteralType::String => write!(f, "#String"),
             LiteralType::StringValue(value) => write!(f, "#\"{}\"", value),
         }
@@ -1448,8 +1448,8 @@ pub fn literal_type_equals(left: &LiteralType, right: &LiteralType) -> bool {
         (LiteralType::UIntValue(l), LiteralType::UIntValue(r)) => l == r,
         (LiteralType::Float, LiteralType::Float | LiteralType::FloatValue(_)) => true,
         (LiteralType::FloatValue(l), LiteralType::FloatValue(r)) => l == r,
-        (LiteralType::Char, LiteralType::Char | LiteralType::CharValue(_)) => true,
-        (LiteralType::CharValue(l), LiteralType::CharValue(r)) => l == r,
+        (LiteralType::Rune, LiteralType::Rune | LiteralType::RuneValue(_)) => true,
+        (LiteralType::RuneValue(l), LiteralType::RuneValue(r)) => l == r,
         (LiteralType::String, LiteralType::String | LiteralType::StringValue(_)) => true,
         (LiteralType::StringValue(l), LiteralType::StringValue(r)) => l == r,
         _ => false,

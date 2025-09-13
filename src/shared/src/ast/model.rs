@@ -277,7 +277,7 @@ pub enum ValueLiteral {
     UInt(u64),
     Float(f64),
     String(String),
-    Char(char),
+    Rune(char),
     Bool(bool),
     Array(Vec<Expression>),
 
@@ -307,7 +307,7 @@ impl Display for ValueLiteral {
             ValueLiteral::UInt(v) => write!(f, "#{}", v),
             ValueLiteral::Float(v) => write!(f, "#{}", v),
             ValueLiteral::String(v) => write!(f, "#\"{}\"", v),
-            ValueLiteral::Char(v) => write!(f, "#'{}'", v),
+            ValueLiteral::Rune(v) => write!(f, "#'{}'", v),
             ValueLiteral::Bool(v) => write!(f, "#{}", v),
             ValueLiteral::Array(array) => write!(
                 f,
@@ -338,7 +338,7 @@ impl ToKey for ValueLiteral {
             ValueLiteral::UInt(v) => format!("#Uint:{}", v),
             ValueLiteral::Float(v) => format!("#Float:{}", v),
             ValueLiteral::String(v) => format!("#String:{}", v),
-            ValueLiteral::Char(v) => format!("#Char:{}", v),
+            ValueLiteral::Rune(v) => format!("#Rune:{}", v),
             ValueLiteral::Bool(v) => format!("#Bool:{}", v),
             ValueLiteral::Array(array) => format!(
                 "#[{}]",

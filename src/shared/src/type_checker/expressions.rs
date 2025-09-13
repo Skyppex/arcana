@@ -580,7 +580,7 @@ pub fn check_type(
             ast::ValueLiteral::String(v) => {
                 Ok(TypedExpression::Literal(ValueLiteral::String(v.clone())))
             }
-            ast::ValueLiteral::Char(v) => Ok(TypedExpression::Literal(ValueLiteral::Char(*v))),
+            ast::ValueLiteral::Rune(v) => Ok(TypedExpression::Literal(ValueLiteral::Rune(*v))),
             ast::ValueLiteral::Bool(v) => Ok(TypedExpression::Literal(ValueLiteral::Bool(*v))),
             ast::ValueLiteral::Array(values) => {
                 let v: Result<(Vec<TypedExpression>, Type), String> = {
@@ -1742,7 +1742,7 @@ fn check_type_pattern(
         | Pattern::Int(_)
         | Pattern::UInt(_)
         | Pattern::Float(_)
-        | Pattern::Char(_)
+        | Pattern::Rune(_)
         | Pattern::String(_)
         | Pattern::LessThan(_)
         | Pattern::GreaterThan(_)
@@ -1809,7 +1809,7 @@ fn get_binop_type(
         (Type::UInt, BinaryOperator::Add, Type::UInt) => Ok(Type::UInt),
         (Type::Float, BinaryOperator::Add, Type::Float) => Ok(Type::Float),
         (Type::String, BinaryOperator::Add, Type::String) => Ok(Type::String),
-        (Type::Char, BinaryOperator::Add, Type::Char) => Ok(Type::String),
+        (Type::Rune, BinaryOperator::Add, Type::Rune) => Ok(Type::String),
         (Type::Int, BinaryOperator::Subtract, Type::Int) => Ok(Type::Int),
         (Type::UInt, BinaryOperator::Subtract, Type::UInt) => Ok(Type::UInt),
         (Type::Float, BinaryOperator::Subtract, Type::Float) => Ok(Type::Float),
@@ -1836,14 +1836,14 @@ fn get_binop_type(
         (Type::UInt, BinaryOperator::Equal, Type::UInt) => Ok(Type::Bool),
         (Type::Float, BinaryOperator::Equal, Type::Float) => Ok(Type::Bool),
         (Type::String, BinaryOperator::Equal, Type::String) => Ok(Type::Bool),
-        (Type::Char, BinaryOperator::Equal, Type::Char) => Ok(Type::Bool),
+        (Type::Rune, BinaryOperator::Equal, Type::Rune) => Ok(Type::Bool),
         (Type::Bool, BinaryOperator::Equal, Type::Bool) => Ok(Type::Bool),
         (Type::Unit, BinaryOperator::Equal, Type::Unit) => Ok(Type::Bool),
         (Type::Int, BinaryOperator::NotEqual, Type::Int) => Ok(Type::Bool),
         (Type::UInt, BinaryOperator::NotEqual, Type::UInt) => Ok(Type::Bool),
         (Type::Float, BinaryOperator::NotEqual, Type::Float) => Ok(Type::Bool),
         (Type::String, BinaryOperator::NotEqual, Type::String) => Ok(Type::Bool),
-        (Type::Char, BinaryOperator::NotEqual, Type::Char) => Ok(Type::Bool),
+        (Type::Rune, BinaryOperator::NotEqual, Type::Rune) => Ok(Type::Bool),
         (Type::Bool, BinaryOperator::NotEqual, Type::Bool) => Ok(Type::Bool),
         (Type::Unit, BinaryOperator::NotEqual, Type::Unit) => Ok(Type::Bool),
         (Type::Int, BinaryOperator::LessThan, Type::Int) => Ok(Type::Bool),
@@ -1862,7 +1862,7 @@ fn get_binop_type(
         (Type::Bool, BinaryOperator::LogicalOr, Type::Bool) => Ok(Type::Bool),
         (Type::Int, BinaryOperator::Range, Type::Int) => Ok(Type::Array(Box::new(Type::Int))),
         (Type::UInt, BinaryOperator::Range, Type::UInt) => Ok(Type::Array(Box::new(Type::UInt))),
-        (Type::Char, BinaryOperator::Range, Type::Char) => Ok(Type::Array(Box::new(Type::Char))),
+        (Type::Rune, BinaryOperator::Range, Type::Rune) => Ok(Type::Array(Box::new(Type::Rune))),
         (Type::TypeAlias(TypeAlias { types, .. }), operator, right_type) => {
             let mut acc = Type::Unknown;
 
@@ -1911,8 +1911,8 @@ fn get_binop_type(
         (Type::UInt, BinaryOperator::RangeInclusive, Type::UInt) => {
             Ok(Type::Array(Box::new(Type::UInt)))
         }
-        (Type::Char, BinaryOperator::RangeInclusive, Type::Char) => {
-            Ok(Type::Array(Box::new(Type::Char)))
+        (Type::Rune, BinaryOperator::RangeInclusive, Type::Rune) => {
+            Ok(Type::Array(Box::new(Type::Rune)))
         }
         (Type::Literal { type_, .. }, operator, Type::Int)
             if matches!(**type_, LiteralType::UIntValue(_)) =>

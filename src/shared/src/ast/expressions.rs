@@ -1286,10 +1286,10 @@ fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::Float(v))
         }
-        TokenKind::Literal(token::Literal::Char(v)) => {
+        TokenKind::Literal(token::Literal::Rune(v)) => {
             cursor.bump()?; // Consume the literal
-            Ok(Pattern::Char(
-                v.parse::<char>().expect("Failed to parse char literal"),
+            Ok(Pattern::Rune(
+                v.parse::<char>().expect("Failed to parse rune literal"),
             ))
         }
         TokenKind::Literal(token::Literal::String(v)) => {
@@ -1408,8 +1408,8 @@ fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> 
         token::Literal::UInt(literal) => Ok(Expression::Literal(ValueLiteral::UInt(literal.value))),
         token::Literal::Float(value) => Ok(Expression::Literal(ValueLiteral::Float(value))),
         token::Literal::String(value) => Ok(Expression::Literal(ValueLiteral::String(value))),
-        token::Literal::Char(value) => Ok(Expression::Literal(ValueLiteral::Char(
-            value.parse::<char>().expect("Failed to parse char literal"),
+        token::Literal::Rune(value) => Ok(Expression::Literal(ValueLiteral::Rune(
+            value.parse::<char>().expect("Failed to parse rune literal"),
         ))),
         token::Literal::Bool(value) => Ok(Expression::Literal(ValueLiteral::Bool(value))),
     }

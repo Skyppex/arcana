@@ -476,15 +476,15 @@ fn evaluate_pattern(
             }
             _ => Err(format!("Expected float, found '{}'", value)),
         },
-        Pattern::Char(v) => match value {
-            Value::Char(v2) => {
+        Pattern::Rune(v) => match value {
+            Value::Rune(v2) => {
                 if *v == *v2 {
                     Ok(Some(Vec::new()))
                 } else {
                     Ok(None)
                 }
             }
-            _ => Err(format!("Expected char, found '{}'", value)),
+            _ => Err(format!("Expected rune, found '{}'", value)),
         },
         Pattern::String(v) => match value {
             Value::String(v2) => {
@@ -1083,7 +1083,7 @@ fn evaluate_literal(
         ValueLiteral::UInt(v) => Ok(Value::Number(Number::UInt(v))),
         ValueLiteral::Float(v) => Ok(Value::Number(Number::Float(v))),
         ValueLiteral::String(v) => Ok(Value::String(v)),
-        ValueLiteral::Char(v) => Ok(Value::Char(v)),
+        ValueLiteral::Rune(v) => Ok(Value::Rune(v)),
         ValueLiteral::Bool(v) => Ok(Value::Bool(v)),
         ValueLiteral::Array { values, .. } => {
             let mut array = Vec::new();

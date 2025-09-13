@@ -253,7 +253,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
 
             cursor.bump();
             Ok(Token {
-                kind: TokenKind::Literal(Literal::Char(string)),
+                kind: TokenKind::Literal(Literal::Rune(string)),
                 length: cursor.position_within_token(),
             })
         }

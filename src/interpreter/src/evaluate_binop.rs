@@ -337,7 +337,7 @@ fn evaluate_equal(
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left == right)),
             (left, right) => Err(format!("Cannot equal {:?} and {:?}", left, right)),
         },
-        (Value::Char(left), Value::Char(right)) => Ok(Value::Bool(left == right)),
+        (Value::Rune(left), Value::Rune(right)) => Ok(Value::Bool(left == right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left == right)),
         (
             Value::Enum(Enum {
@@ -370,7 +370,7 @@ fn evaluate_not_equal(
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left != right)),
             (left, right) => Err(format!("Cannot not equal {:?} and {:?}", left, right)),
         },
-        (Value::Char(left), Value::Char(right)) => Ok(Value::Bool(left != right)),
+        (Value::Rune(left), Value::Rune(right)) => Ok(Value::Bool(left != right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left != right)),
         (left, right) => Err(format!("Cannot not equal {:?} and {:?}", left, right)),
     }
@@ -497,11 +497,11 @@ fn evaluate_range(
             )),
             (left, right, _) => Err(format!("Cannot range {:?} and {:?}", left, right)),
         },
-        (Value::Char(left), Value::Char(right)) => {
+        (Value::Rune(left), Value::Rune(right)) => {
             if !inclusive {
-                Ok(Value::Array((left..right).map(Value::Char).collect()))
+                Ok(Value::Array((left..right).map(Value::Rune).collect()))
             } else {
-                Ok(Value::Array((left..=right).map(Value::Char).collect()))
+                Ok(Value::Array((left..=right).map(Value::Rune).collect()))
             }
         }
         (left, right) => Err(format!("Cannot range {:?} and {:?}", left, right)),

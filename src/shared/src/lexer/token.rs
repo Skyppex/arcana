@@ -108,7 +108,7 @@ pub enum Literal {
     UInt(IntLiteral<u64>),
     Float(f64),
     String(String),
-    Char(String),
+    Rune(String),
     Bool(bool),
 }
 
@@ -121,7 +121,7 @@ impl Display for Literal {
             Literal::UInt(v) => write!(f, "{}", v),
             Literal::Float(v) => write!(f, "{}", v),
             Literal::String(v) => write!(f, "{}", v),
-            Literal::Char(v) => write!(f, "{}", v),
+            Literal::Rune(v) => write!(f, "{}", v),
             Literal::Bool(v) => write!(f, "{}", v),
         }
     }
