@@ -13,3 +13,6 @@ a:[3u..]:println()
 a:[3u..6u]:println()
 a:[3u..=6u]:println()
 
+let r = [['a', 'b'], ['c', 'd'], ['e', 'f']];
+
+r:[1]:[1]

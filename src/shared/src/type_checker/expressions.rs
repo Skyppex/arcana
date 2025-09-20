@@ -591,7 +591,11 @@ pub fn check_type(
                         let value =
                             check_type(value, discovered_types, type_environment.clone(), None)?;
 
-                        let type_ = value.get_deep_type();
+                        let type_ = if let Type::Array(_) = value.get_type() {
+                            value.get_type()
+                        } else {
+                            value.get_deep_type()
+                        };
 
                         if !type_equals(&previous_type, &Type::Void)
                             && !type_equals_unstrict(&type_, &previous_type)
@@ -610,6 +614,7 @@ pub fn check_type(
                 };
 
                 let v = v?;
+
                 let mut target_type = v.1.clone();
 
                 if type_equals(&v.1, &Type::Void) {
