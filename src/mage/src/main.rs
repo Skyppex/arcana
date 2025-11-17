@@ -11,6 +11,7 @@ use utils::{get_path, normalize_path};
 use std::{
     cell::RefCell,
     fs,
+    io::{self, IsTerminal, Read},
     path::{Path, PathBuf},
     rc::Rc,
     thread,
@@ -27,7 +28,7 @@ use shared::{
 
 const STACK_SIZE: usize = 4 * 1024 * 1024;
 
-fn main() -> std::io::Result<()> {
+fn main() -> io::Result<()> {
     // Spawn thread with explicit stack size
     let child = thread::Builder::new().stack_size(STACK_SIZE).spawn(run)?;
 
@@ -36,17 +37,29 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-fn run() -> std::io::Result<()> {
+fn run() -> io::Result<()> {
     let args = crate::cli::Cli::parse();
+    let mut stdin = io::stdin();
+    let mut input = String::new();
 
-    let result = if let Some(ref source) = args.source {
-        run_source(source, &args)
+    if stdin.is_terminal() || stdin.read_to_string(&mut input)? == 0 {
+        let result = if let Some(ref source) = args.source {
+            run_source(source, &args)
+        } else {
+            crate::interactive::interactive(&args)
+        };
+
+        if let Err(error) = result {
+            eprintln!("Fatal: {error}");
+            std::process::exit(1);
+        }
     } else {
-        crate::interactive::interactive(&args)
-    };
+        let result = run_script(input, None, &args);
 
-    if let Err(error) = result {
-        eprintln!("Fatal: {error}");
+        if let Err(error) = result {
+            eprintln!("Fatal: {error}");
+            std::process::exit(1);
+        }
     }
 
     Ok(())
@@ -86,6 +99,9 @@ pub fn run_source(source: &str, args: &Cli) -> Result<(), String> {
 
         return run_spell(spell_config, project_files, &source, args);
     }
+
+    let source =
+        std::fs::read_to_string(source).map_err(|error| format!("Failed to read file: {error}"))?;
 
     run_script(source, project_files, args)
 }
@@ -187,23 +203,20 @@ fn run_spell(
 }
 
 fn run_script(
-    source: PathBuf,
+    content: String,
     project_files: Option<Vec<PathBuf>>,
     args: &Cli,
 ) -> Result<(), String> {
-    let source =
-        std::fs::read_to_string(source).map_err(|error| format!("Failed to read file: {error}"))?;
+    let mut lines = content.lines();
 
-    let mut lines = source.lines();
-
-    let source = if let Some(first_line) = lines.next() {
+    let content = if let Some(first_line) = lines.next() {
         if first_line.starts_with("#!") {
             lines.collect::<Vec<_>>().join("\n")
         } else {
-            source
+            content
         }
     } else {
-        source
+        content
     };
 
     let exe = std::env::current_exe()
@@ -248,7 +261,7 @@ fn run_script(
     }
 
     let result = read_input(
-        source,
+        content,
         type_environment.clone(),
         environment.clone(),
         args,
