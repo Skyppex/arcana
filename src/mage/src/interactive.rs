@@ -58,8 +58,14 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
     }
 
     loop {
-        let _ = io::stdout().flush();
         let mut input = String::new();
+
+        io::stdout()
+            .write_all(b"mage> ")
+            .expect("Failed to write to stdout");
+
+        let _ = io::stdout().flush();
+
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read line");
