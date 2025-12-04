@@ -40,26 +40,25 @@ fn main() -> io::Result<()> {
 fn run() -> io::Result<()> {
     let args = crate::cli::Cli::parse();
     let mut stdin = io::stdin();
-    let mut input = String::new();
 
-    if stdin.is_terminal() || stdin.read_to_string(&mut input)? == 0 {
-        let result = if let Some(ref source) = args.source {
-            run_source(source, &args)
-        } else {
-            crate::interactive::interactive(&args)
-        };
+    let result = match (&args.source, stdin.is_terminal()) {
+        (Some(source), _) => run_source(source, &args),
+        (None, true) => crate::interactive::interactive(&args),
+        (None, false) => {
+            let mut input = String::new();
+            let bytes_read = stdin.read_to_string(&mut input)?;
 
-        if let Err(error) = result {
-            eprintln!("Fatal: {error}");
-            std::process::exit(1);
+            if bytes_read == 0 {
+                Ok(())
+            } else {
+                run_script(input, None, &args)
+            }
         }
-    } else {
-        let result = run_script(input, None, &args);
+    };
 
-        if let Err(error) = result {
-            eprintln!("Fatal: {error}");
-            std::process::exit(1);
-        }
+    if let Err(error) = result {
+        eprintln!("Fatal: {error}");
+        std::process::exit(1);
     }
 
     Ok(())
