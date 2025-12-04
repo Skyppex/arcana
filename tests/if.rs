@@ -110,7 +110,7 @@ fn if_returns_option_some() {
     );
 }
 
-#[ignore]
+#[test]
 fn if_returns_option_some_2() {
     // Arrange
     let input = "if false => { 1 } else if true => { 2 }";
@@ -137,7 +137,7 @@ fn if_returns_option_none() {
     assert_eq!(value, Value::option_none());
 }
 
-#[ignore]
+#[test]
 fn if_returns_option_none_2() {
     // Arrange
     let input = "if false => { 1 } else if false => { 2 }";

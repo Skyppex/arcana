@@ -10,4 +10,4 @@ imp Default for A {
     fun default(): Self => Self { a: 0 }
 }
 
-// let a = A::default();
+let a = A::default()
