@@ -653,7 +653,7 @@ pub fn check_type(
                     .borrow()
                     .get_type_from_annotation(type_annotation)?;
 
-                let Type::Struct(Struct { fields, .. }) = type_.clone() else {
+                let Type::Struct(Struct { fields, .. }) = type_.clone().unsubstitute() else {
                     Err(format!("{} is not a struct", type_.full_name()))?
                 };
 

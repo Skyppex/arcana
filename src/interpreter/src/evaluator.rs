@@ -1095,8 +1095,8 @@ fn evaluate_literal(
             Ok(Value::Array(array))
         }
         ValueLiteral::Struct {
-            type_annotation,
             field_initializers,
+            type_,
             ..
         } => {
             let mut fields = vec![];
@@ -1109,13 +1109,13 @@ fn evaluate_literal(
             }
 
             Ok(Value::Struct(Struct {
-                type_name: type_annotation.to_key(),
+                type_name: type_.unsubstitute().to_key(),
                 fields,
             }))
         }
         ValueLiteral::Enum {
-            type_annotation,
             field_initializers,
+            type_,
             ..
         } => {
             let mut fields = vec![];
@@ -1132,9 +1132,9 @@ fn evaluate_literal(
             }
 
             Ok(Value::Enum(Enum {
-                type_name: type_annotation.to_key(),
+                type_name: type_.clone().unsubstitute().to_key(),
                 enum_member: Struct {
-                    type_name: type_annotation.to_key(),
+                    type_name: type_.unsubstitute().to_key(),
                     fields,
                 },
             }))

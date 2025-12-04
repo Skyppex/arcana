@@ -113,7 +113,7 @@ fn run_spell(
 ) -> Result<(), String> {
     let main = spell
         .main
-        .map(|m| get_path(&m))
+        .map(|m| get_path(args.source.as_ref().unwrap_or(&".".to_string())).map(|p| p.join(m)))
         .transpose()
         .map_err(|e| e.to_string())?
         .map(|p| source.join(&p))

@@ -4,6 +4,7 @@ use shared::{built_in::BuiltInFunctionType, type_checker::model::TypedExpression
 
 use crate::{environment::Rcrc, Environment};
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Uninitialized,
@@ -134,6 +135,8 @@ impl Display for Value {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
+#[allow(unpredictable_function_pointer_comparisons)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionBody {
     Expr(TypedExpression),

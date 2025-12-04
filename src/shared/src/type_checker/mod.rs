@@ -1,6 +1,7 @@
 pub mod decision_tree;
 pub mod full_name;
 pub mod model;
+#[allow(clippy::module_inception)]
 pub mod type_checker;
 pub mod type_environment;
 

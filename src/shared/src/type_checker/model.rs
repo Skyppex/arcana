@@ -19,6 +19,7 @@ pub trait Typed {
     fn get_deep_type(&self) -> Type;
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypedStatement {
     None,
