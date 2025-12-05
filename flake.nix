@@ -66,7 +66,11 @@
       };
 
       devShells.default = pkgs.mkShell {
-        packages = [toolchain];
+        packages = with pkgs; [
+          toolchain
+          nil
+          alejandra
+        ];
         env.RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
       };
 
