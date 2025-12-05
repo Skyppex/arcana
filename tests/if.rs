@@ -60,6 +60,7 @@ fn if_has_correct_type_2() {
 
     assert_eq!(expression.get_type(), Type::Int);
 }
+
 #[test]
 fn if_returns_if_block() {
     // Arrange
