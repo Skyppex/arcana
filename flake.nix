@@ -20,9 +20,9 @@
     ...
   }:
     flake-utils.lib.eachDefaultSystem (system: let
-      # system = "x86_64-linux";
       pkgs = import nixpkgs {inherit system;};
       fenixLib = fenix.packages.${system};
+
       toolchain = with fenixLib;
         combine [
           (stable.withComponents [
@@ -49,14 +49,16 @@
           pkgConfig = pkgs.pkg-config;
           inherit release;
         };
+
       checks = import ./checks.nix {
         src = self;
         naersk = naerskLib;
-        pkgs = pkgs;
+        inherit pkgs;
       };
+
       apps = import ./apps.nix {
-        arcanaPackage = arcanaPackage;
-        pkgs = pkgs;
+        inherit arcanaPackage;
+        inherit pkgs;
       };
     in {
       packages = rec {
@@ -65,18 +67,18 @@
         release = arcanaPackage {release = true;};
       };
 
+      inherit checks;
+      inherit apps;
+
       devShells.default = pkgs.mkShell {
         packages = with pkgs; [
           toolchain
           nil
           alejandra
         ];
+
         env.RUST_SRC_PATH = "${toolchain}/lib/rustlib/src/rust/library";
       };
-
-      checks = checks;
-
-      apps = apps;
 
       formatter = pkgs.writeShellApplication {
         name = "fmt";
