@@ -502,31 +502,11 @@ fn evaluate_pattern(
             field_patterns,
         }) => {
             let fields = match value {
-                Value::Struct(Struct { type_name, fields }) => {
-                    if type_name != &type_annotation.to_key() {
-                        return Err(format!(
-                            "Expected struct '{}', found struct '{}'",
-                            type_annotation, type_name
-                        ));
-                    }
-
-                    fields
-                }
+                Value::Struct(Struct { fields, .. }) => fields,
                 Value::Enum(Enum {
-                    enum_member: Struct { type_name, fields },
+                    enum_member: Struct { fields, .. },
                     ..
-                }) => {
-                    let member_type_annotation = TypeAnnotation::Type(type_name.clone());
-
-                    if !type_annotation_equals(&member_type_annotation, type_annotation) {
-                        return Err(format!(
-                            "Expected enum '{}', found '{}'",
-                            type_annotation, type_name
-                        ));
-                    }
-
-                    fields
-                }
+                }) => fields,
                 _ => return Err(format!("Expected enum, found '{}'", value)),
             };
 
