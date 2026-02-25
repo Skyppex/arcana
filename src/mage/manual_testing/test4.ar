@@ -1,9 +1,16 @@
-enum E {
-    A { a: Int, b: Int },
-    B { a: String, b: String },
+struct Test {
+    a: String,
+    b: Int,
 }
 
-let a = E::A { a: 10, b: 20 };
-let a = E::B { a: "aaa", b: "bbb" };
+let test = Test {
+    a: "hello",
+    b: 300
+}
 
-let A { a, b } = a
+println(test)
+
+let { a, b } = test
+
+println(a)
+println(b)
