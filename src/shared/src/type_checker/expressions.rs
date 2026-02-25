@@ -1623,6 +1623,13 @@ fn check_type_pattern(
                 return Err("Expected initializer for constructor pattern".to_string());
             };
 
+            let type_annotation =
+                if type_annotation_equals(type_annotation, &TypeAnnotation::void()) {
+                    &initializer_type.type_annotation()
+                } else {
+                    type_annotation
+                };
+
             let mut is_enum_member = false;
 
             match &initializer_type {
@@ -1649,10 +1656,7 @@ fn check_type_pattern(
             }
 
             if !is_enum_member
-                && !type_annotation_equals(
-                    &initializer_type.type_annotation(),
-                    &type_annotation.clone(),
-                )
+                && !type_annotation_equals(&initializer_type.type_annotation(), type_annotation)
             {
                 return Err(format!(
                     "Expected type annotation {} but got {}",

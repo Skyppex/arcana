@@ -1306,6 +1306,49 @@ fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
                 }));
             }
 
+            parse_single_pattern(cursor)
+        }
+        TokenKind::Identifier(identifier) if identifier.is_variable_identifier_name() => {
+            cursor.bump()?; // Consume the identifier
+
+            Ok(Pattern::Variable(identifier))
+        }
+        TokenKind::Less => {
+            cursor.bump()?; // Consume the <
+            let pattern = parse_pattern(cursor)?;
+            Ok(Pattern::LessThan(Box::new(pattern)))
+        }
+        TokenKind::Greater => {
+            cursor.bump()?; // Consume the >
+            let pattern = parse_pattern(cursor)?;
+            Ok(Pattern::GreaterThan(Box::new(pattern)))
+        }
+        TokenKind::LessEqual => {
+            cursor.bump()?; // Consume the <=
+            let pattern = parse_pattern(cursor)?;
+            Ok(Pattern::LessThanOrEqual(Box::new(pattern)))
+        }
+        TokenKind::GreaterEqual => {
+            cursor.bump()?; // Consume the >=
+            let pattern = parse_pattern(cursor)?;
+            Ok(Pattern::GreaterThanOrEqual(Box::new(pattern)))
+        }
+        TokenKind::OpenParen => {
+            cursor.bump()?; // Consume the (
+            let mut patterns = vec![];
+
+            while cursor.first().kind != TokenKind::CloseParen {
+                patterns.push(parse_pattern(cursor)?);
+
+                if cursor.first().kind == TokenKind::Comma {
+                    cursor.bump()?; // Consume the ,
+                }
+            }
+
+            cursor.expect(TokenKind::CloseParen)?;
+            Ok(Pattern::Tuple(patterns))
+        }
+        TokenKind::OpenBrace => {
             cursor.bump()?; // Consume the {
 
             let mut fields = vec![];
@@ -1349,49 +1392,9 @@ fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
 
             cursor.expect(TokenKind::CloseBrace)?;
             Ok(Pattern::Constructor(Constructor::Struct {
-                type_annotation,
+                type_annotation: TypeAnnotation::void(),
                 field_patterns: fields,
             }))
-        }
-        TokenKind::Identifier(identifier) if identifier.is_variable_identifier_name() => {
-            cursor.bump()?; // Consume the identifier
-
-            Ok(Pattern::Variable(identifier))
-        }
-        TokenKind::Less => {
-            cursor.bump()?; // Consume the <
-            let pattern = parse_pattern(cursor)?;
-            Ok(Pattern::LessThan(Box::new(pattern)))
-        }
-        TokenKind::Greater => {
-            cursor.bump()?; // Consume the >
-            let pattern = parse_pattern(cursor)?;
-            Ok(Pattern::GreaterThan(Box::new(pattern)))
-        }
-        TokenKind::LessEqual => {
-            cursor.bump()?; // Consume the <=
-            let pattern = parse_pattern(cursor)?;
-            Ok(Pattern::LessThanOrEqual(Box::new(pattern)))
-        }
-        TokenKind::GreaterEqual => {
-            cursor.bump()?; // Consume the >=
-            let pattern = parse_pattern(cursor)?;
-            Ok(Pattern::GreaterThanOrEqual(Box::new(pattern)))
-        }
-        TokenKind::OpenParen => {
-            cursor.bump()?; // Consume the (
-            let mut patterns = vec![];
-
-            while cursor.first().kind != TokenKind::CloseParen {
-                patterns.push(parse_pattern(cursor)?);
-
-                if cursor.first().kind == TokenKind::Comma {
-                    cursor.bump()?; // Consume the ,
-                }
-            }
-
-            cursor.expect(TokenKind::CloseParen)?;
-            Ok(Pattern::Tuple(patterns))
         }
         _ => Err(format!(
             "Unknown start of pattern: {:?}",
