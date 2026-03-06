@@ -1236,9 +1236,11 @@ fn check_type_member_access(
 ) -> Result<TypedExpression, String> {
     let object_type_expression =
         check_type(object, discovered_types, type_environment.clone(), None)?;
+
     let object_type = object_type_expression.get_type();
+
     check_type_member_access_recurse(
-        object_type.clone(),
+        object_type,
         member,
         type_environment,
         object_type_expression,
@@ -1278,7 +1280,7 @@ fn check_type_member_access_recurse(
                         symbol: symbol.clone(),
                         type_: identifier_type.clone(),
                     }),
-                    symbol: symbol.clone(),
+                    symbol,
                     type_: field_type.clone(),
                 }))
             }
@@ -1307,8 +1309,30 @@ fn check_type_member_access_recurse(
                         symbol: symbol.clone(),
                         type_: identifier_type.clone(),
                     }),
-                    symbol: symbol.clone(),
+                    symbol,
                     type_: field_type.clone(),
+                }))
+            }
+            Type::Array(element_type) => {
+                let element_access_expression = check_type_member_access_recurse(
+                    *element_type,
+                    member,
+                    type_environment,
+                    object_typed_expression.clone(),
+                    discovered_types,
+                    context,
+                )?;
+
+                let field_type = Type::Array(Box::new(element_access_expression.get_type()));
+
+                Ok(TypedExpression::Member(Member::MemberAccess {
+                    object: Box::new(object_typed_expression),
+                    member: Box::new(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: field_type.clone(),
+                    }),
+                    symbol,
+                    type_: field_type,
                 }))
             }
             _ => Err(format!(

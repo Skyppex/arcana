@@ -989,6 +989,42 @@ fn evaluate_static_member_access(
         .clone())
 }
 
+/// Helper to extract a field from a value (struct, enum, or recursively from arrays)
+fn extract_field_from_value(value: Value, symbol: &str) -> Result<Value, String> {
+    match value {
+        Value::Struct(Struct { type_name, fields }) => fields
+            .iter()
+            .find(|f| f.identifier == symbol)
+            .map(|f| f.value.clone())
+            .ok_or(format!(
+                "Field '{}' not found in struct '{}'",
+                symbol, type_name
+            )),
+        Value::Enum(Enum {
+            enum_member: Struct { type_name, fields },
+            ..
+        }) => fields
+            .iter()
+            .find(|f| f.identifier == symbol)
+            .map(|f| f.value.clone())
+            .ok_or(format!(
+                "Field '{}' not found in enum member '{}'",
+                symbol, type_name
+            )),
+        Value::Array(elements) => {
+            let results: Result<Vec<Value>, String> = elements
+                .into_iter()
+                .map(|el| extract_field_from_value(el, symbol))
+                .collect();
+            Ok(Value::Array(results?))
+        }
+        other => Err(format!(
+            "Cannot access field '{}' on value: '{}'",
+            symbol, other
+        )),
+    }
+}
+
 fn evaluate_member_access(
     object: Box<TypedExpression>,
     environment: Rcrc<Environment>,
@@ -1041,6 +1077,26 @@ fn evaluate_member_access(
                 type_name
             )),
             Member::MemberAccess { object, member, .. } => {
+                evaluate_member_access(object, environment, member)
+            }
+            Member::BuiltInFunction(_) => {
+                panic!("Cannot access members on a built-in function")
+            }
+            Member::Index { .. } => todo!("members on an indexed expression"),
+        },
+        Value::Array(elements) => match *member.clone() {
+            Member::Identifier { symbol, .. } => {
+                let results: Result<Vec<Value>, String> = elements
+                    .into_iter()
+                    .map(|el| extract_field_from_value(el, &symbol))
+                    .collect();
+                Ok(Value::Array(results?))
+            }
+            Member::StaticMemberAccess { .. } => {
+                Err("Cannot access static member on an array".to_string())
+            }
+            Member::MemberAccess { object, member, .. } => {
+                // For chained access like arr.foo.bar, evaluate the inner access first
                 evaluate_member_access(object, environment, member)
             }
             Member::BuiltInFunction(_) => {
