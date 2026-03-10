@@ -1,11 +1,11 @@
-use std::fmt::Display;
+use std::fmt::{self, Display};
 
 use shared::{built_in::BuiltInFunctionType, type_checker::model::TypedExpression};
 
 use crate::{environment::Rcrc, Environment};
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Value {
     Uninitialized,
     Void,
@@ -131,6 +131,35 @@ impl Display for Value {
                 body: _,
                 environment: _,
             } => write!(f, "fun({})", param_name.clone().unwrap_or("".to_owned())),
+        }
+    }
+}
+
+impl std::fmt::Debug for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Uninitialized => f.write_str("Uninitialized"),
+            Value::Void => f.write_str("Void"),
+            Value::Unit => f.write_str("Unit"),
+            Value::Bool(v) => fmt::Debug::fmt(v, f),
+            Value::Number(v) => fmt::Debug::fmt(v, f),
+            Value::Rune(v) => fmt::Debug::fmt(v, f),
+            Value::String(v) => fmt::Debug::fmt(v, f),
+            Value::Array(v) => fmt::Debug::fmt(v, f),
+            Value::Tuple(v) => fmt::Debug::fmt(v, f),
+            Value::Struct(v) => fmt::Debug::fmt(v, f),
+            Value::Enum(v) => fmt::Debug::fmt(v, f),
+
+            Value::Function {
+                param_name,
+                body,
+                environment: _,
+            } => f
+                .debug_struct("Function")
+                .field("param_name", param_name)
+                .field("body", body)
+                .field("environment", &"<captured>")
+                .finish(),
         }
     }
 }

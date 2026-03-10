@@ -241,12 +241,12 @@ impl TypeEnvironment {
     }
 
     pub fn get_type(&self, key: impl ToKey) -> Option<Type> {
-        self.get_built_in_function(&key).or_else(|| {
-            self.types
-                .get(&key.to_key())
-                .cloned()
-                .or_else(|| self.parent.as_ref().and_then(|p| p.borrow().get_type(key)))
-        })
+        let key = &key.to_key();
+
+        self.get_built_in_function(key)
+            .or_else(|| self.types.get(key).cloned())
+            .or_else(|| self.variables.get(key).cloned())
+            .or_else(|| self.parent.as_ref().and_then(|p| p.borrow().get_type(key)))
     }
 
     pub fn get_type_from_annotation(

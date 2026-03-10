@@ -157,7 +157,7 @@ pub fn parse_while(cursor: &mut Cursor, context: &ParseContext) -> Result<Expres
 
 pub fn parse_for(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::For) {
-        return parse_block(cursor, context);
+        return parse_type_literal(cursor, context);
     }
 
     cursor.bump()?; // Consume the for
@@ -188,35 +188,6 @@ pub fn parse_for(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
         body: Box::new(body),
         else_body: Some(Box::new(else_block)),
     }))
-}
-
-pub fn parse_block(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
-    if cursor.first().kind != TokenKind::OpenBrace {
-        return parse_type_literal(cursor, context);
-    }
-
-    parse_block_statements(cursor, context).map(Expression::Block)
-}
-
-pub fn parse_block_statements(
-    cursor: &mut Cursor,
-    context: &ParseContext,
-) -> Result<Vec<Statement>, String> {
-    if cursor.first().kind != TokenKind::OpenBrace {
-        return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
-    }
-
-    cursor.bump()?; // Consume the {
-
-    let mut statements = vec![];
-
-    while cursor.first().kind != TokenKind::CloseBrace {
-        statements.push(parse_statement(cursor, context)?);
-    }
-
-    cursor.bump()?; // Consume the }
-
-    Ok(statements)
 }
 
 fn parse_type_literal(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
@@ -1116,6 +1087,7 @@ fn parse_primary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
                 generics: None,
             }))
         }
+        TokenKind::OpenBrace => parse_block(cursor, context),
         TokenKind::OpenParen => {
             cursor.bump()?; // Consume the (
 
@@ -1194,6 +1166,27 @@ fn parse_primary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
     }
 }
 
+pub fn parse_block(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    parse_block_statements(cursor, context).map(Expression::Block)
+}
+
+pub fn parse_block_statements(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Vec<Statement>, String> {
+    cursor.expect(TokenKind::OpenBrace)?; // Consume the {
+
+    let mut statements = vec![];
+
+    while cursor.first().kind != TokenKind::CloseBrace {
+        statements.push(parse_statement(cursor, context)?);
+    }
+
+    cursor.expect(TokenKind::CloseBrace)?; // Consume the }
+
+    Ok(statements)
+}
+
 fn parse_index(cursor: &mut Cursor, context: &ParseContext) -> Result<Index, String> {
     let mut start = None;
 
@@ -1245,7 +1238,7 @@ fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
         let inclusive = cursor.first().kind == TokenKind::Equal;
 
         if inclusive {
-            cursor.bump()?; // Consume the =
+            cursor.expect(TokenKind::Equal)?;
         }
 
         let right = parse_pattern(cursor)?;
