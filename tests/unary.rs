@@ -22,7 +22,16 @@ fn identity_is_identity() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression, TypedExpression::Literal(ValueLiteral::Int(1)));
+    assert_eq!(
+        expression,
+        TypedExpression::Literal {
+            literal: ValueLiteral::Int(1),
+            type_: Type::Literal {
+                name: "1".to_string(),
+                type_: Box::new(LiteralType::IntValue(1))
+            }
+        }
+    );
 }
 
 #[test]
@@ -39,7 +48,16 @@ fn negate_is_negate() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression, TypedExpression::Literal(ValueLiteral::Int(-1)));
+    assert_eq!(
+        expression,
+        TypedExpression::Literal {
+            literal: ValueLiteral::Int(-1),
+            type_: Type::Literal {
+                name: "-1".to_string(),
+                type_: Box::new(LiteralType::IntValue(-1))
+            }
+        }
+    );
 }
 
 #[test]

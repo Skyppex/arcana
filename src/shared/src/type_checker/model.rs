@@ -403,7 +403,10 @@ pub enum TypedExpression {
         type_: Type,
     },
     Member(Member),
-    Literal(ValueLiteral),
+    Literal {
+        literal: ValueLiteral,
+        type_: Type,
+    },
     Tuple {
         elements: Vec<TypedExpression>,
         type_: Type,
@@ -462,7 +465,7 @@ impl Typed for TypedExpression {
             TypedExpression::Match { type_, .. } => type_.clone(),
             TypedExpression::Assignment { type_, .. } => type_.clone(),
             TypedExpression::Member(member) => member.get_type(),
-            TypedExpression::Literal(literal) => literal.get_type(),
+            TypedExpression::Literal { type_, .. } => type_.clone(),
             TypedExpression::Tuple { type_, .. } => type_.clone(),
             TypedExpression::Closure { type_, .. } => type_.clone(),
             TypedExpression::Call { type_, .. } => type_.clone(),
@@ -487,7 +490,13 @@ impl Typed for TypedExpression {
             TypedExpression::Match { type_, .. } => type_.clone(),
             TypedExpression::Assignment { type_, .. } => type_.clone(),
             TypedExpression::Member(member) => member.get_deep_type(),
-            TypedExpression::Literal(literal) => literal.get_deep_type(),
+            TypedExpression::Literal { type_, .. } => {
+                if let Type::Array(inner) = type_ {
+                    *inner.clone()
+                } else {
+                    type_.clone()
+                }
+            }
             TypedExpression::Tuple { type_, .. } => type_.clone(),
             TypedExpression::Closure { type_, .. } => type_.clone(),
             TypedExpression::Call { type_, .. } => type_.clone(),
@@ -563,7 +572,7 @@ impl Display for TypedExpression {
                 ..
             } => write!(f, "{} = {}", member, initializer),
             TypedExpression::Member(member) => write!(f, "{}", member),
-            TypedExpression::Literal(literal) => write!(f, "{}", literal),
+            TypedExpression::Literal { literal, .. } => write!(f, "{}", literal),
             TypedExpression::Tuple { elements, .. } => {
                 write!(
                     f,

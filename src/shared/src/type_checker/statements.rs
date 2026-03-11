@@ -1121,7 +1121,7 @@ pub fn check_type(
 
             let body_type = return_scope
                 .map(|s| s.fold())
-                .unwrap_or_else(|| Ok(body_typed_expression.get_deep_type()))?;
+                .unwrap_or_else(|| Ok(body_typed_expression.get_type()))?;
 
             if !type_equals(&return_type, &Type::Void) && !type_equals(&return_type, &body_type) {
                 return Err(format!(

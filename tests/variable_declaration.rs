@@ -141,7 +141,13 @@ fn variable_declaration_has_value() {
             let initializer = *initializer.unwrap();
             assert_eq!(
                 initializer,
-                TypedExpression::Literal(ValueLiteral::Bool(true))
+                TypedExpression::Literal {
+                    literal: ValueLiteral::Bool(true),
+                    type_: Type::Literal {
+                        name: "true".to_string(),
+                        type_: Box::new(LiteralType::BoolValue(true))
+                    }
+                }
             );
         }
         _ => panic!("Expected a variable declaration, but found {expression:?}"),

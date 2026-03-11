@@ -1313,6 +1313,9 @@ impl Display for LiteralType {
 /// assert_eq!(type_equals(&int, &literal_int), true);
 pub fn type_equals(left: &Type, right: &Type) -> bool {
     match (left, right) {
+        (Type::Unknown, Type::Unknown) => true,
+        (Type::Unknown, _) => false,
+        (_, Type::Unknown) => false,
         (Type::Substitution { actual_type, .. }, right) => type_equals(actual_type, right),
         (left, Type::Substitution { actual_type, .. }) => type_equals(left, actual_type),
         (Type::Any, _) => true,

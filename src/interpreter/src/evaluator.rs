@@ -186,7 +186,7 @@ pub(super) fn evaluate_expression(
             ..
         } => evaluate_assignment(member, initializer, environment),
         TypedExpression::Member(m) => evaluate_member(m, environment),
-        TypedExpression::Literal(l) => evaluate_literal(l, environment),
+        TypedExpression::Literal { literal, .. } => evaluate_literal(literal, environment),
         TypedExpression::Tuple { elements, .. } => evaluate_tuple(elements, environment),
         TypedExpression::Closure {
             param,

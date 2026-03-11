@@ -2411,7 +2411,7 @@ impl IndentDisplay for TypedExpression {
                 result
             }
             TypedExpression::Member(m) => m.indent_display(indent),
-            TypedExpression::Literal(l) => l.indent_display(indent),
+            TypedExpression::Literal { literal, .. } => literal.indent_display(indent),
             TypedExpression::Tuple { elements, type_ } => {
                 let mut result = String::new();
                 result.push_str(format!("<tuple>: {}", type_).as_str());
@@ -2950,7 +2950,9 @@ impl IndentDisplay for type_checker::model::ValueLiteral {
                 type_,
             } => {
                 let mut result = String::new();
-                result.push_str(format!("<array>: {}", type_).as_str());
+                result.push_str(
+                    format!("<array>: {}", Type::Array(Box::new(type_.clone()))).as_str(),
+                );
                 indent.increase();
 
                 for (i, expression) in values.iter().enumerate() {

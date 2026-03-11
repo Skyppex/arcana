@@ -296,7 +296,11 @@ pub fn check_type(
                         None,
                     )?;
 
+                    dbg!(&initializer);
+
                     type_ = initializer.get_type();
+
+                    dbg!(&type_);
 
                     if *mutable {
                         if let Type::Literal {
@@ -573,19 +577,38 @@ pub fn check_type(
             }
         },
         Expression::Literal(l) => match l {
-            ast::ValueLiteral::Unit => Ok(TypedExpression::Literal(ValueLiteral::Unit)),
-            ast::ValueLiteral::Int(v) => Ok(TypedExpression::Literal(ValueLiteral::Int(*v))),
-            ast::ValueLiteral::UInt(v) => Ok(TypedExpression::Literal(ValueLiteral::UInt(*v))),
-            ast::ValueLiteral::Float(v) => Ok(TypedExpression::Literal(ValueLiteral::Float(*v))),
-            ast::ValueLiteral::String(v) => {
-                Ok(TypedExpression::Literal(ValueLiteral::String(v.clone())))
-            }
-            ast::ValueLiteral::Rune(v) => Ok(TypedExpression::Literal(ValueLiteral::Rune(*v))),
-            ast::ValueLiteral::Bool(v) => Ok(TypedExpression::Literal(ValueLiteral::Bool(*v))),
+            ast::ValueLiteral::Unit => Ok(TypedExpression::Literal {
+                literal: ValueLiteral::Unit,
+                type_: Type::Unit,
+            }),
+            ast::ValueLiteral::Int(v) => Ok(TypedExpression::Literal {
+                literal: ValueLiteral::Int(*v),
+                type_: Type::Int,
+            }),
+            ast::ValueLiteral::UInt(v) => Ok(TypedExpression::Literal {
+                literal: ValueLiteral::UInt(*v),
+                type_: Type::UInt,
+            }),
+            ast::ValueLiteral::Float(v) => Ok(TypedExpression::Literal {
+                literal: ValueLiteral::Float(*v),
+                type_: Type::Float,
+            }),
+            ast::ValueLiteral::String(v) => Ok(TypedExpression::Literal {
+                literal: ValueLiteral::String(v.clone()),
+                type_: Type::String,
+            }),
+            ast::ValueLiteral::Rune(v) => Ok(TypedExpression::Literal {
+                literal: ValueLiteral::Rune(*v),
+                type_: Type::Rune,
+            }),
+            ast::ValueLiteral::Bool(v) => Ok(TypedExpression::Literal {
+                literal: ValueLiteral::Bool(*v),
+                type_: Type::Bool,
+            }),
             ast::ValueLiteral::Array(items) => {
                 let v: Result<(Vec<ArrayItem>, Type), String> = {
                     let mut v_: Vec<ArrayItem> = vec![];
-                    let mut previous_type = Type::Void;
+                    let mut previous_type = Type::Unknown;
 
                     for item in items {
                         match item {
@@ -603,7 +626,7 @@ pub fn check_type(
                                     value.get_deep_type()
                                 };
 
-                                if !type_equals(&previous_type, &Type::Void)
+                                if !type_equals(&previous_type, &Type::Unknown)
                                     && !type_equals_unstrict(&type_, &previous_type)
                                 {
                                     return Err(format!(
@@ -632,7 +655,7 @@ pub fn check_type(
                                     ));
                                 };
 
-                                if !type_equals(&previous_type, &Type::Void)
+                                if !type_equals(&previous_type, &Type::Unknown)
                                     && !type_equals_unstrict(&type_, &previous_type)
                                 {
                                     return Err(format!(
@@ -655,16 +678,19 @@ pub fn check_type(
 
                 let mut target_type = v.1.clone();
 
-                if type_equals(&v.1, &Type::Void) {
+                if type_equals(&v.1, &Type::Unknown) {
                     if let Some(Type::Array(inner)) = context {
                         target_type = *inner;
                     }
                 }
 
-                Ok(TypedExpression::Literal(ValueLiteral::Array {
-                    items: v.0,
-                    type_: target_type,
-                }))
+                Ok(TypedExpression::Literal {
+                    literal: ValueLiteral::Array {
+                        items: v.0,
+                        type_: target_type.clone(),
+                    },
+                    type_: Type::Array(Box::new(target_type)),
+                })
             }
             ast::ValueLiteral::Struct {
                 type_annotation,
@@ -725,7 +751,10 @@ pub fn check_type(
 
                             let lit = ValueLiteral::try_from(default_value.clone())?;
 
-                            let initializer = TypedExpression::Literal(lit);
+                            let initializer = TypedExpression::Literal {
+                                literal: lit,
+                                type_: default_value.clone(),
+                            };
 
                             field_initializers.push(FieldInitializer {
                                 identifier: field.field_name.clone(),
@@ -746,11 +775,14 @@ pub fn check_type(
                     }
                 }
 
-                Ok(TypedExpression::Literal(ValueLiteral::Struct {
-                    type_annotation: type_annotation.clone(),
-                    field_initializers,
+                Ok(TypedExpression::Literal {
+                    literal: ValueLiteral::Struct {
+                        type_annotation: type_annotation.clone(),
+                        field_initializers,
+                        type_: type_.clone(),
+                    },
                     type_,
-                }))
+                })
             }
             ast::ValueLiteral::Enum {
                 type_annotation,
@@ -821,7 +853,10 @@ pub fn check_type(
 
                             let lit = ValueLiteral::try_from(default_value.clone())?;
 
-                            let initializer = TypedExpression::Literal(lit);
+                            let initializer = TypedExpression::Literal {
+                                literal: lit,
+                                type_: default_value.clone(),
+                            };
 
                             field_initializers.push(FieldInitializer {
                                 identifier: struct_field.field_name.clone(),
@@ -842,12 +877,15 @@ pub fn check_type(
                     }
                 }
 
-                Ok(TypedExpression::Literal(ValueLiteral::Enum {
-                    type_annotation: type_annotation.clone(),
-                    member: member.clone(),
-                    field_initializers,
+                Ok(TypedExpression::Literal {
+                    literal: ValueLiteral::Enum {
+                        type_annotation: type_annotation.clone(),
+                        member: member.clone(),
+                        field_initializers,
+                        type_: type_.clone(),
+                    },
                     type_,
-                }))
+                })
             }
         },
         Expression::Tuple(elements) => {

@@ -34,7 +34,13 @@ fn assignment_is_assignment() {
                 symbol: "x".to_owned(),
                 type_: Type::Int
             }),
-            initializer: Box::new(TypedExpression::Literal(ValueLiteral::Int(1))),
+            initializer: Box::new(TypedExpression::Literal {
+                literal: ValueLiteral::Int(1),
+                type_: Type::Literal {
+                    name: "1".to_string(),
+                    type_: Box::new(LiteralType::IntValue(1))
+                }
+            }),
             type_: Type::Literal {
                 name: "1".to_string(),
                 type_: Box::new(LiteralType::IntValue(1))
