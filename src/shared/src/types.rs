@@ -128,9 +128,7 @@ impl ToKey for TypeAnnotation {
     fn to_key(&self) -> String {
         match self {
             TypeAnnotation::Type(name) => name.to_string(),
-            TypeAnnotation::ConcreteType(name, concretes) => {
-                format!("{}<{}>", name, concretes.len())
-            }
+            TypeAnnotation::ConcreteType(name, _) => name.to_string(),
             TypeAnnotation::Array(element_annotation) => {
                 format!("[{}]", element_annotation.to_key())
             }
@@ -377,10 +375,8 @@ impl ToKey for TypeIdentifier {
     fn to_key(&self) -> String {
         match self {
             TypeIdentifier::Type(name) => name.clone(),
-            TypeIdentifier::GenericType(name, generics) => format!("{}<{}>", name, generics.len()),
-            TypeIdentifier::ConcreteType(name, concretes) => {
-                format!("{}<{}>", name, concretes.len())
-            }
+            TypeIdentifier::GenericType(name, _) => name.to_string(),
+            TypeIdentifier::ConcreteType(name, _) => name.to_string(),
             TypeIdentifier::MemberType(identifier, member_name) => {
                 format!("{}.{}", identifier.to_key(), member_name)
             }

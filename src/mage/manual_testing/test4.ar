@@ -1,5 +1,6 @@
-fun get_arr(): [Int] => [1, 2, 3]
+// fun f<T>(a: T): T => a;
+//
+// f(5)
 
-let a = [..get_arr(), 4, 5, ..get_arr(), ..(100..=105)]
-
-a
+fun a(a: Int): Int => a;
+fun a(a: Int, b: Int): Int => a + b;

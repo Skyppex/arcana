@@ -570,13 +570,7 @@ impl Display for Member {
 impl ToKey for Member {
     fn to_key(&self) -> String {
         match self {
-            Member::Identifier { symbol, generics } => {
-                if let Some(generics) = generics {
-                    format!("{}<{}>", symbol, generics.len())
-                } else {
-                    symbol.to_string()
-                }
-            }
+            Member::Identifier { symbol, .. } => symbol.to_string(),
             Member::StaticMemberAccess {
                 type_annotation,
                 member,

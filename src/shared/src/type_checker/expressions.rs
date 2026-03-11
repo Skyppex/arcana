@@ -516,6 +516,9 @@ pub fn check_type(
         }
         Expression::Member(member) => match member {
             crate::ast::Member::Identifier { symbol, generics } => {
+                dbg!(&symbol);
+                dbg!(&generics);
+
                 let type_ = type_environment
                     .borrow()
                     .get_variable(symbol)
