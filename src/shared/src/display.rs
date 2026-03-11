@@ -1,18 +1,18 @@
 use crate::{
     ast::{
-        AccessModifier, Assignment, AssociatedType, Binary, BinaryOperator, Call, ClosureParameter,
-        EmbeddedStruct, EnumDeclaration, EnumMember, EnumMemberField, Expression, FieldInitializer,
-        FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration, Index, Match,
-        MatchArm, Member, ModuleDeclaration, Parameter, ProtocolDeclaration, Statement, StructData,
-        StructDeclaration, StructField, TypeAliasDeclaration, Unary, UnaryOperator,
-        UnionDeclaration, Use, UseItem, ValueLiteral, VariableDeclaration, While,
+        AccessModifier, ArrayItem, Assignment, AssociatedType, Binary, BinaryOperator, Call,
+        ClosureParameter, EmbeddedStruct, EnumDeclaration, EnumMember, EnumMemberField, Expression,
+        FieldInitializer, FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration,
+        Index, Match, MatchArm, Member, ModuleDeclaration, Parameter, ProtocolDeclaration,
+        Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, Unary,
+        UnaryOperator, UnionDeclaration, Use, UseItem, ValueLiteral, VariableDeclaration, While,
     },
     built_in::BuiltInFunction,
     type_checker::{
         self,
         decision_tree::{Case, Constructor, Decision, FieldPattern, Pattern, Variable},
         model::{
-            Block, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
+            Block, Typed, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
             TypedStatement,
         },
         FullName, LiteralType, Type,
@@ -1824,6 +1824,36 @@ impl IndentDisplay for FieldPattern {
     }
 }
 
+impl IndentDisplay for ArrayItem {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<array item>\n");
+        indent.increase_leaf();
+
+        match self {
+            ArrayItem::Expression(e) => {
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+            }
+            ArrayItem::Spread(e) => {
+                result.push_str(
+                    format!("{}spread: {}", indent.dash_end(), e.indent_display(indent)).as_str(),
+                );
+            }
+        }
+
+        indent.decrease();
+
+        result
+    }
+}
+
 impl IndentDisplay for TypedStatement {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
@@ -2915,7 +2945,10 @@ impl IndentDisplay for type_checker::model::ValueLiteral {
             type_checker::model::ValueLiteral::String(s) => format!("#\"{}\"", s),
             type_checker::model::ValueLiteral::Rune(r) => format!("#'{}'", r),
             type_checker::model::ValueLiteral::Bool(b) => format!("#{}", b),
-            type_checker::model::ValueLiteral::Array { values, type_ } => {
+            type_checker::model::ValueLiteral::Array {
+                items: values,
+                type_,
+            } => {
                 let mut result = String::new();
                 result.push_str(format!("<array>: {}", type_).as_str());
                 indent.increase();
@@ -3601,6 +3634,37 @@ impl IndentDisplay for LiteralType {
             LiteralType::RuneValue(v) => format!("#'{}'", v),
             LiteralType::StringValue(v) => format!("#\"{}\"", v),
         }
+    }
+}
+
+impl IndentDisplay for type_checker::model::ArrayItem {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str(format!("<array item>: {}\n", self.get_type()).as_str());
+
+        indent.increase_leaf();
+
+        match self {
+            type_checker::model::ArrayItem::Expression(e) => {
+                result.push_str(
+                    format!(
+                        "{}expression: {}",
+                        indent.dash_end(),
+                        e.indent_display(indent)
+                    )
+                    .as_str(),
+                );
+            }
+            type_checker::model::ArrayItem::Spread(e) => {
+                result.push_str(
+                    format!("{}spread: {}", indent.dash_end(), e.indent_display(indent)).as_str(),
+                );
+            }
+        }
+
+        indent.decrease();
+
+        result
     }
 }
 

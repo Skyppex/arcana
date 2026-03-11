@@ -801,7 +801,7 @@ pub enum ValueLiteral {
     Rune(char),
     Bool(bool),
     Array {
-        values: Vec<TypedExpression>,
+        items: Vec<ArrayItem>,
         type_: Type,
     },
     Struct {
@@ -909,7 +909,7 @@ impl Display for ValueLiteral {
             ValueLiteral::String(v) => write!(f, "#\"{}\"", v),
             ValueLiteral::Rune(v) => write!(f, "#'{}'", v),
             ValueLiteral::Bool(v) => write!(f, "#{}", v),
-            ValueLiteral::Array { values, .. } => write!(
+            ValueLiteral::Array { items: values, .. } => write!(
                 f,
                 "#[{}]",
                 values
@@ -940,6 +940,37 @@ impl Display for ValueLiteral {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArrayItem {
+    Expression(TypedExpression),
+    Spread(TypedExpression),
+}
+
+impl Display for ArrayItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArrayItem::Expression(e) => write!(f, "{}", e),
+            ArrayItem::Spread(e) => write!(f, "..{}", e),
+        }
+    }
+}
+
+impl Typed for ArrayItem {
+    fn get_type(&self) -> Type {
+        match self {
+            ArrayItem::Expression(e) => e.get_type(),
+            ArrayItem::Spread(e) => e.get_type(),
+        }
+    }
+
+    fn get_deep_type(&self) -> Type {
+        match self {
+            ArrayItem::Expression(e) => e.get_deep_type(),
+            ArrayItem::Spread(e) => e.get_deep_type(),
         }
     }
 }

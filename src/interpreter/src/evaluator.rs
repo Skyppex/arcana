@@ -7,7 +7,7 @@ use shared::{
     type_checker::{
         decision_tree::{Accessor, Constructor, Decision, FieldPattern, Pattern},
         model::*,
-        type_annotation_equals, Type,
+        Type,
     },
     types::{ToKey, TypeAnnotation, TypeIdentifier},
 };
@@ -1121,11 +1121,26 @@ fn evaluate_literal(
         ValueLiteral::String(v) => Ok(Value::String(v)),
         ValueLiteral::Rune(v) => Ok(Value::Rune(v)),
         ValueLiteral::Bool(v) => Ok(Value::Bool(v)),
-        ValueLiteral::Array { values, .. } => {
+        ValueLiteral::Array { items, .. } => {
             let mut array = Vec::new();
 
-            for element in values {
-                array.push(evaluate_expression(element, environment.clone())?);
+            for item in items {
+                match item {
+                    ArrayItem::Expression(expression) => {
+                        array.push(evaluate_expression(expression, environment.clone())?)
+                    }
+                    ArrayItem::Spread(expression) => {
+                        let values = evaluate_expression(expression, environment.clone())?;
+
+                        let Value::Array(values) = values else {
+                            return Err(format!("Expected to spread an array, but got {}", values));
+                        };
+
+                        for value in values {
+                            array.push(value);
+                        }
+                    }
+                }
             }
 
             Ok(Value::Array(array))

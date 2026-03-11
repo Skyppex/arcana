@@ -1,5 +1,5 @@
 use crate::{
-    ast::{statements::ParseContext, Index},
+    ast::{statements::ParseContext, ArrayItem, Index},
     lexer::token::{self, IdentifierType, Keyword, TokenKind},
     type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
     types::{parse_generics_in_type_name, parse_optional_type_annotation, ToKey, TypeAnnotation},
@@ -1121,43 +1121,70 @@ fn parse_primary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
         TokenKind::OpenBracket => {
             cursor.bump()?; // Consume the [
 
-            let first_expression = parse_expression(cursor, context)?;
+            let mut items = vec![];
 
-            match cursor.first().kind {
-                TokenKind::CloseBracket => {
-                    cursor.bump()?; // Consume the ]
+            while cursor.first().kind != TokenKind::CloseBracket {
+                let mut is_spread = false;
 
-                    Ok(Expression::Literal(ValueLiteral::Array(vec![
-                        first_expression,
-                    ])))
+                if cursor.first().kind == TokenKind::DoubleDot {
+                    cursor.bump()?; // consume the ..
+                    is_spread = true;
                 }
-                TokenKind::Comma => {
-                    cursor.bump()?; // Consume the ,
-                    let mut elements = vec![first_expression];
 
-                    while cursor.first().kind != TokenKind::CloseBracket {
-                        elements.push(parse_expression(cursor, context)?);
+                let expression = parse_expression(cursor, context)?;
 
-                        if cursor.first().kind == TokenKind::Comma {
-                            cursor.bump()?; // Consume the ,
-                        }
-                    }
-
-                    cursor.bump()?; // Consume the ]
-                    Ok(Expression::Literal(ValueLiteral::Array(elements)))
+                if is_spread {
+                    items.push(ArrayItem::Spread(expression))
+                } else {
+                    items.push(ArrayItem::Expression(expression))
                 }
-                TokenKind::Semicolon => {
-                    cursor.bump()?; // Consume the ;
-                    let index = parse_index(cursor, context)?;
 
-                    cursor.expect(TokenKind::CloseBracket)?;
-                    Ok(Expression::Member(Member::Index {
-                        object: Box::new(first_expression),
-                        index,
-                    }))
+                if cursor.first().kind == TokenKind::Comma {
+                    cursor.bump()?; // consume the ,
                 }
-                _ => Err(format!("Unexpected token {:?}", cursor.first().kind)),
             }
+
+            cursor.expect(TokenKind::CloseBracket)?;
+
+            Ok(Expression::Literal(ValueLiteral::Array(items)))
+
+            // let first_expression = parse_expression(cursor, context)?;
+            //
+            // match cursor.first().kind {
+            //     TokenKind::CloseBracket => {
+            //         cursor.bump()?; // Consume the ]
+            //
+            //         Ok(Expression::Literal(ValueLiteral::Array(vec![
+            //             first_expression,
+            //         ])))
+            //     }
+            //     TokenKind::Comma => {
+            //         cursor.bump()?; // Consume the ,
+            //         let mut elements = vec![first_expression];
+            //
+            //         while cursor.first().kind != TokenKind::CloseBracket {
+            //             elements.push(parse_expression(cursor, context)?);
+            //
+            //             if cursor.first().kind == TokenKind::Comma {
+            //                 cursor.bump()?; // Consume the ,
+            //             }
+            //         }
+            //
+            //         cursor.bump()?; // Consume the ]
+            //         Ok(Expression::Literal(ValueLiteral::Array(elements)))
+            //     }
+            //     // TokenKind::Semicolon => {
+            //     //     cursor.bump()?; // Consume the ;
+            //     //     let index = parse_index(cursor, context)?;
+            //     //
+            //     //     cursor.expect(TokenKind::CloseBracket)?;
+            //     //     Ok(Expression::Member(Member::Index {
+            //     //         object: Box::new(first_expression),
+            //     //         index,
+            //     //     }))
+            //     // }
+            //     _ => Err(format!("Unexpected token {:?}", cursor.first().kind)),
+            // }
         }
         _ => Err(format!(
             "Expected primary expression but found {:?}",

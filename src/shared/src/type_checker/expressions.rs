@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use crate::{
     ast::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
     type_checker::{
-        model::{Index, ValueLiteral},
+        model::{ArrayItem, Index, ValueLiteral},
         type_annotation_equals, type_equals_unstrict, StructField,
     },
     types::{TypeAnnotation, TypeIdentifier},
@@ -582,32 +582,70 @@ pub fn check_type(
             }
             ast::ValueLiteral::Rune(v) => Ok(TypedExpression::Literal(ValueLiteral::Rune(*v))),
             ast::ValueLiteral::Bool(v) => Ok(TypedExpression::Literal(ValueLiteral::Bool(*v))),
-            ast::ValueLiteral::Array(values) => {
-                let v: Result<(Vec<TypedExpression>, Type), String> = {
-                    let mut v_: Vec<TypedExpression> = vec![];
+            ast::ValueLiteral::Array(items) => {
+                let v: Result<(Vec<ArrayItem>, Type), String> = {
+                    let mut v_: Vec<ArrayItem> = vec![];
                     let mut previous_type = Type::Void;
 
-                    for value in values {
-                        let value =
-                            check_type(value, discovered_types, type_environment.clone(), None)?;
+                    for item in items {
+                        match item {
+                            ast::ArrayItem::Expression(value) => {
+                                let value = check_type(
+                                    value,
+                                    discovered_types,
+                                    type_environment.clone(),
+                                    None,
+                                )?;
 
-                        let type_ = if let Type::Array(_) = value.get_type() {
-                            value.get_type()
-                        } else {
-                            value.get_deep_type()
-                        };
+                                let type_ = if let Type::Array(_) = value.get_type() {
+                                    value.get_type()
+                                } else {
+                                    value.get_deep_type()
+                                };
 
-                        if !type_equals(&previous_type, &Type::Void)
-                            && !type_equals_unstrict(&type_, &previous_type)
-                        {
-                            return Err(format!(
-                                "Array element type {:?} does not match previous element type {:?}",
-                                type_, previous_type
-                            ));
+                                if !type_equals(&previous_type, &Type::Void)
+                                    && !type_equals_unstrict(&type_, &previous_type)
+                                {
+                                    return Err(format!(
+                                            "Array element type {:?} does not match previous element type {:?}",
+                                            type_, previous_type
+                                    ));
+                                }
+
+                                previous_type = type_.clone();
+                                v_.push(ArrayItem::Expression(value));
+                            }
+                            ast::ArrayItem::Spread(value) => {
+                                let value = check_type(
+                                    value,
+                                    discovered_types,
+                                    type_environment.clone(),
+                                    None,
+                                )?;
+
+                                let type_ = if let Type::Array(inner_type) = value.get_type() {
+                                    *inner_type
+                                } else {
+                                    return Err(format!(
+                                        "Exprected to spread and array but found {:?}",
+                                        value.get_type()
+                                    ));
+                                };
+
+                                if !type_equals(&previous_type, &Type::Void)
+                                    && !type_equals_unstrict(&type_, &previous_type)
+                                {
+                                    return Err(format!(
+                                        "Array element type {:?} does not match previous element type {:?}",
+                                        type_, previous_type
+                                    ));
+                                }
+
+                                previous_type = type_.clone();
+
+                                v_.push(ArrayItem::Spread(value));
+                            }
                         }
-
-                        previous_type = type_.clone();
-                        v_.push(value);
                     }
 
                     Ok((v_, previous_type.clone()))
@@ -624,7 +662,7 @@ pub fn check_type(
                 }
 
                 Ok(TypedExpression::Literal(ValueLiteral::Array {
-                    values: v.0,
+                    items: v.0,
                     type_: target_type,
                 }))
             }

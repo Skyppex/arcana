@@ -279,7 +279,7 @@ pub enum ValueLiteral {
     String(String),
     Rune(char),
     Bool(bool),
-    Array(Vec<Expression>),
+    Array(Vec<ArrayItem>),
 
     Struct {
         type_annotation: TypeAnnotation,
@@ -314,13 +314,7 @@ impl Display for ValueLiteral {
                 "#[{}]",
                 array
                     .iter()
-                    .map(|e| {
-                        if let Expression::Literal(literal) = e {
-                            literal.to_string()
-                        } else {
-                            panic!("Array element is not a literal")
-                        }
-                    })
+                    .map(|e| format!("{}", e))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -344,13 +338,7 @@ impl ToKey for ValueLiteral {
                 "#[{}]",
                 array
                     .iter()
-                    .map(|e| {
-                        if let Expression::Literal(literal) = e {
-                            literal.to_key()
-                        } else {
-                            panic!("Array element is not a literal")
-                        }
-                    })
+                    .map(|e| format!("{}", e))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -362,6 +350,21 @@ impl ToKey for ValueLiteral {
                 member,
                 ..
             } => format!("{}::{}", type_annotation.to_key(), member),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArrayItem {
+    Expression(Expression),
+    Spread(Expression),
+}
+
+impl Display for ArrayItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArrayItem::Expression(_) => write!(f, "(expression)"),
+            ArrayItem::Spread(_) => write!(f, "..(expression)"),
         }
     }
 }
