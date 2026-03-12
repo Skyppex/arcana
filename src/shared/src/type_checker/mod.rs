@@ -847,6 +847,48 @@ impl Type {
             other => other.clone(),
         }
     }
+
+    pub fn bool_literal(value: bool) -> Type {
+        Type::Literal {
+            name: value.to_string(),
+            type_: Box::new(LiteralType::BoolValue(value)),
+        }
+    }
+
+    fn int_literal(value: i64) -> Type {
+        Type::Literal {
+            name: value.to_string(),
+            type_: Box::new(LiteralType::IntValue(value)),
+        }
+    }
+
+    fn uint_literal(value: u64) -> Type {
+        Type::Literal {
+            name: value.to_string(),
+            type_: Box::new(LiteralType::UIntValue(value)),
+        }
+    }
+
+    fn float_literal(value: f64) -> Type {
+        Type::Literal {
+            name: value.to_string(),
+            type_: Box::new(LiteralType::FloatValue(value)),
+        }
+    }
+
+    fn string_literal(value: String) -> Type {
+        Type::Literal {
+            name: value.to_string(),
+            type_: Box::new(LiteralType::StringValue(value)),
+        }
+    }
+
+    fn rune_literal(value: String) -> Type {
+        Type::Literal {
+            name: value.to_string(),
+            type_: Box::new(LiteralType::RuneValue(value)),
+        }
+    }
 }
 
 impl FullName for Type {

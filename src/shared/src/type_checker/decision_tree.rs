@@ -296,7 +296,7 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal {
                         literal: crate::type_checker::model::ValueLiteral::Bool(v),
-                        type_: Type::Bool,
+                        type_: Type::bool_literal(v),
                     }),
                     type_: Type::Bool,
                 }),
@@ -344,7 +344,7 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal {
                         literal: crate::type_checker::model::ValueLiteral::Int(v),
-                        type_: Type::Int,
+                        type_: Type::int_literal(v),
                     }),
                     type_: Type::Bool,
                 }),
@@ -392,7 +392,7 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal {
                         literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                        type_: Type::UInt,
+                        type_: Type::uint_literal(v),
                     }),
                     type_: Type::Bool,
                 }),
@@ -440,7 +440,7 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal {
                         literal: crate::type_checker::model::ValueLiteral::Float(v),
-                        type_: Type::Float,
+                        type_: Type::float_literal(v),
                     }),
                     type_: Type::Bool,
                 }),
@@ -488,7 +488,7 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal {
                         literal: crate::type_checker::model::ValueLiteral::Rune(v),
-                        type_: Type::Rune,
+                        type_: Type::rune_literal(v.to_string()),
                     }),
                     type_: Type::Bool,
                 }),
@@ -536,7 +536,7 @@ pub fn create_decision_tree(
                     operator: BinaryOperator::Equal,
                     right: Box::new(TypedExpression::Literal {
                         literal: crate::type_checker::model::ValueLiteral::String(v.clone()),
-                        type_: Type::String,
+                        type_: Type::string_literal(v.clone()),
                     }),
                     type_: Type::Bool,
                 }),
@@ -833,15 +833,15 @@ pub fn create_decision_tree(
                     right: match *value {
                         Pattern::Int(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::Int(v),
-                            type_: Type::Int,
+                            type_: Type::int_literal(v),
                         }),
                         Pattern::UInt(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                            type_: Type::UInt,
+                            type_: Type::uint_literal(v),
                         }),
                         Pattern::Float(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::Float(v),
-                            type_: Type::Float,
+                            type_: Type::float_literal(v),
                         }),
                         Pattern::Variable(v) => {
                             let variable_type = type_environment
@@ -905,15 +905,15 @@ pub fn create_decision_tree(
                     right: match *value {
                         Pattern::Int(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::Int(v),
-                            type_: Type::Int,
+                            type_: Type::int_literal(v),
                         }),
                         Pattern::UInt(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                            type_: Type::UInt,
+                            type_: Type::uint_literal(v),
                         }),
                         Pattern::Float(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::Float(v),
-                            type_: Type::Float,
+                            type_: Type::float_literal(v),
                         }),
                         Pattern::Variable(v) => {
                             let variable_type = type_environment
@@ -977,15 +977,15 @@ pub fn create_decision_tree(
                     right: match *value {
                         Pattern::Int(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::Int(v),
-                            type_: Type::Int,
+                            type_: Type::int_literal(v),
                         }),
                         Pattern::UInt(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                            type_: Type::UInt,
+                            type_: Type::uint_literal(v),
                         }),
                         Pattern::Float(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::Float(v),
-                            type_: Type::Float,
+                            type_: Type::float_literal(v),
                         }),
                         Pattern::Variable(v) => {
                             let variable_type = type_environment
@@ -1049,15 +1049,15 @@ pub fn create_decision_tree(
                     right: match *value {
                         Pattern::Int(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::Int(v),
-                            type_: Type::Int,
+                            type_: Type::int_literal(v),
                         }),
                         Pattern::UInt(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                            type_: Type::UInt,
+                            type_: Type::uint_literal(v),
                         }),
                         Pattern::Float(v) => Box::new(TypedExpression::Literal {
                             literal: crate::type_checker::model::ValueLiteral::Float(v),
-                            type_: Type::Float,
+                            type_: Type::float_literal(v),
                         }),
                         Pattern::Variable(v) => {
                             let variable_type = type_environment
@@ -1217,15 +1217,15 @@ pub fn create_decision_tree(
                         right: match *left {
                             Pattern::Int(v) => Box::new(TypedExpression::Literal {
                                 literal: crate::type_checker::model::ValueLiteral::Int(v),
-                                type_: Type::Int,
+                                type_: Type::int_literal(v),
                             }),
                             Pattern::UInt(v) => Box::new(TypedExpression::Literal {
                                 literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                                type_: Type::UInt,
+                                type_: Type::uint_literal(v),
                             }),
                             Pattern::Float(v) => Box::new(TypedExpression::Literal {
                                 literal: crate::type_checker::model::ValueLiteral::Float(v),
-                                type_: Type::Float,
+                                type_: Type::float_literal(v),
                             }),
                             Pattern::Variable(v) => {
                                 let variable_type = type_environment
@@ -1255,15 +1255,15 @@ pub fn create_decision_tree(
                         right: match *right {
                             Pattern::Int(v) => Box::new(TypedExpression::Literal {
                                 literal: crate::type_checker::model::ValueLiteral::Int(v),
-                                type_: Type::Int,
+                                type_: Type::int_literal(v),
                             }),
                             Pattern::UInt(v) => Box::new(TypedExpression::Literal {
                                 literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                                type_: Type::UInt,
+                                type_: Type::uint_literal(v),
                             }),
                             Pattern::Float(v) => Box::new(TypedExpression::Literal {
                                 literal: crate::type_checker::model::ValueLiteral::Float(v),
-                                type_: Type::Float,
+                                type_: Type::float_literal(v),
                             }),
                             Pattern::Variable(v) => {
                                 let variable_type = type_environment

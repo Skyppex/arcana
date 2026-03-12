@@ -579,27 +579,27 @@ pub fn check_type(
             }),
             ast::ValueLiteral::Int(v) => Ok(TypedExpression::Literal {
                 literal: ValueLiteral::Int(*v),
-                type_: Type::Int,
+                type_: Type::int_literal(*v),
             }),
             ast::ValueLiteral::UInt(v) => Ok(TypedExpression::Literal {
                 literal: ValueLiteral::UInt(*v),
-                type_: Type::UInt,
+                type_: Type::uint_literal(*v),
             }),
             ast::ValueLiteral::Float(v) => Ok(TypedExpression::Literal {
                 literal: ValueLiteral::Float(*v),
-                type_: Type::Float,
+                type_: Type::float_literal(*v),
             }),
             ast::ValueLiteral::String(v) => Ok(TypedExpression::Literal {
                 literal: ValueLiteral::String(v.clone()),
-                type_: Type::String,
+                type_: Type::string_literal(v.clone()),
             }),
             ast::ValueLiteral::Rune(v) => Ok(TypedExpression::Literal {
                 literal: ValueLiteral::Rune(*v),
-                type_: Type::Rune,
+                type_: Type::rune_literal(v.to_string()),
             }),
             ast::ValueLiteral::Bool(v) => Ok(TypedExpression::Literal {
                 literal: ValueLiteral::Bool(*v),
-                type_: Type::Bool,
+                type_: Type::bool_literal(*v),
             }),
             ast::ValueLiteral::Array(items) => {
                 let v: Result<(Vec<ArrayItem>, Type), String> = {
