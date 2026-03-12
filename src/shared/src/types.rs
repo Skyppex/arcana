@@ -272,12 +272,12 @@ impl TypeIdentifier {
         }
     }
 
-    pub fn is_function_identifier(&self) -> bool {
-        self.name().is_function_identifier_name()
+    pub fn validate_function_identifier(&self) -> Result<(), String> {
+        self.name().validate_function_identifier_name()
     }
 
-    pub fn is_type_identifier(&self) -> bool {
-        self.name().is_type_identifier_name()
+    pub fn validate_type_identifier(&self) -> Result<(), String> {
+        self.name().validate_type_identifier_name()
     }
 
     pub fn eq_names(&self, other: &Self) -> bool {
@@ -480,7 +480,9 @@ pub(super) fn parse_type_annotation(
         TokenKind::Identifier(type_name) => {
             cursor.bump()?; // Consume the type identifier
 
-            if !type_name.is_type_identifier_name() && !type_name.is_function_identifier_name() {
+            if type_name.validate_type_identifier_name().is_err()
+                && type_name.validate_function_identifier_name().is_err()
+            {
                 return Err(format!("Invalid type name: {}", type_name));
             }
 
@@ -524,9 +526,7 @@ pub(super) fn parse_type_annotation(
 
                 cursor.bump()?; // Consume the variant name
 
-                if !variant_name.is_type_identifier_name() {
-                    return Err(format!("Invalid variant name: {}", variant_name));
-                }
+                variant_name.validate_type_identifier_name()?;
 
                 let type_name = format!("{type_name}::{variant_name}");
 
@@ -730,6 +730,8 @@ pub fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericTyp
             ));
         };
 
+        type_name.validate_type_identifier_name()?;
+
         types.push(GenericType { type_name });
 
         if cursor.first().kind == TokenKind::Comma {
@@ -797,7 +799,7 @@ fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, String> {
             }
         }
         TokenKind::Identifier(identifier) => {
-            if identifier.is_type_identifier_name() {
+            if identifier.validate_type_identifier_name().is_ok() {
                 cursor.bump()?; // Consume the identifier
                 return LiteralType::from_str(&identifier);
             }

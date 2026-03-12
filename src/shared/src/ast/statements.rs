@@ -48,9 +48,7 @@ pub fn parse_module(
 
     cursor.bump()?; // Consume the identifier
 
-    if !module_name.is_module_identifier_name() {
-        return Err(format!("Invalid module name: {}", module_name));
-    }
+    module_name.validate_module_identifier_name()?;
 
     let mut module_path: Vec<String> = vec![];
     module_path.push(module_name);
@@ -121,9 +119,7 @@ fn parse_mod_statement(
 
     cursor.bump()?; // Consume the identifier
 
-    if !module_name.is_module_identifier_name() {
-        return Err(format!("Invalid module name: {}", module_name));
-    }
+    module_name.validate_module_identifier_name()?;
 
     let mut module_path: Vec<String> = vec![];
     module_path.push(module_name);
@@ -264,9 +260,7 @@ fn parse_function_declaration_statement(
 
     let type_identifier = parse_type_identifier(cursor, false)?;
 
-    if !type_identifier.is_function_identifier() {
-        return Err(format!("Invalid function name: {}", type_identifier.name()));
-    }
+    type_identifier.validate_function_identifier()?;
 
     let TokenKind::OpenParen = cursor.bump()?.kind else {
         return Err(format!("Expected ( but found {:?}", cursor.first().kind));
@@ -430,9 +424,7 @@ fn parse_struct_declaration_statement(
 
     let type_identifier = parse_type_identifier(cursor, false)?;
 
-    if !type_identifier.name().is_type_identifier_name() {
-        return Err(format!("Invalid type name: {}", type_identifier.name()));
-    }
+    type_identifier.name().validate_type_identifier_name()?;
 
     let TokenKind::OpenBrace = cursor.first().kind else {
         return Ok(Statement::StructDeclaration(StructDeclaration {
@@ -512,9 +504,7 @@ fn parse_enum_declaration_statement(
 
     let type_name = parse_type_identifier(cursor, false)?;
 
-    if !type_name.name().is_type_identifier_name() {
-        return Err(format!("Invalid type name: {}", type_name.name()));
-    }
+    type_name.name().validate_type_identifier_name()?;
 
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
@@ -553,9 +543,7 @@ fn parse_enum_declaration_statement(
                 ));
             };
 
-            if !identifier.is_type_identifier_name() {
-                return Err(format!("Invalid type name: {}", identifier));
-            }
+            identifier.validate_type_identifier_name()?;
 
             cursor.bump()?; // Consume the identifier
 
@@ -621,9 +609,7 @@ fn parse_union_declaration_statement(
         ));
     };
 
-    if !type_name.is_type_identifier_name() {
-        return Err(format!("Invalid type name: {}", type_name));
-    }
+    type_name.validate_type_identifier_name()?;
 
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
         return Err(format!("Expected {{ but found {:?}", cursor.prev().kind));
@@ -686,9 +672,7 @@ fn parse_type_alias_declaration(
 
     let type_identifier = parse_type_identifier(cursor, false)?;
 
-    if !type_identifier.name().is_type_identifier_name() {
-        return Err(format!("Invalid type name: {}", type_identifier.name()));
-    }
+    type_identifier.name().validate_type_identifier_name()?;
 
     let TokenKind::Equal = cursor.bump()?.kind else {
         return Err(format!("Expected = but found {:?}", cursor.first().kind));
@@ -734,9 +718,7 @@ fn parse_protocol_declaration(
 
     let type_identifier = parse_type_identifier(cursor, false)?;
 
-    if !type_identifier.name().is_type_identifier_name() {
-        return Err(format!("Invalid type name: {}", type_identifier.name()));
-    }
+    type_identifier.name().validate_type_identifier_name()?;
 
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
@@ -758,12 +740,7 @@ fn parse_protocol_declaration(
 
         let associated_type = parse_type_identifier(cursor, false)?;
 
-        if !associated_type.name().is_generic_type_identifier_name() {
-            return Err(format!(
-                "Invalid associated type name: {}",
-                associated_type.name()
-            ));
-        }
+        associated_type.name().validate_type_identifier_name()?;
 
         if cursor.first().kind == TokenKind::Equal {
             cursor.bump()?; // Consume the :
@@ -838,9 +815,7 @@ fn parse_implementation_declaration(
 
     let protocol_annotation = parse_type_annotation(cursor, false)?;
 
-    if !protocol_annotation.name().is_type_identifier_name() {
-        return Err(format!("Invalid type name: {}", protocol_annotation.name()));
-    }
+    protocol_annotation.name().validate_type_identifier_name()?;
 
     let TokenKind::Keyword(Keyword::For) = cursor.bump()?.kind else {
         return Err(format!("Expected for but found {:?}", cursor.first().kind));
@@ -848,9 +823,7 @@ fn parse_implementation_declaration(
 
     let type_annotation = parse_type_annotation(cursor, false)?;
 
-    if !type_annotation.name().is_type_identifier_name() {
-        return Err(format!("Invalid protocol name: {}", type_annotation.name()));
-    }
+    type_annotation.name().validate_type_identifier_name()?;
 
     cursor.expect(TokenKind::OpenBrace)?;
 
@@ -861,12 +834,7 @@ fn parse_implementation_declaration(
 
         let associated_type = parse_type_identifier(cursor, false)?;
 
-        if !associated_type.name().is_generic_type_identifier_name() {
-            return Err(format!(
-                "Invalid associated type name: {}",
-                associated_type.name()
-            ));
-        }
+        associated_type.name().validate_type_identifier_name()?;
 
         if cursor.first().kind == TokenKind::Equal {
             cursor.bump()?; // Consume the :
@@ -972,9 +940,7 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, String> {
         ));
     };
 
-    if !identifier.is_variable_identifier_name() {
-        return Err(format!("Invalid variable name: {}", identifier));
-    }
+    identifier.validate_variable_identifier_name()?;
 
     let TokenKind::Colon = cursor.bump()?.kind else {
         return Err(format!("Expected : but found {:?}", cursor.first().kind));
@@ -1022,9 +988,7 @@ fn parse_struct_field(
 
     cursor.bump()?; // Consume the identifier
 
-    if !identifier.is_variable_identifier_name() {
-        return Err(format!("Invalid field name: {}", identifier));
-    }
+    identifier.validate_variable_identifier_name()?;
 
     let TokenKind::Colon = cursor.bump()?.kind else {
         return Err(format!("Expected : but found {:?}", cursor.first().kind));
@@ -1063,7 +1027,7 @@ fn parse_embedded_structs(
 
     loop {
         if let TokenKind::Identifier(identifier) = cursor.first().kind {
-            if identifier.is_type_identifier_name() {
+            if identifier.validate_type_identifier_name().is_ok() {
                 let type_annotation = parse_type_annotation(cursor, false)?;
 
                 if !matches!(

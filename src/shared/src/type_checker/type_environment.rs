@@ -380,7 +380,6 @@ impl TypeEnvironment {
     }
 
     pub fn get_variable<K: ToKey>(&self, key: K) -> Option<Type> {
-        dbg!(&self.variables);
         if let Some(type_) = self.variables.get(&key.to_key()) {
             Some(type_.clone())
         } else if let Some(parent) = &self.parent {

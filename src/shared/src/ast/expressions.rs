@@ -195,7 +195,7 @@ fn parse_type_literal(cursor: &mut Cursor, context: &ParseContext) -> Result<Exp
         return parse_range(cursor, context);
     };
 
-    if !identifier.is_type_identifier_name() {
+    if identifier.validate_type_identifier_name().is_err() {
         return parse_range(cursor, context);
     }
 
@@ -996,7 +996,7 @@ fn parse_member_access(cursor: &mut Cursor, context: &ParseContext) -> Result<Ex
             break;
         };
 
-        if !symbol.is_type_identifier_name() {
+        if symbol.validate_type_identifier_name().is_err() {
             break;
         }
 
@@ -1019,7 +1019,7 @@ fn parse_member_access(cursor: &mut Cursor, context: &ParseContext) -> Result<Ex
             ));
         };
 
-        if !identifier.is_function_identifier_name() {
+        if identifier.validate_function_identifier_name().is_err() {
             return Ok(object);
         }
 
@@ -1316,7 +1316,7 @@ fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::String(v))
         }
-        TokenKind::Identifier(ident) if ident.is_type_identifier_name() => {
+        TokenKind::Identifier(ident) if ident.validate_type_identifier_name().is_ok() => {
             let type_annotation = parse_type_annotation(cursor, false)?;
 
             if cursor.first().kind != TokenKind::OpenBrace {
@@ -1328,7 +1328,9 @@ fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
 
             parse_single_pattern(cursor)
         }
-        TokenKind::Identifier(identifier) if identifier.is_variable_identifier_name() => {
+        TokenKind::Identifier(identifier)
+            if identifier.validate_variable_identifier_name().is_ok() =>
+        {
             cursor.bump()?; // Consume the identifier
 
             Ok(Pattern::Variable(identifier))

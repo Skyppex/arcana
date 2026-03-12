@@ -75,7 +75,7 @@ fn evaluate_use_item(
 ) -> Result<Vec<Rcrc<Variable>>, String> {
     match use_item {
         UseItem::Item(item_name) => {
-            if item_name.is_type_identifier_name() {
+            if item_name.validate_type_identifier_name().is_ok() {
                 return Ok(vec![]);
             }
 
