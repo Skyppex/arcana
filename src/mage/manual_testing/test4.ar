@@ -1,3 +1,5 @@
-fun f<T>(a: T): T => a;
-
-f::<Int>(5)
+if let x = 4 {
+    println(x)
+} else {
+    println("nope")
+}

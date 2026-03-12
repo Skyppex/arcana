@@ -276,9 +276,11 @@ fn evaluate_variable_declaration(
                 .borrow_mut()
                 .add_variable(identifier, value, mutable);
         }
+
+        return Ok(Value::Bool(true));
     }
 
-    Ok(value)
+    Ok(Value::Bool(false))
 }
 
 fn evaluate_if(

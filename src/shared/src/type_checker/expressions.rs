@@ -331,7 +331,7 @@ pub fn check_type(
                 mutable: *mutable,
                 pattern: pattern.clone(),
                 initializer: initializer.map(Box::new),
-                type_,
+                type_: Type::Bool,
             })
         }
         Expression::If(If {
