@@ -1,10 +1,12 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    ast::{self, Assignment, Binary, Expression, For, If, Match, VariableDeclaration, While},
+    ast::{
+        self, Assignment, Binary, Expression, For, If, Match, UseExpr, VariableDeclaration, While,
+    },
     type_checker::{
         model::{ArrayItem, Index, ValueLiteral},
-        type_annotation_equals, type_equals_unstrict, StructField,
+        type_annotation_equals, type_equals_unstrict, Parameter, StructField,
     },
     types::{TypeAnnotation, TypeIdentifier},
 };
@@ -1161,6 +1163,112 @@ pub fn check_type(
                 else_body: else_body.map(Box::new),
                 type_: type_.clone(),
             })
+        }
+        Expression::Use(UseExpr { args, expr }) => {
+            let typed_expr = check_type(expr, discovered_types, type_environment, context)?;
+
+            let expr_type = typed_expr.get_type();
+
+            let Type::Function(function) = expr_type else {
+                return Err("Right hand side of a use expression must be a function.".to_string());
+            };
+
+            let Some(Parameter { type_, .. }) = function.param else {
+                return Err(
+                    "Last argument of a function in a use expression must be a function"
+                        .to_string(),
+                );
+            };
+
+            let Type::Function(Function { param }) = *type_ else {
+                return Err(
+                    "Last argument of a function in a use expression must be a function"
+                        .to_string(),
+                );
+            };
+
+            todo!()
+
+            // let for_and_else_environment =
+            //     Rc::new(RefCell::new(TypeEnvironment::new_parent(type_environment)));
+            //
+            // let for_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
+            //     for_and_else_environment.clone(),
+            //     ScopeType::Break,
+            // )));
+            //
+            // let iterable = check_type(
+            //     iterable,
+            //     discovered_types,
+            //     for_and_else_environment.clone(),
+            //     None,
+            // )?;
+            //
+            // let Type::Array(inner_type) = iterable.get_type() else {
+            //     return Err(format!(
+            //         "For iterable must be of type array, found {}",
+            //         iterable.get_type()
+            //     ));
+            // };
+            //
+            // check_type_pattern(
+            //     pattern,
+            //     Some(inner_type.as_ref()),
+            //     for_environment.clone(),
+            //     context.clone(),
+            // )?;
+            //
+            // // for_environment
+            // //     .borrow_mut()
+            // //     .add_variable(identifier.clone(), *inner_type);
+            //
+            // let body = check_type(body, discovered_types, for_environment.clone(), None)?;
+            //
+            // let else_body = match else_body {
+            //     Some(else_body) => Some(check_type(
+            //         else_body,
+            //         discovered_types,
+            //         for_and_else_environment,
+            //         None,
+            //     )?),
+            //     None => None,
+            // };
+            //
+            // let mut type_ = for_environment
+            //     .borrow()
+            //     .get_scope(&ScopeType::Break)
+            //     .map(|scope| scope.fold())
+            //     .unwrap_or(Ok(Type::Void))?;
+            //
+            // match &else_body {
+            //     Some(else_body) => {
+            //         let else_type = else_body.get_type();
+            //
+            //         if !type_equals(&type_, &Type::Void)
+            //             && !type_equals_unstrict(&type_, &else_body.get_type())
+            //         {
+            //             return Err(format!("For block breaks with value of type {} which does not match else blocks type {}", type_, else_body.get_type()));
+            //         }
+            //
+            //         type_ = else_type
+            //     }
+            //     None => {
+            //         if !type_equals(&type_, &Type::Void) {
+            //             return Err(
+            //                 "Must have an else block if the for block breaks with a value"
+            //                     .to_string(),
+            //             );
+            //         }
+            //     }
+            // };
+            //
+            // Ok(TypedExpression::For {
+            //     pattern: pattern.clone(),
+            //     iterable: Box::new(iterable),
+            //     body: Box::new(body),
+            //     else_body: else_body.map(Box::new),
+            //     type_: type_.clone(),
+            // })
         }
     }
 }

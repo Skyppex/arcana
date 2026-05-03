@@ -49,6 +49,7 @@ pub enum Expression {
     Loop(Box<Expression>),
     While(While),
     For(For),
+    Use(UseExpr),
 
     Break(Option<Box<Expression>>),
     Continue,
@@ -382,6 +383,12 @@ pub struct For {
     pub iterable: Box<Expression>,
     pub body: Box<Expression>,
     pub else_body: Option<Box<Expression>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UseExpr {
+    pub args: Vec<Expression>,
+    pub expr: Box<Expression>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

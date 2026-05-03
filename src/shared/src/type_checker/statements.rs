@@ -8,7 +8,7 @@ use std::{
 use crate::{
     ast::{
         self, ImplementationDeclaration, ModPath, ModuleDeclaration, ProtocolDeclaration,
-        Statement, StructData, UnionDeclaration, Use, UseItem,
+        Statement, StructData, UnionDeclaration, Use, UseExpr, UseItem,
     },
     types::{ToKey, TypeAnnotation, TypeIdentifier},
 };

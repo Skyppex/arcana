@@ -5,7 +5,8 @@ use crate::{
         FieldInitializer, FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration,
         Index, Match, MatchArm, Member, ModuleDeclaration, Parameter, ProtocolDeclaration,
         Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, Unary,
-        UnaryOperator, UnionDeclaration, Use, UseItem, ValueLiteral, VariableDeclaration, While,
+        UnaryOperator, UnionDeclaration, Use, UseExpr, UseItem, ValueLiteral, VariableDeclaration,
+        While,
     },
     built_in::BuiltInFunction,
     type_checker::{
@@ -1007,6 +1008,25 @@ impl IndentDisplay for Expression {
                     result.push_str(format!("\n{}else: None", indent.dash_end()).as_str());
                 }
 
+                indent.decrease();
+                result
+            }
+            Expression::Use(UseExpr { args, expr }) => {
+                let mut result = String::new();
+                result.push_str("<use-expr>");
+                indent.increase();
+                result.push_str(&indent_display_slice(
+                    &args,
+                    "arguments",
+                    "argument",
+                    indent,
+                ));
+
+                result.push_str(
+                    format!("\n{}expr: {}", indent.dash(), expr.indent_display(indent)).as_str(),
+                );
+
+                indent.end_current();
                 indent.decrease();
                 result
             }

@@ -1,4 +1,5 @@
 use crate::{
+    ast::Use,
     lexer::token::{IdentifierType, Keyword, TokenKind},
     types::{
         can_be_type_annotation, parse_generic_type_parameters, parse_type_annotation,
@@ -11,7 +12,7 @@ use super::{
     Closure, EmbeddedStruct, EnumDeclaration, Expression, FunctionDeclaration,
     ImplementationDeclaration, ModPath, ModuleDeclaration, Parameter, ProtocolDeclaration,
     Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration,
-    Use, UseItem, ValueLiteral,
+    UseItem, ValueLiteral,
 };
 
 #[derive(Debug, Default, Clone)]

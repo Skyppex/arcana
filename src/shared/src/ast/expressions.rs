@@ -1,5 +1,5 @@
 use crate::{
-    ast::{statements::ParseContext, ArrayItem, Index},
+    ast::{statements::ParseContext, ArrayItem, Index, UseExpr},
     lexer::token::{self, IdentifierType, Keyword, TokenKind},
     type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
     types::{parse_generics_in_type_name, parse_optional_type_annotation, ToKey, TypeAnnotation},
@@ -45,7 +45,7 @@ fn parse_continue(cursor: &mut Cursor, context: &ParseContext) -> Result<Express
 
 fn parse_return(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
     if cursor.first().kind != TokenKind::Keyword(Keyword::Return) {
-        return parse_trailing_closure(cursor, context);
+        return parse_use_expression(cursor, context);
     }
 
     cursor.bump()?; // Consume the return
@@ -60,13 +60,30 @@ fn parse_return(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressio
     Ok(Expression::Return(expression.map(Box::new)))
 }
 
+fn parse_use_expression(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
+    let TokenKind::Keyword(Keyword::Use) = cursor.first().kind else {
+        return parse_trailing_closure(cursor, context);
+    };
+
+    let args = parse_args_list(cursor, context)?;
+
+    cursor.expect(TokenKind::LeftArrow)?;
+
+    let expr = parse_trailing_closure(cursor, context)?;
+
+    Ok(Expression::Use(UseExpr {
+        args,
+        expr: Box::new(expr),
+    }))
+}
+
 fn parse_trailing_closure(
     cursor: &mut Cursor,
     context: &ParseContext,
 ) -> Result<Expression, String> {
     let mut expression = parse_loop(cursor, context)?;
 
-    while cursor.first().kind == TokenKind::Arrow {
+    while cursor.first().kind == TokenKind::RightArrow {
         cursor.bump()?; // Consume the ->
 
         let mut params = None;
