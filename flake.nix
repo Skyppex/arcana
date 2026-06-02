@@ -73,7 +73,8 @@
       devShells.default = pkgs.mkShell {
         packages = with pkgs; [
           toolchain
-          nil
+          vscode-extensions.vadimcn.vscode-lldb
+          nixd
           alejandra
         ];
 
