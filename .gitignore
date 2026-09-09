@@ -1,4 +1,11 @@
 /target
 .idea
 /result
-/.direnv
+
+# Devenv
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+
+# pre-commit
+.pre-commit-config.yaml
