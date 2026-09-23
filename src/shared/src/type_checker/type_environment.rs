@@ -27,6 +27,9 @@ pub struct TypeEnvironment {
     types: HashMap<String, Type>,
     discovered_types: Vec<DiscoveredType>,
     static_members: HashMap<String, HashMap<String, Type>>,
+    /// Bounds declared in a `where` clause, by the type they belong to, so an
+    /// instantiation can be checked against them.
+    generic_constraints: HashMap<String, Vec<GenericConstraint>>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
     pub allow_override_types: bool,
@@ -49,6 +52,7 @@ impl TypeEnvironment {
             ]),
             discovered_types: Vec::new(),
             static_members: HashMap::new(),
+            generic_constraints: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
             allow_override_types,
@@ -64,6 +68,7 @@ impl TypeEnvironment {
             types: HashMap::new(),
             discovered_types: Vec::new(),
             static_members: HashMap::new(),
+            generic_constraints: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
             allow_override_types,
@@ -91,6 +96,7 @@ impl TypeEnvironment {
             types: HashMap::new(),
             discovered_types: Vec::new(),
             static_members: HashMap::new(),
+            generic_constraints: HashMap::new(),
             scopes: scopes
                 .into_iter()
                 .map(|scope| scope.into())
@@ -208,6 +214,29 @@ impl TypeEnvironment {
         }
 
         Ok(())
+    }
+
+    /// Records the bounds declared for a type, so that instantiating it can
+    /// check each type argument against them.
+    pub fn add_generic_constraints(&mut self, key: String, constraints: Vec<GenericConstraint>) {
+        if constraints.is_empty() {
+            return;
+        }
+
+        self.generic_constraints.insert(key, constraints);
+    }
+
+    /// The bounds declared for a type, looked up through the parent chain.
+    pub fn get_generic_constraints(&self, key: &str) -> Vec<GenericConstraint> {
+        self.generic_constraints
+            .get(key)
+            .cloned()
+            .or_else(|| {
+                self.parent
+                    .as_ref()
+                    .map(|parent| parent.borrow().get_generic_constraints(key))
+            })
+            .unwrap_or_default()
     }
 
     pub fn add_generic_constraint(&mut self, constraint: &GenericConstraint) -> Result<(), String> {
@@ -442,7 +471,12 @@ impl TypeEnvironment {
     }
 
     pub fn lookup_type(&self, type_: &Type) -> bool {
-        self.types.values().any(|t| t == type_)
+        // Only declarations are registered, so an instantiation such as
+        // `Foo<Int>` never matches one exactly. Its key is the bare name, which
+        // the declaration `Foo<T>` shares.
+        self.types
+            .values()
+            .any(|t| t == type_ || t.to_key() == type_.to_key())
             || self
                 .parent
                 .as_ref()

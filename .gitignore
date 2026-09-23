@@ -1,6 +1,7 @@
 /target
 .idea
 /result
+.crypt
 
 # Devenv
 .devenv*
@@ -9,3 +10,4 @@ devenv.local.yaml
 
 # pre-commit
 .pre-commit-config.yaml
+

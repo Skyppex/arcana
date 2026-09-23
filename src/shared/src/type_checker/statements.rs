@@ -279,6 +279,7 @@ pub fn check_type(
                     embedded_structs,
                     fields,
                 },
+            where_clause,
         }) => {
             let struct_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
@@ -291,6 +292,19 @@ pub fn check_type(
                         .add_type(Type::Generic(generic.clone()))?;
                 }
             }
+
+            // A bound both brings the protocol's functions into scope on the
+            // parameter and is remembered, so instantiating the struct can
+            // check the type argument against it.
+            for constraint in where_clause {
+                struct_type_environment
+                    .borrow_mut()
+                    .add_generic_constraint(constraint)?;
+            }
+
+            type_environment
+                .borrow_mut()
+                .add_generic_constraints(type_identifier.to_key(), where_clause.clone());
 
             let embedded_structs: Result<Vec<_>, String> = embedded_structs
                 .iter()
@@ -468,6 +482,7 @@ pub fn check_type(
             type_identifier,
             shared_fields,
             members,
+            where_clause,
         }) => {
             let enum_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
@@ -480,6 +495,16 @@ pub fn check_type(
                         .add_type(Type::Generic(generic.clone()))?;
                 }
             }
+
+            for constraint in where_clause {
+                enum_type_environment
+                    .borrow_mut()
+                    .add_generic_constraint(constraint)?;
+            }
+
+            type_environment
+                .borrow_mut()
+                .add_generic_constraints(type_identifier.to_key(), where_clause.clone());
 
             let shared_fields: Result<Vec<model::StructField>, String> = shared_fields
                 .iter()
@@ -641,16 +666,20 @@ pub fn check_type(
                         .cloned()
                         .collect::<Vec<model::StructField>>();
 
+                    let member_identifier = TypeIdentifier::MemberType(
+                        Box::new(type_identifier.clone()),
+                        member.type_identifier.to_key(),
+                    );
+
                     let enum_member = Type::Struct(Struct {
-                        type_identifier: TypeIdentifier::MemberType(
-                            Box::new(type_identifier.clone()),
-                            member.type_identifier.to_key(),
-                        ),
+                        type_identifier: member_identifier.clone(),
                         embedded_structs: embedded_structs.clone(),
                         fields: field_types
                             .iter()
                             .map(|ft| StructField {
-                                struct_name: type_identifier.clone(),
+                                // The field belongs to the variant, not to the
+                                // enum as a whole — shared fields included.
+                                struct_name: member_identifier.clone(),
                                 field_name: ft.identifier.clone(),
                                 default_value: ft.default_value.as_ref().map(|t| t.get_type()),
                                 field_type: ft.type_.clone(),
@@ -1068,10 +1097,19 @@ pub fn check_type(
                 None => None,
             };
 
+            // The declared return type is what the body is expected to produce,
+            // so it is pushed down as context. Without it an expression that
+            // cannot type itself — an empty array literal, say — has nothing to
+            // go on and lands on `{unknown}`.
             let body_typed_expression: Option<TypedExpression> = body
                 .as_ref()
                 .map(|body| {
-                    expressions::check_type(body, discovered_types, body_environment.clone(), None)
+                    expressions::check_type(
+                        body,
+                        discovered_types,
+                        body_environment.clone(),
+                        Some(return_type.clone()),
+                    )
                 })
                 .transpose()?;
 

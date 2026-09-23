@@ -34,7 +34,7 @@ impl Value {
                 enum_member: Struct {
                     type_name: "Option::Some".to_owned(),
                     fields: vec![StructField {
-                        identifier: "v".to_owned(),
+                        identifier: "value".to_owned(),
                         value: v,
                     }],
                 },
@@ -319,6 +319,12 @@ pub fn get_built_in_function_value(
             }),
             environment,
         },
+        // `typeof` is answered by the type checker, which folds every call into
+        // the string it produced, and rejects any other use. No `typeof` ever
+        // reaches the interpreter.
+        BuiltInFunctionType::TypeOf => {
+            unreachable!("typeof is resolved during type checking and cannot be called at runtime")
+        }
         BuiltInFunctionType::Rand => Value::Function {
             param_name: Some("arr".to_string()),
             body: FunctionBody::Fn(|value| {

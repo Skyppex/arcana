@@ -1,124 +1,160 @@
+//! Compiles match arms into a decision tree.
+//!
+//! The algorithm is the usual clause-matrix one (Maranget, *Compiling Pattern
+//! Matching to Good Decision Trees*), with rows carrying a list of outstanding
+//! *obligations* — "the value at this path must match this pattern" — rather
+//! than a fixed column per position. That generalisation is what lets two arms
+//! name different subsets of a struct's fields, and what makes an enum matched
+//! over its shared fields fall out for free: such a row simply has no
+//! obligation on the value being discriminated, so it belongs to every branch.
+
 use std::fmt::Display;
 
 use crate::{
+    ast::pattern::ComparisonOperator,
     type_checker::{
-        expressions::check_type,
-        get_field_by_name,
-        model::{BinaryOperator, Member, Typed},
-        type_annotation_equals, type_equals, type_equals_coerce, Enum, Struct, Type,
+        model::{Typed, TypedExpression},
+        pattern::{CheckedBound, CheckedFieldPattern, CheckedPattern},
+        Enum, Type,
     },
-    types::{TypeAnnotation, TypeIdentifier},
+    types::ToKey,
 };
 
-use super::{
-    model::{TypedExpression, TypedMatchArm},
-    DiscoveredType,
-};
+/// Where a value lives, relative to the value being matched.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AccessPath {
+    Root,
+    Field(Box<AccessPath>, String),
+    TupleIndex(Box<AccessPath>, usize),
+}
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Constructor {
-    Struct {
-        type_annotation: TypeAnnotation,
-        field_patterns: Vec<FieldPattern>,
-    },
+impl Display for AccessPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AccessPath::Root => write!(f, "<matched value>"),
+            AccessPath::Field(parent, name) => write!(f, "{}.{}", parent, name),
+            AccessPath::TupleIndex(parent, index) => write!(f, "{}.{}", parent, index),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Pattern {
-    Wildcard,
-    Unit,
+pub struct Occurrence {
+    pub path: AccessPath,
+    pub type_: Type,
+}
+
+impl Occurrence {
+    pub fn root(type_: Type) -> Self {
+        Occurrence {
+            path: AccessPath::Root,
+            type_,
+        }
+    }
+
+    fn field(&self, name: &str, type_: Type) -> Self {
+        Occurrence {
+            path: AccessPath::Field(Box::new(self.path.clone()), name.to_owned()),
+            type_,
+        }
+    }
+
+    fn tuple_index(&self, index: usize, type_: Type) -> Self {
+        Occurrence {
+            path: AccessPath::TupleIndex(Box::new(self.path.clone()), index),
+            type_,
+        }
+    }
+}
+
+/// A single test against one value.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Test {
     Bool(bool),
     Int(i64),
     UInt(u64),
     Float(f64),
     Rune(char),
     String(String),
-    Variable(String),
-    Constructor(Constructor),
-    LessThan(Box<Pattern>),
-    GreaterThan(Box<Pattern>),
-    LessThanOrEqual(Box<Pattern>),
-    GreaterThanOrEqual(Box<Pattern>),
-    Tuple(Vec<Pattern>),
-    Range(Box<Pattern>, Box<Pattern>, bool),
+    /// Fully qualified variant name, as carried by the runtime value.
+    Variant(String),
+    Comparison {
+        operator: ComparisonOperator,
+        bound: CheckedBound,
+    },
+    Range {
+        lower: CheckedBound,
+        upper: CheckedBound,
+        inclusive: bool,
+    },
 }
 
-impl Display for Pattern {
+impl Test {
+    /// Constructor tests carve the type into disjoint cases, so a value
+    /// matching one cannot match another. Predicate tests overlap freely and
+    /// never contribute to exhaustiveness.
+    fn is_constructor(&self) -> bool {
+        !matches!(self, Test::Comparison { .. } | Test::Range { .. })
+    }
+}
+
+impl Display for Test {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Pattern::Wildcard => write!(f, "_"),
-            Pattern::Unit => write!(f, "()"),
-            Pattern::Bool(v) => write!(f, "{}", v),
-            Pattern::Int(v) => write!(f, "{}", v),
-            Pattern::UInt(v) => write!(f, "{}", v),
-            Pattern::Float(v) => write!(f, "{}", v),
-            Pattern::Rune(v) => write!(f, "{}", v),
-            Pattern::String(v) => write!(f, "{}", v),
-            Pattern::Variable(v) => write!(f, "{}", v),
-            Pattern::Constructor(Constructor::Struct {
-                type_annotation,
-                field_patterns,
-            }) => {
-                write!(f, "{} {{ ", type_annotation)?;
-                for (i, field_pattern) in field_patterns.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", field_pattern)?;
-                }
-                write!(f, " }}")
-            }
-            Pattern::LessThan(p) => write!(f, "<{}", p),
-            Pattern::GreaterThan(p) => write!(f, ">{}", p),
-            Pattern::LessThanOrEqual(p) => write!(f, "<={}", p),
-            Pattern::GreaterThanOrEqual(p) => write!(f, ">={}", p),
-            Pattern::Tuple(patterns) => write!(
+            Test::Bool(v) => write!(f, "{}", v),
+            Test::Int(v) => write!(f, "{}", v),
+            Test::UInt(v) => write!(f, "{}u", v),
+            Test::Float(v) => write!(f, "{}f", v),
+            Test::Rune(v) => write!(f, "'{}'", v),
+            Test::String(v) => write!(f, "\"{}\"", v),
+            Test::Variant(name) => write!(f, "{}", name),
+            Test::Comparison { operator, bound } => write!(f, "{} {}", operator, bound),
+            Test::Range {
+                lower,
+                upper,
+                inclusive,
+            } => write!(
                 f,
-                "({})",
-                patterns
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                "{}..{}{}",
+                lower,
+                if *inclusive { "=" } else { "" },
+                upper
             ),
-            Pattern::Range(p1, p2, inclusive) => {
-                write!(f, "{}..{}{}", p1, if *inclusive { "=" } else { "" }, p2)
-            }
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FieldPattern {
+pub struct Binding {
     pub identifier: String,
-    pub pattern: Pattern,
+    pub occurrence: Occurrence,
 }
 
-impl Display for FieldPattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.identifier, self.pattern)
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub struct Case {
+    pub test: Test,
+    pub decision: Decision,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Decision {
+    /// An arm matched. Its bindings are projected from the matched value, then
+    /// its body is evaluated.
     Success {
-        expression: Box<TypedExpression>,
+        arm: usize,
+        bindings: Vec<Binding>,
+        body: Box<TypedExpression>,
         type_: Type,
     },
-    Failure {
-        error_message: String,
-    },
-    Guard {
-        condition: Box<TypedExpression>,
-        consequence: Box<Decision>,
-        alternative: Box<Decision>,
-        type_: Type,
-    },
+    /// Nothing matched. Exhaustiveness checking rejects any match that can
+    /// reach this, so it only survives as a defensive internal error.
+    Failure { witness: String },
+    /// Test one value, take the first case whose test succeeds, else the
+    /// default. A missing default means the cases are exhaustive.
     Switch {
-        variable: Variable,
+        occurrence: Occurrence,
         cases: Vec<Case>,
-        fallback: Box<Decision>,
+        default: Option<Box<Decision>>,
         type_: Type,
     },
 }
@@ -128,7 +164,6 @@ impl Typed for Decision {
         match self {
             Decision::Success { type_, .. } => type_.clone(),
             Decision::Failure { .. } => Type::Unknown,
-            Decision::Guard { type_, .. } => type_.clone(),
             Decision::Switch { type_, .. } => type_.clone(),
         }
     }
@@ -138,1163 +173,415 @@ impl Typed for Decision {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Case {
-    pub pattern: Pattern,
-    pub arguments: Vec<Variable>,
-    pub body: Decision,
+/// One arm, ready to compile: its pattern resolved against the matched type and
+/// its body already checked in a scope holding the pattern's bindings.
+#[derive(Debug, Clone)]
+pub struct CompilableArm {
+    pub pattern: CheckedPattern,
+    pub body: TypedExpression,
 }
 
-impl Typed for Case {
-    fn get_type(&self) -> Type {
-        self.body.get_type()
+#[derive(Debug, Clone)]
+struct Row {
+    /// Outstanding "value at this occurrence must match this pattern" pairs.
+    obligations: Vec<(Occurrence, CheckedPattern)>,
+    bindings: Vec<Binding>,
+    arm: usize,
+}
+
+impl Row {
+    /// Expands everything irrefutable — bindings, tuples, field projections —
+    /// until only real tests remain.
+    fn normalize(&mut self) {
+        let mut pending = std::mem::take(&mut self.obligations);
+
+        while let Some((occurrence, pattern)) = pending.pop() {
+            match pattern {
+                CheckedPattern::Wildcard => {}
+                CheckedPattern::Binding(identifier) => self.bindings.push(Binding {
+                    identifier,
+                    occurrence,
+                }),
+                CheckedPattern::Tuple(patterns) => {
+                    let element_types = match occurrence.type_.clone().unsubstitute() {
+                        Type::Tuple(types) => types,
+                        // Checking has already rejected this; nothing to expand.
+                        _ => continue,
+                    };
+
+                    for (index, element) in patterns.into_iter().enumerate().rev() {
+                        let element_type =
+                            element_types.get(index).cloned().unwrap_or(Type::Unknown);
+
+                        pending.push((occurrence.tuple_index(index, element_type), element));
+                    }
+                }
+                CheckedPattern::Fields(fields) => {
+                    for field in fields.into_iter().rev() {
+                        pending.push(field_obligation(&occurrence, field));
+                    }
+                }
+                test => self.obligations.push((occurrence, test)),
+            }
+        }
+
+        self.obligations.reverse();
     }
 
-    fn get_deep_type(&self) -> Type {
-        self.get_type()
+    fn obligation_at(&self, occurrence: &Occurrence) -> Option<&CheckedPattern> {
+        self.obligations
+            .iter()
+            .find(|(o, _)| o.path == occurrence.path)
+            .map(|(_, pattern)| pattern)
+    }
+
+    /// The same row with its obligation at `occurrence` removed, and `extra`
+    /// added in its place.
+    fn without_obligation_at(
+        &self,
+        occurrence: &Occurrence,
+        extra: Vec<(Occurrence, CheckedPattern)>,
+    ) -> Row {
+        let mut row = self.clone();
+        row.obligations.retain(|(o, _)| o.path != occurrence.path);
+        row.obligations.extend(extra);
+        row.normalize();
+        row
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Variable {
-    pub identifier: String,
-    pub accessor: Accessor,
-    pub type_: Type,
+fn field_obligation(
+    occurrence: &Occurrence,
+    field: CheckedFieldPattern,
+) -> (Occurrence, CheckedPattern) {
+    (
+        occurrence.field(&field.identifier, field.type_),
+        field.pattern,
+    )
 }
 
-impl Typed for Variable {
-    fn get_type(&self) -> Type {
-        self.type_.clone()
-    }
-
-    fn get_deep_type(&self) -> Type {
-        self.get_type()
-    }
+pub struct CompiledMatch {
+    pub decision: Decision,
+    /// Arms that no value can reach.
+    pub unreachable_arms: Vec<usize>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Accessor {
-    Expression(Box<TypedExpression>),
-    Environment,
+/// Compiles `arms` into a decision tree over `matchee_type`.
+///
+/// Fails if the arms are not exhaustive. Unreachable arms are reported rather
+/// than rejected here, so the caller can attach them to source patterns.
+pub fn compile_match(
+    matchee_type: Type,
+    arms: &[CompilableArm],
+    body_type: Type,
+) -> Result<CompiledMatch, String> {
+    let root = Occurrence::root(matchee_type);
+
+    let rows = arms
+        .iter()
+        .enumerate()
+        .map(|(arm, compilable)| {
+            let mut row = Row {
+                obligations: vec![(root.clone(), compilable.pattern.clone())],
+                bindings: vec![],
+                arm,
+            };
+
+            row.normalize();
+            row
+        })
+        .collect::<Vec<_>>();
+
+    let mut reached = vec![false; arms.len()];
+    let decision = compile_rows(rows, arms, &body_type, &mut reached)?;
+
+    Ok(CompiledMatch {
+        decision,
+        unreachable_arms: reached
+            .into_iter()
+            .enumerate()
+            .filter(|(_, reached)| !reached)
+            .map(|(arm, _)| arm)
+            .collect(),
+    })
 }
 
-pub fn create_decision_tree(
-    matchee: TypedExpression,
-    arms: Vec<TypedMatchArm>,
-    discovered_types: &Vec<DiscoveredType>,
-    body_type: Option<Type>,
+fn compile_rows(
+    rows: Vec<Row>,
+    arms: &[CompilableArm],
+    body_type: &Type,
+    reached: &mut [bool],
 ) -> Result<Decision, String> {
-    if arms.is_empty() {
+    let Some(first) = rows.first() else {
         return Ok(Decision::Failure {
-            error_message: "No match found".to_string(),
+            witness: String::new(),
+        });
+    };
+
+    // Every obligation discharged: this arm matches whatever got us here.
+    if first.obligations.is_empty() {
+        reached[first.arm] = true;
+
+        return Ok(Decision::Success {
+            arm: first.arm,
+            bindings: first.bindings.clone(),
+            body: Box::new(arms[first.arm].body.clone()),
+            type_: body_type.clone(),
         });
     }
 
-    let arm = arms.first().expect("testing matches");
+    // Leftmost outstanding obligation of the first unsatisfied arm.
+    let (occurrence, head) = first.obligations[0].clone();
+    let head_test = pattern_test(&head);
 
-    let decision = match arm.pattern.clone() {
-        Pattern::Wildcard => {
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
+    if head_test.is_constructor() {
+        compile_constructor_switch(rows, &occurrence, arms, body_type, reached)
+    } else {
+        compile_predicate_switch(rows, &occurrence, head_test, arms, body_type, reached)
+    }
+}
 
-            let type_ = expression.get_type();
+/// Switches on a value's constructor: every distinct constructor named at this
+/// occurrence becomes a case, and rows that don't constrain it ride along into
+/// all of them.
+fn compile_constructor_switch(
+    rows: Vec<Row>,
+    occurrence: &Occurrence,
+    arms: &[CompilableArm],
+    body_type: &Type,
+    reached: &mut [bool],
+) -> Result<Decision, String> {
+    let mut tests: Vec<Test> = vec![];
 
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
+    for row in &rows {
+        if let Some(pattern) = row.obligation_at(occurrence) {
+            let test = pattern_test(pattern);
+
+            if test.is_constructor() && !tests.contains(&test) {
+                tests.push(test);
             }
-
-            Ok(Decision::Success {
-                expression: Box::new(expression),
-                type_: type_.clone(),
-            })
         }
-        Pattern::Unit => {
-            if !type_equals(&Type::Unit, &matchee.get_type()) {
-                return Err(format!(
-                    "Expected type {:?} but got {:?}",
-                    matchee.get_type(),
-                    Type::Unit,
-                ));
-            }
+    }
 
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
+    let mut cases = vec![];
 
-            let type_ = expression.get_type();
+    for test in &tests {
+        let mut case_rows = vec![];
 
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
+        for row in &rows {
+            match row.obligation_at(occurrence) {
+                // Unconstrained here, so it survives whatever this value is.
+                None => case_rows.push(row.clone()),
+                Some(pattern) => {
+                    let row_test = pattern_test(pattern);
 
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
+                    if &row_test == test {
+                        let extra = match pattern {
+                            CheckedPattern::Variant { fields, .. } => fields
+                                .iter()
+                                .map(|field| field_obligation(occurrence, field.clone()))
+                                .collect(),
+                            _ => vec![],
+                        };
 
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::Equal,
-                    right: Box::new(TypedExpression::Literal {
-                        literal: crate::type_checker::model::ValueLiteral::Unit,
-                        type_: Type::Unit,
-                    }),
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
-        Pattern::Bool(v) => {
-            if !type_equals(&Type::Bool, &matchee.get_type()) {
-                return Err(format!(
-                    "Expected type {:?} but got {:?}",
-                    matchee.get_type(),
-                    Type::Bool,
-                ));
-            }
-
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::Equal,
-                    right: Box::new(TypedExpression::Literal {
-                        literal: crate::type_checker::model::ValueLiteral::Bool(v),
-                        type_: Type::bool_literal(v),
-                    }),
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
-        Pattern::Int(v) => {
-            if !type_equals(&Type::Int, &matchee.get_type()) {
-                return Err(format!(
-                    "Expected type {:?} but got {:?}",
-                    matchee.get_type(),
-                    Type::Int,
-                ));
-            }
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::Equal,
-                    right: Box::new(TypedExpression::Literal {
-                        literal: crate::type_checker::model::ValueLiteral::Int(v),
-                        type_: Type::int_literal(v),
-                    }),
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
-        Pattern::UInt(v) => {
-            if !type_equals(&Type::UInt, &matchee.get_type()) {
-                return Err(format!(
-                    "Expected type {:?} but got {:?}",
-                    matchee.get_type(),
-                    Type::UInt,
-                ));
-            }
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::Equal,
-                    right: Box::new(TypedExpression::Literal {
-                        literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                        type_: Type::uint_literal(v),
-                    }),
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
-        Pattern::Float(v) => {
-            if !type_equals(&Type::Float, &matchee.get_type()) {
-                return Err(format!(
-                    "Expected type {:?} but got {:?}",
-                    matchee.get_type(),
-                    Type::Float,
-                ));
-            }
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::Equal,
-                    right: Box::new(TypedExpression::Literal {
-                        literal: crate::type_checker::model::ValueLiteral::Float(v),
-                        type_: Type::float_literal(v),
-                    }),
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
-        Pattern::Rune(v) => {
-            if !type_equals(&Type::Rune, &matchee.get_type()) {
-                return Err(format!(
-                    "Expected type {:?} but got {:?}",
-                    matchee.get_type(),
-                    Type::Rune,
-                ));
-            }
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::Equal,
-                    right: Box::new(TypedExpression::Literal {
-                        literal: crate::type_checker::model::ValueLiteral::Rune(v),
-                        type_: Type::rune_literal(v.to_string()),
-                    }),
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
-        Pattern::String(v) => {
-            if !type_equals(&Type::String, &matchee.get_type()) {
-                return Err(format!(
-                    "Expected type {:?} but got {:?}",
-                    matchee.get_type(),
-                    Type::String,
-                ));
-            }
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::Equal,
-                    right: Box::new(TypedExpression::Literal {
-                        literal: crate::type_checker::model::ValueLiteral::String(v.clone()),
-                        type_: Type::string_literal(v.clone()),
-                    }),
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
-        Pattern::Variable(ref identifier) => {
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let matchee_type = matchee.get_type();
-
-            type_environment
-                .borrow_mut()
-                .add_variable(identifier.clone(), matchee_type.clone());
-
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&type_, &body_type) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let variable = Variable {
-                identifier: identifier.clone(),
-                accessor: Accessor::Environment,
-                type_: matchee_type.clone(),
-            };
-
-            let case = Case {
-                pattern: Pattern::Variable(identifier.clone()),
-                arguments: vec![variable.clone()],
-                body: Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                },
-            };
-
-            Ok(Decision::Switch {
-                variable,
-                cases: vec![case],
-                fallback: Box::new(Decision::Failure {
-                    error_message: "No match found".to_string(),
-                }),
-                type_,
-            })
-        }
-        Pattern::Constructor(Constructor::Struct {
-            type_annotation,
-            field_patterns,
-        }) => {
-            let matchee_type = matchee.get_type();
-
-            let mut is_enum_member = false;
-
-            match &matchee_type {
-                Type::Enum(Enum { members, .. }) => {
-                    for member_type in members.values() {
-                        if type_annotation_equals(&type_annotation, &member_type.type_annotation())
-                        {
-                            is_enum_member = true;
-                            break;
-                        }
+                        case_rows.push(row.without_obligation_at(occurrence, extra));
+                    } else if !row_test.is_constructor() {
+                        // A predicate can still hold for this constructor, so
+                        // keep the row and its obligation.
+                        case_rows.push(row.clone());
                     }
                 }
-                Type::Struct(Struct {
-                    type_identifier: TypeIdentifier::MemberType(_, discriminant_name),
-                    ..
-                }) => {
-                    if type_annotation_equals(
-                        &type_annotation,
-                        &TypeAnnotation::Type(discriminant_name.clone()),
-                    ) {
-                        is_enum_member = true;
-                    }
-                }
-                _ => {}
             }
+        }
 
-            if !is_enum_member
-                && !type_annotation_equals(
-                    &matchee_type.type_annotation(),
-                    &type_annotation.clone(),
-                )
-            {
-                return Err(format!(
-                    "Expected type annotation {} but got {}",
-                    matchee_type.type_annotation(),
-                    type_annotation,
-                ));
-            }
+        cases.push(Case {
+            test: test.clone(),
+            decision: compile_rows(case_rows, arms, body_type, reached)?,
+        });
+    }
 
-            let expression = &arm.expression;
-            let type_environment = arm.type_environment.clone();
+    let default_rows = rows
+        .iter()
+        .filter(|row| match row.obligation_at(occurrence) {
+            None => true,
+            Some(pattern) => !pattern_test(pattern).is_constructor(),
+        })
+        .cloned()
+        .collect::<Vec<_>>();
 
-            let fields = match matchee_type.clone() {
-                Type::Struct(Struct { fields, .. }) => fields,
-                Type::Enum(Enum {
-                    shared_fields,
-                    members,
-                    ..
-                }) => {
-                    let member = members.get(&type_annotation.name()).expect(
-                        "Already checked if the constructor name exists in the member list",
-                    );
+    let missing = missing_constructors(&occurrence.type_, &tests);
 
-                    let Type::Struct(Struct { fields, .. }) = member.clone() else {
-                        return Err(format!("Expected enum member but got {:?}", member.clone()));
-                    };
-
-                    fields.into_iter().chain(shared_fields).collect()
-                }
-                _ => {
-                    return Err(format!(
-                        "Expected struct, enum or enum member but got {:?}",
-                        matchee_type.clone()
-                    ));
-                }
-            };
-
-            if fields.is_empty() {
-                let expression =
-                    check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-                let type_ = body_type.unwrap_or_else(|| expression.get_type());
-
-                let alternative = create_decision_tree(
-                    matchee.clone(),
-                    arms.into_iter().skip(1).collect(),
-                    discovered_types,
-                    Some(type_.clone()),
-                )?;
-
-                let condition = if is_enum_member {
-                    let Type::Enum(Enum {
-                        type_identifier, ..
-                    }) = &matchee_type
-                    else {
-                        return Err("Expected matchee to be an enum type".to_owned());
-                    };
-
-                    Box::new(TypedExpression::Binary {
-                        left: Box::new(matchee),
-                        operator: BinaryOperator::Equal,
-                        right: Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Enum {
-                                type_annotation: TypeAnnotation::from(
-                                    format!(
-                                        "{}::{}",
-                                        type_identifier.name(),
-                                        type_annotation.name()
-                                    )
-                                    .as_str(),
-                                ),
-                                field_initializers: vec![],
-                                member: type_annotation.name(),
-                                type_: matchee_type.clone(),
-                            },
-                            type_: matchee_type.clone(),
-                        }),
-                        type_: Type::Bool,
-                    })
-                } else {
-                    Box::new(TypedExpression::Binary {
-                        left: Box::new(matchee),
-                        operator: BinaryOperator::Equal,
-                        right: Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Struct {
-                                type_annotation: type_annotation.clone(),
-                                field_initializers: vec![],
-                                type_: matchee_type.clone(),
-                            },
-                            type_: matchee_type.clone(),
-                        }),
-                        type_: Type::Bool,
-                    })
-                };
-
-                return Ok(Decision::Guard {
-                    condition,
-                    consequence: Box::new(Decision::Success {
-                        expression: Box::new(expression),
-                        type_: type_.clone(),
-                    }),
-                    alternative: Box::new(alternative),
-                    type_,
-                });
-            }
-
-            let field_name = field_patterns.first().unwrap().identifier.clone();
-            let field_type = get_field_by_name(&fields, &field_name)
-                .expect("testing matches")
-                .clone()
-                .field_type;
-
-            let expr = TypedExpression::Member(Member::MemberAccess {
-                object: Box::new(matchee.clone()),
-                member: Box::new(Member::Identifier {
-                    symbol: field_name.clone(),
-                    type_: field_type.clone(),
-                }),
-                symbol: field_name.clone(),
-                type_: field_type.clone(),
+    // A complete signature needs no default: the cases cover every value.
+    if let Some(missing) = &missing {
+        if missing.is_empty() {
+            return Ok(Decision::Switch {
+                occurrence: occurrence.clone(),
+                cases,
+                default: None,
+                type_: body_type.clone(),
             });
-
-            let case = Case {
-                pattern: Pattern::Constructor(Constructor::Struct {
-                    type_annotation: type_annotation.clone(),
-                    field_patterns: field_patterns.clone(),
-                }),
-                arguments: fields
-                    .iter()
-                    .map(|struct_field| Variable {
-                        identifier: struct_field.field_name.clone(),
-                        accessor: Accessor::Environment,
-                        type_: struct_field.field_type.clone(),
-                    })
-                    .collect(),
-                body: create_decision_tree(
-                    expr.clone(),
-                    field_patterns
-                        .into_iter()
-                        .map(|field_pattern| TypedMatchArm {
-                            pattern: field_pattern.pattern,
-                            expression: expression.clone(),
-                            type_environment: type_environment.clone(),
-                        })
-                        .collect(),
-                    discovered_types,
-                    body_type.clone(),
-                )?,
-            };
-
-            let fallback = create_decision_tree(
-                matchee.clone(),
-                arms.into_iter().skip(1).collect(),
-                discovered_types,
-                body_type,
-            )?;
-
-            Ok(Decision::Switch {
-                variable: Variable {
-                    identifier: field_name.clone(),
-                    accessor: Accessor::Expression(Box::new(expr.clone())),
-                    type_: field_type.clone(),
-                },
-                cases: vec![case],
-                fallback: Box::new(fallback),
-                type_: field_type.clone(),
-            })
         }
-        Pattern::LessThan(value) => {
-            if !matches!(
-                *value,
-                Pattern::Int(_) | Pattern::UInt(_) | Pattern::Float(_) | Pattern::Variable(_)
-            ) {
-                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
+    }
+
+    if default_rows.is_empty() {
+        return Err(non_exhaustive_error(occurrence, &missing));
+    }
+
+    let default = compile_rows(default_rows, arms, body_type, reached)?;
+
+    if let Decision::Failure { .. } = default {
+        return Err(non_exhaustive_error(occurrence, &missing));
+    }
+
+    Ok(Decision::Switch {
+        occurrence: occurrence.clone(),
+        cases,
+        default: Some(Box::new(default)),
+        type_: body_type.clone(),
+    })
+}
+
+/// Switches on a predicate — a range or comparison. These never partition the
+/// type, so there is exactly one case and a default is always required.
+fn compile_predicate_switch(
+    rows: Vec<Row>,
+    occurrence: &Occurrence,
+    test: Test,
+    arms: &[CompilableArm],
+    body_type: &Type,
+    reached: &mut [bool],
+) -> Result<Decision, String> {
+    let mut case_rows = vec![];
+
+    for row in &rows {
+        match row.obligation_at(occurrence) {
+            None => case_rows.push(row.clone()),
+            Some(pattern) => {
+                if pattern_test(pattern) == test {
+                    case_rows.push(row.without_obligation_at(occurrence, vec![]));
+                } else {
+                    // Another test on the same value may still hold once this
+                    // predicate has; keep it to be tested inside the branch.
+                    case_rows.push(row.clone());
+                }
             }
+        }
+    }
 
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
+    let default_rows = rows
+        .iter()
+        .filter(|row| match row.obligation_at(occurrence) {
+            None => true,
+            Some(pattern) => pattern_test(pattern) != test,
+        })
+        .cloned()
+        .collect::<Vec<_>>();
 
-            let type_ = expression.get_type();
+    if default_rows.is_empty() {
+        return Err(non_exhaustive_error(occurrence, &None));
+    }
 
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
+    let default = compile_rows(default_rows, arms, body_type, reached)?;
+
+    if let Decision::Failure { .. } = default {
+        return Err(non_exhaustive_error(occurrence, &None));
+    }
+
+    Ok(Decision::Switch {
+        occurrence: occurrence.clone(),
+        cases: vec![Case {
+            test,
+            decision: compile_rows(case_rows, arms, body_type, reached)?,
+        }],
+        default: Some(Box::new(default)),
+        type_: body_type.clone(),
+    })
+}
+
+fn pattern_test(pattern: &CheckedPattern) -> Test {
+    match pattern {
+        CheckedPattern::Bool(v) => Test::Bool(*v),
+        CheckedPattern::Int(v) => Test::Int(*v),
+        CheckedPattern::UInt(v) => Test::UInt(*v),
+        CheckedPattern::Float(v) => Test::Float(*v),
+        CheckedPattern::Rune(v) => Test::Rune(*v),
+        CheckedPattern::String(v) => Test::String(v.clone()),
+        CheckedPattern::Variant { qualified_name, .. } => Test::Variant(qualified_name.clone()),
+        CheckedPattern::Comparison { operator, bound } => Test::Comparison {
+            operator: *operator,
+            bound: bound.clone(),
+        },
+        CheckedPattern::Range {
+            lower,
+            upper,
+            inclusive,
+        } => Test::Range {
+            lower: lower.clone(),
+            upper: upper.clone(),
+            inclusive: *inclusive,
+        },
+        // Normalization removes these before a test is ever asked for.
+        CheckedPattern::Wildcard
+        | CheckedPattern::Binding(_)
+        | CheckedPattern::Tuple(_)
+        | CheckedPattern::Fields(_) => {
+            unreachable!("irrefutable patterns are expanded before testing")
+        }
+    }
+}
+
+/// The constructors of `type_` that `covered` leaves out, or `None` when the
+/// type has no finite set of constructors.
+fn missing_constructors(type_: &Type, covered: &[Test]) -> Option<Vec<String>> {
+    match type_.clone().unsubstitute() {
+        Type::Bool => {
+            let mut missing = vec![];
+
+            for value in [true, false] {
+                if !covered.contains(&Test::Bool(value)) {
+                    missing.push(value.to_string());
                 }
             }
 
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.clone().into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::LessThan,
-                    right: match *value {
-                        Pattern::Int(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Int(v),
-                            type_: Type::int_literal(v),
-                        }),
-                        Pattern::UInt(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                            type_: Type::uint_literal(v),
-                        }),
-                        Pattern::Float(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Float(v),
-                            type_: Type::float_literal(v),
-                        }),
-                        Pattern::Variable(v) => {
-                            let variable_type = type_environment
-                                .borrow()
-                                .get_variable(&v)
-                                .expect("testing matches");
-
-                            Box::new(TypedExpression::Member(Member::Identifier {
-                                symbol: v.clone(),
-                                type_: variable_type.clone(),
-                            }))
-                        }
-                        _ => unreachable!(
-                            "Already checked if the value is Int, UInt, Float or Identifier"
-                        ),
-                    },
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
+            Some(missing)
         }
-        Pattern::GreaterThan(value) => {
-            if !matches!(
-                *value,
-                Pattern::Int(_) | Pattern::UInt(_) | Pattern::Float(_) | Pattern::Variable(_)
-            ) {
-                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
-            }
+        Type::Enum(Enum { members, .. }) => {
+            let mut missing = vec![];
 
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
+            for member_type in members.values() {
+                let name = member_type.clone().unsubstitute().to_key();
 
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
+                if !covered.contains(&Test::Variant(name.clone())) {
+                    missing.push(name);
                 }
             }
 
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.clone().into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::GreaterThan,
-                    right: match *value {
-                        Pattern::Int(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Int(v),
-                            type_: Type::int_literal(v),
-                        }),
-                        Pattern::UInt(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                            type_: Type::uint_literal(v),
-                        }),
-                        Pattern::Float(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Float(v),
-                            type_: Type::float_literal(v),
-                        }),
-                        Pattern::Variable(v) => {
-                            let variable_type = type_environment
-                                .borrow()
-                                .get_variable(&v)
-                                .expect("testing matches");
-
-                            Box::new(TypedExpression::Member(Member::Identifier {
-                                symbol: v.clone(),
-                                type_: variable_type.clone(),
-                            }))
-                        }
-                        _ => unreachable!(
-                            "Already checked if the value is Int, UInt, Float or Identifier"
-                        ),
-                    },
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
+            missing.sort();
+            Some(missing)
         }
-        Pattern::LessThanOrEqual(value) => {
-            if !matches!(
-                *value,
-                Pattern::Int(_) | Pattern::UInt(_) | Pattern::Float(_) | Pattern::Variable(_)
-            ) {
-                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
-            }
+        _ => None,
+    }
+}
 
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.clone().into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::LessThanOrEqual,
-                    right: match *value {
-                        Pattern::Int(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Int(v),
-                            type_: Type::int_literal(v),
-                        }),
-                        Pattern::UInt(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                            type_: Type::uint_literal(v),
-                        }),
-                        Pattern::Float(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Float(v),
-                            type_: Type::float_literal(v),
-                        }),
-                        Pattern::Variable(v) => {
-                            let variable_type = type_environment
-                                .borrow()
-                                .get_variable(&v)
-                                .expect("testing matches");
-
-                            Box::new(TypedExpression::Member(Member::Identifier {
-                                symbol: v.clone(),
-                                type_: variable_type.clone(),
-                            }))
-                        }
-                        _ => unreachable!(
-                            "Already checked if the value is Int, UInt, Float or Identifier"
-                        ),
-                    },
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
-        Pattern::GreaterThanOrEqual(value) => {
-            if !matches!(
-                *value,
-                Pattern::Int(_) | Pattern::UInt(_) | Pattern::Float(_) | Pattern::Variable(_)
-            ) {
-                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
-            }
-
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.clone().into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(matchee),
-                    operator: BinaryOperator::GreaterThanOrEqual,
-                    right: match *value {
-                        Pattern::Int(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Int(v),
-                            type_: Type::int_literal(v),
-                        }),
-                        Pattern::UInt(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                            type_: Type::uint_literal(v),
-                        }),
-                        Pattern::Float(v) => Box::new(TypedExpression::Literal {
-                            literal: crate::type_checker::model::ValueLiteral::Float(v),
-                            type_: Type::float_literal(v),
-                        }),
-                        Pattern::Variable(v) => {
-                            let variable_type = type_environment
-                                .borrow()
-                                .get_variable(&v)
-                                .expect("testing matches");
-
-                            Box::new(TypedExpression::Member(Member::Identifier {
-                                symbol: v.clone(),
-                                type_: variable_type.clone(),
-                            }))
-                        }
-                        _ => unreachable!(
-                            "Already checked if the value is Int, UInt, Float or Identifier"
-                        ),
-                    },
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
-        Pattern::Tuple(patterns) => {
-            let matchee_type = matchee.get_type();
-
-            if let Type::Tuple(types) = &matchee_type {
-                if types.len() != patterns.len() {
-                    return Err(format!(
-                        "Expected tuple of length {} but got {}",
-                        patterns.len(),
-                        types.len()
-                    ));
-                }
-
-                let mut conditions = Vec::new();
-                let mut consequences = Vec::new();
-
-                for (i, pattern) in patterns.into_iter().enumerate() {
-                    let sub_expression = TypedExpression::Member(Member::MemberAccess {
-                        object: Box::new(matchee.clone()),
-                        member: Box::new(Member::Identifier {
-                            symbol: format!("{}", i),
-                            type_: types[i].clone(),
-                        }),
-                        symbol: format!("{}", i),
-                        type_: types[i].clone(),
-                    });
-
-                    let sub_arm = TypedMatchArm {
-                        pattern,
-                        expression: arm.expression.clone(),
-                        type_environment: arm.type_environment.clone(),
-                    };
-
-                    let sub_decision = create_decision_tree(
-                        sub_expression,
-                        vec![sub_arm],
-                        discovered_types,
-                        body_type.clone(),
-                    )?;
-
-                    if let Decision::Guard {
-                        condition,
-                        consequence,
-                        ..
-                    } = sub_decision
-                    {
-                        conditions.push(condition);
-                        consequences.push(consequence);
-                    } else {
-                        return Err("Expected a guard decision".to_string());
-                    }
-                }
-
-                let combined_condition = conditions
-                    .into_iter()
-                    .reduce(|acc, cond| {
-                        Box::new(TypedExpression::Binary {
-                            left: acc,
-                            operator: BinaryOperator::LogicalAnd,
-                            right: cond,
-                            type_: Type::Bool,
-                        })
-                    })
-                    .expect("Expected at least one condition");
-
-                let combined_consequence = consequences
-                    .into_iter()
-                    .next_back()
-                    .expect("Expected at least one consequence");
-
-                let alternative = create_decision_tree(
-                    matchee.clone(),
-                    arms.into_iter().skip(1).collect(),
-                    discovered_types,
-                    body_type.clone(),
-                )?;
-
-                Ok(Decision::Guard {
-                    condition: combined_condition,
-                    consequence: combined_consequence,
-                    alternative: Box::new(alternative),
-                    type_: body_type.unwrap_or(matchee_type),
-                })
-            } else {
-                Err(format!("Expected tuple type but got {:?}", matchee_type))
-            }
-        }
-        Pattern::Range(left, right, inclusive) => {
-            if !matches!(
-                (*left.clone(), *right.clone()),
-                (Pattern::Int(_), Pattern::Int(_))
-                    | (Pattern::Variable(_), Pattern::Int(_))
-                    | (Pattern::Int(_), Pattern::Variable(_))
-                    | (Pattern::UInt(_), Pattern::UInt(_))
-                    | (Pattern::Variable(_), Pattern::UInt(_))
-                    | (Pattern::UInt(_), Pattern::Variable(_))
-                    | (Pattern::Float(_), Pattern::Float(_))
-                    | (Pattern::Variable(_), Pattern::Float(_))
-                    | (Pattern::Float(_), Pattern::Variable(_))
-                    | (Pattern::Variable(_), Pattern::Variable(_))
-            ) {
-                return Err("Expected Int, UInt, Float or Variable pattern".to_owned());
-            }
-
-            let expression = &arm.expression;
-            let type_environment = &arm.type_environment;
-            let expression =
-                check_type(expression, discovered_types, type_environment.clone(), None)?;
-
-            let type_ = expression.get_type();
-
-            if let Some(body_type) = body_type {
-                if !type_equals_coerce(&body_type, &type_) {
-                    return Err(format!("Expected type {:?} but got {:?}", body_type, type_));
-                }
-            }
-
-            let alternative = create_decision_tree(
-                matchee.clone(),
-                arms.clone().into_iter().skip(1).collect(),
-                discovered_types,
-                Some(type_.clone()),
-            )?;
-
-            let decision = Decision::Guard {
-                condition: Box::new(TypedExpression::Binary {
-                    left: Box::new(TypedExpression::Binary {
-                        left: Box::new(matchee.clone()),
-                        operator: BinaryOperator::GreaterThanOrEqual,
-                        right: match *left {
-                            Pattern::Int(v) => Box::new(TypedExpression::Literal {
-                                literal: crate::type_checker::model::ValueLiteral::Int(v),
-                                type_: Type::int_literal(v),
-                            }),
-                            Pattern::UInt(v) => Box::new(TypedExpression::Literal {
-                                literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                                type_: Type::uint_literal(v),
-                            }),
-                            Pattern::Float(v) => Box::new(TypedExpression::Literal {
-                                literal: crate::type_checker::model::ValueLiteral::Float(v),
-                                type_: Type::float_literal(v),
-                            }),
-                            Pattern::Variable(v) => {
-                                let variable_type = type_environment
-                                    .borrow()
-                                    .get_variable(&v)
-                                    .expect("testing matches");
-
-                                Box::new(TypedExpression::Member(Member::Identifier {
-                                    symbol: v.clone(),
-                                    type_: variable_type.clone(),
-                                }))
-                            }
-                            _ => unreachable!(
-                                "Already checked if the value is Int, UInt, Float or Identifier"
-                            ),
-                        },
-                        type_: Type::Bool,
-                    }),
-                    operator: BinaryOperator::LogicalAnd,
-                    right: Box::new(TypedExpression::Binary {
-                        left: Box::new(matchee),
-                        operator: if inclusive {
-                            BinaryOperator::LessThanOrEqual
-                        } else {
-                            BinaryOperator::LessThan
-                        },
-                        right: match *right {
-                            Pattern::Int(v) => Box::new(TypedExpression::Literal {
-                                literal: crate::type_checker::model::ValueLiteral::Int(v),
-                                type_: Type::int_literal(v),
-                            }),
-                            Pattern::UInt(v) => Box::new(TypedExpression::Literal {
-                                literal: crate::type_checker::model::ValueLiteral::UInt(v),
-                                type_: Type::uint_literal(v),
-                            }),
-                            Pattern::Float(v) => Box::new(TypedExpression::Literal {
-                                literal: crate::type_checker::model::ValueLiteral::Float(v),
-                                type_: Type::float_literal(v),
-                            }),
-                            Pattern::Variable(v) => {
-                                let variable_type = type_environment
-                                    .borrow()
-                                    .get_variable(&v)
-                                    .expect("testing matches");
-
-                                Box::new(TypedExpression::Member(Member::Identifier {
-                                    symbol: v.clone(),
-                                    type_: variable_type.clone(),
-                                }))
-                            }
-                            _ => unreachable!(
-                                "Already checked if the value is Int, UInt, Float or Identifier"
-                            ),
-                        },
-                        type_: Type::Bool,
-                    }),
-                    type_: Type::Bool,
-                }),
-                consequence: Box::new(Decision::Success {
-                    expression: Box::new(expression),
-                    type_: type_.clone(),
-                }),
-                alternative: Box::new(alternative),
-                type_,
-            };
-
-            Ok(decision)
-        }
+fn non_exhaustive_error(occurrence: &Occurrence, missing: &Option<Vec<String>>) -> String {
+    let at = match occurrence.path {
+        AccessPath::Root => String::new(),
+        _ => format!(" at {}", occurrence.path),
     };
 
-    decision
+    match missing {
+        Some(missing) if !missing.is_empty() => format!(
+            "Match is not exhaustive{}: no arm covers {}",
+            at,
+            missing
+                .iter()
+                .map(|m| format!("`{}`", m))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        _ => format!(
+            "Match is not exhaustive{}: {} is not fully covered, add a catch-all arm",
+            at, occurrence.type_
+        ),
+    }
 }

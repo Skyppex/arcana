@@ -166,7 +166,14 @@ fn logical_not_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Bool);
+    // `!` folds the literal, as `-` does for `-1`.
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "false".to_owned(),
+            type_: Box::new(LiteralType::BoolValue(false))
+        }
+    );
 }
 
 #[test]
@@ -183,7 +190,14 @@ fn bitwise_not_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Int);
+    // `~` folds the literal, as `-` does for `-1`.
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "-2".to_owned(),
+            type_: Box::new(LiteralType::IntValue(-2))
+        }
+    );
 }
 
 #[test]

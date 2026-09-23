@@ -18,16 +18,18 @@ fn enum_variant_can_be_used_as_a_type() {
         }
 
         let x: O::S;
+        x
         "#;
 
     // Act
     let typed_ast = create_typed_ast(input);
 
     // Assert
+    // The declaration evaluates to whether the name could be bound, so the
+    // annotated type is observed on the variable itself.
     let expression = typed_ast
         .unwrap_program()
-        .nth_statement(1)
-        .unwrap_semi()
+        .nth_statement(2)
         .unwrap_expression();
 
     assert_eq!(
@@ -52,22 +54,22 @@ fn enum_variant_can_be_used_as_a_type() {
 }
 
 #[test]
-#[ignore]
 fn enum_variant_can_be_assigned_to_variable_with_variant_type() {
     // Arrange
     let input = r#"
         enum O {
-            S(x: Int),
+            S { x: Int },
             N
         }
 
-        let x: O::S = O::S(x: 1);
+        let x: O::S = O::S { x: 1 };
+        x
         "#;
 
     let environment = create_env();
 
     // Act
-    let value = evaluate_expression(input, environment, true);
+    let value = evaluate_expression(input, environment, false);
 
     // Assert
     assert_eq!(

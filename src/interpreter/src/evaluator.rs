@@ -1,12 +1,14 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use shared::{
-    ast::{ModPath, UseItem},
+    ast::{pattern::Pattern, ComparisonOperator, ModPath, UseItem},
     built_in::BuiltInFunction,
     lexer::token::IdentifierType,
     type_checker::{
-        decision_tree::{Accessor, Constructor, Decision, FieldPattern, Pattern},
+        decision_tree::{AccessPath, Decision, Test},
+        is_option,
         model::*,
+        pattern::CheckedBound,
         Type,
     },
     types::{ToKey, TypeAnnotation, TypeIdentifier},
@@ -173,8 +175,14 @@ pub(super) fn evaluate_expression(
             condition,
             true_expression,
             false_expression,
-            ..
-        } => evaluate_if(condition, true_expression, false_expression, environment),
+            type_,
+        } => evaluate_if(
+            condition,
+            true_expression,
+            false_expression,
+            type_,
+            environment,
+        ),
         TypedExpression::Match {
             expression,
             decision_tree,
@@ -270,47 +278,52 @@ fn evaluate_variable_declaration(
         None => Value::Uninitialized,
     };
 
-    if let Some(bindings) = evaluate_pattern(&pattern, &value, environment.clone())? {
-        for (identifier, value) in bindings {
-            environment
-                .borrow_mut()
-                .add_variable(identifier, value, mutable);
-        }
+    let mut bindings = vec![];
+    destructure_irrefutable(&pattern, &value, &mut bindings)?;
 
-        return Ok(Value::Bool(true));
+    for (identifier, value) in bindings {
+        environment
+            .borrow_mut()
+            .add_variable(identifier, value, mutable);
     }
 
-    Ok(Value::Bool(false))
+    Ok(Value::Bool(true))
 }
 
 fn evaluate_if(
     condition: Box<TypedExpression>,
     true_expression: Box<TypedExpression>,
     false_expression: Option<Box<TypedExpression>>,
+    type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let if_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
     let condition = evaluate_expression(*condition, if_environment.clone())?;
 
-    match condition {
-        Value::Bool(v) => {
-            if v {
-                let value = evaluate_expression(*true_expression, if_environment)?;
-                if false_expression.is_none() {
-                    Ok(Value::option_some(value))
-                } else {
-                    Ok(value)
-                }
-            } else {
-                match false_expression {
-                    Some(false_expression) => {
-                        evaluate_expression(*false_expression, if_environment)
-                    }
-                    None => Ok(Value::option_none()),
-                }
-            }
-        }
-        _ => Err(format!("If condition must be boolean '{}'", condition)),
+    let Value::Bool(condition) = condition else {
+        return Err(format!("If condition must be boolean '{}'", condition));
+    };
+
+    // The whole expression is optional when some path through it produces no
+    // value — no else at all, or an `else if` chain that can run out. A branch
+    // that yields a bare value is wrapped to match.
+    let branch = if condition {
+        Some(true_expression)
+    } else {
+        false_expression
+    };
+
+    let Some(branch) = branch else {
+        return Ok(Value::option_none());
+    };
+
+    let wrap = is_option(&type_) && !is_option(&branch.get_type());
+    let value = evaluate_expression(*branch, if_environment)?;
+
+    if wrap {
+        Ok(Value::option_some(value))
+    } else {
+        Ok(value)
     }
 }
 
@@ -319,620 +332,231 @@ fn evaluate_match(
     decision_tree: Decision,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
+    // Evaluated once. Everything the tree tests is projected out of this value.
     let value = evaluate_expression(*expression, environment.clone())?;
-    let match_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
+    let match_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
 
-    evaluate_decision_tree(decision_tree, value, match_environment)
+    evaluate_decision_tree(decision_tree, &value, match_environment)
 }
 
 fn evaluate_decision_tree(
     decision_tree: Decision,
-    value: Value,
+    value: &Value,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
-    match decision_tree {
-        Decision::Success { expression, .. } => evaluate_expression(*expression, environment),
-        Decision::Failure { error_message } => Err(error_message),
-        Decision::Guard {
-            condition,
-            consequence: true_,
-            alternative: false_,
-            type_: _,
-        } => {
-            let condition = evaluate_expression(*condition, environment.clone())?;
+    let mut decision = decision_tree;
 
-            match condition {
-                Value::Bool(v) => {
-                    if v {
-                        evaluate_decision_tree(*true_, value, environment)
-                    } else {
-                        evaluate_decision_tree(*false_, value, environment)
-                    }
-                }
-                _ => Err(format!(
-                    "Match guard condition must be boolean '{}'",
-                    condition
-                )),
-            }
-        }
-        Decision::Switch {
-            variable,
-            cases,
-            fallback,
-            type_: _,
-        } => {
-            let switch_value = match variable.accessor {
-                Accessor::Environment => {
-                    let Some(variable) = environment.borrow().get_variable(&variable.identifier)
-                    else {
-                        return Err(format!(
-                            "Variable '{}' not found in environment",
-                            variable.identifier
-                        ));
-                    };
-
-                    let value = variable.borrow().value.clone();
-                    value
-                }
-                Accessor::Expression(expression) => {
-                    let argument_value = evaluate_expression(*expression, environment.clone())?;
-
-                    environment.borrow_mut().add_variable(
-                        variable.identifier.clone(),
-                        argument_value.clone(),
-                        false,
-                    );
-
-                    argument_value
-                }
-            };
-
-            for case in cases {
-                let pattern = case.pattern;
-                let arguments = case.arguments;
-                let body = case.body;
-
-                let case_environment =
+    loop {
+        match decision {
+            Decision::Success { bindings, body, .. } => {
+                let arm_environment =
                     Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
 
-                for argument in arguments {
-                    match argument.accessor {
-                        Accessor::Environment => continue,
-                        Accessor::Expression(expression) => {
-                            let argument_value =
-                                evaluate_expression(*expression, environment.clone())?;
+                for binding in bindings {
+                    let bound = project(value, &binding.occurrence.path)?;
 
-                            case_environment.borrow_mut().add_variable(
-                                argument.identifier,
-                                argument_value,
-                                false,
-                            );
-                        }
-                    }
+                    arm_environment
+                        .borrow_mut()
+                        .add_variable(binding.identifier, bound, false);
                 }
 
-                if let Some(bindings) = evaluate_pattern(&pattern, &value, environment.clone())? {
-                    for (identifier, value) in bindings {
-                        case_environment
-                            .borrow_mut()
-                            .add_variable(identifier, value, false);
-                    }
-
-                    return evaluate_decision_tree(body, switch_value, case_environment);
-                }
+                return evaluate_expression(*body, arm_environment);
             }
+            Decision::Failure { witness } => {
+                return Err(format!("No match found for '{}' {}", value, witness))
+            }
+            Decision::Switch {
+                occurrence,
+                cases,
+                default,
+                ..
+            } => {
+                let tested = project(value, &occurrence.path)?;
 
-            evaluate_decision_tree(*fallback, value, environment)
+                let matched = cases
+                    .into_iter()
+                    .find(|case| test_matches(&case.test, &tested, &environment).unwrap_or(false))
+                    .map(|case| case.decision);
+
+                decision = match matched.or(default.map(|d| *d)) {
+                    Some(decision) => decision,
+                    None => {
+                        return Err(format!(
+                            "No case matched '{}' and there is no default",
+                            tested
+                        ))
+                    }
+                };
+            }
         }
     }
 }
 
-fn evaluate_pattern(
-    pattern: &Pattern,
-    value: &Value,
-    environment: Rcrc<Environment>,
-) -> Result<Option<Vec<(String, Value)>>, String> {
-    match pattern {
-        Pattern::Wildcard => Ok(Some(Vec::new())),
-        Pattern::Unit => match value {
-            Value::Unit => Ok(Some(Vec::new())),
-            _ => Err(format!("Expected unit, found '{}'", value)),
-        },
-        Pattern::Bool(v) => match value {
-            Value::Bool(v2) => {
-                if *v == *v2 {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            _ => Err(format!("Expected boolean, found '{}'", value)),
-        },
-        Pattern::Int(v) => match value {
-            Value::Number(Number::Int(v2)) => {
-                if *v == *v2 {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            _ => Err(format!("Expected int, found '{}'", value)),
-        },
-        Pattern::UInt(v) => match value {
-            Value::Number(Number::UInt(v2)) => {
-                if *v == *v2 {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            _ => Err(format!("Expected uint, found '{}'", value)),
-        },
-        Pattern::Float(v) => match value {
-            Value::Number(Number::Float(v2)) => {
-                if *v == *v2 {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            _ => Err(format!("Expected float, found '{}'", value)),
-        },
-        Pattern::Rune(v) => match value {
-            Value::Rune(v2) => {
-                if *v == *v2 {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            _ => Err(format!("Expected rune, found '{}'", value)),
-        },
-        Pattern::String(v) => match value {
-            Value::String(v2) => {
-                if *v == *v2 {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            _ => Err(format!("Expected string, found '{}'", value)),
-        },
-        Pattern::Variable(v) => Ok(Some(vec![(v.clone(), value.clone())])),
-        Pattern::Constructor(Constructor::Struct {
-            type_annotation,
-            field_patterns,
-        }) => {
-            let fields = match value {
+/// Reads the value at `path` out of the value being matched.
+fn project(value: &Value, path: &AccessPath) -> Result<Value, String> {
+    match path {
+        AccessPath::Root => Ok(value.clone()),
+        AccessPath::Field(parent, name) => {
+            let parent = project(value, parent)?;
+            let fields = match &parent {
                 Value::Struct(Struct { fields, .. }) => fields,
+                // Shared fields live on the variant like any other field.
                 Value::Enum(Enum {
                     enum_member: Struct { fields, .. },
                     ..
                 }) => fields,
-                _ => return Err(format!("Expected enum, found '{}'", value)),
+                other => return Err(format!("Expected a struct or enum, found '{}'", other)),
             };
 
-            let mut bindings = Vec::new();
-
-            for FieldPattern {
-                identifier,
-                pattern,
-            } in field_patterns
-            {
-                let field_value =
-                    fields
-                        .iter()
-                        .find(|f| &f.identifier == identifier)
-                        .ok_or(format!(
-                            "Field '{}' not found in struct '{}'",
-                            identifier, type_annotation
-                        ))?;
-
-                match evaluate_pattern(pattern, &field_value.value, environment.clone())? {
-                    Some(mut bindings_) => bindings.append(&mut bindings_),
-                    None => {
-                        return Ok(None);
-                    }
-                }
-            }
-
-            Ok(Some(bindings))
+            fields
+                .iter()
+                .find(|field| &field.identifier == name)
+                .map(|field| field.value.clone())
+                .ok_or(format!("Field '{}' not found on '{}'", name, parent))
         }
-        Pattern::LessThan(v) => match (v.as_ref(), value) {
-            (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
-                if *v2 < *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
+        AccessPath::TupleIndex(parent, index) => {
+            let parent = project(value, parent)?;
 
-                let Value::Number(Number::Int(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
+            let Value::Tuple(values) = &parent else {
+                return Err(format!("Expected a tuple, found '{}'", parent));
+            };
 
-                if *v2 < v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
-                if *v2 < *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
+            values
+                .get(*index)
+                .cloned()
+                .ok_or(format!("Tuple has no element {}", index))
+        }
+    }
+}
 
-                let Value::Number(Number::UInt(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
+fn test_matches(
+    test: &Test,
+    value: &Value,
+    environment: &Rcrc<Environment>,
+) -> Result<bool, String> {
+    Ok(match (test, value) {
+        (Test::Bool(expected), Value::Bool(actual)) => expected == actual,
+        (Test::Int(expected), Value::Number(Number::Int(actual))) => expected == actual,
+        (Test::UInt(expected), Value::Number(Number::UInt(actual))) => expected == actual,
+        (Test::Float(expected), Value::Number(Number::Float(actual))) => expected == actual,
+        (Test::Rune(expected), Value::Rune(actual)) => expected == actual,
+        (Test::String(expected), Value::String(actual)) => expected == actual,
+        (
+            Test::Variant(qualified_name),
+            Value::Enum(Enum {
+                enum_member: Struct { type_name, .. },
+                ..
+            }),
+        ) => qualified_name == type_name,
+        (Test::Comparison { operator, bound }, value) => {
+            let bound = resolve_bound(bound, environment)?;
 
-                if *v2 < v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
+            match compare(value, &bound)? {
+                Some(ordering) => match operator {
+                    ComparisonOperator::LessThan => ordering.is_lt(),
+                    ComparisonOperator::GreaterThan => ordering.is_gt(),
+                    ComparisonOperator::LessThanOrEqual => ordering.is_le(),
+                    ComparisonOperator::GreaterThanOrEqual => ordering.is_ge(),
+                },
+                None => false,
             }
-            (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
-                if *v2 < *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
+        }
+        (
+            Test::Range {
+                lower,
+                upper,
+                inclusive,
+            },
+            value,
+        ) => {
+            let lower = resolve_bound(lower, environment)?;
+            let upper = resolve_bound(upper, environment)?;
 
-                let Value::Number(Number::Float(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
+            let at_least_lower = compare(value, &lower)?.is_some_and(|o| o.is_ge());
+            let within_upper =
+                compare(value, &upper)?.is_some_and(
+                    |o| {
+                        if *inclusive {
+                            o.is_le()
+                        } else {
+                            o.is_lt()
+                        }
+                    },
+                );
 
-                if *v2 < v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            other => Err(format!("Unexpected pattern: '{:?}'", other)),
-        },
-        Pattern::GreaterThan(v) => match (v.as_ref(), value) {
-            (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
-                if *v2 > *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
+            at_least_lower && within_upper
+        }
+        _ => false,
+    })
+}
 
-                let Value::Number(Number::Int(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
+fn resolve_bound(bound: &CheckedBound, environment: &Rcrc<Environment>) -> Result<Value, String> {
+    Ok(match bound {
+        CheckedBound::Int(v) => Value::Number(Number::Int(*v)),
+        CheckedBound::UInt(v) => Value::Number(Number::UInt(*v)),
+        CheckedBound::Float(v) => Value::Number(Number::Float(*v)),
+        CheckedBound::Rune(v) => Value::Rune(*v),
+        CheckedBound::Variable(identifier) => {
+            let Some(variable) = environment.borrow().get_variable(identifier) else {
+                return Err(format!(
+                    "Variable '{}' not found in environment",
+                    identifier
+                ));
+            };
 
-                if *v2 > v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
-                if *v2 > *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
+            let value = variable.borrow().value.clone();
+            value
+        }
+    })
+}
 
-                let Value::Number(Number::UInt(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
+fn compare(left: &Value, right: &Value) -> Result<Option<std::cmp::Ordering>, String> {
+    Ok(match (left, right) {
+        (Value::Number(Number::Int(l)), Value::Number(Number::Int(r))) => l.partial_cmp(r),
+        (Value::Number(Number::UInt(l)), Value::Number(Number::UInt(r))) => l.partial_cmp(r),
+        (Value::Number(Number::Float(l)), Value::Number(Number::Float(r))) => l.partial_cmp(r),
+        (Value::Rune(l), Value::Rune(r)) => l.partial_cmp(r),
+        _ => None,
+    })
+}
 
-                if *v2 > v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
-                if *v2 > *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
-
-                let Value::Number(Number::Float(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
-
-                if *v2 > v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            other => Err(format!("Unexpected pattern: '{:?}'", other)),
-        },
-        Pattern::LessThanOrEqual(v) => match (v.as_ref(), value) {
-            (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
-                if *v2 <= *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
-
-                let Value::Number(Number::Int(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
-
-                if *v2 <= v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
-                if *v2 <= *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
-
-                let Value::Number(Number::UInt(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
-
-                if *v2 <= v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
-                if *v2 <= *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
-
-                let Value::Number(Number::Float(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
-
-                if *v2 <= v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            other => Err(format!("Unexpected pattern: '{:?}'", other)),
-        },
-        Pattern::GreaterThanOrEqual(v) => match (v.as_ref(), value) {
-            (Pattern::Int(v), Value::Number(Number::Int(v2))) => {
-                if *v2 >= *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::Int(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
-
-                let Value::Number(Number::Int(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
-
-                if *v2 >= v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::UInt(v), Value::Number(Number::UInt(v2))) => {
-                if *v2 >= *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::UInt(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
-
-                let Value::Number(Number::UInt(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
-
-                if *v2 >= v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Float(v), Value::Number(Number::Float(v2))) => {
-                if *v2 >= *v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            (Pattern::Variable(v), Value::Number(Number::Float(v2))) => {
-                let Some(variable) = environment.borrow().get_variable(v) else {
-                    return Err(format!("Variable '{}' not found", v));
-                };
-
-                let Value::Number(Number::Float(v)) = variable.borrow().value.clone() else {
-                    return Err(format!("Expected int, found '{}'", variable.borrow().value));
-                };
-
-                if *v2 >= v {
-                    Ok(Some(Vec::new()))
-                } else {
-                    Ok(None)
-                }
-            }
-            other => Err(format!("Unexpected pattern: '{:?}'", other)),
-        },
+/// Binds the names in a pattern that cannot fail. Declarations and loops use
+/// these; the type checker has already rejected anything refutable.
+fn destructure_irrefutable(
+    pattern: &Pattern,
+    value: &Value,
+    bindings: &mut Vec<(String, Value)>,
+) -> Result<(), String> {
+    match pattern {
+        Pattern::Wildcard | Pattern::Unit => Ok(()),
+        Pattern::Binding(identifier) => {
+            bindings.push((identifier.clone(), value.clone()));
+            Ok(())
+        }
         Pattern::Tuple(patterns) => {
             let Value::Tuple(values) = value else {
-                return Err(format!("Expected tuple, found '{}'", value));
+                return Err(format!("Expected a tuple, found '{}'", value));
             };
-
-            let mut bindings = vec![];
 
             for (pattern, value) in patterns.iter().zip(values) {
-                let Some(new_bindings) = evaluate_pattern(pattern, value, environment.clone())?
-                else {
-                    return Ok(None);
-                };
-
-                bindings.extend(new_bindings);
+                destructure_irrefutable(pattern, value, bindings)?;
             }
 
-            Ok(Some(bindings))
+            Ok(())
         }
-        Pattern::Range(left, right, inclusive) => {
-            let left = match left.as_ref() {
-                Pattern::Int(v) => Value::Number(Number::Int(*v)),
-                Pattern::UInt(v) => Value::Number(Number::UInt(*v)),
-                Pattern::Float(v) => Value::Number(Number::Float(*v)),
-                Pattern::Variable(v) => {
-                    let variable = environment
-                        .borrow()
-                        .get_variable(v)
-                        .ok_or(format!("Variable '{}' not found in env", v))?;
+        Pattern::Struct { fields, .. } | Pattern::EnumVariant { fields, .. } => {
+            for field in fields {
+                let field_value = project(
+                    value,
+                    &AccessPath::Field(Box::new(AccessPath::Root), field.identifier.clone()),
+                )?;
 
-                    let value = variable.borrow().value.clone();
-
-                    if !matches!(value, Value::Number(_)) {
-                        return Err(format!("Expected number, found '{}'", value));
-                    }
-
-                    value
-                }
-                other => return Err(format!("Unexpected pattern: '{:?}'", other)),
-            };
-
-            let right = match right.as_ref() {
-                Pattern::Int(v) => Value::Number(Number::Int(*v)),
-                Pattern::UInt(v) => Value::Number(Number::UInt(*v)),
-                Pattern::Float(v) => Value::Number(Number::Float(*v)),
-                Pattern::Variable(v) => {
-                    let variable = environment
-                        .borrow()
-                        .get_variable(v)
-                        .ok_or(format!("Variable '{}' not found in env", v))?;
-
-                    let value = variable.borrow().value.clone();
-
-                    if !matches!(value, Value::Number(_)) {
-                        return Err(format!("Expected number, found '{}'", value));
-                    }
-
-                    value
-                }
-                other => return Err(format!("Unexpected pattern: '{:?}'", other)),
-            };
-
-            match (left, value, right) {
-                (
-                    Value::Number(Number::Int(left)),
-                    Value::Number(Number::Int(v)),
-                    Value::Number(Number::Int(right)),
-                ) => {
-                    if *inclusive {
-                        if *v >= left && *v <= right {
-                            Ok(Some(Vec::new()))
-                        } else {
-                            Ok(None)
-                        }
-                    } else if *v >= left && *v < right {
-                        Ok(Some(Vec::new()))
-                    } else {
-                        Ok(None)
-                    }
-                }
-                (
-                    Value::Number(Number::UInt(left)),
-                    Value::Number(Number::UInt(v)),
-                    Value::Number(Number::UInt(right)),
-                ) => {
-                    if *inclusive {
-                        if *v >= left && *v <= right {
-                            Ok(Some(Vec::new()))
-                        } else {
-                            Ok(None)
-                        }
-                    } else if *v >= left && *v < right {
-                        Ok(Some(Vec::new()))
-                    } else {
-                        Ok(None)
-                    }
-                }
-                (
-                    Value::Number(Number::Float(left)),
-                    Value::Number(Number::Float(v)),
-                    Value::Number(Number::Float(right)),
-                ) => {
-                    if *inclusive {
-                        if *v >= left && *v <= right {
-                            Ok(Some(Vec::new()))
-                        } else {
-                            Ok(None)
-                        }
-                    } else if *v >= left && *v < right {
-                        Ok(Some(Vec::new()))
-                    } else {
-                        Ok(None)
-                    }
-                }
-                other => Err(format!(
-                    "Expected number, found '{}', '{}', '{}'",
-                    other.0, other.1, other.2
-                )),
+                destructure_irrefutable(&field.pattern, &field_value, bindings)?;
             }
+
+            Ok(())
         }
+        other => Err(format!("Pattern '{}' is refutable", other)),
     }
 }
 
@@ -1184,10 +808,18 @@ fn evaluate_literal(
                 });
             }
 
+            // The member's key is qualified (`O::S`); the enum itself is the
+            // part before the last separator.
+            let member_name = type_.unsubstitute().to_key();
+            let enum_name = member_name
+                .rsplit_once("::")
+                .map(|(enum_name, _)| enum_name.to_owned())
+                .unwrap_or_else(|| member_name.clone());
+
             Ok(Value::Enum(Enum {
-                type_name: type_.clone().unsubstitute().to_key(),
+                type_name: enum_name,
                 enum_member: Struct {
-                    type_name: type_.unsubstitute().to_key(),
+                    type_name: member_name,
                     fields,
                 },
             }))
@@ -1545,12 +1177,13 @@ fn evaluate_for(
 
         index += 1;
 
-        if let Some(bindings) = evaluate_pattern(&pattern, &value, for_environment.clone())? {
-            for (identifier, value) in bindings {
-                for_environment
-                    .borrow_mut()
-                    .add_variable(identifier.clone(), value.clone(), false);
-            }
+        let mut bindings = vec![];
+        destructure_irrefutable(&pattern, &value, &mut bindings)?;
+
+        for (identifier, value) in bindings {
+            for_environment
+                .borrow_mut()
+                .add_variable(identifier.clone(), value.clone(), false);
         }
 
         evaluate_expression(*body.clone(), for_environment.clone())?;

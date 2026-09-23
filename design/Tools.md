@@ -25,3 +25,7 @@ Documentation page
 ## Runesmith
 
 Language Server
+
+## Quill
+
+Opinionated code formatter

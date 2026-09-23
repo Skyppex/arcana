@@ -104,7 +104,7 @@ fn call_takes_caller_variable_as_first_argument_using_function_propagation() {
     let input = r#"
         fun a(x: Int): Int => x
         let y: Int = 5;
-        y:a
+        y:a()
     "#;
 
     // Act
@@ -136,7 +136,7 @@ fn function_propagation_can_be_chained() {
     let input = r#"
         fun a(x: Int): Int => x + 1
         let y: Int = 5;
-        y:a:a
+        y:a():a()
     "#;
 
     // Act
@@ -188,7 +188,7 @@ fn call_takes_caller_expression_as_first_argument() {
     // Arrange
     let input = r#"
         fun a(x: Int): Int => x
-        8:a
+        8:a()
     "#;
 
     // Act

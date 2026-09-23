@@ -1,4 +1,5 @@
 use crate::{
+    ast::pattern::{FieldPattern, Pattern},
     ast::{
         AccessModifier, ArrayItem, Assignment, AssociatedType, Binary, BinaryOperator, Call,
         ClosureParameter, EmbeddedStruct, EnumDeclaration, EnumMember, EnumMemberField, Expression,
@@ -11,11 +12,12 @@ use crate::{
     built_in::BuiltInFunction,
     type_checker::{
         self,
-        decision_tree::{Case, Constructor, Decision, FieldPattern, Pattern, Variable},
+        decision_tree::{Case, Decision},
         model::{
             Block, Typed, TypedClosureParameter, TypedExpression, TypedMatchArm, TypedParameter,
             TypedStatement,
         },
+        pattern::CheckedPattern,
         FullName, LiteralType, Type,
     },
     types::{GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier},
@@ -142,6 +144,7 @@ impl IndentDisplay for Statement {
             Statement::StructDeclaration(StructDeclaration {
                 access_modifier,
                 body,
+                where_clause: _,
             }) => {
                 let mut result = String::new();
                 result.push_str("<struct declaration>\n");
@@ -196,6 +199,7 @@ impl IndentDisplay for Statement {
                 result
             }
             Statement::EnumDeclaration(EnumDeclaration {
+                where_clause: _,
                 access_modifier,
                 type_identifier,
                 shared_fields,
@@ -1687,160 +1691,20 @@ impl IndentDisplay for MatchArm {
 }
 
 impl IndentDisplay for Pattern {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        match self {
-            Pattern::Wildcard => "_".to_string(),
-            Pattern::Unit => "unit".to_string(),
-            Pattern::Bool(b) => b.to_string(),
-            Pattern::Int(v) => v.to_string(),
-            Pattern::UInt(v) => v.to_string(),
-            Pattern::Float(v) => v.to_string(),
-            Pattern::Rune(r) => r.to_string(),
-            Pattern::String(s) => s.to_string(),
-            Pattern::Variable(v) => v.to_string(),
-            Pattern::Constructor(Constructor::Struct {
-                type_annotation,
-                field_patterns,
-            }) => {
-                let mut result = String::new();
+    fn indent_display(&self, _indent: &mut Indent) -> String {
+        self.to_string()
+    }
+}
 
-                result.push_str("<struct pattern>");
-                indent.increase();
-                result.push_str(
-                    format!(
-                        "\n{}type_annotation: {}",
-                        indent.dash(),
-                        type_annotation.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-
-                for (i, field_pattern) in field_patterns.iter().enumerate() {
-                    if i < field_patterns.len() - 1 {
-                        result.push_str(
-                            format!(
-                                "\n{}{}",
-                                indent.dash(),
-                                field_pattern.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    } else {
-                        indent.end_current();
-                        result.push_str(
-                            format!(
-                                "\n{}{}",
-                                indent.dash_end(),
-                                field_pattern.indent_display(indent)
-                            )
-                            .as_str(),
-                        );
-                    }
-                }
-
-                indent.decrease();
-
-                result
-            }
-            Pattern::LessThan(v) => {
-                let mut result = String::new();
-                result.push_str("<less than pattern>");
-                indent.increase();
-                result.push_str(
-                    format!("\n{}value: {}", indent.dash(), v.indent_display(indent)).as_str(),
-                );
-                indent.decrease();
-                result
-            }
-            Pattern::GreaterThan(v) => {
-                let mut result = String::new();
-                result.push_str("<greater than pattern>");
-                indent.increase();
-                result.push_str(
-                    format!("\n{}value: {}", indent.dash(), v.indent_display(indent)).as_str(),
-                );
-                indent.decrease();
-                result
-            }
-            Pattern::LessThanOrEqual(v) => {
-                let mut result = String::new();
-                result.push_str("<less than or equal pattern>");
-                indent.increase();
-                result.push_str(
-                    format!("\n{}value: {}", indent.dash(), v.indent_display(indent)).as_str(),
-                );
-                indent.decrease();
-                result
-            }
-            Pattern::GreaterThanOrEqual(v) => {
-                let mut result = String::new();
-                result.push_str("<greater than or equal pattern>");
-                indent.increase();
-                result.push_str(
-                    format!("\n{}value: {}", indent.dash(), v.indent_display(indent)).as_str(),
-                );
-                indent.decrease();
-                result
-            }
-            Pattern::Tuple(patterns) => {
-                let mut result = String::new();
-                result.push_str("<tuple pattern>");
-                indent.increase_leaf();
-                result.push_str(
-                    format!(
-                        "\n{}{}",
-                        indent.dash_end(),
-                        indent_display_slice(patterns, "patterns", "pattern", indent)
-                    )
-                    .as_str(),
-                );
-                indent.decrease();
-                result
-            }
-            Pattern::Range(left, right, inclusive) => {
-                let mut result = String::new();
-                result.push_str("<range pattern>");
-                indent.increase();
-                result.push_str(
-                    format!("\n{}left: {}", indent.dash(), left.indent_display(indent)).as_str(),
-                );
-                result.push_str(
-                    format!("\n{}right: {}", indent.dash(), right.indent_display(indent)).as_str(),
-                );
-                indent.end_current();
-                result
-                    .push_str(format!("\n{}inclusive: {}", indent.dash_end(), inclusive).as_str());
-                indent.decrease();
-                result
-            }
-        }
+impl IndentDisplay for CheckedPattern {
+    fn indent_display(&self, _indent: &mut Indent) -> String {
+        self.to_string()
     }
 }
 
 impl IndentDisplay for FieldPattern {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        let mut result = String::new();
-        result.push_str("<field pattern>\n");
-        indent.increase_leaf();
-        result.push_str(
-            format!(
-                "{}identifier: {}\n",
-                indent.dash(),
-                self.identifier.indent_display(indent)
-            )
-            .as_str(),
-        );
-        indent.end_current();
-        result.push_str(
-            format!(
-                "{}pattern: {}",
-                indent.dash_end(),
-                self.pattern.indent_display(indent)
-            )
-            .as_str(),
-        );
-        indent.decrease();
-        result
+    fn indent_display(&self, _indent: &mut Indent) -> String {
+        self.to_string()
     }
 }
 
@@ -3467,111 +3331,75 @@ impl IndentDisplay for TypedMatchArm {
 impl IndentDisplay for Decision {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str("<decision>");
-        indent.increase();
 
         match self {
-            Decision::Success { expression, type_ } => {
-                result.push_str(format!(": {}", type_).as_str());
-                result.push_str(format!("\n{}variant: Success", indent.dash()).as_str());
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "\n{}expression: {}",
-                        indent.dash_end(),
-                        expression.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-            }
-            Decision::Failure { error_message } => {
-                result.push_str(format!(": {}", Type::Unknown).as_str());
-                result.push_str(format!("\n{}variant: Failure", indent.dash()).as_str());
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "\n{}error_message: {}",
-                        indent.dash_end(),
-                        error_message.indent_display(indent)
-                    )
-                    .as_str(),
-                );
-            }
-            Decision::Guard {
-                condition,
-                consequence,
-                alternative,
+            Decision::Success {
+                arm,
+                bindings,
+                body,
                 type_,
             } => {
-                result.push_str(format!(": {}", type_).as_str());
-                result.push_str(format!("\n{}variant: Guard", indent.dash()).as_str());
-                result.push_str(
-                    format!(
-                        "\n{}condition: {}",
-                        indent.dash(),
-                        condition.indent_display(indent)
-                    )
-                    .as_str(),
-                );
+                result.push_str(format!("<success arm {}>: {}", arm, type_.full_name()).as_str());
+                indent.increase();
 
-                result.push_str(
-                    format!(
-                        "\n{}consequence: {}",
-                        indent.dash(),
-                        consequence.indent_display(indent)
-                    )
-                    .as_str(),
-                );
+                for binding in bindings {
+                    result.push_str(
+                        format!(
+                            "\n{}binds {} to {}",
+                            indent.dash(),
+                            binding.identifier,
+                            binding.occurrence.path
+                        )
+                        .as_str(),
+                    );
+                }
 
                 indent.end_current();
                 result.push_str(
                     format!(
-                        "\n{}alternative: {}",
+                        "\n{}body: {}",
                         indent.dash_end(),
-                        alternative.indent_display(indent)
+                        body.indent_display(indent)
                     )
                     .as_str(),
                 );
+                indent.decrease();
+            }
+            Decision::Failure { witness } => {
+                result.push_str(format!("<failure>: {}", witness).as_str());
             }
             Decision::Switch {
-                variable,
+                occurrence,
                 cases,
-                fallback,
+                default,
                 type_,
             } => {
-                result.push_str(format!(": {}", type_).as_str());
-                result.push_str(format!("\n{}variant: Switch", indent.dash()).as_str());
                 result.push_str(
-                    format!(
-                        "\n{}variable: {}",
-                        indent.dash(),
-                        variable.indent_display(indent)
-                    )
-                    .as_str(),
+                    format!("<switch {}>: {}", occurrence.path, type_.full_name()).as_str(),
                 );
+                indent.increase();
 
-                result.push_str(
-                    format!(
-                        "\n{}{}",
-                        indent.dash(),
-                        indent_display_slice(cases, "cases", "case", indent)
-                    )
-                    .as_str(),
-                );
+                for case in cases {
+                    result.push_str(
+                        format!("\n{}{}", indent.dash(), case.indent_display(indent)).as_str(),
+                    );
+                }
 
-                indent.end_current();
-                result.push_str(
-                    format!(
-                        "\n{}fallback: {}",
-                        indent.dash_end(),
-                        fallback.indent_display(indent)
-                    )
-                    .as_str(),
-                );
+                if let Some(default) = default {
+                    indent.end_current();
+                    result.push_str(
+                        format!(
+                            "\n{}default: {}",
+                            indent.dash_end(),
+                            default.indent_display(indent)
+                        )
+                        .as_str(),
+                    );
+                }
+
+                indent.decrease();
             }
         }
-
-        indent.decrease();
 
         result
     }
@@ -3580,62 +3408,17 @@ impl IndentDisplay for Decision {
 impl IndentDisplay for Case {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
-        result.push_str("<case>");
-        indent.increase();
-        result.push_str(
-            format!(
-                "\n{}pattern: {}",
-                indent.dash(),
-                self.pattern.indent_display(indent)
-            )
-            .as_str(),
-        );
-
-        result.push_str(
-            format!(
-                "\n{}{}",
-                indent.dash(),
-                indent_display_slice(&self.arguments, "arguments", "argument", indent)
-            )
-            .as_str(),
-        );
-
-        indent.end_current();
-        result.push_str(
-            format!(
-                "\n{}decision: {}",
-                indent.dash_end(),
-                self.body.indent_display(indent)
-            )
-            .as_str(),
-        );
-
-        indent.decrease();
-
-        result
-    }
-}
-
-impl IndentDisplay for Variable {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        let mut result = String::new();
-        result.push_str("<variable>");
-        result.push_str(format!(": {}", self.type_.full_name()).as_str());
-
+        result.push_str(format!("<case {}>", self.test).as_str());
         indent.increase_leaf();
         result.push_str(
             format!(
-                "\n{}name: {}",
-                indent.dash(),
-                self.identifier.indent_display(indent)
+                "\n{}{}",
+                indent.dash_end(),
+                self.decision.indent_display(indent)
             )
             .as_str(),
         );
-        result
-            .push_str(format!("\n{}type_: {}", indent.dash_end(), self.type_.full_name()).as_str());
-
         indent.decrease();
-
         result
     }
 }

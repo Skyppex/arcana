@@ -1,10 +1,10 @@
 use std::hash::Hash;
 use std::{collections::HashMap, fmt::Display};
 
+use crate::ast::pattern::Pattern;
 use crate::display::{Indent, IndentDisplay};
 use crate::pretty_print::PrettyPrint;
-use crate::type_checker::decision_tree::Pattern;
-use crate::types::{GenericType, ToKey, TypeAnnotation, TypeIdentifier};
+use crate::types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -168,6 +168,8 @@ impl Display for ModPath {
 pub struct StructDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub body: StructData,
+    /// Bounds on the type parameters, from a `where` clause.
+    pub where_clause: Vec<GenericConstraint>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -195,6 +197,8 @@ pub struct EnumDeclaration {
     pub type_identifier: TypeIdentifier,
     pub shared_fields: Vec<StructField>,
     pub members: Vec<StructData>,
+    /// Bounds on the type parameters, from a `where` clause.
+    pub where_clause: Vec<GenericConstraint>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

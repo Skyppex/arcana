@@ -11,8 +11,10 @@ use crate::{
     types::{TypeAnnotation, TypeIdentifier},
 };
 
-use super::decision_tree::{Decision, Pattern};
-use super::{LiteralType, Rcrc, Type, TypeEnvironment};
+use super::decision_tree::Decision;
+use super::pattern::CheckedPattern;
+use super::{LiteralType, Type};
+use crate::ast::pattern::Pattern;
 
 pub trait Typed {
     fn get_type(&self) -> Type;
@@ -1187,14 +1189,16 @@ impl Display for BinaryOperator {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedMatchArm {
+    /// The pattern as written, kept for diagnostics and printing.
     pub pattern: Pattern,
-    pub expression: Expression,
-    pub type_environment: Rcrc<TypeEnvironment>,
+    /// The pattern resolved against the matched type.
+    pub checked_pattern: CheckedPattern,
+    pub expression: TypedExpression,
 }
 
 impl Display for TypedMatchArm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} => {:?}", self.pattern, self.expression)
+        write!(f, "{} => {}", self.pattern, self.expression)
     }
 }
 

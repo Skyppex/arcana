@@ -5,7 +5,7 @@ use common::{create_typed_ast, evaluate_expression, StatementExt, VecStatementEx
 use interpreter::{value, Value};
 use shared::type_checker::{
     model::{Typed, TypedExpression},
-    Type,
+    LiteralType, Type,
 };
 
 use crate::common::create_env;
@@ -41,7 +41,14 @@ fn if_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Int);
+    // Two different int literals meet at #Int, one step up from #1 and #2.
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "Int".to_owned(),
+            type_: Box::new(LiteralType::Int)
+        }
+    );
 }
 
 #[test]
@@ -58,7 +65,14 @@ fn if_has_correct_type_2() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Int);
+    // Two different int literals meet at #Int, one step up from #1 and #2.
+    assert_eq!(
+        expression.get_type(),
+        Type::Literal {
+            name: "Int".to_owned(),
+            type_: Box::new(LiteralType::Int)
+        }
+    );
 }
 
 #[test]

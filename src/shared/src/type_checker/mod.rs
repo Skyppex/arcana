@@ -1,6 +1,7 @@
 pub mod decision_tree;
 pub mod full_name;
 pub mod model;
+pub mod pattern;
 #[allow(clippy::module_inception)]
 pub mod type_checker;
 pub mod type_environment;
@@ -9,6 +10,7 @@ mod expressions;
 mod scope;
 mod statements;
 
+pub use expressions::{is_option, option_inner};
 pub use full_name::*;
 use num_traits::Zero;
 pub use type_checker::*;
@@ -18,7 +20,7 @@ use std::{cell::RefCell, collections::HashMap, fmt::Display, hash::Hash, rc::Rc,
 
 use crate::{
     ast,
-    types::{GenericType, ToKey, TypeAnnotation, TypeIdentifier},
+    types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };
 
 use model::{EmbeddedStruct, ValueLiteral};
@@ -56,6 +58,116 @@ pub struct StructField {
     pub field_name: String,
     pub default_value: Option<Type>,
     pub field_type: Type,
+}
+
+/// Whether a type parameter appears anywhere inside `type_`.
+///
+/// Substitution is skipped for types that hold none, both to save work and
+/// because a concrete generic type (`Foo<Int>` as a field) is already settled
+/// and must not be re-substituted with the outer type's arguments.
+pub fn contains_generic(type_: &Type) -> bool {
+    match type_ {
+        Type::Generic(_) => true,
+        Type::Array(inner) => contains_generic(inner),
+        Type::Tuple(types) => types.iter().any(contains_generic),
+        Type::Substitution { actual_type, .. } => contains_generic(actual_type),
+        _ => false,
+    }
+}
+
+/// Checks each type argument against the bounds declared for the type it is
+/// instantiating, so `Foo<Int>` is rejected when `Foo`'s parameter is bound to a
+/// protocol that `Int` does not implement.
+///
+/// A type satisfies a protocol when it has every function the protocol
+/// declares, which is what `imp P for T` registers.
+fn check_generic_constraints(
+    type_key: &str,
+    type_map: &HashMap<&GenericType, &TypeAnnotation>,
+    type_environment: Rc<RefCell<TypeEnvironment>>,
+) -> Result<(), String> {
+    let declared = type_environment
+        .borrow()
+        .get_generic_constraints(type_key)
+        .clone();
+
+    for GenericConstraint {
+        generic,
+        constraints,
+    } in declared
+    {
+        let Some(argument) = type_map
+            .iter()
+            .find(|(parameter, _)| parameter.type_name == generic.type_name)
+            .map(|(_, argument)| (*argument).clone())
+        else {
+            continue;
+        };
+
+        let argument_type = type_environment
+            .borrow()
+            .get_type_from_annotation(&argument)?;
+
+        for constraint in constraints {
+            let constraint_type = type_environment
+                .borrow()
+                .get_type_from_annotation(&constraint)?;
+
+            let Type::Protocol(Protocol { functions, .. }) = constraint_type else {
+                continue;
+            };
+
+            for (function_identifier, _) in functions {
+                let name = function_identifier.name().to_owned();
+
+                let implemented = type_environment
+                    .borrow()
+                    .get_static_member(&argument_type, &name)
+                    .is_some();
+
+                if !implemented {
+                    return Err(format!(
+                        "`{}` does not satisfy the bound `{} is {}`: it has no `{}`",
+                        argument, generic.type_name, constraint, name
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Substitutes type arguments through a set of fields, reaching into arrays and
+/// tuples rather than only replacing fields that are a bare type parameter.
+fn substitute_fields(
+    fields: &[StructField],
+    type_map: &HashMap<&GenericType, &TypeAnnotation>,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rc<RefCell<TypeEnvironment>>,
+) -> Result<Vec<StructField>, String> {
+    fields
+        .iter()
+        .map(|field| {
+            let field_type = if contains_generic(&field.field_type) {
+                field.field_type.clone_with_concrete_types(
+                    vec![],
+                    discovered_types,
+                    type_environment.clone(),
+                    Some(type_map.clone()),
+                )?
+            } else {
+                field.field_type.clone()
+            };
+
+            Ok(StructField {
+                struct_name: field.struct_name.clone(),
+                field_name: field.field_name.clone(),
+                default_value: field.default_value.clone(),
+                field_type,
+            })
+        })
+        .collect()
 }
 
 pub fn get_field_by_name<'a>(
@@ -459,15 +571,68 @@ impl Type {
     ) -> Result<Type, String> {
         match self {
             Type::Generic(generic) => {
-                assert!(context.is_some());
-                check_type_annotation(
-                    context
-                        .unwrap()
-                        .get(generic)
-                        .ok_or("No concrete type found")?,
-                    &vec![],
-                    type_environment.clone(),
-                )
+                let context = context.ok_or(format!(
+                    "No type arguments available to substitute `{}` with",
+                    generic.type_name
+                ))?;
+
+                let concrete_type = context.get(generic).ok_or(format!(
+                    "No type argument given for type parameter `{}`",
+                    generic.type_name
+                ))?;
+
+                check_type_annotation(concrete_type, &vec![], type_environment.clone())
+            }
+            // A type parameter can appear anywhere inside another type, so
+            // substitution has to reach through the ones that hold other types.
+            Type::Array(inner) => Ok(Type::Array(Box::new(inner.clone_with_concrete_types(
+                concrete_types,
+                discovered_types,
+                type_environment,
+                context,
+            )?))),
+            Type::Substitution { actual_type, .. } => actual_type.clone_with_concrete_types(
+                concrete_types,
+                discovered_types,
+                type_environment,
+                context,
+            ),
+            Type::TypeAlias(TypeAlias {
+                type_identifier,
+                types,
+            }) => {
+                let type_map = match &context {
+                    Some(context) => context.clone(),
+                    None => {
+                        let TypeIdentifier::GenericType(_, generics) = type_identifier else {
+                            return Ok(self.clone());
+                        };
+
+                        generics.iter().zip(&concrete_types).collect()
+                    }
+                };
+
+                let cloned_types = types
+                    .iter()
+                    .map(|t| {
+                        t.clone_with_concrete_types(
+                            concrete_types.clone(),
+                            discovered_types,
+                            type_environment.clone(),
+                            Some(type_map.clone()),
+                        )
+                    })
+                    .collect::<Result<Vec<Type>, String>>()?;
+
+                // An alias to a single type is that type once substituted.
+                if let [single] = cloned_types.as_slice() {
+                    return Ok(single.clone());
+                }
+
+                Ok(Type::TypeAlias(TypeAlias {
+                    type_identifier: type_identifier.clone(),
+                    types: cloned_types,
+                }))
             }
             Type::Tuple(types) => {
                 let cloned_types = types
@@ -492,50 +657,16 @@ impl Type {
                     ));
                 };
 
-                let mut type_map = HashMap::new();
+                let type_map: HashMap<_, _> = generics.iter().zip(concrete_types.iter()).collect();
 
-                for (ta, gt) in concrete_types.iter().zip(generics) {
-                    type_map.insert(gt, ta);
-                }
+                check_generic_constraints(&name, &type_map, type_environment.clone())?;
 
-                let mut fields = Vec::new();
-
-                for StructField {
-                    struct_name,
-                    field_name,
-                    default_value,
-                    field_type,
-                } in s.fields.iter()
-                {
-                    let Type::Generic(generic) = field_type.clone() else {
-                        fields.push(StructField {
-                            struct_name: struct_name.clone(),
-                            field_name: field_name.clone(),
-                            default_value: default_value.clone(),
-                            field_type: field_type.clone(),
-                        });
-
-                        continue;
-                    };
-
-                    let concrete_type = type_map.get(&generic).ok_or(format!(
-                        "No concrete type found for generic type {}",
-                        generic.type_name
-                    ))?;
-
-                    let concrete_type = check_type_annotation(
-                        concrete_type,
-                        discovered_types,
-                        type_environment.clone(),
-                    )?;
-
-                    fields.push(StructField {
-                        struct_name: struct_name.clone(),
-                        field_name: field_name.clone(),
-                        default_value: default_value.clone(),
-                        field_type: concrete_type,
-                    });
-                }
+                let fields = substitute_fields(
+                    &s.fields,
+                    &type_map,
+                    discovered_types,
+                    type_environment.clone(),
+                )?;
 
                 Ok(Type::Struct(Struct {
                     type_identifier: TypeIdentifier::ConcreteType(name, concrete_types),
@@ -558,49 +689,14 @@ impl Type {
                     ));
                 };
 
-                let mut type_map = HashMap::new();
+                let type_map: HashMap<_, _> = generics.iter().zip(concrete_types.iter()).collect();
 
-                for (ta, gt) in concrete_types.iter().zip(generics) {
-                    type_map.insert(gt, ta);
-                }
-
-                let mut cloned_fields = Vec::new();
-
-                for StructField {
-                    struct_name,
-                    field_name,
-                    default_value,
-                    field_type,
-                } in s.fields.iter()
-                {
-                    let Type::Generic(generic) = field_type.clone() else {
-                        cloned_fields.push(StructField {
-                            struct_name: struct_name.clone(),
-                            field_name: field_name.clone(),
-                            default_value: default_value.clone(),
-                            field_type: field_type.clone(),
-                        });
-                        continue;
-                    };
-
-                    let concrete_type = type_map.get(&generic).ok_or(format!(
-                        "No concrete type found for generic type {}",
-                        generic.type_name
-                    ))?;
-
-                    let concrete_type = check_type_annotation(
-                        concrete_type,
-                        discovered_types,
-                        type_environment.clone(),
-                    )?;
-
-                    cloned_fields.push(StructField {
-                        struct_name: struct_name.clone(),
-                        field_name: field_name.clone(),
-                        default_value: default_value.clone(),
-                        field_type: concrete_type,
-                    });
-                }
+                let cloned_fields = substitute_fields(
+                    &s.fields,
+                    &type_map,
+                    discovered_types,
+                    type_environment.clone(),
+                )?;
 
                 let member_type = Type::Struct(Struct {
                     type_identifier: TypeIdentifier::MemberType(
@@ -625,52 +721,19 @@ impl Type {
                     ));
                 };
 
-                let mut type_map = HashMap::new();
+                let type_map: HashMap<_, _> = generics.iter().zip(concrete_types.iter()).collect();
 
-                for (ta, gt) in concrete_types.iter().zip(generics) {
-                    type_map.insert(gt, ta);
-                }
+                check_generic_constraints(&name, &type_map, type_environment.clone())?;
 
                 let type_identifier =
                     TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone());
 
-                let mut shared_fields = Vec::new();
-
-                for StructField {
-                    struct_name,
-                    field_name,
-                    default_value,
-                    field_type,
-                } in r#enum.shared_fields.iter()
-                {
-                    let Type::Generic(generic) = field_type.clone() else {
-                        shared_fields.push(StructField {
-                            struct_name: struct_name.clone(),
-                            field_name: field_name.clone(),
-                            default_value: default_value.clone(),
-                            field_type: field_type.clone(),
-                        });
-                        continue;
-                    };
-
-                    let concrete_type = type_map.get(&generic).ok_or(format!(
-                        "No concrete type found for generic type {}",
-                        generic.type_name
-                    ))?;
-
-                    let concrete_type = check_type_annotation(
-                        concrete_type,
-                        discovered_types,
-                        type_environment.clone(),
-                    )?;
-
-                    shared_fields.push(StructField {
-                        struct_name: struct_name.clone(),
-                        field_name: field_name.clone(),
-                        default_value: default_value.clone(),
-                        field_type: concrete_type,
-                    });
-                }
+                let shared_fields = substitute_fields(
+                    &r#enum.shared_fields,
+                    &type_map,
+                    discovered_types,
+                    type_environment.clone(),
+                )?;
 
                 let mut members = HashMap::new();
 
@@ -682,47 +745,12 @@ impl Type {
                         ));
                     };
 
-                    let mut fields = Vec::new();
-
-                    for StructField {
-                        struct_name,
-                        field_name,
-                        default_value,
-                        field_type,
-                    } in r#struct.fields.iter()
-                    {
-                        let field_name = field_name.clone();
-                        let field_type = field_type.clone();
-
-                        let Type::Generic(generic) = field_type else {
-                            fields.push(StructField {
-                                struct_name: struct_name.clone(),
-                                field_name: field_name.clone(),
-                                default_value: default_value.clone(),
-                                field_type,
-                            });
-
-                            continue;
-                        };
-
-                        let concrete_type = type_map.get(&generic).ok_or(format!(
-                            "No concrete type found for generic type {}",
-                            generic.type_name
-                        ))?;
-
-                        let concrete_type = check_type_annotation(
-                            concrete_type,
-                            discovered_types,
-                            type_environment.clone(),
-                        )?;
-
-                        fields.push(StructField {
-                            struct_name: struct_name.clone(),
-                            field_name: field_name.clone(),
-                            default_value: default_value.clone(),
-                            field_type: concrete_type,
-                        });
-                    }
+                    let fields = substitute_fields(
+                        &r#struct.fields,
+                        &type_map,
+                        discovered_types,
+                        type_environment.clone(),
+                    )?;
 
                     let member_type = Type::Struct(Struct {
                         type_identifier: TypeIdentifier::MemberType(
@@ -803,10 +831,11 @@ impl Type {
                     return_type: Box::new(cloned_return_type),
                 }))
             }
-            _ => Err(format!(
-                "Cannot clone concrete types for type {}",
-                self.full_name()
-            )),
+            // Everything else holds no type parameters, so substituting into it
+            // yields the type itself. This has to be a success: a concrete type
+            // shows up here whenever it sits inside something generic, such as
+            // the `Int` in `fun f<T>(x: T): Int`.
+            _ => Ok(self.clone()),
         }
     }
 
@@ -1076,7 +1105,9 @@ impl Display for Type {
                 }
             }
             Type::Function(fun) => write!(f, "{}", fun.full_name()),
-            Type::Literal { name, .. } => write!(f, "#{}", name),
+            // The literal type knows how to render itself, quotes and all —
+            // the name is just the raw text and would lose them.
+            Type::Literal { type_, .. } => write!(f, "{}", type_),
             Type::Tuple(items) => write!(
                 f,
                 "({})",
@@ -1418,7 +1449,10 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 type_identifier: TypeIdentifier::MemberType(enum_name, discriminant_name),
                 ..
             }),
-        ) => *type_identifier == **enum_name && members.contains_key(discriminant_name),
+        ) => {
+            *type_identifier == **enum_name
+                && get_enum_member(members, type_identifier, discriminant_name).is_some()
+        }
         (
             Type::Struct(Struct {
                 type_identifier: left_type_identifier,
@@ -1528,4 +1562,104 @@ pub fn type_annotation_equals(left: &TypeAnnotation, right: &TypeAnnotation) -> 
         (TypeAnnotation::Type(l), TypeAnnotation::Type(r)) => l == r,
         _ => false,
     }
+}
+
+/// The least type that covers both `left` and `right`, or `None` when no such
+/// type exists.
+///
+/// Literals widen one step at a time: `#1` and `#2` meet at `#Int`, the literal
+/// type that names no value, and `#Int` meets `Int` at `Int`. Identical literals
+/// stay exactly as they are, and literals of different kinds have no join at
+/// all.
+///
+/// Used to give a match or an if-else the type of all its branches together,
+/// rather than the type of whichever branch happened to come first.
+pub fn join_types(left: &Type, right: &Type) -> Option<Type> {
+    // Two literals are never `type_equals` to each other, so they are settled
+    // before the coverage checks below.
+    if let (
+        Type::Literal {
+            name: left_name,
+            type_: left_literal,
+        },
+        Type::Literal {
+            name: right_name,
+            type_: right_literal,
+        },
+    ) = (left, right)
+    {
+        // Different kinds of literal — `#1` and `#true` — have no common type.
+        if !type_equals(
+            &left_literal.get_runtime_type(),
+            &right_literal.get_runtime_type(),
+        ) {
+            return None;
+        }
+
+        // Same value: keep the exact literal. Different values of one kind:
+        // widen a single step, to `#Int` rather than all the way to `Int`.
+        return Some(if left_name == right_name {
+            left.clone()
+        } else {
+            left.unstrict()
+        });
+    }
+
+    // A literal meeting its own runtime type collapses to that runtime type.
+    match (left, right) {
+        (Type::Literal { type_, .. }, other) | (other, Type::Literal { type_, .. })
+            if type_equals(&type_.get_runtime_type(), other) =>
+        {
+            return Some(other.clone())
+        }
+        _ => {}
+    }
+
+    let left_covers_right = type_equals(left, right);
+    let right_covers_left = type_equals(right, left);
+
+    if left_covers_right && right_covers_left {
+        return Some(left.clone());
+    }
+
+    // One side already covers the other, as an enum covers its variants.
+    if left_covers_right {
+        return Some(left.clone());
+    }
+
+    if right_covers_left {
+        return Some(right.clone());
+    }
+
+    None
+}
+
+/// The runtime type behind a literal type — `#1` is `Int`.
+///
+/// A matched value is widened this way before its patterns are checked: `1` has
+/// the singleton type `#1`, but matching it should behave like matching an
+/// `Int`, not like matching a type with exactly one inhabitant.
+pub fn runtime_type(type_: &Type) -> Type {
+    match type_.clone().unsubstitute() {
+        Type::Literal { type_, .. } => type_.get_runtime_type(),
+        other => other,
+    }
+}
+
+/// Looks up a variant in an enum's member map.
+///
+/// Declared enums key their members by the member type's key (`E.A`), while the
+/// built-in `Option` keys them by the bare variant name, so both spellings are
+/// tried.
+pub fn get_enum_member<'a>(
+    members: &'a HashMap<String, Type>,
+    enum_identifier: &TypeIdentifier,
+    variant: &str,
+) -> Option<&'a Type> {
+    let enum_key = enum_identifier.to_key();
+
+    members
+        .get(variant)
+        .or_else(|| members.get(&format!("{}.{}", enum_key, variant)))
+        .or_else(|| members.get(&format!("{}::{}", enum_key, variant)))
 }

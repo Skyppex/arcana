@@ -22,6 +22,16 @@ pub fn create_typed_ast(input: &str) -> TypedStatement {
     type_checker::create_typed_ast(ast, type_environment).unwrap()
 }
 
+/// Like [`create_typed_ast`], but surfaces lex/parse/type errors instead of panicking.
+/// Use this to assert that a program is *rejected*.
+pub fn try_create_typed_ast(input: &str) -> Result<TypedStatement, String> {
+    let tokens = lexer::tokenize(input)?;
+    let ast = ast::create_ast(tokens, false)?;
+    let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new(false)));
+
+    type_checker::create_typed_ast(ast, type_environment)
+}
+
 pub fn evaluate_expression(
     input: &str,
     environment: Rcrc<Environment>,

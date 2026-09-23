@@ -4,25 +4,31 @@ use crate::{
     ast::{
         self, Assignment, Binary, Expression, For, If, Match, UseExpr, VariableDeclaration, While,
     },
+    built_in::{BuiltInFunction, BuiltInFunctionType},
     type_checker::{
         model::{ArrayItem, Index, ValueLiteral},
-        type_annotation_equals, type_equals_unstrict, Parameter, StructField,
+        type_equals_unstrict, Parameter,
     },
     types::{TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
-    decision_tree::{create_decision_tree, Constructor, Pattern},
-    get_field_by_name,
+    contains_generic,
+    decision_tree::{compile_match, CompilableArm},
+    get_enum_member, get_field_by_name, join_types,
     model::{
         BinaryOperator, Block, FieldInitializer, Member, Typed, TypedClosureParameter,
         TypedExpression, TypedMatchArm, TypedStatement, UnaryOperator,
     },
+    pattern::{check_pattern, CheckedPattern},
+    runtime_type,
     scope::ScopeType,
     statements::{self, check_type_annotation},
     type_equals, type_equals_coerce, DiscoveredType, Enum, FullName, Function, LiteralType, Rcrc,
     Struct, Type, TypeAlias, TypeEnvironment, Union,
 };
+
+use crate::ast::pattern::Pattern;
 
 pub fn check_type(
     expression: &Expression,
@@ -158,6 +164,22 @@ pub fn check_type(
             })
         }
         Expression::Call(call) => {
+            // `value:typeof()` propagates the value in as the argument, so the
+            // call carries none of its own. Both spellings answer the same
+            // question and fold the same way.
+            if let (
+                Expression::Member(ast::Member::ParamPropagation { object, member, .. }),
+                None,
+            ) = (call.callee.as_ref(), &call.argument)
+            {
+                if is_typeof(member) {
+                    let argument =
+                        check_type(object, discovered_types, type_environment.clone(), None)?;
+
+                    return Ok(typeof_literal(&argument));
+                }
+            }
+
             let callee =
                 if let Some(built_in_function) = call.callee.get_built_in_function_identifier() {
                     // turn the callee into a TypedExpression which is the build-in function
@@ -210,8 +232,50 @@ pub fn check_type(
                 })
                 .transpose()?;
 
+            // `typeof` asks about the static type, which only exists here, so
+            // it is answered at check time and folds away to the string it
+            // produced — `typeof(4)` becomes the literal `"#4"`, of type `#"#4"`.
+            if let TypedExpression::Member(Member::BuiltInFunction(BuiltInFunction {
+                function_type: BuiltInFunctionType::TypeOf,
+                ..
+            })) = &callee
+            {
+                let Some(argument) = &arg_typed_expression else {
+                    return Err(format!(
+                        "{}, and needs a value to report on",
+                        TYPEOF_IS_NOT_A_VALUE
+                    ));
+                };
+
+                return Ok(typeof_literal(argument));
+            }
+
             let mut callee = callee;
             let mut return_type = return_type;
+            let mut callee_type = callee_type;
+
+            // A generic function called without type arguments takes them from
+            // the argument it was given and from where its result is going.
+            let argument_type = arg_typed_expression.as_ref().map(|arg| arg.get_type());
+
+            if let Some(inferred) = infer_call_type_arguments(
+                &callee_type,
+                argument_type.as_ref(),
+                context.as_ref(),
+                discovered_types,
+                type_environment.clone(),
+            )? {
+                if let Type::Function(Function {
+                    return_type: inferred_return,
+                    ..
+                }) = &inferred
+                {
+                    return_type = *inferred_return.clone();
+                }
+
+                callee = retype(callee, inferred.clone());
+                callee_type = inferred;
+            }
 
             if let Some(arg) = arg_typed_expression.clone() {
                 if let Type::Function(Function {
@@ -381,21 +445,30 @@ pub fn check_type(
 
             let else_type = else_block.clone().map(|e| e.get_deep_type());
 
-            let type_ = if let Some(else_type) = else_type {
-                if !is_option(&else_type) {
-                    if !type_equals_unstrict(&if_block_type, &else_type) {
-                        return Err(format!(
-                            "If block type {:?} does not match else block type {:?}",
-                            if_block_type, else_type
-                        ));
-                    }
+            let type_ = match else_type {
+                // An `else if` chain can run out of branches, so an optional
+                // else makes the whole expression optional. The branches are
+                // joined inside the Option, and the bare branch is wrapped in
+                // Some when it is evaluated.
+                Some(else_type) if is_option(&else_type) => {
+                    let else_inner = option_inner(&else_type).unwrap_or(Type::Unknown);
 
-                    if_block_type.clone()
-                } else {
-                    Type::option_of(if_block_type.clone())
+                    let joined = if matches!(else_inner, Type::Unknown) {
+                        if_block_type.clone()
+                    } else {
+                        join_types(&if_block_type, &else_inner).ok_or(format!(
+                            "If block type {} does not match else block type {}",
+                            if_block_type, else_inner
+                        ))?
+                    };
+
+                    Type::option_of(joined)
                 }
-            } else {
-                Type::option_of(if_block_type.clone())
+                Some(else_type) => join_types(&if_block_type, &else_type).ok_or(format!(
+                    "If block type {} does not match else block type {}",
+                    if_block_type, else_type
+                ))?,
+                None => Type::option_of(if_block_type.clone()),
             };
 
             Ok(TypedExpression::If {
@@ -417,36 +490,77 @@ pub fn check_type(
                 None,
             )?;
 
+            let matchee_type = runtime_type(&expression.get_type());
+
+            if arms.is_empty() {
+                return Err("Match must have at least one arm".to_string());
+            }
+
+            // Each arm is checked once, in a scope holding the bindings its own
+            // pattern introduces.
             let mut typed_arms: Vec<TypedMatchArm> = vec![];
+            let mut type_: Option<Type> = None;
 
             for arm in arms {
                 let arm_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                     match_environment.clone(),
                 )));
 
-                let pattern = arm.pattern.clone();
-                let expression = arm.expression.clone();
+                let (checked_pattern, bindings) =
+                    check_pattern(&arm.pattern, &matchee_type, arm_environment.clone())?;
+
+                for (identifier, binding_type) in bindings {
+                    arm_environment
+                        .borrow_mut()
+                        .add_variable(identifier, binding_type);
+                }
+
+                let body = check_type(
+                    &arm.expression,
+                    discovered_types,
+                    arm_environment.clone(),
+                    context.clone(),
+                )?;
+
+                type_ = Some(match type_ {
+                    None => body.get_type(),
+                    Some(joined) => join_types(&joined, &body.get_type()).ok_or(format!(
+                        "Match arms have incompatible types: {} and {}",
+                        joined,
+                        body.get_type()
+                    ))?,
+                });
 
                 typed_arms.push(TypedMatchArm {
-                    pattern,
-                    expression: *expression,
-                    type_environment: arm_environment.clone(),
+                    pattern: arm.pattern.clone(),
+                    checked_pattern,
+                    expression: body,
                 });
             }
 
-            let decision_tree = create_decision_tree(
-                expression.clone(),
-                typed_arms.clone(),
-                discovered_types,
-                None,
-            )?;
+            let type_ = type_.expect("at least one arm");
 
-            let type_ = decision_tree.get_type();
+            let compilable = typed_arms
+                .iter()
+                .map(|arm| CompilableArm {
+                    pattern: arm.checked_pattern.clone(),
+                    body: arm.expression.clone(),
+                })
+                .collect::<Vec<_>>();
+
+            let compiled = compile_match(matchee_type, &compilable, type_.clone())?;
+
+            if let Some(arm) = compiled.unreachable_arms.first() {
+                return Err(format!(
+                    "Match arm `{}` is unreachable",
+                    typed_arms[*arm].pattern
+                ));
+            }
 
             Ok(TypedExpression::Match {
                 expression: Box::new(expression),
                 arms: typed_arms,
-                decision_tree,
+                decision_tree: compiled.decision,
                 type_,
             })
         }
@@ -514,29 +628,37 @@ pub fn check_type(
         }
         Expression::Member(member) => match member {
             crate::ast::Member::Identifier { symbol, generics } => {
-                let type_ = type_environment
-                    .borrow()
-                    .get_variable(symbol)
-                    .or_else(|| {
-                        let type_ = type_environment.borrow().get_type(member);
+                // `typeof` is answered while checking and has no value to carry
+                // into the program, so it cannot be referred to as one.
+                if is_typeof(member) {
+                    return Err(TYPEOF_IS_NOT_A_VALUE.to_string());
+                }
 
-                        match (type_, generics) {
-                            (None, _) => None,
-                            (Some(type_), None) => Some(type_),
-                            (Some(type_), Some(generics)) => Some(
-                                type_
-                                    .clone_with_concrete_types(
-                                        generics.iter().map(|g| g.type_annotation()).collect(),
-                                        discovered_types,
-                                        type_environment.clone(),
-                                        None,
-                                    )
-                                    .expect("Failed to clone type with concrete types"),
-                            ),
+                let variable = type_environment.borrow().get_variable(symbol);
+
+                let type_ = match variable {
+                    Some(variable) => variable,
+                    None => {
+                        let type_ = type_environment
+                            .borrow()
+                            .get_type(member)
+                            .ok_or_else(|| format!("Unexpected variable: {}", symbol))?;
+
+                        match generics {
+                            None => type_,
+                            Some(generics) => {
+                                check_type_argument_count(&type_, generics.len(), symbol)?;
+
+                                type_.clone_with_concrete_types(
+                                    generics.iter().map(|g| g.type_annotation()).collect(),
+                                    discovered_types,
+                                    type_environment.clone(),
+                                    None,
+                                )?
+                            }
                         }
-                    })
-                    .ok_or_else(|| format!("Unexpected variable: {}", symbol))?
-                    .clone();
+                    }
+                };
 
                 Ok(TypedExpression::Member(Member::Identifier {
                     symbol: symbol.clone(),
@@ -694,32 +816,50 @@ pub fn check_type(
                 type_annotation,
                 field_initializers,
             } => {
-                let field_initializers: Result<Vec<FieldInitializer>, String> = {
-                    let mut field_initializers_: Vec<FieldInitializer> = vec![];
-                    for field_initializer in field_initializers {
-                        let field_initializer = FieldInitializer {
-                            identifier: field_initializer.identifier.clone(),
-                            initializer: check_type(
-                                &field_initializer.initializer,
-                                discovered_types,
-                                type_environment.clone(),
-                                None,
-                            )?,
-                        };
-                        field_initializers_.push(field_initializer);
-                    }
-                    Ok(field_initializers_)
+                // A literal names the struct but never its type arguments, so a
+                // generic one would be checked against `T`. The expected type
+                // carries the arguments, so it is preferred when it names the
+                // same struct.
+                let type_ = match instantiation_of(context.as_ref(), type_annotation) {
+                    Some(instantiated) => instantiated,
+                    None => type_environment
+                        .borrow()
+                        .get_type_from_annotation(type_annotation)?,
                 };
 
-                let type_ = type_environment
-                    .borrow()
-                    .get_type_from_annotation(type_annotation)?;
+                // With no expected type to take arguments from, the fields the
+                // literal provides pin them down instead.
+                let type_ = infer_struct_type_arguments(
+                    type_,
+                    field_initializers,
+                    discovered_types,
+                    type_environment.clone(),
+                )?;
 
                 let Type::Struct(Struct { fields, .. }) = type_.clone().unsubstitute() else {
                     Err(format!("{} is not a struct", type_.full_name()))?
                 };
 
-                let mut field_initializers = field_initializers?;
+                // Each initializer is checked against the field it fills, so a
+                // nested literal inherits the type arguments too.
+                let mut field_initializers_: Vec<FieldInitializer> = vec![];
+
+                for field_initializer in field_initializers {
+                    let field_type = get_field_by_name(&fields, &field_initializer.identifier)
+                        .map(|field| field.field_type.clone());
+
+                    field_initializers_.push(FieldInitializer {
+                        identifier: field_initializer.identifier.clone(),
+                        initializer: check_type(
+                            &field_initializer.initializer,
+                            discovered_types,
+                            type_environment.clone(),
+                            field_type,
+                        )?,
+                    });
+                }
+
+                let mut field_initializers = field_initializers_;
 
                 let field_initializer_map: HashMap<_, _> = field_initializers
                     .iter()
@@ -787,31 +927,15 @@ pub fn check_type(
                 member,
                 field_initializers,
             } => {
-                let field_initializers: Result<Vec<FieldInitializer>, String> = {
-                    let mut fis = Vec::new();
-
-                    for ast::model::FieldInitializer {
-                        identifier,
-                        initializer,
-                    } in field_initializers
-                    {
-                        fis.push(FieldInitializer {
-                            identifier: identifier.clone(),
-                            initializer: check_type(
-                                initializer,
-                                discovered_types,
-                                type_environment.clone(),
-                                None,
-                            )?,
-                        });
-                    }
-
-                    Ok(fis)
+                // As with structs, the literal names the variant but not the
+                // enum's type arguments. The expected type supplies them, and
+                // the variant is taken from the instantiated enum.
+                let type_ = match instantiated_variant(context.as_ref(), type_annotation, member) {
+                    Some(instantiated) => instantiated,
+                    None => type_environment
+                        .borrow()
+                        .get_type_from_annotation(type_annotation)?,
                 };
-
-                let type_ = type_environment
-                    .borrow()
-                    .get_type_from_annotation(type_annotation)?;
 
                 let Type::Struct(Struct { fields, .. }) = &type_ else {
                     Err(format!(
@@ -821,7 +945,28 @@ pub fn check_type(
                     ))?
                 };
 
-                let mut field_initializers = field_initializers?;
+                let mut checked_initializers = Vec::new();
+
+                for ast::model::FieldInitializer {
+                    identifier,
+                    initializer,
+                } in field_initializers
+                {
+                    let field_type =
+                        get_field_by_name(fields, identifier).map(|field| field.field_type.clone());
+
+                    checked_initializers.push(FieldInitializer {
+                        identifier: identifier.clone(),
+                        initializer: check_type(
+                            initializer,
+                            discovered_types,
+                            type_environment.clone(),
+                            field_type,
+                        )?,
+                    });
+                }
+
+                let mut field_initializers = checked_initializers;
 
                 let field_initializer_map: HashMap<_, _> = field_initializers
                     .iter()
@@ -1180,7 +1325,7 @@ pub fn check_type(
                 );
             };
 
-            let Type::Function(Function { param }) = *type_ else {
+            let Type::Function(Function { param, .. }) = *type_ else {
                 return Err(
                     "Last argument of a function in a use expression must be a function"
                         .to_string(),
@@ -1273,7 +1418,306 @@ pub fn check_type(
     }
 }
 
-fn is_option(type_: &Type) -> bool {
+/// The expected type, when it is an instantiation of the type the annotation
+/// names — `Foo<Int>` for a `Foo { .. }` literal.
+///
+/// A literal spells out the type's name but never its type arguments, so this
+/// is where a generic one gets them from.
+fn instantiation_of(expected: Option<&Type>, annotation: &TypeAnnotation) -> Option<Type> {
+    let expected = expected?.clone().unsubstitute();
+
+    let identifier = match &expected {
+        Type::Struct(Struct {
+            type_identifier, ..
+        }) => type_identifier,
+        Type::Enum(Enum {
+            type_identifier, ..
+        }) => type_identifier,
+        _ => return None,
+    };
+
+    // Only an instantiation is useful here; the declaration itself still has
+    // its parameters standing in for real types.
+    if !matches!(identifier, TypeIdentifier::ConcreteType(_, _)) {
+        return None;
+    }
+
+    if identifier.name() != annotation.name() {
+        return None;
+    }
+
+    Some(expected)
+}
+
+/// Instantiates a generic function for a call that gave no explicit type
+/// arguments, taking them from the argument it was called with and from where
+/// its result is going.
+///
+/// Both directions are needed: a parameter mentioning `T` pins it from the
+/// argument, while a `T` that appears only in the return type can be pinned
+/// only by the expected type at the call site.
+///
+/// Returns `None` when the callee is not a generic function, when it was
+/// already instantiated, or when neither direction pins down every type
+/// parameter — in which case the call is checked as before and reports the
+/// mismatch itself.
+fn infer_call_type_arguments(
+    callee_type: &Type,
+    argument_type: Option<&Type>,
+    expected_type: Option<&Type>,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<Option<Type>, String> {
+    let Type::Function(Function {
+        identifier: Some(TypeIdentifier::GenericType(_, generics)),
+        param,
+        return_type,
+    }) = callee_type
+    else {
+        return Ok(None);
+    };
+
+    let mut bindings = HashMap::new();
+
+    // A literal argument pins the parameter to its runtime type: `id(1)` means
+    // `id::<Int>(1)`, not `id::<#1>(1)`.
+    if let (Some(param), Some(argument_type)) = (param, argument_type) {
+        if contains_generic(&param.type_) {
+            unify_type_argument(&param.type_, &runtime_type(argument_type), &mut bindings);
+        }
+    }
+
+    // Whatever the argument left open, the expected type may settle. The
+    // expectation is written out by hand, so it is taken as given rather than
+    // widened.
+    if let Some(expected_type) = expected_type {
+        if contains_generic(return_type) {
+            unify_type_argument(return_type, expected_type, &mut bindings);
+        }
+    }
+
+    let concrete_types = generics
+        .iter()
+        .map(|generic| bindings.get(&generic.type_name).cloned())
+        .collect::<Option<Vec<TypeAnnotation>>>();
+
+    let Some(concrete_types) = concrete_types else {
+        return Ok(None);
+    };
+
+    Ok(Some(callee_type.clone_with_concrete_types(
+        concrete_types,
+        discovered_types,
+        type_environment,
+        None,
+    )?))
+}
+
+/// Instantiates a generic struct from the fields a literal provides, for a
+/// literal with no expected type to take arguments from.
+///
+/// Returns the type unchanged when it is not a generic declaration or when the
+/// fields do not pin down every type parameter.
+fn infer_struct_type_arguments(
+    type_: Type,
+    field_initializers: &[ast::model::FieldInitializer],
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<Type, String> {
+    let Type::Struct(Struct {
+        type_identifier: TypeIdentifier::GenericType(_, generics),
+        fields,
+        ..
+    }) = &type_
+    else {
+        return Ok(type_);
+    };
+
+    let (generics, fields) = (generics.clone(), fields.clone());
+    let mut bindings = HashMap::new();
+
+    for initializer in field_initializers {
+        let Some(field) = get_field_by_name(&fields, &initializer.identifier) else {
+            continue;
+        };
+
+        if !contains_generic(&field.field_type) {
+            continue;
+        }
+
+        let checked = check_type(
+            &initializer.initializer,
+            discovered_types,
+            type_environment.clone(),
+            None,
+        )?;
+
+        unify_type_argument(
+            &field.field_type,
+            &runtime_type(&checked.get_type()),
+            &mut bindings,
+        );
+    }
+
+    let concrete_types = generics
+        .iter()
+        .map(|generic| bindings.get(&generic.type_name).cloned())
+        .collect::<Option<Vec<TypeAnnotation>>>();
+
+    let Some(concrete_types) = concrete_types else {
+        return Ok(type_);
+    };
+
+    type_.clone_with_concrete_types(concrete_types, discovered_types, type_environment, None)
+}
+
+/// Matches a parameter type against an argument type, recording what each type
+/// parameter would have to be. The first binding wins.
+fn unify_type_argument(
+    parameter: &Type,
+    argument: &Type,
+    bindings: &mut HashMap<String, TypeAnnotation>,
+) {
+    match (parameter, argument) {
+        (Type::Generic(generic), argument) => {
+            bindings
+                .entry(generic.type_name.clone())
+                .or_insert_with(|| argument.type_annotation());
+        }
+        (Type::Array(parameter), Type::Array(argument)) => {
+            unify_type_argument(parameter, argument, bindings)
+        }
+        (Type::Tuple(parameters), Type::Tuple(arguments)) => {
+            for (parameter, argument) in parameters.iter().zip(arguments) {
+                unify_type_argument(parameter, argument, bindings);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Replaces the type on a checked expression, for when instantiation settles it
+/// after the expression was built.
+fn retype(expression: TypedExpression, type_: Type) -> TypedExpression {
+    match expression {
+        TypedExpression::Member(Member::Identifier { symbol, .. }) => {
+            TypedExpression::Member(Member::Identifier { symbol, type_ })
+        }
+        other => other,
+    }
+}
+
+/// The variant of the expected enum that an enum literal names, when the
+/// expected type is an instantiation of that enum — the `Res<Int>::Ok` for a
+/// `Res::Ok { .. }` literal expected to be a `Res<Int>`.
+fn instantiated_variant(
+    expected: Option<&Type>,
+    annotation: &TypeAnnotation,
+    member: &str,
+) -> Option<Type> {
+    let Type::Enum(Enum {
+        type_identifier,
+        members,
+        ..
+    }) = expected?.clone().unsubstitute()
+    else {
+        return None;
+    };
+
+    if !matches!(type_identifier, TypeIdentifier::ConcreteType(_, _)) {
+        return None;
+    }
+
+    // The literal's annotation is the qualified variant, `Res::Ok`.
+    let annotation_name = annotation.name();
+    let (enum_name, _) = annotation_name.rsplit_once("::")?;
+
+    if enum_name != type_identifier.name() {
+        return None;
+    }
+
+    get_enum_member(&members, &type_identifier, member).cloned()
+}
+
+/// Rejects a type argument list that doesn't match what the type declares,
+/// which would otherwise be silently truncated during substitution.
+fn check_type_argument_count(type_: &Type, given: usize, symbol: &str) -> Result<(), String> {
+    let declared = match type_ {
+        Type::Function(Function {
+            identifier: Some(TypeIdentifier::GenericType(_, generics)),
+            ..
+        }) => generics.len(),
+        Type::Struct(Struct {
+            type_identifier: TypeIdentifier::GenericType(_, generics),
+            ..
+        }) => generics.len(),
+        Type::Enum(Enum {
+            type_identifier: TypeIdentifier::GenericType(_, generics),
+            ..
+        }) => generics.len(),
+        Type::TypeAlias(TypeAlias {
+            type_identifier: TypeIdentifier::GenericType(_, generics),
+            ..
+        }) => generics.len(),
+        // Not generic at all, so any type argument is one too many.
+        _ => 0,
+    };
+
+    if declared == given {
+        return Ok(());
+    }
+
+    Err(format!(
+        "`{}` takes {} type argument{}, but {} {} given",
+        symbol,
+        declared,
+        if declared == 1 { "" } else { "s" },
+        given,
+        if given == 1 { "was" } else { "were" }
+    ))
+}
+
+const TYPEOF_IS_NOT_A_VALUE: &str =
+    "`typeof` is resolved while type checking, so it cannot be used as a value at runtime";
+
+/// Whether a member names the `typeof` built-in.
+fn is_typeof(member: &ast::Member) -> bool {
+    let ast::Member::Identifier { symbol, .. } = member else {
+        return false;
+    };
+
+    BuiltInFunction::new(symbol).is_some_and(|f| f.function_type == BuiltInFunctionType::TypeOf)
+}
+
+/// The answer `typeof` gives for an expression: its static type, rendered, as a
+/// string literal carrying that same text as its type.
+fn typeof_literal(argument: &TypedExpression) -> TypedExpression {
+    let name = argument.get_type().to_string();
+
+    TypedExpression::Literal {
+        literal: ValueLiteral::String(name.clone()),
+        type_: Type::string_literal(name),
+    }
+}
+
+/// The `T` in an `Option<T>`.
+pub fn option_inner(type_: &Type) -> Option<Type> {
+    if !is_option(type_) {
+        return None;
+    }
+
+    let Type::Enum(Enum { members, .. }) = type_ else {
+        return None;
+    };
+
+    let Type::Struct(Struct { fields, .. }) = members.get("Some")? else {
+        return None;
+    };
+
+    Some(get_field_by_name(fields, "value")?.field_type.clone())
+}
+
+pub fn is_option(type_: &Type) -> bool {
     let Type::Enum(Enum {
         type_identifier,
         shared_fields,
@@ -1298,7 +1742,7 @@ fn is_option(type_: &Type) -> bool {
                     return false;
                 };
 
-                get_field_by_name(fields, "f0").is_some_and(|_| true)
+                get_field_by_name(fields, "value").is_some()
             })
         }
         _ => false,
@@ -1563,6 +2007,15 @@ fn check_type_param_propagation(
         return Err("Param propagation must be followed by a member access".to_string());
     };
 
+    // `x:typeof()` is folded by the caller. Reaching here means the call was
+    // left off, which would leave `typeof` standing as a value.
+    if is_typeof(member) {
+        return Err(format!(
+            "{}, so `:typeof` must be called",
+            TYPEOF_IS_NOT_A_VALUE
+        ));
+    }
+
     let object_type_expression =
         check_type(object, discovered_types, type_environment.clone(), context)?;
 
@@ -1793,175 +2246,43 @@ fn check_type_pattern(
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
 ) -> Result<(), String> {
-    match pattern {
-        Pattern::Wildcard => Ok(()),
-        Pattern::Unit => Ok(()),
-        Pattern::Variable(identifier) => {
-            if let Some(context) = context {
-                type_environment
-                    .borrow_mut()
-                    .add_variable(identifier.clone(), context);
+    let known_type = context.or_else(|| initializer_type.cloned());
 
-                return Ok(());
-            }
-
-            if let Some(initializer_type) = initializer_type {
-                type_environment
-                    .borrow_mut()
-                    .add_variable(identifier.clone(), initializer_type.clone());
-
-                return Ok(());
-            }
-
+    // Without a type there is nothing to resolve the pattern against, so its
+    // names are introduced untyped, as they were before.
+    let Some(known_type) = known_type else {
+        for identifier in pattern.bindings() {
             type_environment
                 .borrow_mut()
-                .add_variable(identifier.clone(), Type::Unknown);
-
-            Ok(())
+                .add_variable(identifier, Type::Unknown);
         }
-        Pattern::Constructor(Constructor::Struct {
-            type_annotation,
-            field_patterns,
-        }) => {
-            let Some(initializer_type) = initializer_type else {
-                return Err("Expected initializer for constructor pattern".to_string());
-            };
 
-            let type_annotation =
-                if type_annotation_equals(type_annotation, &TypeAnnotation::void()) {
-                    &initializer_type.type_annotation()
-                } else {
-                    type_annotation
-                };
+        return Ok(());
+    };
 
-            let mut is_enum_member = false;
+    let (checked, bindings) = check_pattern(pattern, &known_type, type_environment.clone())?;
 
-            match &initializer_type {
-                Type::Enum(Enum { members, .. }) => {
-                    for member_type in members.values() {
-                        if type_annotation_equals(type_annotation, &member_type.type_annotation()) {
-                            is_enum_member = true;
-                            break;
-                        }
-                    }
-                }
-                Type::Struct(Struct {
-                    type_identifier: TypeIdentifier::MemberType(_, discriminant_name),
-                    ..
-                }) => {
-                    if type_annotation_equals(
-                        type_annotation,
-                        &TypeAnnotation::Type(discriminant_name.clone()),
-                    ) {
-                        is_enum_member = true;
-                    }
-                }
-                _ => {}
-            }
+    // Declarations and loops bind unconditionally, so a pattern that can fail
+    // has nowhere to fail to.
+    if is_refutable(&checked) {
+        return Err(format!("Pattern `{}` is refutable", pattern));
+    }
 
-            if !is_enum_member
-                && !type_annotation_equals(&initializer_type.type_annotation(), type_annotation)
-            {
-                return Err(format!(
-                    "Expected type annotation {} but got {}",
-                    initializer_type.type_annotation(),
-                    type_annotation,
-                ));
-            }
+    for (identifier, binding_type) in bindings {
+        type_environment
+            .borrow_mut()
+            .add_variable(identifier, binding_type);
+    }
 
-            let fields = match initializer_type.clone() {
-                Type::Struct(Struct { fields, .. }) => fields,
-                Type::Enum(Enum {
-                    shared_fields,
-                    members,
-                    ..
-                }) => {
-                    let member = members.get(&type_annotation.name()).expect(
-                        "Already checked if the constructor name exists in the member list",
-                    );
+    Ok(())
+}
 
-                    let Type::Struct(Struct { fields, .. }) = member.clone() else {
-                        return Err(format!("Expected enum member but got {:?}", member.clone()));
-                    };
-
-                    fields.into_iter().chain(shared_fields).collect()
-                }
-                _ => {
-                    return Err(format!(
-                        "Expected struct, enum or enum member but got {:?}",
-                        initializer_type.clone()
-                    ));
-                }
-            };
-
-            for StructField {
-                field_name,
-                field_type,
-                ..
-            } in fields
-            {
-                let field_pattern = field_patterns
-                    .iter()
-                    .find(|field_pattern| field_pattern.identifier == field_name)
-                    .ok_or_else(|| {
-                        format!(
-                            "Field {} not found in constructor pattern",
-                            field_name.clone()
-                        )
-                    })?;
-
-                check_type_pattern(
-                    &field_pattern.pattern,
-                    Some(&field_type),
-                    type_environment.clone(),
-                    context.clone(),
-                )?;
-            }
-
-            Ok(())
-        }
-        Pattern::Tuple(patterns) => {
-            let Some(initializer_type) = initializer_type else {
-                return Err("Expected initializer for tuple pattern".to_string());
-            };
-
-            let Type::Tuple(types) = initializer_type else {
-                return Err(format!(
-                    "Expected tuple type but got {}",
-                    initializer_type.full_name()
-                ));
-            };
-
-            if patterns.len() != types.len() {
-                return Err(format!(
-                    "Expected {} patterns but got {}",
-                    types.len(),
-                    patterns.len()
-                ));
-            }
-
-            for (pattern, type_) in patterns.iter().zip(types) {
-                check_type_pattern(
-                    pattern,
-                    Some(type_),
-                    type_environment.clone(),
-                    context.clone(),
-                )?;
-            }
-
-            Ok(())
-        }
-        Pattern::Bool(_)
-        | Pattern::Int(_)
-        | Pattern::UInt(_)
-        | Pattern::Float(_)
-        | Pattern::Rune(_)
-        | Pattern::String(_)
-        | Pattern::LessThan(_)
-        | Pattern::GreaterThan(_)
-        | Pattern::LessThanOrEqual(_)
-        | Pattern::GreaterThanOrEqual(_)
-        | Pattern::Range(_, _, _) => Err("Refutable pattern".to_string()),
+fn is_refutable(pattern: &CheckedPattern) -> bool {
+    match pattern {
+        CheckedPattern::Wildcard | CheckedPattern::Binding(_) => false,
+        CheckedPattern::Tuple(patterns) => patterns.iter().any(is_refutable),
+        CheckedPattern::Fields(fields) => fields.iter().any(|f| is_refutable(&f.pattern)),
+        _ => true,
     }
 }
 
@@ -2003,8 +2324,31 @@ fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, Strin
             })
         }
         (UnaryOperator::LogicalNot, Type::Bool) => Ok(Type::Bool),
+        (UnaryOperator::LogicalNot, Type::Literal { type_, .. }) => match **type_ {
+            LiteralType::Bool => Ok(Type::Literal {
+                name: "Bool".to_string(),
+                type_: type_.clone(),
+            }),
+            LiteralType::BoolValue(value) => Ok(Type::bool_literal(!value)),
+            _ => Err(format!(
+                "Invalid unary operator {:?} for type {}",
+                operator, operand
+            )),
+        },
         (UnaryOperator::BitwiseNot, Type::Int) => Ok(Type::Int),
         (UnaryOperator::BitwiseNot, Type::UInt) => Ok(Type::UInt),
+        (UnaryOperator::BitwiseNot, Type::Literal { type_, .. }) => match **type_ {
+            LiteralType::Int | LiteralType::UInt => Ok(Type::Literal {
+                name: operand.to_string(),
+                type_: type_.clone(),
+            }),
+            LiteralType::IntValue(value) => Ok(Type::int_literal(!value)),
+            LiteralType::UIntValue(value) => Ok(Type::uint_literal(!value)),
+            _ => Err(format!(
+                "Invalid unary operator {:?} for type {}",
+                operator, operand
+            )),
+        },
         _ => Err(format!(
             "Invalid unary operator {:?} for type {}",
             operator, operand

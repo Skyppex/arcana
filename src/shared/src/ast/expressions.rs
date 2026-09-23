@@ -1,7 +1,7 @@
 use crate::{
+    ast::pattern::{Bound, ComparisonOperator, FieldPattern, Pattern},
     ast::{statements::ParseContext, ArrayItem, Index, UseExpr},
     lexer::token::{self, IdentifierType, Keyword, TokenKind},
-    type_checker::decision_tree::{Constructor, FieldPattern, Pattern},
     types::{parse_generics_in_type_name, parse_optional_type_annotation, ToKey, TypeAnnotation},
 };
 
@@ -225,10 +225,27 @@ fn parse_type_literal(cursor: &mut Cursor, context: &ParseContext) -> Result<Exp
         {
             return parse_range(cursor, context);
         }
+        // `Foo::<Int> { .. }` constructs a generic struct; the same prefix
+        // without a brace is something else, so look past the type arguments
+        // to decide.
+        (TokenKind::DoubleColon, TokenKind::Less) => {
+            let mut lookahead = cursor.clone();
+
+            let constructs_a_literal = parse_type_annotation(&mut lookahead, false)
+                .is_ok_and(|_| lookahead.first().kind == TokenKind::OpenBrace);
+
+            if !constructs_a_literal {
+                return parse_range(cursor, context);
+            }
+        }
         (_, TokenKind::Less) => {
             return parse_range(cursor, context);
         }
-        (TokenKind::DoubleColon, TokenKind::Identifier(_)) => {
+        // `E::foo` is a static member access, parsed further down. `E::First`
+        // names a variant, so it is an enum literal and belongs here.
+        (TokenKind::DoubleColon, TokenKind::Identifier(identifier))
+            if identifier.validate_type_identifier_name().is_err() =>
+        {
             return parse_range(cursor, context);
         }
         _ => {}
@@ -1274,41 +1291,43 @@ fn parse_index(cursor: &mut Cursor, context: &ParseContext) -> Result<Index, Str
 }
 
 fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
-    let pattern = parse_single_pattern(cursor)?;
+    let pattern = parse_pattern_primary(cursor)?;
 
-    if cursor.first().kind == TokenKind::DoubleDot {
-        cursor.bump()?; // Consume the ..
-
-        let inclusive = cursor.first().kind == TokenKind::Equal;
-
-        if inclusive {
-            cursor.expect(TokenKind::Equal)?;
-        }
-
-        let right = parse_pattern(cursor)?;
-
-        return Ok(Pattern::Range(
-            Box::new(pattern),
-            Box::new(right),
-            inclusive,
-        ));
+    if cursor.first().kind != TokenKind::DoubleDot {
+        return Ok(pattern);
     }
 
-    Ok(pattern)
+    cursor.bump()?; // Consume the ..
+
+    let inclusive = cursor.first().kind == TokenKind::Equal;
+
+    if inclusive {
+        cursor.bump()?; // Consume the =
+    }
+
+    // Ranges don't nest: the endpoints are primaries, so `1..2..3` is an error
+    // rather than something with a made-up meaning.
+    let upper = parse_pattern_primary(cursor)?;
+
+    Ok(Pattern::Range {
+        lower: pattern_into_bound(pattern)?,
+        upper: pattern_into_bound(upper)?,
+        inclusive,
+    })
 }
 
-fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
+fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, String> {
     match cursor.first().kind {
         TokenKind::Underscore => {
             cursor.bump()?; // Consume the _
             Ok(Pattern::Wildcard)
         }
         TokenKind::Literal(token::Literal::Unit) => {
-            cursor.bump()?; // Consume the ()
+            cursor.bump()?; // Consume the unit
             Ok(Pattern::Unit)
         }
         TokenKind::Literal(token::Literal::Bool(v)) => {
-            cursor.bump()?; // Consume the ()
+            cursor.bump()?; // Consume the literal
             Ok(Pattern::Bool(v))
         }
         TokenKind::Literal(token::Literal::Int(v)) => {
@@ -1325,55 +1344,72 @@ fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
         }
         TokenKind::Literal(token::Literal::Rune(v)) => {
             cursor.bump()?; // Consume the literal
-            Ok(Pattern::Rune(
-                v.parse::<char>().expect("Failed to parse rune literal"),
-            ))
+            Ok(Pattern::Rune(parse_rune(&v)?))
         }
         TokenKind::Literal(token::Literal::String(v)) => {
             cursor.bump()?; // Consume the literal
             Ok(Pattern::String(v))
         }
-        TokenKind::Identifier(ident) if ident.validate_type_identifier_name().is_ok() => {
+        TokenKind::Less => parse_comparison_pattern(cursor, ComparisonOperator::LessThan),
+        TokenKind::Greater => parse_comparison_pattern(cursor, ComparisonOperator::GreaterThan),
+        TokenKind::LessEqual => {
+            parse_comparison_pattern(cursor, ComparisonOperator::LessThanOrEqual)
+        }
+        TokenKind::GreaterEqual => {
+            parse_comparison_pattern(cursor, ComparisonOperator::GreaterThanOrEqual)
+        }
+        // `::First` — the enum comes from the matched value.
+        TokenKind::DoubleColon => {
+            cursor.bump()?; // Consume the ::
+
+            let TokenKind::Identifier(variant) = cursor.first().kind else {
+                return Err(format!(
+                    "Expected a variant name after :: but found {:?}",
+                    cursor.first().kind
+                ));
+            };
+
+            variant.validate_type_identifier_name()?;
+            cursor.bump()?; // Consume the variant name
+
+            Ok(Pattern::EnumVariant {
+                enum_annotation: None,
+                variant,
+                fields: parse_optional_field_patterns(cursor)?,
+            })
+        }
+        // `MyEnum::First { .. }` or `Point { .. }`. A `::` anywhere in the name
+        // makes it a variant; without one it is always a struct.
+        TokenKind::Identifier(identifier) if identifier.validate_type_identifier_name().is_ok() => {
             let type_annotation = parse_type_annotation(cursor, false)?;
+            let fields = parse_optional_field_patterns(cursor)?;
 
-            if cursor.first().kind != TokenKind::OpenBrace {
-                return Ok(Pattern::Constructor(Constructor::Struct {
-                    type_annotation,
-                    field_patterns: vec![],
-                }));
+            match split_variant_annotation(&type_annotation) {
+                Some((enum_annotation, variant)) => Ok(Pattern::EnumVariant {
+                    enum_annotation: Some(enum_annotation),
+                    variant,
+                    fields,
+                }),
+                None => Ok(Pattern::Struct {
+                    type_annotation: Some(type_annotation),
+                    fields,
+                }),
             }
-
-            parse_single_pattern(cursor)
         }
         TokenKind::Identifier(identifier)
             if identifier.validate_variable_identifier_name().is_ok() =>
         {
             cursor.bump()?; // Consume the identifier
-
-            Ok(Pattern::Variable(identifier))
+            Ok(Pattern::Binding(identifier))
         }
-        TokenKind::Less => {
-            cursor.bump()?; // Consume the <
-            let pattern = parse_pattern(cursor)?;
-            Ok(Pattern::LessThan(Box::new(pattern)))
-        }
-        TokenKind::Greater => {
-            cursor.bump()?; // Consume the >
-            let pattern = parse_pattern(cursor)?;
-            Ok(Pattern::GreaterThan(Box::new(pattern)))
-        }
-        TokenKind::LessEqual => {
-            cursor.bump()?; // Consume the <=
-            let pattern = parse_pattern(cursor)?;
-            Ok(Pattern::LessThanOrEqual(Box::new(pattern)))
-        }
-        TokenKind::GreaterEqual => {
-            cursor.bump()?; // Consume the >=
-            let pattern = parse_pattern(cursor)?;
-            Ok(Pattern::GreaterThanOrEqual(Box::new(pattern)))
-        }
+        // `{ x, y: 1 }` — the type comes from the matched value.
+        TokenKind::OpenBrace => Ok(Pattern::Struct {
+            type_annotation: None,
+            fields: parse_field_patterns(cursor)?,
+        }),
         TokenKind::OpenParen => {
             cursor.bump()?; // Consume the (
+
             let mut patterns = vec![];
 
             while cursor.first().kind != TokenKind::CloseParen {
@@ -1384,62 +1420,136 @@ fn parse_single_pattern(cursor: &mut Cursor) -> Result<Pattern, String> {
                 }
             }
 
-            cursor.expect(TokenKind::CloseParen)?;
+            cursor.expect(TokenKind::CloseParen)?; // Consume the )
             Ok(Pattern::Tuple(patterns))
-        }
-        TokenKind::OpenBrace => {
-            cursor.bump()?; // Consume the {
-
-            let mut fields = vec![];
-
-            while cursor.first().kind != TokenKind::CloseBrace {
-                let TokenKind::Identifier(identifier) = cursor.first().kind else {
-                    return Err(format!(
-                        "Expected identifier but found {:?}",
-                        cursor.first().kind
-                    ));
-                };
-
-                cursor.bump()?; // Consume the identifier
-
-                if cursor.first().kind != TokenKind::Colon {
-                    fields.push(FieldPattern {
-                        identifier: identifier.clone(),
-                        pattern: Pattern::Variable(identifier),
-                    });
-
-                    if cursor.first().kind == TokenKind::Comma {
-                        cursor.bump()?; // Consume the ,
-                    }
-
-                    continue;
-                }
-
-                cursor.bump()?; // Consume the :
-
-                let pattern = parse_pattern(cursor)?;
-
-                fields.push(FieldPattern {
-                    identifier,
-                    pattern,
-                });
-
-                if cursor.first().kind == TokenKind::Comma {
-                    cursor.bump()?; // Consume the ,
-                }
-            }
-
-            cursor.expect(TokenKind::CloseBrace)?;
-            Ok(Pattern::Constructor(Constructor::Struct {
-                type_annotation: TypeAnnotation::void(),
-                field_patterns: fields,
-            }))
         }
         _ => Err(format!(
             "Unknown start of pattern: {:?}",
             cursor.first().kind
         )),
     }
+}
+
+fn parse_comparison_pattern(
+    cursor: &mut Cursor,
+    operator: ComparisonOperator,
+) -> Result<Pattern, String> {
+    cursor.bump()?; // Consume the operator
+
+    Ok(Pattern::Comparison {
+        operator,
+        bound: parse_bound(cursor)?,
+    })
+}
+
+/// A comparison endpoint is a numeric or rune literal, or a variable holding
+/// one. Restricting it here keeps the type checker from having to reject
+/// nonsense like `< { x: 1 }` after the fact.
+fn parse_bound(cursor: &mut Cursor) -> Result<Bound, String> {
+    let bound = match cursor.first().kind {
+        TokenKind::Literal(token::Literal::Int(v)) => Bound::Int(v.value),
+        TokenKind::Literal(token::Literal::UInt(v)) => Bound::UInt(v.value),
+        TokenKind::Literal(token::Literal::Float(v)) => Bound::Float(v),
+        TokenKind::Literal(token::Literal::Rune(v)) => Bound::Rune(parse_rune(&v)?),
+        TokenKind::Identifier(identifier)
+            if identifier.validate_variable_identifier_name().is_ok() =>
+        {
+            Bound::Variable(identifier)
+        }
+        kind => {
+            return Err(format!(
+                "Expected a number, rune or variable but found {:?}",
+                kind
+            ))
+        }
+    };
+
+    cursor.bump()?; // Consume the bound
+    Ok(bound)
+}
+
+fn pattern_into_bound(pattern: Pattern) -> Result<Bound, String> {
+    match pattern {
+        Pattern::Int(v) => Ok(Bound::Int(v)),
+        Pattern::UInt(v) => Ok(Bound::UInt(v)),
+        Pattern::Float(v) => Ok(Bound::Float(v)),
+        Pattern::Rune(v) => Ok(Bound::Rune(v)),
+        Pattern::Binding(v) => Ok(Bound::Variable(v)),
+        other => Err(format!(
+            "Range endpoints must be numbers, runes or variables, found {}",
+            other
+        )),
+    }
+}
+
+fn parse_optional_field_patterns(cursor: &mut Cursor) -> Result<Vec<FieldPattern>, String> {
+    if cursor.first().kind != TokenKind::OpenBrace {
+        return Ok(vec![]);
+    }
+
+    parse_field_patterns(cursor)
+}
+
+fn parse_field_patterns(cursor: &mut Cursor) -> Result<Vec<FieldPattern>, String> {
+    cursor.expect(TokenKind::OpenBrace)?; // Consume the {
+
+    let mut fields = vec![];
+
+    while cursor.first().kind != TokenKind::CloseBrace {
+        let TokenKind::Identifier(identifier) = cursor.first().kind else {
+            return Err(format!(
+                "Expected a field name but found {:?}",
+                cursor.first().kind
+            ));
+        };
+
+        cursor.bump()?; // Consume the field name
+
+        // `{ x }` is shorthand for `{ x: x }`.
+        let pattern = if cursor.first().kind == TokenKind::Colon {
+            cursor.bump()?; // Consume the :
+            parse_pattern(cursor)?
+        } else {
+            Pattern::Binding(identifier.clone())
+        };
+
+        fields.push(FieldPattern {
+            identifier,
+            pattern,
+        });
+
+        if cursor.first().kind == TokenKind::Comma {
+            cursor.bump()?; // Consume the ,
+        }
+    }
+
+    cursor.expect(TokenKind::CloseBrace)?; // Consume the }
+    Ok(fields)
+}
+
+/// Splits `MyEnum::First` into the enum annotation and the variant name.
+/// Returns `None` for a plain type name, which is therefore a struct.
+fn split_variant_annotation(type_annotation: &TypeAnnotation) -> Option<(TypeAnnotation, String)> {
+    let (name, generics) = match type_annotation {
+        TypeAnnotation::Type(name) => (name, None),
+        TypeAnnotation::ConcreteType(name, generics) => (name, Some(generics.clone())),
+        _ => return None,
+    };
+
+    let (enum_name, variant) = name.rsplit_once("::")?;
+
+    let enum_annotation = match generics {
+        Some(generics) => TypeAnnotation::ConcreteType(enum_name.to_owned(), generics),
+        None => TypeAnnotation::Type(enum_name.to_owned()),
+    };
+
+    Some((enum_annotation, variant.to_owned()))
+}
+
+fn parse_rune(literal: &str) -> Result<char, String> {
+    literal
+        .parse::<char>()
+        .map_err(|_| format!("Invalid rune literal: {}", literal))
 }
 
 fn to_expression_literal(literal: token::Literal) -> Result<Expression, String> {

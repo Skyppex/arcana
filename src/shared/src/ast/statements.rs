@@ -3,7 +3,7 @@ use crate::{
     lexer::token::{IdentifierType, Keyword, TokenKind},
     types::{
         can_be_type_annotation, parse_generic_type_parameters, parse_type_annotation,
-        parse_type_identifier, TypeAnnotation, TypeIdentifier,
+        parse_type_identifier, GenericConstraint, GenericType, TypeAnnotation, TypeIdentifier,
     },
 };
 
@@ -427,6 +427,8 @@ fn parse_struct_declaration_statement(
 
     type_identifier.name().validate_type_identifier_name()?;
 
+    let where_clause = parse_where_clause(cursor)?;
+
     let TokenKind::OpenBrace = cursor.first().kind else {
         return Ok(Statement::StructDeclaration(StructDeclaration {
             access_modifier,
@@ -435,6 +437,7 @@ fn parse_struct_declaration_statement(
                 embedded_structs: vec![],
                 fields: vec![],
             },
+            where_clause,
         }));
     };
 
@@ -447,6 +450,7 @@ fn parse_struct_declaration_statement(
     Ok(Statement::StructDeclaration(StructDeclaration {
         access_modifier,
         body,
+        where_clause,
     }))
 }
 
@@ -507,6 +511,8 @@ fn parse_enum_declaration_statement(
 
     type_name.name().validate_type_identifier_name()?;
 
+    let where_clause = parse_where_clause(cursor)?;
+
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
         return Ok(Statement::EnumDeclaration(EnumDeclaration {
@@ -514,6 +520,7 @@ fn parse_enum_declaration_statement(
             type_identifier: type_name,
             shared_fields: vec![],
             members: vec![],
+            where_clause,
         }));
     }
 
@@ -579,6 +586,7 @@ fn parse_enum_declaration_statement(
         type_identifier: type_name,
         shared_fields,
         members,
+        where_clause,
     }))
 }
 
@@ -1068,7 +1076,52 @@ fn parse_embedded_structs(
     Ok(embedded_structs)
 }
 
-// fn parse_where_clause(cursor: &mut Cursor) -> Result<Option<Vec<GenericConstraint>>, String> {
+/// Parses `where T is Proto`, with `and` for several bounds on one parameter
+/// and `,` to constrain several parameters.
+///
+/// Returns an empty list when there is no `where`, so callers can always ask.
+fn parse_where_clause(cursor: &mut Cursor) -> Result<Vec<GenericConstraint>, String> {
+    if cursor.first().kind != TokenKind::Keyword(Keyword::Where) {
+        return Ok(vec![]);
+    }
+
+    cursor.bump()?; // Consume the where
+
+    let mut where_clause = vec![];
+
+    loop {
+        let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
+            return Err(format!(
+                "Expected a type parameter but found {:?}",
+                cursor.prev().kind
+            ));
+        };
+
+        cursor.expect(TokenKind::Keyword(Keyword::Is))?;
+
+        let mut constraints = vec![parse_type_annotation(cursor, false)?];
+
+        while cursor.first().kind == TokenKind::Keyword(Keyword::And) {
+            cursor.bump()?; // Consume the and
+            constraints.push(parse_type_annotation(cursor, false)?);
+        }
+
+        where_clause.push(GenericConstraint {
+            generic: GenericType { type_name },
+            constraints,
+        });
+
+        if cursor.first().kind != TokenKind::Comma {
+            break;
+        }
+
+        cursor.bump()?; // Consume the ,
+    }
+
+    Ok(where_clause)
+}
+
+// fn parse_where_clause_old(cursor: &mut Cursor) -> Result<Option<Vec<GenericConstraint>>, String> {
 //     if cursor.first().kind != TokenKind::Keyword(Keyword::Where) {
 //         return Ok(None);
 //     }

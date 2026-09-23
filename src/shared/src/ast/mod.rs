@@ -1,10 +1,12 @@
 pub mod cursor;
 mod expressions;
 pub(crate) mod model;
+pub mod pattern;
 mod statements;
 
 use expressions::{parse_block, parse_expression};
 pub use model::*;
+pub use pattern::*;
 
 use crate::{
     ast::statements::ParseContext,
