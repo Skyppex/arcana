@@ -253,11 +253,15 @@ fn parse_type_literal(cursor: &mut Cursor, context: &ParseContext) -> Result<Exp
 
     let type_annotation = parse_type_annotation(cursor, false)?;
 
-    if type_annotation.has_double_colon() {
-        parse_enum_literal(cursor, type_annotation, context)
+    let literal = if type_annotation.has_double_colon() {
+        parse_enum_literal(cursor, type_annotation, context)?
     } else {
-        parse_struct_literal(cursor, type_annotation, context)
-    }
+        parse_struct_literal(cursor, type_annotation, context)?
+    };
+
+    // A literal is a value like any other, so what follows it applies to it —
+    // except a call, since a literal is not a function.
+    parse_postfix(literal, cursor, context, false)
 }
 
 fn parse_struct_literal(
@@ -921,11 +925,30 @@ fn parse_call_or_param_propagation(
         expression = Expression::Member(member.with_generics(generics));
     }
 
+    parse_postfix(expression, cursor, context, true)
+}
+
+/// Consumes whatever follows an expression and binds tighter than any operator:
+/// calls, field access, indexing and param propagation, in any order.
+///
+/// `allow_call` is false after something that cannot be called, such as a
+/// struct literal. Without that, a literal ending a line would take a
+/// parenthesised expression on the next line as its argument list.
+fn parse_postfix(
+    mut expression: Expression,
+    cursor: &mut Cursor,
+    context: &ParseContext,
+    allow_call: bool,
+) -> Result<Expression, String> {
     loop {
         match cursor.first().kind {
             // Call expression
-            TokenKind::OpenParen => {
+            TokenKind::OpenParen if allow_call => {
                 expression = parse_call_expression(expression, cursor, context)?;
+            }
+            // Field access
+            TokenKind::Dot => {
+                expression = parse_field_access(expression, cursor, context)?;
             }
             // Param propagation
             TokenKind::Colon => {
@@ -1074,32 +1097,40 @@ fn parse_member_access(cursor: &mut Cursor, context: &ParseContext) -> Result<Ex
         });
     }
 
-    while let TokenKind::Dot = cursor.first().kind {
-        cursor.bump()?; // Consume the .
-
-        let TokenKind::Identifier(identifier) = cursor.first().kind else {
-            return Err(format!(
-                "Expected identifier but found {:?}",
-                cursor.first().kind
-            ));
-        };
-
-        let Expression::Member(member) = parse_literal(cursor, context)? else {
-            return Err(format!(
-                "Expected member but found {:?}",
-                cursor.first().kind
-            ));
-        };
-
-        object = Expression::Member(Member::MemberAccess {
-            object: Box::new(object),
-            member: Box::new(member),
-            symbol: identifier,
-            generics: None,
-        });
-    }
-
     Ok(object)
+}
+
+/// Consumes `.field`, wrapping what came before it.
+///
+/// Field access is postfix, so it belongs in the same loop as calls, indexing
+/// and propagation rather than only applying to what a literal produced.
+fn parse_field_access(
+    object: Expression,
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, String> {
+    cursor.bump()?; // Consume the .
+
+    let TokenKind::Identifier(identifier) = cursor.first().kind else {
+        return Err(format!(
+            "Expected identifier but found {:?}",
+            cursor.first().kind
+        ));
+    };
+
+    let Expression::Member(member) = parse_literal(cursor, context)? else {
+        return Err(format!(
+            "Expected member but found {:?}",
+            cursor.first().kind
+        ));
+    };
+
+    Ok(Expression::Member(Member::MemberAccess {
+        object: Box::new(object),
+        member: Box::new(member),
+        symbol: identifier,
+        generics: None,
+    }))
 }
 
 pub fn parse_literal(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, String> {
