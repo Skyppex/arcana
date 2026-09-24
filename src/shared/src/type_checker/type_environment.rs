@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{self, Debug},
     rc::Rc,
     str::FromStr,
@@ -30,6 +30,10 @@ pub struct TypeEnvironment {
     /// Bounds declared in a `where` clause, by the type they belong to, so an
     /// instantiation can be checked against them.
     generic_constraints: HashMap<String, Vec<GenericConstraint>>,
+    /// Which protocols each type implements. A protocol is satisfied by having
+    /// an `imp`, not by happening to have the right methods, so this is
+    /// recorded rather than inferred from the members.
+    implementations: HashMap<String, HashSet<String>>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
     pub allow_override_types: bool,
@@ -53,6 +57,7 @@ impl TypeEnvironment {
             discovered_types: Vec::new(),
             static_members: HashMap::new(),
             generic_constraints: HashMap::new(),
+            implementations: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
             allow_override_types,
@@ -69,6 +74,7 @@ impl TypeEnvironment {
             discovered_types: Vec::new(),
             static_members: HashMap::new(),
             generic_constraints: HashMap::new(),
+            implementations: HashMap::new(),
             variables: HashMap::new(),
             scopes: Vec::new(),
             allow_override_types,
@@ -97,6 +103,7 @@ impl TypeEnvironment {
             discovered_types: Vec::new(),
             static_members: HashMap::new(),
             generic_constraints: HashMap::new(),
+            implementations: HashMap::new(),
             scopes: scopes
                 .into_iter()
                 .map(|scope| scope.into())
@@ -190,13 +197,44 @@ impl TypeEnvironment {
         self.variables.insert(name, type_);
     }
 
+    /// The key a type's own implementations are stored under — the full
+    /// instantiation, so `B<Int>` and `B<String>` are kept apart.
+    fn instantiation_key(type_: &Type) -> String {
+        type_.type_annotation().to_string()
+    }
+
+    /// The key an implementation covering every instantiation is stored under —
+    /// the bare constructor, shared by `B<Int>`, `B<String>` and the rest.
+    fn constructor_key(type_: &Type) -> String {
+        type_.to_key()
+    }
+
     pub fn add_static_member(
         &mut self,
         type_: Type,
         name: String,
         member_type: Type,
     ) -> Result<(), String> {
-        let key = type_.to_key();
+        self.add_static_member_covering(type_, name, member_type, true)
+    }
+
+    /// Registers a static member.
+    ///
+    /// `covers_all_instantiations` is true for a blanket implementation, which
+    /// is stored against the constructor so every instantiation finds it, and
+    /// false for one written for a single instantiation such as `B<Int>`.
+    pub fn add_static_member_covering(
+        &mut self,
+        type_: Type,
+        name: String,
+        member_type: Type,
+        covers_all_instantiations: bool,
+    ) -> Result<(), String> {
+        let key = if covers_all_instantiations {
+            Self::constructor_key(&type_)
+        } else {
+            Self::instantiation_key(&type_)
+        };
 
         if let Some(members) = self.static_members.get_mut(&key) {
             if !self.allow_override_types && members.contains_key(&name) {
@@ -214,6 +252,45 @@ impl TypeEnvironment {
         }
 
         Ok(())
+    }
+
+    /// Records that a type implements a protocol.
+    ///
+    /// `covers_all_instantiations` follows the same rule as static members: a
+    /// blanket implementation is recorded against the constructor, one written
+    /// for a single instantiation against that instantiation.
+    pub fn add_implementation(
+        &mut self,
+        type_: &Type,
+        protocol: String,
+        covers_all_instantiations: bool,
+    ) {
+        let key = if covers_all_instantiations {
+            Self::constructor_key(type_)
+        } else {
+            Self::instantiation_key(type_)
+        };
+
+        self.implementations
+            .entry(key)
+            .or_default()
+            .insert(protocol);
+    }
+
+    /// Whether a type implements a protocol, by name.
+    pub fn implements(&self, type_: &Type, protocol: &str) -> bool {
+        let implements_under = |key: &str| {
+            self.implementations
+                .get(key)
+                .is_some_and(|protocols| protocols.contains(protocol))
+        };
+
+        implements_under(&Self::instantiation_key(type_))
+            || implements_under(&Self::constructor_key(type_))
+            || self
+                .parent
+                .as_ref()
+                .is_some_and(|parent| parent.borrow().implements(type_, protocol))
     }
 
     /// Records the bounds declared for a type, so that instantiating it can
@@ -314,29 +391,23 @@ impl TypeEnvironment {
                 })
                 .ok_or_else(|| format!("Type {} not found", type_name)),
             TypeAnnotation::ConcreteType(type_name, concrete_types) => {
-                if let Some((_, t)) = self.types.iter().find(|(k, _)| {
-                    **k == TypeIdentifier::GenericType(
-                        type_name.clone(),
-                        vec![
-                            GenericType {
-                                type_name: "T".to_string()
-                            };
-                            concrete_types.len()
-                        ],
-                    )
-                    .to_key()
-                }) {
-                    t.clone_with_concrete_types(
-                        concrete_types.clone(),
-                        &self.discovered_types,
-                        Rc::new(RefCell::new(self.clone())),
-                        None,
-                    )
-                } else if let Some(parent) = &self.parent {
-                    parent.borrow().get_type_from_annotation(type_annotation)
-                } else {
-                    Err(format!("Type {} not found", type_name))
-                }
+                // The declaration may live in an enclosing scope, but the type
+                // arguments are written here — `imp<T> P for B<T>` resolves `B`
+                // outside while `T` is only in scope inside. So the declaration
+                // is looked up through the parents and then substituted in
+                // *this* environment.
+                let Some(declaration) =
+                    self.find_generic_declaration(type_name, concrete_types.len())
+                else {
+                    return Err(format!("Type {} not found", type_name));
+                };
+
+                declaration.clone_with_concrete_types(
+                    concrete_types.clone(),
+                    &self.discovered_types,
+                    Rc::new(RefCell::new(self.clone())),
+                    None,
+                )
             }
             TypeAnnotation::Array(type_annotation) => self
                 .get_type_from_annotation(type_annotation)
@@ -432,9 +503,17 @@ impl TypeEnvironment {
 
     pub fn get_static_member<K: ToKey>(&self, type_: &Type, member_key: K) -> Option<Type> {
         let member_key = member_key.to_key();
+        // An implementation written for this exact instantiation wins over one
+        // written for every instantiation. The overlap check has already made
+        // sure both cannot exist, so this is only about where to look.
         self.static_members
-            .get(&type_.to_key())
+            .get(&Self::instantiation_key(type_))
             .and_then(|members| members.get(&member_key))
+            .or_else(|| {
+                self.static_members
+                    .get(&Self::constructor_key(type_))
+                    .and_then(|members| members.get(&member_key))
+            })
             .cloned()
             .or_else(|| {
                 let Type::Struct(Struct {
@@ -470,7 +549,43 @@ impl TypeEnvironment {
             })
     }
 
+    /// The declaration of a generic type with this name and arity, searched
+    /// through enclosing scopes without resolving it.
+    ///
+    /// Separated from resolution so that substitution happens in the scope that
+    /// wrote the type arguments, not the one that holds the declaration.
+    fn find_generic_declaration(&self, type_name: &str, arity: usize) -> Option<Type> {
+        let key = TypeIdentifier::GenericType(
+            type_name.to_owned(),
+            vec![
+                GenericType {
+                    type_name: "T".to_string()
+                };
+                arity
+            ],
+        )
+        .to_key();
+
+        self.types
+            .iter()
+            .find(|(k, _)| **k == key)
+            .map(|(_, t)| t.clone())
+            .or_else(|| {
+                self.parent
+                    .as_ref()
+                    .and_then(|parent| parent.borrow().find_generic_declaration(type_name, arity))
+            })
+    }
+
     pub fn lookup_type(&self, type_: &Type) -> bool {
+        // Structural types are not registered in their own right; they are
+        // known exactly when the types they are built from are.
+        match type_ {
+            Type::Array(inner) => return self.lookup_type(inner),
+            Type::Tuple(types) => return types.iter().all(|t| self.lookup_type(t)),
+            _ => {}
+        }
+
         // Only declarations are registered, so an instantiation such as
         // `Foo<Int>` never matches one exactly. Its key is the bare name, which
         // the declaration `Foo<T>` shares.

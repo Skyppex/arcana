@@ -288,6 +288,8 @@ fn parse_function_declaration_statement(
         return_type_annotation = Some(parse_type_annotation(cursor, true)?);
     }
 
+    let where_clause = parse_where_clause(cursor)?;
+
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
 
@@ -301,6 +303,7 @@ fn parse_function_declaration_statement(
             return_type_annotation,
             body: None,
             signature_only: true,
+            where_clause,
         }));
     }
 
@@ -312,6 +315,7 @@ fn parse_function_declaration_statement(
         params,
         return_type_annotation.clone(),
         body,
+        where_clause,
     )?;
 
     Ok(body)
@@ -346,6 +350,7 @@ fn unwrap_parameters(
     params: Vec<Parameter>,
     return_type_annotation: Option<TypeAnnotation>,
     body: Expression,
+    where_clause: Vec<GenericConstraint>,
 ) -> Result<Statement, String> {
     match params.first().cloned() {
         None => Ok(Statement::FunctionDeclaration(FunctionDeclaration {
@@ -355,6 +360,7 @@ fn unwrap_parameters(
             return_type_annotation,
             body: Some(body),
             signature_only: false,
+            where_clause,
         })),
         Some(first) => {
             let (new_body, new_return_type_annotation) = unwrap_parameters_recurse(
@@ -370,6 +376,7 @@ fn unwrap_parameters(
                 return_type_annotation: new_return_type_annotation,
                 body: Some(new_body),
                 signature_only: false,
+                where_clause,
             }))
         }
     }
@@ -833,6 +840,21 @@ fn parse_implementation_declaration(
     let type_annotation = parse_type_annotation(cursor, false)?;
 
     type_annotation.name().validate_type_identifier_name()?;
+
+    // `imp P for T;` is the empty implementation, the same as `imp P for T {}`.
+    if cursor.first().kind == TokenKind::Semicolon {
+        cursor.bump()?; // Consume the ;
+
+        return Ok(Statement::ImplementationDeclaration(
+            ImplementationDeclaration {
+                scoped_generics,
+                protocol_annotation,
+                type_annotation,
+                associated_types: vec![],
+                functions: vec![],
+            },
+        ));
+    }
 
     cursor.expect(TokenKind::OpenBrace)?;
 

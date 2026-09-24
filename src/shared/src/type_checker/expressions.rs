@@ -755,7 +755,11 @@ pub fn check_type(
                                     ));
                                 }
 
-                                previous_type = type_.clone();
+                                // The array's element type covers every
+                                // element, so differing literals widen rather
+                                // than the last one winning.
+                                previous_type = join_types(&previous_type, &type_)
+                                    .unwrap_or_else(|| type_.clone());
                                 v_.push(ArrayItem::Expression(value));
                             }
                             ast::ArrayItem::Spread(value) => {
@@ -784,7 +788,11 @@ pub fn check_type(
                                     ));
                                 }
 
-                                previous_type = type_.clone();
+                                // The array's element type covers every
+                                // element, so differing literals widen rather
+                                // than the last one winning.
+                                previous_type = join_types(&previous_type, &type_)
+                                    .unwrap_or_else(|| type_.clone());
 
                                 v_.push(ArrayItem::Spread(value));
                             }
@@ -1483,7 +1491,7 @@ fn infer_call_type_arguments(
     // `id::<Int>(1)`, not `id::<#1>(1)`.
     if let (Some(param), Some(argument_type)) = (param, argument_type) {
         if contains_generic(&param.type_) {
-            unify_type_argument(&param.type_, &runtime_type(argument_type), &mut bindings);
+            unify_type_argument(&param.type_, &widen_literals(argument_type), &mut bindings);
         }
     }
 
@@ -1554,7 +1562,7 @@ fn infer_struct_type_arguments(
 
         unify_type_argument(
             &field.field_type,
-            &runtime_type(&checked.get_type()),
+            &widen_literals(&checked.get_type()),
             &mut bindings,
         );
     }
@@ -1569,6 +1577,20 @@ fn infer_struct_type_arguments(
     };
 
     type_.clone_with_concrete_types(concrete_types, discovered_types, type_environment, None)
+}
+
+/// Widens literal types to their runtime type, reaching inside arrays and
+/// tuples.
+///
+/// Inferring from an argument takes the runtime type — `id(1)` means
+/// `id::<Int>(1)`, not `id::<#1>(1)` — and that has to hold just as much for the
+/// `Int` inside a `[Int]`.
+fn widen_literals(type_: &Type) -> Type {
+    match type_ {
+        Type::Array(inner) => Type::Array(Box::new(widen_literals(inner))),
+        Type::Tuple(types) => Type::Tuple(types.iter().map(widen_literals).collect()),
+        other => runtime_type(other),
+    }
 }
 
 /// Matches a parameter type against an argument type, recording what each type

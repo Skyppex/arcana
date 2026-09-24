@@ -252,6 +252,8 @@ pub struct FunctionDeclaration {
     pub return_type_annotation: Option<TypeAnnotation>,
     pub body: Option<Expression>,
     pub signature_only: bool,
+    /// Bounds on the type parameters, from a `where` clause.
+    pub where_clause: Vec<GenericConstraint>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

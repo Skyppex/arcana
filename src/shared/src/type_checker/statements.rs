@@ -183,7 +183,16 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .map(|f| f.type_identifier)
                 .collect(),
         }]),
-        Statement::ImplementationDeclaration(ImplementationDeclaration { .. }) => Ok(vec![]),
+        Statement::ImplementationDeclaration(ImplementationDeclaration {
+            scoped_generics,
+            protocol_annotation,
+            type_annotation,
+            ..
+        }) => Ok(vec![DiscoveredType::Implementation {
+            protocol_annotation: protocol_annotation.clone(),
+            type_annotation: type_annotation.clone(),
+            scoped_generics: scoped_generics.clone(),
+        }]),
         Statement::FunctionDeclaration(ast::FunctionDeclaration {
             type_identifier,
             param,
@@ -851,6 +860,16 @@ pub fn check_type(
                     actual_type: Box::new(Type::Unknown),
                 })?;
 
+            // A protocol's own type parameters have to be in scope for the
+            // signatures that mention them, exactly as for a struct or enum.
+            if let TypeIdentifier::GenericType(_, generics) = type_identifier {
+                for generic in generics {
+                    protocol_type_environment
+                        .borrow_mut()
+                        .add_type(Type::Generic(generic.clone()))?;
+                }
+            }
+
             let functions: Result<Vec<TypedStatement>, String> = functions
                 .clone()
                 .into_iter()
@@ -985,6 +1004,19 @@ pub fn check_type(
                 return Err(format!("Expected protocol, found {}", protocol_type));
             };
 
+            // `imp<T> P for B<T>` covers every `B`; `imp P for B<Int>` covers
+            // only that one, and the two cannot both exist because overlapping
+            // implementations are rejected during discovery.
+            let covers_all_instantiations = !scoped_generics.is_empty();
+
+            // Recorded once for the implementation itself, not per function, so
+            // that implementing a protocol with no functions still counts.
+            type_environment.borrow_mut().add_implementation(
+                &imp_type,
+                protocol_annotation.name().to_owned(),
+                covers_all_instantiations,
+            );
+
             let mut typed_functions = vec![];
 
             for (protocol_function_identifier, _) in protocol_functions {
@@ -1014,10 +1046,11 @@ pub fn check_type(
 
                 let function_name = protocol_function_identifier.name().to_owned();
 
-                type_environment.borrow_mut().add_static_member(
+                type_environment.borrow_mut().add_static_member_covering(
                     imp_type.clone(),
                     function_name.clone(),
                     typed_function.get_type(),
+                    covers_all_instantiations,
                 )?;
 
                 typed_functions.push((function_name, typed_function));
@@ -1039,6 +1072,7 @@ pub fn check_type(
             return_type_annotation,
             body,
             signature_only,
+            where_clause,
         }) => {
             let function_type_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
@@ -1051,6 +1085,19 @@ pub fn check_type(
                         .add_type(Type::Generic(generic.clone()))?;
                 }
             }
+
+            // A bound brings the protocol's functions into scope on the
+            // parameter inside the body, and is remembered so that calling the
+            // function can check the type argument against it.
+            for constraint in where_clause {
+                function_type_environment
+                    .borrow_mut()
+                    .add_generic_constraint(constraint)?;
+            }
+
+            type_environment
+                .borrow_mut()
+                .add_generic_constraints(type_identifier.to_key(), where_clause.clone());
 
             let return_type = check_type_annotation(
                 &return_type_annotation
@@ -1263,6 +1310,8 @@ fn check_type_identifier(
             DiscoveredType::UseItem {
                 type_identifier: name,
             } => name == type_identifier,
+            // Implementations name no type of their own.
+            DiscoveredType::Implementation { .. } => false,
         }) {
         Some(DiscoveredType::Struct {
             type_identifier,
@@ -1517,6 +1566,8 @@ fn check_type_identifier(
             }))
         }
         Some(DiscoveredType::UseItem { .. }) => Ok(Type::Void),
+        // Implementations are not types, and are never found by name.
+        Some(DiscoveredType::Implementation { .. }) => Ok(Type::Void),
         None => type_environment
             .borrow()
             .get_type_from_identifier(type_identifier)
@@ -1560,6 +1611,8 @@ pub fn check_type_annotation(
             DiscoveredType::UseItem { type_identifier } => {
                 type_identifier.name() == type_annotation.name()
             }
+            // Implementations name no type of their own.
+            DiscoveredType::Implementation { .. } => false,
         }) {
         Some(DiscoveredType::Struct {
             type_identifier,
@@ -1810,6 +1863,8 @@ pub fn check_type_annotation(
             }))
         }
         Some(DiscoveredType::UseItem { .. }) => Ok(Type::Void),
+        // Implementations are not types, and are never found by name.
+        Some(DiscoveredType::Implementation { .. }) => Ok(Type::Void),
         None => type_environment
             .borrow()
             .get_type_from_annotation(type_annotation),

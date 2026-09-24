@@ -789,3 +789,513 @@ fn an_enum_constraint_rejects_a_type_that_does_not_satisfy_it() {
     // Act & Assert
     assert_error_contains(&input, "does not satisfy");
 }
+
+// ---------------------------------------------------------------------------
+// Implementations
+//
+// A type has at most one implementation of a protocol, so nothing is ever
+// chosen between. `B<Int>` and `B<String>` are distinct types and may each have
+// their own; a blanket `B<T>` covers both and so cannot sit beside either.
+//
+// The overlap check runs during type discovery, before anything is checked,
+// because it needs only the names written in the source.
+// ---------------------------------------------------------------------------
+
+/// A protocol and a generic type to implement it for.
+const SHOW: &str = r#"
+    proto Show { fun show(): String; }
+    struct B<T> { v: T }
+"#;
+
+#[test]
+fn distinct_instantiations_may_each_be_implemented() {
+    // Arrange
+    // `B<Int>` and `B<String>` are different types; no value is covered twice.
+    let input = format!(
+        r#"{SHOW}
+        imp Show for B<Int> {{ fun show(): String => "int" }}
+        imp Show for B<String> {{ fun show(): String => "str" }}
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert!(try_create_typed_ast(&input).is_ok());
+}
+
+#[test]
+fn a_blanket_implementation_is_allowed_on_its_own() {
+    // Arrange
+    let input = format!(
+        r#"{SHOW}
+        imp<T> Show for B<T> {{ fun show(): String => "any" }}
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert!(try_create_typed_ast(&input).is_ok());
+}
+
+#[test]
+fn a_blanket_conflicts_with_an_instantiation() {
+    // Arrange
+    // `B<T>` already covers `B<Int>`, so the two collide.
+    let input = format!(
+        r#"{SHOW}
+        imp<T> Show for B<T> {{ fun show(): String => "any" }}
+        imp Show for B<Int> {{ fun show(): String => "int" }}
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert_error_contains(&input, "Conflicting implementations of `Show`");
+}
+
+#[test]
+fn two_blankets_conflict() {
+    // Arrange
+    // Renaming the parameter changes nothing about what they cover.
+    let input = format!(
+        r#"{SHOW}
+        imp<T> Show for B<T> {{ fun show(): String => "one" }}
+        imp<U> Show for B<U> {{ fun show(): String => "two" }}
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert_error_contains(&input, "Conflicting implementations of `Show`");
+}
+
+#[test]
+fn the_same_instantiation_cannot_be_implemented_twice() {
+    // Arrange
+    let input = format!(
+        r#"{SHOW}
+        imp Show for B<Int> {{ fun show(): String => "one" }}
+        imp Show for B<Int> {{ fun show(): String => "two" }}
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert_error_contains(&input, "Conflicting implementations of `Show`");
+}
+
+#[test]
+fn an_alias_cannot_disguise_a_duplicate_implementation() {
+    // Arrange
+    // `MyInt` and `Int` are the same type spelled two ways.
+    let input = format!(
+        r#"{SHOW}
+        type MyInt = Int;
+        imp Show for B<Int> {{ fun show(): String => "one" }}
+        imp Show for B<MyInt> {{ fun show(): String => "two" }}
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert_error_contains(&input, "Conflicting implementations of `Show`");
+}
+
+#[test]
+fn different_protocols_on_one_type_do_not_conflict() {
+    // Arrange
+    let input = format!(
+        r#"{SHOW}
+        proto Eq {{ fun eq(): Bool; }}
+        imp<T> Show for B<T> {{ fun show(): String => "s" }}
+        imp<T> Eq for B<T> {{ fun eq(): Bool => true }}
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert!(try_create_typed_ast(&input).is_ok());
+}
+
+#[test]
+fn one_protocol_on_different_types_does_not_conflict() {
+    // Arrange
+    let input = format!(
+        r#"{SHOW}
+        struct C<T> {{ v: T }}
+        imp<T> Show for B<T> {{ fun show(): String => "b" }}
+        imp<T> Show for C<T> {{ fun show(): String => "c" }}
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert!(try_create_typed_ast(&input).is_ok());
+}
+
+// --- What a bound sees ------------------------------------------------------
+
+#[test]
+fn a_blanket_satisfies_a_bound_for_every_instantiation() {
+    // Arrange
+    let input = format!(
+        r#"{SHOW}
+        imp<T> Show for B<T> {{ fun show(): String => "any" }}
+        struct W<U> where U is Show {{ i: U }}
+        let w: W<B<String>> = W {{ i: B {{ v: "s" }} }};
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert!(try_create_typed_ast(&input).is_ok());
+}
+
+#[test]
+fn an_instantiation_implementation_satisfies_a_bound_only_for_that_instantiation() {
+    // Arrange
+    // Implementations used to be keyed by the bare constructor, so an impl for
+    // `B<Int>` made `B<String>` look like it had one too.
+    let satisfied = format!(
+        r#"{SHOW}
+        imp Show for B<Int> {{ fun show(): String => "int" }}
+        struct W<U> where U is Show {{ i: U }}
+        let w: W<B<Int>> = W {{ i: B {{ v: 1 }} }};
+        0
+    "#
+    );
+
+    let unsatisfied = format!(
+        r#"{SHOW}
+        imp Show for B<Int> {{ fun show(): String => "int" }}
+        struct W<U> where U is Show {{ i: U }}
+        let w: W<B<String>> = W {{ i: B {{ v: "s" }} }};
+        0
+    "#
+    );
+
+    // Act & Assert
+    assert!(try_create_typed_ast(&satisfied).is_ok());
+    assert_error_contains(&unsatisfied, "does not satisfy");
+}
+
+// ---------------------------------------------------------------------------
+// Constrained functions
+//
+// A function's `where` clause is checked wherever it is called, against the
+// type arguments it was called with — whether those were written out or
+// inferred.
+// ---------------------------------------------------------------------------
+
+/// A protocol and a type implementing it, for the function bound tests.
+const SHOWABLE: &str = r#"
+    proto Show { fun show(): String; }
+    proto Eq { fun eq(): Bool; }
+    struct Dog { n: Int }
+    imp Show for Dog { fun show(): String => "woof" }
+    imp Eq for Dog { fun eq(): Bool => true }
+"#;
+
+#[test]
+fn a_function_can_constrain_its_type_parameter() {
+    // Arrange
+    let input = format!(
+        r#"{SHOWABLE}
+        fun describe<T>(x: T): Int where T is Show => 1
+        describe::<Dog>(Dog {{ n: 1 }})
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn a_function_bound_rejects_an_explicit_type_argument() {
+    // Arrange
+    let input = format!(
+        r#"{SHOWABLE}
+        fun describe<T>(x: T): Int where T is Show => 1
+        describe::<Int>(1)
+    "#
+    );
+
+    // Act & Assert
+    assert_error_contains(&input, "does not satisfy the bound `T is Show`");
+}
+
+#[test]
+fn a_function_bound_is_checked_on_an_inferred_type_argument() {
+    // Arrange
+    // Nothing was written out, so the bound has to be checked against what was
+    // inferred from the argument.
+    let satisfied = format!(
+        r#"{SHOWABLE}
+        fun describe<T>(x: T): Int where T is Show => 1
+        describe(Dog {{ n: 1 }})
+    "#
+    );
+
+    let violated = format!(
+        r#"{SHOWABLE}
+        fun describe<T>(x: T): Int where T is Show => 1
+        describe(1)
+    "#
+    );
+
+    // Act & Assert
+    assert_eq!(evaluate_expression(&satisfied, create_env(), false), int(1));
+    assert_error_contains(&violated, "does not satisfy the bound `T is Show`");
+}
+
+#[test]
+fn a_function_parameter_can_have_several_bounds() {
+    // Arrange
+    let input = format!(
+        r#"{SHOWABLE}
+        fun describe<T>(x: T): Int where T is Show and Eq => 1
+        describe::<Dog>(Dog {{ n: 1 }})
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn a_function_can_constrain_several_parameters() {
+    // Arrange
+    let input = format!(
+        r#"{SHOWABLE}
+        fun describe<A, B>(a: A): Int where A is Show, B is Show => 1
+        describe::<Dog, Dog>(Dog {{ n: 1 }})
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn a_protocol_signature_can_carry_a_where_clause() {
+    // Arrange
+    let input = r#"
+        proto Show { fun show(): String; }
+        proto Describe { fun describe<T>(x: T): Int where T is Show; }
+        0
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(input).is_ok());
+}
+
+#[test]
+fn an_unconstrained_generic_function_is_unaffected() {
+    // Arrange
+    let input = r#"
+        fun id<T>(x: T): T => x
+        id(1)
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+// ---------------------------------------------------------------------------
+// Bounds are satisfied nominally
+//
+// A type satisfies a protocol because an `imp` says so, not because it happens
+// to have methods of the right names. Otherwise a protocol declaring nothing
+// would be satisfied by every type, and two protocols declaring the same method
+// name would be interchangeable.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn an_empty_protocol_is_satisfied_by_nothing_in_particular() {
+    // Arrange
+    // `Listable` requires nothing, but `Int` still does not implement it.
+    let input = r#"
+        proto Listable;
+        fun list<T>(value: T): [T] where T is Listable => [value];
+        list(3)
+    "#;
+
+    // Act & Assert
+    assert_error_contains(input, "does not implement `Listable`");
+}
+
+#[test]
+fn an_empty_protocol_is_satisfied_by_implementing_it() {
+    // Arrange
+    // An implementation with no functions to write is still an implementation.
+    let input = r#"
+        proto Listable;
+        struct Dog { n: Int }
+        imp Listable for Dog { }
+        fun list<T>(value: T): [T] where T is Listable => [value];
+        list(Dog { n: 1 })
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(input).is_ok());
+}
+
+#[test]
+fn matching_method_names_do_not_satisfy_a_protocol() {
+    // Arrange
+    // `Sneaky` implements `Show`, which declares the same method as `Other`.
+    // Implementing one is not implementing the other.
+    let input = r#"
+        proto Show { fun show(): String; }
+        proto Other { fun show(): String; }
+        struct Sneaky { }
+        imp Show for Sneaky { fun show(): String => "s" }
+        fun f<T>(x: T): Int where T is Other => 1
+        f(Sneaky { })
+    "#;
+
+    // Act & Assert
+    assert_error_contains(input, "does not implement `Other`");
+}
+
+#[test]
+fn a_blanket_implementation_satisfies_a_bound() {
+    // Arrange
+    let input = r#"
+        proto Show { fun show(): String; }
+        struct B<T> { v: T }
+        imp<T> Show for B<T> { fun show(): String => "b" }
+        fun f<U>(x: U): Int where U is Show => 1
+        f(B { v: 1 })
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(input).is_ok());
+}
+
+#[test]
+fn an_instantiation_implementation_satisfies_only_its_own_instantiation() {
+    // Arrange
+    let matching = r#"
+        proto Show { fun show(): String; }
+        struct B<T> { v: T }
+        imp Show for B<Int> { fun show(): String => "i" }
+        fun f<U>(x: U): Int where U is Show => 1
+        f(B { v: 1 })
+    "#;
+
+    let mismatched = r#"
+        proto Show { fun show(): String; }
+        struct B<T> { v: T }
+        imp Show for B<Int> { fun show(): String => "i" }
+        fun f<U>(x: U): Int where U is Show => 1
+        f(B { v: "s" })
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(matching).is_ok());
+    assert_error_contains(mismatched, "does not implement `Show`");
+}
+
+// ---------------------------------------------------------------------------
+// The semicolon form of an implementation
+//
+// `imp P for T;` is the empty implementation, the same as `imp P for T {}`.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn an_implementation_can_end_with_a_semicolon() {
+    // Arrange
+    let input = r#"
+        proto Listable;
+        struct Dog { n: Int }
+        imp Listable for Dog;
+        fun list<T>(value: T): [T] where T is Listable => [value];
+        list(Dog { n: 1 })
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(input).is_ok());
+}
+
+#[test]
+fn the_semicolon_and_brace_forms_are_equivalent() {
+    // Arrange
+    let semicolon = r#"
+        proto Listable;
+        struct Dog { n: Int }
+        imp Listable for Dog;
+        fun list<T>(value: T): [T] where T is Listable => [value];
+        list(Dog { n: 1 })
+    "#;
+
+    let braces = r#"
+        proto Listable;
+        struct Dog { n: Int }
+        imp Listable for Dog { }
+        fun list<T>(value: T): [T] where T is Listable => [value];
+        list(Dog { n: 1 })
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(semicolon).is_ok());
+    assert!(try_create_typed_ast(braces).is_ok());
+}
+
+#[test]
+fn a_semicolon_implementation_can_be_generic() {
+    // Arrange
+    let input = r#"
+        proto Listable;
+        struct B<T> { v: T }
+        imp<T> Listable for B<T>;
+        fun list<U>(value: U): [U] where U is Listable => [value];
+        list(B { v: 1 })
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(input).is_ok());
+}
+
+#[test]
+fn a_semicolon_implementation_still_conflicts_with_an_overlapping_one() {
+    // Arrange
+    let input = r#"
+        proto Listable;
+        struct B<T> { v: T }
+        imp<T> Listable for B<T>;
+        imp Listable for B<Int>;
+        0
+    "#;
+
+    // Act & Assert
+    assert_error_contains(input, "Conflicting implementations of `Listable`");
+}
+
+#[test]
+fn a_semicolon_implementation_cannot_skip_required_functions() {
+    // Arrange
+    // The short form is for protocols that require nothing; it is not a way to
+    // leave a function unimplemented.
+    let input = r#"
+        proto Show { fun show(): String; }
+        struct Dog { n: Int }
+        imp Show for Dog;
+        0
+    "#;
+
+    // Act & Assert
+    assert_error_contains(input, "not implemented");
+}

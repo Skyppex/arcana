@@ -79,8 +79,9 @@ pub fn contains_generic(type_: &Type) -> bool {
 /// instantiating, so `Foo<Int>` is rejected when `Foo`'s parameter is bound to a
 /// protocol that `Int` does not implement.
 ///
-/// A type satisfies a protocol when it has every function the protocol
-/// declares, which is what `imp P for T` registers.
+/// A type satisfies a protocol when an `imp` says so. Satisfaction is nominal,
+/// not structural — having methods of the right name is not enough, and an
+/// empty protocol is satisfied by nothing rather than by everything.
 fn check_generic_constraints(
     type_key: &str,
     type_map: &HashMap<&GenericType, &TypeAnnotation>,
@@ -104,33 +105,45 @@ fn check_generic_constraints(
             continue;
         };
 
-        let argument_type = type_environment
+        // Some paths reach here before real arguments are supplied, with the
+        // type's own parameters standing in for them. There is nothing to check
+        // yet — the bound is checked when the type is finally instantiated.
+        let Ok(argument_type) = type_environment
             .borrow()
-            .get_type_from_annotation(&argument)?;
+            .get_type_from_annotation(&argument)
+        else {
+            continue;
+        };
+
+        if matches!(argument_type, Type::Generic(_)) {
+            continue;
+        }
 
         for constraint in constraints {
             let constraint_type = type_environment
                 .borrow()
                 .get_type_from_annotation(&constraint)?;
 
-            let Type::Protocol(Protocol { functions, .. }) = constraint_type else {
+            let Type::Protocol(Protocol {
+                type_identifier, ..
+            }) = constraint_type
+            else {
                 continue;
             };
 
-            for (function_identifier, _) in functions {
-                let name = function_identifier.name().to_owned();
+            // Satisfaction is nominal: a type implements a protocol because an
+            // `imp` says so, not because it happens to have matching methods.
+            // Otherwise an empty protocol would be satisfied by everything.
+            let protocol_name = type_identifier.name().to_owned();
 
-                let implemented = type_environment
-                    .borrow()
-                    .get_static_member(&argument_type, &name)
-                    .is_some();
-
-                if !implemented {
-                    return Err(format!(
-                        "`{}` does not satisfy the bound `{} is {}`: it has no `{}`",
-                        argument, generic.type_name, constraint, name
-                    ));
-                }
+            if !type_environment
+                .borrow()
+                .implements(&argument_type, &protocol_name)
+            {
+                return Err(format!(
+                    "`{}` does not satisfy the bound `{} is {}`: it does not implement `{}`",
+                    argument, generic.type_name, constraint, protocol_name
+                ));
             }
         }
     }
@@ -798,6 +811,12 @@ impl Type {
 
                     (Some(name), generics.iter().zip(&concrete_types).collect())
                 };
+
+                // The bounds declared in the function's `where` clause apply
+                // to the type arguments it is being called with.
+                if let Some(name) = &name {
+                    check_generic_constraints(name, &type_map, type_environment.clone())?;
+                }
 
                 let cloned_param = match param {
                     Some(Parameter { identifier, type_ }) => {
