@@ -927,6 +927,7 @@ pub fn check_type(
             type_annotation,
             associated_types: _,
             functions,
+            where_clause,
         }) => {
             let implementation_type_environment = Rc::new(RefCell::new(
                 TypeEnvironment::new_parent(type_environment.clone()),
@@ -937,6 +938,14 @@ pub fn check_type(
                 implementation_type_environment
                     .borrow_mut()
                     .add_type(Type::Generic(generic.clone()))?;
+            }
+
+            // The bounds hold inside the implementation, so the protocol's
+            // functions are available on the parameter there.
+            for constraint in where_clause {
+                implementation_type_environment
+                    .borrow_mut()
+                    .add_generic_constraint(constraint)?;
             }
 
             // check generics in protocol_annotation
@@ -1015,6 +1024,9 @@ pub fn check_type(
                 &imp_type,
                 protocol_annotation.name().to_owned(),
                 covers_all_instantiations,
+                type_annotation.clone(),
+                scoped_generics.clone(),
+                where_clause.clone(),
             );
 
             let mut typed_functions = vec![];

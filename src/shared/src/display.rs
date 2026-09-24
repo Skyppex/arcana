@@ -424,6 +424,7 @@ impl IndentDisplay for Statement {
                 result
             }
             Statement::ImplementationDeclaration(ImplementationDeclaration {
+                where_clause: _,
                 scoped_generics,
                 protocol_annotation,
                 type_annotation,

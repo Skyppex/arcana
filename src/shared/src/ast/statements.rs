@@ -841,6 +841,8 @@ fn parse_implementation_declaration(
 
     type_annotation.name().validate_type_identifier_name()?;
 
+    let where_clause = parse_where_clause(cursor)?;
+
     // `imp P for T;` is the empty implementation, the same as `imp P for T {}`.
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
@@ -852,6 +854,7 @@ fn parse_implementation_declaration(
                 type_annotation,
                 associated_types: vec![],
                 functions: vec![],
+                where_clause,
             },
         ));
     }
@@ -922,6 +925,7 @@ fn parse_implementation_declaration(
             type_annotation,
             associated_types,
             functions,
+            where_clause,
         },
     ))
 }

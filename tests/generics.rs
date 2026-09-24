@@ -1299,3 +1299,135 @@ fn a_semicolon_implementation_cannot_skip_required_functions() {
     // Act & Assert
     assert_error_contains(input, "not implemented");
 }
+
+// ---------------------------------------------------------------------------
+// Conditional implementations
+//
+// `imp<T> Show for B<T> where T is Show` gives `B<T>` the implementation only
+// for the instantiations whose argument satisfies the bound. There is still one
+// implementation, so nothing is ever chosen between — the clause narrows which
+// types it covers, it does not create a second candidate.
+// ---------------------------------------------------------------------------
+
+/// A showable type, a generic box, and a function demanding `Show`.
+const BOXES: &str = r#"
+    proto Show { fun show(): String; }
+    struct Dog { n: Int }
+    imp Show for Dog { fun show(): String => "woof" }
+    struct B<T> { v: T }
+    imp<T> Show for B<T> where T is Show { fun show(): String => "boxed" }
+    fun need<U>(x: U): Int where U is Show => 1
+"#;
+
+#[test]
+fn an_implementation_can_carry_a_where_clause() {
+    // Arrange
+    let input = format!("{BOXES}0");
+
+    // Act & Assert
+    assert!(try_create_typed_ast(&input).is_ok());
+}
+
+#[test]
+fn a_conditional_implementation_applies_when_its_bound_holds() {
+    // Arrange
+    let input = format!("{BOXES}need(B {{ v: Dog {{ n: 1 }} }})");
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn a_conditional_implementation_does_not_apply_when_its_bound_fails() {
+    // Arrange
+    // `Int` is not `Show`, so `B<Int>` does not get the implementation.
+    let input = format!("{BOXES}need(B {{ v: 1 }})");
+
+    // Act & Assert
+    assert_error_contains(&input, "`B<Int>` does not satisfy");
+}
+
+#[test]
+fn a_conditional_implementation_is_checked_through_nesting() {
+    // Arrange
+    // `B<B<Dog>>` is showable because `B<Dog>` is, which is because `Dog` is.
+    let satisfied = format!("{BOXES}need(B {{ v: B {{ v: Dog {{ n: 1 }} }} }})");
+    let violated = format!("{BOXES}need(B {{ v: B {{ v: 1 }} }})");
+
+    // Act & Assert
+    assert_eq!(evaluate_expression(&satisfied, create_env(), false), int(1));
+    assert_error_contains(&violated, "does not satisfy");
+}
+
+#[test]
+fn a_conditional_implementation_leaves_other_types_alone() {
+    // Arrange
+    // `Dog`'s own implementation is unaffected by the conditional one on `B`.
+    let input = format!("{BOXES}need(Dog {{ n: 1 }})");
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn an_unconditional_blanket_still_covers_everything() {
+    // Arrange
+    // Without a where clause the implementation applies regardless.
+    let input = r#"
+        proto Show { fun show(): String; }
+        struct B<T> { v: T }
+        imp<T> Show for B<T> { fun show(): String => "b" }
+        fun need<U>(x: U): Int where U is Show => 1
+        need(B { v: 1 })
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn the_semicolon_form_can_carry_a_where_clause() {
+    // Arrange
+    let input = r#"
+        proto Listable;
+        struct Dog { n: Int }
+        imp Listable for Dog;
+        struct B<T> { v: T }
+        imp<T> Listable for B<T> where T is Listable;
+        fun need<U>(x: U): Int where U is Listable => 1
+        need(B { v: Dog { n: 1 } })
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn two_conditional_implementations_still_conflict() {
+    // Arrange
+    // Constraints do not make two blankets disjoint — a type satisfying both
+    // bounds would be covered twice — so they are rejected as before.
+    let input = r#"
+        proto Show { fun show(): String; }
+        proto Eq { fun eq(): Bool; }
+        struct B<T> { v: T }
+        imp<T> Show for B<T> where T is Show { fun show(): String => "one" }
+        imp<T> Show for B<T> where T is Eq { fun show(): String => "two" }
+        0
+    "#;
+
+    // Act & Assert
+    assert_error_contains(input, "Conflicting implementations of `Show`");
+}

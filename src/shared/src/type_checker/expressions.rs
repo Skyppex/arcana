@@ -1783,6 +1783,29 @@ fn check_type_static_member_access(
 
     match member.clone() {
         ast::Member::Identifier { symbol, .. } => match &object_type {
+            // A bound puts its protocol's functions on the type parameter, so
+            // `T::from(..)` is reachable inside a `where T is From<..>`.
+            Type::Generic(generic) => {
+                let Some(static_member_type) = type_environment
+                    .borrow()
+                    .get_static_member(&object_type, &symbol)
+                else {
+                    return Err(format!(
+                        "Type parameter '{}' has no bound providing '{}'",
+                        generic.type_name, symbol
+                    ));
+                };
+
+                Ok(TypedExpression::Member(Member::StaticMemberAccess {
+                    type_annotation: type_annotation.clone(),
+                    member: Box::new(Member::Identifier {
+                        symbol: symbol.clone(),
+                        type_: static_member_type.clone(),
+                    }),
+                    symbol: symbol.clone(),
+                    type_: static_member_type,
+                }))
+            }
             Type::Struct(struct_) => {
                 let Some(static_member_type) = type_environment
                     .borrow()

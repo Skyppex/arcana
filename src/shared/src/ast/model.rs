@@ -230,6 +230,8 @@ pub struct ImplementationDeclaration {
     pub type_annotation: TypeAnnotation,
     pub associated_types: Vec<AssociatedType>,
     pub functions: Vec<FunctionDeclaration>,
+    /// Bounds that must hold for the implementation to apply.
+    pub where_clause: Vec<GenericConstraint>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

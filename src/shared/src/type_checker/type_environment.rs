@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::{self, Debug},
     rc::Rc,
     str::FromStr,
@@ -15,10 +15,22 @@ use crate::{
 
 use super::{
     scope::{Scope, ScopeType},
-    DiscoveredType, FullName, Parameter, Struct, Type,
+    DiscoveredType, FullName, Function, Parameter, Struct, Type,
 };
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
+
+/// One protocol implementation, as far as satisfaction is concerned.
+///
+/// The type it was written for and the names bound by `imp<..>` are kept so
+/// that a conditional implementation can bind its parameters against the type
+/// being asked about before testing its bounds.
+#[derive(Debug, Clone, PartialEq)]
+struct ImplementationRecord {
+    type_annotation: TypeAnnotation,
+    scoped_generics: Vec<GenericType>,
+    where_clause: Vec<GenericConstraint>,
+}
 
 #[derive(Clone, PartialEq)]
 pub struct TypeEnvironment {
@@ -30,10 +42,10 @@ pub struct TypeEnvironment {
     /// Bounds declared in a `where` clause, by the type they belong to, so an
     /// instantiation can be checked against them.
     generic_constraints: HashMap<String, Vec<GenericConstraint>>,
-    /// Which protocols each type implements. A protocol is satisfied by having
-    /// an `imp`, not by happening to have the right methods, so this is
-    /// recorded rather than inferred from the members.
-    implementations: HashMap<String, HashSet<String>>,
+    /// Which protocols each type implements, by protocol name. A protocol is
+    /// satisfied by having an `imp`, not by happening to have the right
+    /// methods, so this is recorded rather than inferred from the members.
+    implementations: HashMap<String, HashMap<String, ImplementationRecord>>,
     variables: HashMap<String, Type>,
     scopes: Vec<Scope>,
     pub allow_override_types: bool,
@@ -259,11 +271,15 @@ impl TypeEnvironment {
     /// `covers_all_instantiations` follows the same rule as static members: a
     /// blanket implementation is recorded against the constructor, one written
     /// for a single instantiation against that instantiation.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_implementation(
         &mut self,
         type_: &Type,
         protocol: String,
         covers_all_instantiations: bool,
+        type_annotation: TypeAnnotation,
+        scoped_generics: Vec<GenericType>,
+        where_clause: Vec<GenericConstraint>,
     ) {
         let key = if covers_all_instantiations {
             Self::constructor_key(type_)
@@ -271,26 +287,77 @@ impl TypeEnvironment {
             Self::instantiation_key(type_)
         };
 
-        self.implementations
-            .entry(key)
-            .or_default()
-            .insert(protocol);
+        self.implementations.entry(key).or_default().insert(
+            protocol,
+            ImplementationRecord {
+                type_annotation,
+                scoped_generics,
+                where_clause,
+            },
+        );
     }
 
     /// Whether a type implements a protocol, by name.
+    ///
+    /// A conditional implementation applies only to the instantiations that
+    /// satisfy its bounds, so `imp<T> Show for B<T> where T is Show` makes
+    /// `B<Dog>` showable but not `B<Int>`.
     pub fn implements(&self, type_: &Type, protocol: &str) -> bool {
-        let implements_under = |key: &str| {
-            self.implementations
-                .get(key)
-                .is_some_and(|protocols| protocols.contains(protocol))
-        };
+        let record = self
+            .implementations
+            .get(&Self::instantiation_key(type_))
+            .and_then(|protocols| protocols.get(protocol))
+            .or_else(|| {
+                self.implementations
+                    .get(&Self::constructor_key(type_))
+                    .and_then(|protocols| protocols.get(protocol))
+            });
 
-        implements_under(&Self::instantiation_key(type_))
-            || implements_under(&Self::constructor_key(type_))
-            || self
+        match record {
+            Some(record) => self.implementation_applies(record, type_),
+            None => self
                 .parent
                 .as_ref()
-                .is_some_and(|parent| parent.borrow().implements(type_, protocol))
+                .is_some_and(|parent| parent.borrow().implements(type_, protocol)),
+        }
+    }
+
+    /// Whether a conditional implementation's bounds hold for this type.
+    fn implementation_applies(&self, record: &ImplementationRecord, type_: &Type) -> bool {
+        if record.where_clause.is_empty() {
+            return true;
+        }
+
+        let mut bindings = HashMap::new();
+
+        bind_scoped_generics(
+            &record.type_annotation,
+            &type_.type_annotation(),
+            &record.scoped_generics,
+            &mut bindings,
+        );
+
+        record.where_clause.iter().all(|constraint| {
+            let Some(argument) = bindings.get(&constraint.generic.type_name) else {
+                // Nothing bound it, so there is nothing to disprove.
+                return true;
+            };
+
+            let Ok(argument_type) = self.get_type_from_annotation(argument) else {
+                return true;
+            };
+
+            constraint.constraints.iter().all(|bound| {
+                let Ok(Type::Protocol(Protocol {
+                    type_identifier, ..
+                })) = self.get_type_from_annotation(bound)
+                else {
+                    return true;
+                };
+
+                self.implements(&argument_type, type_identifier.name())
+            })
+        })
     }
 
     /// Records the bounds declared for a type, so that instantiating it can
@@ -333,6 +400,10 @@ impl TypeEnvironment {
             if let Type::Protocol(Protocol { functions, .. }) = constraint_type {
                 for (function_identifier, function_type) in functions {
                     let name = function_identifier.name();
+
+                    // Inside the bound, `Self` is the constrained parameter, so
+                    // `T::from(..)` returns a `T`.
+                    let function_type = substitute_self(&function_type, &generic_type);
 
                     self.add_static_member(
                         self.get_type_from_annotation(&generic_annotation)?,
@@ -624,5 +695,72 @@ impl Debug for TypeEnvironment {
             .field("scopes", &self.scopes)
             .field("allow_override_types", &self.allow_override_types)
             .finish()
+    }
+}
+
+/// Binds an implementation's type parameters by matching the type it was
+/// written for against the type being asked about — `B<T>` against `B<Dog>`
+/// binds `T` to `Dog`.
+fn bind_scoped_generics(
+    pattern: &TypeAnnotation,
+    actual: &TypeAnnotation,
+    scoped_generics: &[GenericType],
+    bindings: &mut HashMap<String, TypeAnnotation>,
+) {
+    if let TypeAnnotation::Type(name) = pattern {
+        if scoped_generics.iter().any(|g| &g.type_name == name) {
+            bindings.insert(name.clone(), actual.clone());
+            return;
+        }
+    }
+
+    match (pattern, actual) {
+        (TypeAnnotation::Array(pattern), TypeAnnotation::Array(actual)) => {
+            bind_scoped_generics(pattern, actual, scoped_generics, bindings)
+        }
+        (TypeAnnotation::Tuple(patterns), TypeAnnotation::Tuple(actuals)) => {
+            for (pattern, actual) in patterns.iter().zip(actuals) {
+                bind_scoped_generics(pattern, actual, scoped_generics, bindings);
+            }
+        }
+        (TypeAnnotation::ConcreteType(_, patterns), TypeAnnotation::ConcreteType(_, actuals)) => {
+            for (pattern, actual) in patterns.iter().zip(actuals) {
+                bind_scoped_generics(pattern, actual, scoped_generics, bindings);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Replaces `Self` throughout a type with the type it stands for.
+///
+/// A protocol's signatures are written in terms of `Self`; once the protocol is
+/// attached to something — an implementing type, or a constrained parameter —
+/// `Self` is that something.
+fn substitute_self(type_: &Type, self_type: &Type) -> Type {
+    match type_ {
+        Type::Substitution {
+            type_identifier, ..
+        } if type_identifier.name() == "Self" => self_type.clone(),
+        Type::Function(Function {
+            identifier,
+            param,
+            return_type,
+        }) => Type::Function(Function {
+            identifier: identifier.clone(),
+            param: param.as_ref().map(|param| Parameter {
+                identifier: param.identifier.clone(),
+                type_: Box::new(substitute_self(&param.type_, self_type)),
+            }),
+            return_type: Box::new(substitute_self(return_type, self_type)),
+        }),
+        Type::Array(inner) => Type::Array(Box::new(substitute_self(inner, self_type))),
+        Type::Tuple(types) => Type::Tuple(
+            types
+                .iter()
+                .map(|type_| substitute_self(type_, self_type))
+                .collect(),
+        ),
+        other => other.clone(),
     }
 }

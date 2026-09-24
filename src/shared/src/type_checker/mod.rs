@@ -604,12 +604,21 @@ impl Type {
                 type_environment,
                 context,
             )?))),
-            Type::Substitution { actual_type, .. } => actual_type.clone_with_concrete_types(
-                concrete_types,
-                discovered_types,
-                type_environment,
-                context,
-            ),
+            // The marker is kept, not unwrapped: `Self` still has to be
+            // recognisable afterwards so it can be replaced with whatever type
+            // the protocol ends up attached to.
+            Type::Substitution {
+                type_identifier,
+                actual_type,
+            } => Ok(Type::Substitution {
+                type_identifier: type_identifier.clone(),
+                actual_type: Box::new(actual_type.clone_with_concrete_types(
+                    concrete_types,
+                    discovered_types,
+                    type_environment,
+                    context,
+                )?),
+            }),
             Type::TypeAlias(TypeAlias {
                 type_identifier,
                 types,
@@ -787,6 +796,47 @@ impl Type {
                 });
 
                 Ok(enum_)
+            }
+            // A generic protocol's functions mention its parameters, so
+            // instantiating `From<Point3>` has to substitute through the
+            // signature of `from` as well as the protocol's own name.
+            Type::Protocol(Protocol {
+                type_identifier,
+                functions,
+            }) => {
+                let type_map = match &context {
+                    Some(context) => context.clone(),
+                    None => {
+                        let TypeIdentifier::GenericType(_, generics) = type_identifier else {
+                            return Ok(self.clone());
+                        };
+
+                        generics.iter().zip(concrete_types.iter()).collect()
+                    }
+                };
+
+                let cloned_functions = functions
+                    .iter()
+                    .map(|(identifier, function_type)| {
+                        Ok((
+                            identifier.clone(),
+                            function_type.clone_with_concrete_types(
+                                concrete_types.clone(),
+                                discovered_types,
+                                type_environment.clone(),
+                                Some(type_map.clone()),
+                            )?,
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+
+                Ok(Type::Protocol(Protocol {
+                    type_identifier: TypeIdentifier::ConcreteType(
+                        type_identifier.name().to_owned(),
+                        concrete_types.clone(),
+                    ),
+                    functions: cloned_functions,
+                }))
             }
             Type::Function(Function {
                 identifier,
