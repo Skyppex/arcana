@@ -8,6 +8,7 @@ use shared::{
         decision_tree::{AccessPath, Decision, Test},
         is_option,
         model::*,
+        overloaded_member_name,
         pattern::CheckedBound,
         Type,
     },
@@ -114,6 +115,13 @@ fn evaluate_implementation_declaration(
     functions: Vec<(String, TypedStatement)>,
 ) -> Result<Value, String> {
     for (function_name, function) in functions {
+        let parameter_type = match &function {
+            TypedStatement::FunctionDeclaration { param, .. } => {
+                param.as_ref().map(|param| param.type_.clone())
+            }
+            _ => None,
+        };
+
         let _ = evaluate(function, environment.clone())?;
 
         let variable = environment
@@ -122,9 +130,20 @@ fn evaluate_implementation_declaration(
             .ok_or(format!("Function '{}' not found", function_name))?
             .clone();
 
+        // Registered under both the plain and the parameter-qualified name:
+        // the plain one serves the ordinary case, the qualified one lets a
+        // resolved overload reach the implementation that was chosen.
+        let qualified = overloaded_member_name(&function_name, parameter_type.as_deref());
+
+        environment.borrow_mut().add_static_member(
+            &type_annotation,
+            function_name,
+            variable.clone(),
+        );
+
         environment
             .borrow_mut()
-            .add_static_member(&type_annotation, function_name, variable);
+            .add_static_member(&type_annotation, qualified, variable);
     }
 
     Ok(Value::Void)

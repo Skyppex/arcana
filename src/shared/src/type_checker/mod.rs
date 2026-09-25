@@ -60,6 +60,20 @@ pub struct StructField {
     pub field_type: Type,
 }
 
+/// The name a static member is stored under when several implementations
+/// provide one of that name.
+///
+/// `C::from` may come from `From<A>` and from `From<B>`; the parameter type is
+/// what tells them apart, so it is what the name is qualified by. Members are
+/// registered under both this and the plain name, so the ordinary single
+/// implementation case is unaffected.
+pub fn overloaded_member_name(name: &str, parameter: Option<&Type>) -> String {
+    match parameter {
+        Some(parameter) => format!("{}#{}", name, parameter.to_key()),
+        None => name.to_owned(),
+    }
+}
+
 /// Whether a type parameter appears anywhere inside `type_`.
 ///
 /// Substitution is skipped for types that hold none, both to save work and

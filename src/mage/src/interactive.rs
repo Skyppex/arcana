@@ -101,11 +101,15 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
             println!("Static members");
 
             for (type_, members) in type_environment.borrow().get_static_members() {
-                for (ident, member_type) in members {
-                    if let Type::Function(..) = member_type {
-                        println!("{type_}::{ident} -> {member_type}");
-                    } else {
-                        println!("{type_}::{member_type}");
+                // A name can have several candidates, one per implementation
+                // that provides it.
+                for (ident, candidates) in members {
+                    for member_type in candidates {
+                        if let Type::Function(..) = member_type {
+                            println!("{type_}::{ident} -> {member_type}");
+                        } else {
+                            println!("{type_}::{member_type}");
+                        }
                     }
                 }
             }

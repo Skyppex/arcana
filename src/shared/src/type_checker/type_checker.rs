@@ -96,7 +96,14 @@ fn check_implementations_do_not_overlap(discovered_types: &[DiscoveredType]) -> 
         for (other_protocol, other_type, other_scoped_generics) in
             implementations.iter().skip(index + 1)
         {
-            if protocol.name() != other_protocol.name() {
+            // The protocol's own arguments matter as much as the target's:
+            // `From<Q>` and `From<R>` are different protocols to implement.
+            if !annotations_overlap(
+                &resolve_aliases(protocol, &aliases),
+                scoped_generics,
+                &resolve_aliases(other_protocol, &aliases),
+                other_scoped_generics,
+            ) {
                 continue;
             }
 
@@ -110,8 +117,8 @@ fn check_implementations_do_not_overlap(discovered_types: &[DiscoveredType]) -> 
             }
 
             return Err(format!(
-                "Conflicting implementations of `{}`: `{}` and `{}` can both apply to the same type",
-                protocol.name(),
+                "Conflicting implementations of `{}` for `{}` and `{}`: both can apply to the same type",
+                protocol,
                 type_annotation,
                 other_type
             ));

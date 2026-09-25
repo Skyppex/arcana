@@ -1020,16 +1020,32 @@ pub fn check_type(
 
             // Recorded once for the implementation itself, not per function, so
             // that implementing a protocol with no functions still counts.
-            type_environment.borrow_mut().add_implementation(
-                &imp_type,
-                protocol_annotation.name().to_owned(),
-                covers_all_instantiations,
-                type_annotation.clone(),
-                scoped_generics.clone(),
-                where_clause.clone(),
-            );
+            // An implementation written for a bare parameter applies to every
+            // type, so it has no name to be filed under and is kept aside.
+            let universal_target = match type_annotation {
+                TypeAnnotation::Type(name)
+                    if scoped_generics.iter().any(|g| &g.type_name == name) =>
+                {
+                    Some(name.clone())
+                }
+                _ => None,
+            };
+
+            if universal_target.is_none() {
+                type_environment.borrow_mut().add_implementation(
+                    &imp_type,
+                    protocol_annotation.name().to_owned(),
+                    covers_all_instantiations,
+                    protocol_annotation.clone(),
+                    type_annotation.clone(),
+                    scoped_generics.clone(),
+                    where_clause.clone(),
+                );
+            }
 
             let mut typed_functions = vec![];
+            let mut universal_members = HashMap::new();
+            let mut universal_member_sources = HashMap::new();
 
             for (protocol_function_identifier, _) in protocol_functions {
                 let function = functions
@@ -1058,14 +1074,34 @@ pub fn check_type(
 
                 let function_name = protocol_function_identifier.name().to_owned();
 
-                type_environment.borrow_mut().add_static_member_covering(
-                    imp_type.clone(),
-                    function_name.clone(),
-                    typed_function.get_type(),
-                    covers_all_instantiations,
-                )?;
+                match &universal_target {
+                    // Kept aside with the implementation, to be matched against
+                    // whatever type is asked about rather than filed by name.
+                    Some(_) => {
+                        universal_members.insert(function_name.clone(), typed_function.get_type());
+                        universal_member_sources.insert(function_name.clone(), function.clone());
+                    }
+                    None => type_environment.borrow_mut().add_static_member_covering(
+                        imp_type.clone(),
+                        function_name.clone(),
+                        typed_function.get_type(),
+                        covers_all_instantiations,
+                    )?,
+                }
 
                 typed_functions.push((function_name, typed_function));
+            }
+
+            if let Some(target) = universal_target {
+                type_environment.borrow_mut().add_universal_implementation(
+                    protocol_annotation.name().to_owned(),
+                    protocol_annotation.clone(),
+                    target,
+                    scoped_generics.clone(),
+                    where_clause.clone(),
+                    universal_members,
+                    universal_member_sources,
+                );
             }
 
             Ok(TypedStatement::ImplementationDeclaration {
@@ -1110,6 +1146,27 @@ pub fn check_type(
             type_environment
                 .borrow_mut()
                 .add_generic_constraints(type_identifier.to_key(), where_clause.clone());
+            // A body that names a type parameter where a type belongs cannot
+            // run as written, so its source is kept and a copy is specialised
+            // at each call.
+            if let TypeIdentifier::GenericType(_, generics) = type_identifier {
+                if let Some(body) = body {
+                    if expressions::dispatches_on_type_parameter(body, generics) {
+                        type_environment.borrow_mut().add_generic_function(
+                            type_identifier.name().to_owned(),
+                            ast::FunctionDeclaration {
+                                access_modifier: None,
+                                type_identifier: type_identifier.clone(),
+                                param: param.clone(),
+                                return_type_annotation: return_type_annotation.clone(),
+                                body: Some(body.clone()),
+                                signature_only: *signature_only,
+                                where_clause: where_clause.clone(),
+                            },
+                        );
+                    }
+                }
+            }
 
             let return_type = check_type_annotation(
                 &return_type_annotation

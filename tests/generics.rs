@@ -1431,3 +1431,288 @@ fn two_conditional_implementations_still_conflict() {
     // Act & Assert
     assert_error_contains(input, "Conflicting implementations of `Show`");
 }
+
+// ---------------------------------------------------------------------------
+// Overloading through protocol implementations
+//
+// A type may implement `From<A>` and `From<B>`, so `C::from` has two
+// candidates. They are told apart by the argument, which is the one place
+// overloading is allowed: the choice comes from implementing distinct
+// protocols, not from declaring the same function twice.
+// ---------------------------------------------------------------------------
+
+/// A conversion protocol and a type converted from two different types.
+const CONVERSIONS: &str = r#"
+    proto From<T> { fun from(v: T): Self; }
+    struct A { n: Int }
+    struct B { n: Int }
+    struct C { n: Int }
+    imp From<A> for C { fun from(v: A): Self => C { n: 1 } }
+    imp From<B> for C { fun from(v: B): Self => C { n: 2 } }
+"#;
+
+#[test]
+fn a_type_can_be_converted_from_several_types() {
+    // Arrange
+    let input = format!("{CONVERSIONS}0");
+
+    // Act & Assert
+    assert!(try_create_typed_ast(&input).is_ok());
+}
+
+#[test]
+fn the_argument_chooses_which_implementation_runs() {
+    // Arrange
+    // Not merely which one type checks — the chosen one has to be the one
+    // evaluated, so the two return different values.
+    let from_a = format!("{CONVERSIONS}C::from(A {{ n: 0 }}).n");
+    let from_b = format!("{CONVERSIONS}C::from(B {{ n: 0 }}).n");
+
+    // Act & Assert
+    assert_eq!(evaluate_expression(&from_a, create_env(), false), int(1));
+    assert_eq!(evaluate_expression(&from_b, create_env(), false), int(2));
+}
+
+#[test]
+fn an_argument_matching_no_implementation_is_an_error() {
+    // Arrange
+    let input = format!("{CONVERSIONS}C::from(1)");
+
+    // Act & Assert
+    assert_error_contains(&input, "has no implementation for an argument of type");
+}
+
+#[test]
+fn different_protocol_arguments_do_not_conflict() {
+    // Arrange
+    // `From<A>` and `From<B>` are different protocols to implement, so two
+    // implementations of them for one type do not overlap.
+    let input = format!("{CONVERSIONS}0");
+
+    // Act & Assert
+    assert!(try_create_typed_ast(&input).is_ok());
+}
+
+#[test]
+fn the_same_protocol_argument_still_conflicts() {
+    // Arrange
+    let input = r#"
+        proto From<T> { fun from(v: T): Self; }
+        struct A { n: Int }
+        struct C { n: Int }
+        imp From<A> for C { fun from(v: A): Self => C { n: 1 } }
+        imp From<A> for C { fun from(v: A): Self => C { n: 2 } }
+        0
+    "#;
+
+    // Act & Assert
+    assert_error_contains(input, "Conflicting implementations");
+}
+
+#[test]
+fn one_protocol_implemented_for_different_types_does_not_conflict() {
+    // Arrange
+    let input = r#"
+        proto From<T> { fun from(v: T): Self; }
+        struct A { n: Int }
+        struct C { n: Int }
+        struct D { n: Int }
+        imp From<A> for C { fun from(v: A): Self => C { n: 1 } }
+        imp From<A> for D { fun from(v: A): Self => D { n: 2 } }
+        0
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(input).is_ok());
+}
+
+#[test]
+fn two_implementations_providing_the_same_signature_are_rejected() {
+    // Arrange
+    // Nothing could tell these apart at a call, so they are refused where they
+    // are written rather than where they are used.
+    let input = r#"
+        proto X { fun show(): String; }
+        proto Y { fun show(): String; }
+        struct P { n: Int }
+        imp X for P { fun show(): String => "x" }
+        imp Y for P { fun show(): String => "y" }
+        0
+    "#;
+
+    // Act & Assert
+    assert_error_contains(input, "already provides `show` taking the same argument");
+}
+
+#[test]
+fn a_function_cannot_be_declared_twice_in_a_module() {
+    // Arrange
+    // Overloading is allowed only where it comes from implementing distinct
+    // protocols, never from declaring the same function twice.
+    let input = r#"
+        struct A { x: Int }
+        struct B { x: Int }
+        struct C { x: Int }
+        fun from(a: A): C => C { x: 1 }
+        fun from(b: B): C => C { x: 2 }
+        0
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(input).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Bodies that dispatch on a type parameter
+//
+// `T::show()` has no meaning once the program is running — there is no type
+// called `T` — so a body that names a parameter where a type belongs is
+// specialised per call, against the types it was called with.
+// ---------------------------------------------------------------------------
+
+/// Two showable types, to check that two instantiations stay separate.
+const SHOWABLE_PAIR: &str = r#"
+    proto Show { fun show(): String; }
+    struct Dog { n: Int }
+    struct Cat { n: Int }
+    imp Show for Dog { fun show(): String => "woof" }
+    imp Show for Cat { fun show(): String => "meow" }
+    fun describe<T>(x: T): String where T is Show => T::show()
+"#;
+
+#[test]
+fn a_body_can_dispatch_on_its_type_parameter() {
+    // Arrange
+    let input = format!("{SHOWABLE_PAIR}describe(Dog {{ n: 1 }})");
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, string("woof"));
+}
+
+#[test]
+fn each_instantiation_dispatches_to_its_own_type() {
+    // Arrange
+    // One program, two instantiations — the specialised copies must not share.
+    let input = format!("{SHOWABLE_PAIR}describe(Dog {{ n: 1 }}) + describe(Cat {{ n: 1 }})");
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, string("woofmeow"));
+}
+
+#[test]
+fn a_dispatching_body_works_with_a_written_type_argument() {
+    // Arrange
+    let input = format!("{SHOWABLE_PAIR}describe::<Cat>(Cat {{ n: 1 }})");
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, string("meow"));
+}
+
+#[test]
+fn a_body_that_does_not_dispatch_is_unaffected() {
+    // Arrange
+    let input = r#"
+        fun id<T>(x: T): T => x
+        id(5)
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(5));
+}
+
+// ---------------------------------------------------------------------------
+// Implementations for a bare type parameter
+//
+// `imp<T1, T2> Into<T2> for T1` applies to every type, so it cannot be filed
+// under a type's name. The member is found by matching the implementation
+// against the type it is used on, and `T2` is solved from the bounds.
+// ---------------------------------------------------------------------------
+
+/// The `From`/`Into` pair, where `Into` is given once for everything.
+const CONVERSION: &str = r#"
+    proto From<T> { fun from(value: T): Self; }
+    proto Into<T> { fun into(self: Self): T; }
+    struct Point2 { x: Int, y: Int }
+    struct Point3 { x: Int, y: Int, z: Int }
+    imp From<Point3> for Point2 {
+        fun from(value: Point3): Self => Point2 { x: value.x, y: value.y }
+    }
+    imp<T1, T2> Into<T2> for T1 where T2 is From<T1> {
+        fun into(self: Self): T2 => T2::from(self)
+    }
+    let p3 = Point3 { x: 1, y: 2, z: 3 }
+"#;
+
+#[test]
+fn an_implementation_for_a_bare_parameter_provides_its_member() {
+    // Arrange
+    // Nothing declares `Into` for `Point3`; the blanket does.
+    let input = format!("{CONVERSION}let p2: Point2 = p3:into();\np2.x");
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn a_bound_solves_the_parameter_it_does_not_bind() {
+    // Arrange
+    // `T2` appears only in the return type. It is settled by the bound
+    // `T2 is From<T1>`, so no annotation is needed at the call.
+    let input = format!("{CONVERSION}p3:into().x");
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn the_directly_written_conversion_still_works() {
+    // Arrange
+    let input = format!("{CONVERSION}Point2::from(p3).x");
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(1));
+}
+
+#[test]
+fn a_type_without_the_bound_does_not_get_the_member() {
+    // Arrange
+    // Nothing is `From<Point2>`, so `Point2` gets no `into`.
+    let input = r#"
+        proto From<T> { fun from(value: T): Self; }
+        proto Into<T> { fun into(self: Self): T; }
+        struct Point2 { x: Int, y: Int }
+        struct Point3 { x: Int, y: Int, z: Int }
+        imp From<Point3> for Point2 {
+            fun from(value: Point3): Self => Point2 { x: value.x, y: value.y }
+        }
+        imp<T1, T2> Into<T2> for T1 where T2 is From<T1> {
+            fun into(self: Self): T2 => T2::from(self)
+        }
+        let p2 = Point2 { x: 1, y: 2 };
+        p2:into().x
+    "#;
+
+    // Act & Assert
+    assert!(try_create_typed_ast(input).is_err());
+}

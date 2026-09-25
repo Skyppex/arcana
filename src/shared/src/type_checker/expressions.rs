@@ -20,6 +20,7 @@ use super::{
         BinaryOperator, Block, FieldInitializer, Member, Typed, TypedClosureParameter,
         TypedExpression, TypedMatchArm, TypedStatement, UnaryOperator,
     },
+    overloaded_member_name,
     pattern::{check_pattern, CheckedPattern},
     runtime_type,
     scope::ScopeType,
@@ -164,6 +165,30 @@ pub fn check_type(
             })
         }
         Expression::Call(call) => {
+            // A static member may come from several implementations — `C::from`
+            // for both `From<A>` and `From<B>`. Which one is meant is settled
+            // by the argument, so that is checked before the callee.
+            if let Expression::Member(ast::Member::StaticMemberAccess {
+                type_annotation,
+                member,
+                ..
+            }) = call.callee.as_ref()
+            {
+                if let (ast::Member::Identifier { symbol, .. }, Some(argument)) =
+                    (member.as_ref(), &call.argument)
+                {
+                    if let Some(overloaded) = check_overloaded_static_call(
+                        type_annotation,
+                        symbol,
+                        argument,
+                        discovered_types,
+                        type_environment.clone(),
+                    )? {
+                        return Ok(overloaded);
+                    }
+                }
+            }
+
             // `value:typeof()` propagates the value in as the argument, so the
             // call carries none of its own. Both spellings answer the same
             // question and fold the same way.
@@ -254,11 +279,44 @@ pub fn check_type(
             let mut return_type = return_type;
             let mut callee_type = callee_type;
 
+            // A member a type gets from an implementation written for a bare
+            // parameter is specialised here: its body may dispatch on the
+            // implementation's parameters, which only exist while checking.
+            if let (
+                Expression::Member(ast::Member::ParamPropagation { object, member, .. }),
+                None,
+            ) = (call.callee.as_ref(), &call.argument)
+            {
+                if let ast::Member::Identifier { symbol, .. } = member.as_ref() {
+                    if let Some(specialised) = specialise_universal_member(
+                        object,
+                        symbol,
+                        discovered_types,
+                        type_environment.clone(),
+                    )? {
+                        return Ok(specialised);
+                    }
+                }
+            }
+
+            // With the type arguments written out there is nothing to infer, but
+            // a dispatching body still needs specialising to them.
+            if let Some(bindings) = written_type_arguments(&call.callee, type_environment.clone()) {
+                if let Some(specialised) = specialise_generic_call(
+                    &callee,
+                    &bindings,
+                    discovered_types,
+                    type_environment.clone(),
+                )? {
+                    callee = specialised;
+                }
+            }
+
             // A generic function called without type arguments takes them from
             // the argument it was given and from where its result is going.
             let argument_type = arg_typed_expression.as_ref().map(|arg| arg.get_type());
 
-            if let Some(inferred) = infer_call_type_arguments(
+            if let Some((inferred, bindings)) = infer_call_type_arguments(
                 &callee_type,
                 argument_type.as_ref(),
                 context.as_ref(),
@@ -273,7 +331,18 @@ pub fn check_type(
                     return_type = *inferred_return.clone();
                 }
 
-                callee = retype(callee, inferred.clone());
+                // A body that dispatches on a type parameter is replaced by a
+                // copy specialised to these arguments.
+                callee = match specialise_generic_call(
+                    &callee,
+                    &bindings,
+                    discovered_types,
+                    type_environment.clone(),
+                )? {
+                    Some(specialised) => specialised,
+                    None => retype(callee, inferred.clone()),
+                };
+
                 callee_type = inferred;
             }
 
@@ -1475,7 +1544,7 @@ fn infer_call_type_arguments(
     expected_type: Option<&Type>,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Option<Type>, String> {
+) -> Result<Option<(Type, TypeBindings)>, String> {
     let Type::Function(Function {
         identifier: Some(TypeIdentifier::GenericType(_, generics)),
         param,
@@ -1513,12 +1582,212 @@ fn infer_call_type_arguments(
         return Ok(None);
     };
 
-    Ok(Some(callee_type.clone_with_concrete_types(
+    let instantiated = callee_type.clone_with_concrete_types(
         concrete_types,
         discovered_types,
         type_environment,
         None,
-    )?))
+    )?;
+
+    Ok(Some((instantiated, bindings)))
+}
+
+/// Builds the call for a member reached through an implementation written for
+/// a bare type parameter — `p3:into()` where `into` comes from
+/// `imp<T1, T2> Into<T2> for T1`.
+///
+/// The body is specialised to the type it is used on, since it may name the
+/// implementation's parameters where a type belongs.
+fn specialise_universal_member(
+    object: &Expression,
+    symbol: &str,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<Option<TypedExpression>, String> {
+    let object = check_type(object, discovered_types, type_environment.clone(), None)?;
+    let object_type = object.get_type();
+
+    let source = type_environment
+        .borrow()
+        .universal_member_source(&object_type, symbol);
+
+    let Some((declaration, bindings)) = source else {
+        return Ok(None);
+    };
+
+    let specialised_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
+        type_environment.clone(),
+    )));
+
+    // `Self` is the type the member was reached on.
+    specialised_environment
+        .borrow_mut()
+        .add_type_alias("Self".to_owned(), object_type.clone());
+
+    for (name, annotation) in &bindings {
+        let argument =
+            check_type_annotation(annotation, discovered_types, type_environment.clone())?;
+
+        specialised_environment
+            .borrow_mut()
+            .add_type_alias(name.clone(), argument);
+    }
+
+    let declaration = ast::FunctionDeclaration {
+        type_identifier: TypeIdentifier::Type(declaration.type_identifier.name().to_owned()),
+        where_clause: vec![],
+        ..declaration
+    };
+
+    let TypedStatement::FunctionDeclaration {
+        param,
+        return_type,
+        body: Some(body),
+        ..
+    } = statements::check_type(
+        &ast::Statement::FunctionDeclaration(declaration),
+        discovered_types,
+        specialised_environment,
+    )?
+    else {
+        return Ok(None);
+    };
+
+    let closure_type = Type::Function(Function {
+        identifier: None,
+        param: param.as_ref().map(|param| Parameter {
+            identifier: param.identifier.clone(),
+            type_: param.type_.clone(),
+        }),
+        return_type: Box::new(return_type.clone()),
+    });
+
+    let callee = TypedExpression::Closure {
+        param: param.map(|param| TypedClosureParameter {
+            identifier: param.identifier,
+            type_annotation: Some(param.type_annotation),
+            type_: param.type_,
+        }),
+        return_type: return_type.clone(),
+        body: Box::new(body),
+        type_: closure_type,
+    };
+
+    Ok(Some(TypedExpression::Call {
+        callee: Box::new(callee),
+        argument: Some(Box::new(object)),
+        type_: return_type,
+    }))
+}
+
+/// What each of a generic's type parameters is bound to.
+type TypeBindings = HashMap<String, TypeAnnotation>;
+
+/// The type arguments written at a call, paired with the parameters they fill.
+///
+/// Returns `None` when none were written or the callee is not a generic
+/// function whose body needs specialising.
+fn written_type_arguments(
+    callee: &Expression,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Option<TypeBindings> {
+    let Expression::Member(ast::Member::Identifier {
+        symbol,
+        generics: Some(arguments),
+    }) = callee
+    else {
+        return None;
+    };
+
+    let declaration = type_environment.borrow().get_generic_function(symbol)?;
+
+    let TypeIdentifier::GenericType(_, parameters) = declaration.type_identifier else {
+        return None;
+    };
+
+    Some(
+        parameters
+            .iter()
+            .zip(arguments)
+            .map(|(parameter, argument)| (parameter.type_name.clone(), argument.type_annotation()))
+            .collect(),
+    )
+}
+
+/// Builds a specialised copy of a generic function's body with its type
+/// parameters replaced, as a closure to be called in place of the original.
+///
+/// A body like `T::show()` cannot run with `T` still standing for a parameter,
+/// so each call gets its own copy checked against the types it was called with.
+fn specialise_generic_call(
+    callee: &TypedExpression,
+    bindings: &TypeBindings,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<Option<TypedExpression>, String> {
+    let TypedExpression::Member(Member::Identifier { symbol, .. }) = callee else {
+        return Ok(None);
+    };
+
+    let Some(declaration) = type_environment.borrow().get_generic_function(symbol) else {
+        return Ok(None);
+    };
+
+    // The copy is no longer generic: its parameters are bound below, and left
+    // on the declaration they would be re-registered and shadow the bindings.
+    // Its bounds were already checked at the call, so they come off too.
+    let declaration = ast::FunctionDeclaration {
+        type_identifier: TypeIdentifier::Type(declaration.type_identifier.name().to_owned()),
+        where_clause: vec![],
+        ..declaration
+    };
+
+    let specialised_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
+        type_environment.clone(),
+    )));
+
+    for (name, annotation) in bindings {
+        let argument =
+            check_type_annotation(annotation, discovered_types, type_environment.clone())?;
+
+        specialised_environment
+            .borrow_mut()
+            .add_type_alias(name.clone(), argument);
+    }
+
+    let TypedStatement::FunctionDeclaration {
+        param,
+        return_type,
+        body: Some(body),
+        ..
+    } = statements::check_type(
+        &ast::Statement::FunctionDeclaration(declaration),
+        discovered_types,
+        specialised_environment,
+    )?
+    else {
+        return Ok(None);
+    };
+
+    let closure_type = Type::Function(Function {
+        identifier: None,
+        param: param.as_ref().map(|param| Parameter {
+            identifier: param.identifier.clone(),
+            type_: param.type_.clone(),
+        }),
+        return_type: Box::new(return_type.clone()),
+    });
+
+    Ok(Some(TypedExpression::Closure {
+        param: param.map(|param| TypedClosureParameter {
+            identifier: param.identifier,
+            type_annotation: Some(param.type_annotation),
+            type_: param.type_,
+        }),
+        return_type,
+        body: Box::new(body),
+        type_: closure_type,
+    }))
 }
 
 /// Instantiates a generic struct from the fields a literal provides, for a
@@ -1702,6 +1971,142 @@ fn check_type_argument_count(type_: &Type, given: usize, symbol: &str) -> Result
 const TYPEOF_IS_NOT_A_VALUE: &str =
     "`typeof` is resolved while type checking, so it cannot be used as a value at runtime";
 
+/// Resolves a call to a static member that several implementations provide,
+/// choosing by the argument's type.
+///
+/// Returns `None` when the member is not overloaded, leaving the call to the
+/// ordinary path.
+fn check_overloaded_static_call(
+    type_annotation: &TypeAnnotation,
+    symbol: &str,
+    argument: &Expression,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<Option<TypedExpression>, String> {
+    let object_type =
+        check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
+
+    let candidates = type_environment
+        .borrow()
+        .get_static_member_candidates(&object_type, symbol);
+
+    if candidates.len() < 2 {
+        return Ok(None);
+    }
+
+    let argument = check_type(argument, discovered_types, type_environment.clone(), None)?;
+    let argument_type = argument.get_type();
+
+    let matching = candidates
+        .iter()
+        .filter(|candidate| match candidate {
+            Type::Function(Function {
+                param: Some(param), ..
+            }) => type_equals(&param.type_, &argument_type),
+            _ => false,
+        })
+        .collect::<Vec<_>>();
+
+    let [member_type] = matching.as_slice() else {
+        return Err(format!(
+            "{} of `{}` {} for an argument of type {}",
+            symbol,
+            object_type.full_name(),
+            if matching.is_empty() {
+                "has no implementation"
+            } else {
+                "has more than one implementation"
+            },
+            argument_type
+        ));
+    };
+
+    let Type::Function(Function {
+        param, return_type, ..
+    }) = member_type
+    else {
+        return Err(format!("{} is not a function", symbol));
+    };
+
+    // The chosen candidate is named so that evaluation reaches the same one
+    // rather than whichever was registered last under the plain name.
+    let resolved = overloaded_member_name(symbol, param.as_ref().map(|p| p.type_.as_ref()));
+
+    let callee = TypedExpression::Member(Member::StaticMemberAccess {
+        type_annotation: type_annotation.clone(),
+        member: Box::new(Member::Identifier {
+            symbol: resolved.clone(),
+            type_: (*member_type).clone(),
+        }),
+        symbol: resolved,
+        type_: (*member_type).clone(),
+    });
+
+    Ok(Some(TypedExpression::Call {
+        callee: Box::new(callee),
+        argument: Some(Box::new(argument)),
+        type_: *return_type.clone(),
+    }))
+}
+
+/// Whether an expression uses one of these type parameters where a type
+/// belongs — `T::show()` — which is the case a running program cannot serve
+/// without the parameter having been substituted first.
+pub fn dispatches_on_type_parameter(
+    expression: &Expression,
+    generics: &[crate::types::GenericType],
+) -> bool {
+    let names_a_parameter = |annotation: &TypeAnnotation| {
+        generics
+            .iter()
+            .any(|generic| generic.type_name == annotation.name())
+    };
+
+    match expression {
+        Expression::Member(ast::Member::StaticMemberAccess {
+            type_annotation, ..
+        }) => names_a_parameter(type_annotation),
+        Expression::Member(ast::Member::MemberAccess { object, .. }) => {
+            dispatches_on_type_parameter(object, generics)
+        }
+        Expression::Member(ast::Member::ParamPropagation { object, .. }) => {
+            dispatches_on_type_parameter(object, generics)
+        }
+        Expression::Call(call) => {
+            dispatches_on_type_parameter(&call.callee, generics)
+                || call
+                    .argument
+                    .as_ref()
+                    .is_some_and(|argument| dispatches_on_type_parameter(argument, generics))
+        }
+        Expression::Block(statements) => statements
+            .iter()
+            .any(|statement| statement_dispatches_on_type_parameter(statement, generics)),
+        Expression::Binary(binary) => {
+            dispatches_on_type_parameter(&binary.left, generics)
+                || dispatches_on_type_parameter(&binary.right, generics)
+        }
+        Expression::Unary(unary) => dispatches_on_type_parameter(&unary.expression, generics),
+        _ => false,
+    }
+}
+
+/// As above, for a statement inside a block.
+fn statement_dispatches_on_type_parameter(
+    statement: &ast::Statement,
+    generics: &[crate::types::GenericType],
+) -> bool {
+    match statement {
+        ast::Statement::Expression(expression) => {
+            dispatches_on_type_parameter(expression, generics)
+        }
+        ast::Statement::Semi(statement) => {
+            statement_dispatches_on_type_parameter(statement, generics)
+        }
+        _ => false,
+    }
+}
+
 /// Whether a member names the `typeof` built-in.
 fn is_typeof(member: &ast::Member) -> bool {
     let ast::Member::Identifier { symbol, .. } = member else {
@@ -1797,7 +2202,7 @@ fn check_type_static_member_access(
                 };
 
                 Ok(TypedExpression::Member(Member::StaticMemberAccess {
-                    type_annotation: type_annotation.clone(),
+                    type_annotation: object_type.type_annotation(),
                     member: Box::new(Member::Identifier {
                         symbol: symbol.clone(),
                         type_: static_member_type.clone(),
@@ -1820,7 +2225,7 @@ fn check_type_static_member_access(
                 let identifier_type = static_member_type.clone();
 
                 Ok(TypedExpression::Member(Member::StaticMemberAccess {
-                    type_annotation: type_annotation.clone(),
+                    type_annotation: object_type.type_annotation(),
                     member: Box::new(Member::Identifier {
                         symbol: symbol.clone(),
                         type_: identifier_type.clone(),
@@ -1850,7 +2255,7 @@ fn check_type_static_member_access(
                 let identifier_type = static_member_type.clone();
 
                 Ok(TypedExpression::Member(Member::StaticMemberAccess {
-                    type_annotation: type_annotation.clone(),
+                    type_annotation: object_type.type_annotation(),
                     member: Box::new(Member::Identifier {
                         symbol: symbol.clone(),
                         type_: identifier_type.clone(),
