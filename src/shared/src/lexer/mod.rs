@@ -59,6 +59,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             _ => Ok(create_token(TokenKind::Dot, cursor)),
         },
         '?' => Ok(create_token(TokenKind::QuestionMark, cursor)),
+        '@' => Ok(create_token(TokenKind::At, cursor)),
         '+' => match cursor.second() {
             '=' => {
                 cursor.bump();

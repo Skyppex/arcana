@@ -234,6 +234,16 @@ impl Row {
                         pending.push(field_obligation(&occurrence, field));
                     }
                 }
+                // `x @ p` binds unconditionally and then goes on matching the
+                // same value, so it expands to a binding plus `p`.
+                CheckedPattern::Bound { identifier, inner } => {
+                    self.bindings.push(Binding {
+                        identifier,
+                        occurrence: occurrence.clone(),
+                    });
+
+                    pending.push((occurrence, *inner));
+                }
                 test => self.obligations.push((occurrence, test)),
             }
         }
@@ -390,20 +400,11 @@ fn compile_constructor_switch(
 
                     if &row_test == test {
                         let extra = match pattern {
-                            CheckedPattern::Variant {
-                                binding, fields, ..
-                            } => fields
-                                .iter()
-                                .map(|field| field_obligation(occurrence, field.clone()))
-                                // Binding the variant binds the value that was
-                                // just tested, at this same occurrence.
-                                .chain(binding.iter().map(|identifier| {
-                                    (
-                                        occurrence.clone(),
-                                        CheckedPattern::Binding(identifier.clone()),
-                                    )
-                                }))
-                                .collect(),
+                            // The value is unchanged by the test, so the rest
+                            // of the pattern applies at this same occurrence.
+                            CheckedPattern::Variant { inner, .. } => {
+                                vec![(occurrence.clone(), inner.as_ref().clone())]
+                            }
                             // The value does not change, only the type it is
                             // matched at, so the rest of the pattern is an
                             // obligation on the narrowed occurrence.
@@ -561,6 +562,7 @@ fn pattern_test(pattern: &CheckedPattern) -> Test {
         // Normalization removes these before a test is ever asked for.
         CheckedPattern::Wildcard
         | CheckedPattern::Binding(_)
+        | CheckedPattern::Bound { .. }
         | CheckedPattern::Tuple(_)
         | CheckedPattern::Fields(_) => {
             unreachable!("irrefutable patterns are expanded before testing")

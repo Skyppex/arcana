@@ -1410,13 +1410,12 @@ fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, String> {
                 path.push(variant);
             }
 
-            let (binding, fields) = parse_variant_tail(cursor, &path)?;
+            let inner = parse_variant_tail(cursor, &path)?;
 
             Ok(Pattern::EnumVariant {
                 enum_annotation: None,
                 path,
-                binding,
-                fields,
+                inner,
             })
         }
         // `MyEnum::First { .. }` or `Point { .. }`. A `::` anywhere in the name
@@ -1426,13 +1425,12 @@ fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, String> {
 
             match split_variant_annotation(&type_annotation) {
                 Some((enum_annotation, path)) => {
-                    let (binding, fields) = parse_variant_tail(cursor, &path)?;
+                    let inner = parse_variant_tail(cursor, &path)?;
 
                     Ok(Pattern::EnumVariant {
                         enum_annotation: Some(enum_annotation),
                         path,
-                        binding,
-                        fields,
+                        inner,
                     })
                 }
                 None => Ok(Pattern::Struct {
@@ -1445,7 +1443,7 @@ fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, String> {
             if identifier.validate_variable_identifier_name().is_ok() =>
         {
             cursor.bump()?; // Consume the identifier
-            Ok(Pattern::Binding(identifier))
+            parse_optional_bound_pattern(cursor, identifier)
         }
         // `{ x, y: 1 }` — the type comes from the matched value.
         TokenKind::OpenBrace => Ok(Pattern::Struct {
@@ -1603,29 +1601,68 @@ fn split_variant_annotation(
 /// What follows a variant path: a binding, or field patterns, but never both.
 ///
 /// Binding the variant and looking into its fields are alternatives — once the
-/// value is bound its fields are reachable through it, so allowing both would
-/// be two spellings of one thing.
+/// value is bound its fields are reachable through it, so allowing both side by
+/// side would be two spellings of one thing. `@` is how to ask for both.
 fn parse_variant_tail(
     cursor: &mut Cursor,
     path: &[String],
-) -> Result<(Option<String>, Vec<FieldPattern>), String> {
+) -> Result<Option<Box<Pattern>>, String> {
     if let TokenKind::Identifier(binding) = cursor.first().kind {
         if binding.validate_variable_identifier_name().is_ok() {
             cursor.bump()?; // Consume the binding
 
+            let bound = parse_optional_bound_pattern(cursor, binding.clone())?;
+
             if cursor.first().kind == TokenKind::OpenBrace {
                 return Err(format!(
-                    "Pattern `::{}` binds `{}` and destructures its fields; a variant pattern may do one or the other, not both",
+                    "Pattern `::{}` binds `{}` and destructures its fields; a variant pattern may do one or the other, not both — write `{} @ {{ .. }}` to do both",
                     path.join("::"),
+                    binding,
                     binding
                 ));
             }
 
-            return Ok((Some(binding), vec![]));
+            return Ok(Some(Box::new(bound)));
         }
     }
 
-    Ok((None, parse_optional_field_patterns(cursor)?))
+    if cursor.first().kind != TokenKind::OpenBrace {
+        return Ok(None);
+    }
+
+    Ok(Some(Box::new(Pattern::Struct {
+        type_annotation: None,
+        fields: parse_field_patterns(cursor)?,
+    })))
+}
+
+/// A binding, plus the `@ p` that may follow it.
+///
+/// `@` is the only way to both bind a value and look inside it; without it a
+/// binding stands alone.
+fn parse_optional_bound_pattern(
+    cursor: &mut Cursor,
+    identifier: String,
+) -> Result<Pattern, String> {
+    if cursor.first().kind != TokenKind::At {
+        return Ok(Pattern::Binding(identifier));
+    }
+
+    cursor.bump()?; // Consume the @
+
+    let pattern = parse_pattern(cursor)?;
+
+    if let Pattern::Binding(inner) = &pattern {
+        return Err(format!(
+            "Pattern `{} @ {}` binds the same value twice; the right of `@` constrains what was bound",
+            identifier, inner
+        ));
+    }
+
+    Ok(Pattern::Bound {
+        identifier,
+        pattern: Box::new(pattern),
+    })
 }
 
 fn parse_rune(literal: &str) -> Result<char, String> {

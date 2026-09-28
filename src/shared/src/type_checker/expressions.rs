@@ -2750,6 +2750,8 @@ fn check_type_pattern(
 fn is_refutable(pattern: &CheckedPattern) -> bool {
     match pattern {
         CheckedPattern::Wildcard | CheckedPattern::Binding(_) => false,
+        // Binding never fails, so `x @ p` fails exactly when `p` does.
+        CheckedPattern::Bound { inner, .. } => is_refutable(inner),
         CheckedPattern::Tuple(patterns) => patterns.iter().any(is_refutable),
         CheckedPattern::Fields(fields) => fields.iter().any(|f| is_refutable(&f.pattern)),
         _ => true,

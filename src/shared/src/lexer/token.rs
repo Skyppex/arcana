@@ -84,6 +84,8 @@ pub enum TokenKind {
     Dot,
     DoubleDot,
     QuestionMark,
+    /// `@`, which binds a name to the value a pattern matches.
+    At,
     RightArrow,
     LeftArrow,
     FatArrow,

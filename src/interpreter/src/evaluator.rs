@@ -573,7 +573,15 @@ fn destructure_irrefutable(
 
             Ok(())
         }
-        Pattern::Struct { fields, .. } | Pattern::EnumVariant { fields, .. } => {
+        // `x @ p` binds and keeps matching the same value.
+        Pattern::Bound {
+            identifier,
+            pattern,
+        } => {
+            bindings.push((identifier.clone(), value.clone()));
+            destructure_irrefutable(pattern, value, bindings)
+        }
+        Pattern::Struct { fields, .. } => {
             for field in fields {
                 let field_value = project(
                     value,
@@ -585,6 +593,12 @@ fn destructure_irrefutable(
 
             Ok(())
         }
+        // The variant is statically known here, so the test is a no-op and only
+        // the inner pattern binds anything.
+        Pattern::EnumVariant { inner, .. } => match inner {
+            Some(inner) => destructure_irrefutable(inner, value, bindings),
+            None => Ok(()),
+        },
         other => Err(format!("Pattern '{}' is refutable", other)),
     }
 }

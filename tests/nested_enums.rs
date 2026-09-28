@@ -746,3 +746,94 @@ fn a_path_through_a_struct_variant_is_rejected() {
     // Assert
     assert!(result.unwrap_err().contains("is not an enum"));
 }
+
+// --- `@` on variant patterns ------------------------------------------------
+
+#[test]
+fn a_variant_can_be_bound_and_destructured_with_at() {
+    // Arrange: the binder and the field pattern are exclusive on their own,
+    // so `@` is how to ask for both.
+    let input = format!(
+        r#"{E1}
+        fun take_s3(x: E1::E2::S3): Int {{ x.f2 }}
+        let e: E1 = E1::E2::S3 {{ f2: 5 }};
+        e match
+        | ::S1 s1 => 1,
+        | ::E2::S3 s3 @ {{ f2: 5 }} => take_s3(s3),
+        | ::E2::S3 other => 33,
+        | ::E2::S2 => 2,
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(5));
+}
+
+#[test]
+fn the_right_of_at_is_rooted_at_the_narrowed_type() {
+    // Arrange: `::E4::S4` resolves against `E1::E3`, not against `E1`, and
+    // `e3` is bound at the level the path had reached.
+    let input = format!(
+        r#"{E1}
+        fun take_e3(x: E1::E3): Int {{ 33 }}
+        let e: E1 = E1::E3::E4::S4;
+        e match
+        | ::S1 s1 => 1,
+        | ::E2 e2 => 2,
+        | ::E3 e3 @ ::E4::S4 => take_e3(e3),
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(33));
+}
+
+#[test]
+fn a_bare_binder_before_at_binds_at_the_matched_type() {
+    // Arrange: nothing narrows before the binder, so `whole` is an `E1`.
+    let input = format!(
+        r#"{E1}
+        fun take_e1(x: E1): Int {{ 11 }}
+        let e: E1 = E1::E2::S2;
+        e match
+        | whole @ ::E2 => take_e1(whole),
+        | ::S1 s1 => 1,
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(11));
+}
+
+#[test]
+fn a_constrained_variant_binding_does_not_cover_the_whole_variant() {
+    // Arrange: `@ { f2: 5 }` is refutable, so `S3` still needs covering.
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E2::S3 {{ f2: 5 }};
+        e match
+        | ::S1 s1 => 1,
+        | ::E2::S3 s3 @ {{ f2: 5 }} => 55,
+        | ::E2::S2 => 2,
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = try_create_typed_ast(&input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("not exhaustive"));
+}

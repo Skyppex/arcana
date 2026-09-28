@@ -24,6 +24,11 @@ pub enum Pattern {
     String(String),
     /// `x` — binds the matched value.
     Binding(String),
+    /// `x @ p` — binds the matched value *and* matches it against `p`.
+    Bound {
+        identifier: String,
+        pattern: Box<Pattern>,
+    },
     /// `< 5`, `>= x`
     Comparison {
         operator: ComparisonOperator,
@@ -53,13 +58,15 @@ pub enum Pattern {
     /// path — the first segment is always resolved against the matched enum
     /// itself and never searched for.
     ///
-    /// A variant may either bind the value it matched or look into its fields,
-    /// never both, so at most one of `binding` and `fields` is non-empty.
+    /// Once the path has narrowed the value, `inner` is what it is matched
+    /// against, at the variant's own type: a binding, a binding with `@`, or a
+    /// struct pattern over its fields. A variant may bind the value or look
+    /// into its fields, never both, so the two cannot appear side by side —
+    /// `@` is how you ask for both.
     EnumVariant {
         enum_annotation: Option<TypeAnnotation>,
         path: Vec<String>,
-        binding: Option<String>,
-        fields: Vec<FieldPattern>,
+        inner: Option<Box<Pattern>>,
     },
 }
 
@@ -188,17 +195,16 @@ impl Pattern {
                     field.pattern.collect_bindings(names);
                 }
             }
-            Pattern::EnumVariant {
-                binding, fields, ..
+            Pattern::Bound {
+                identifier,
+                pattern,
             } => {
-                if let Some(binding) = binding {
-                    names.push(binding.clone());
-                }
-
-                for field in fields {
-                    field.pattern.collect_bindings(names);
-                }
+                names.push(identifier.clone());
+                pattern.collect_bindings(names);
             }
+            Pattern::EnumVariant {
+                inner: Some(inner), ..
+            } => inner.collect_bindings(names),
             _ => {}
         }
     }
@@ -247,24 +253,21 @@ impl Display for Pattern {
 
                 write_fields(f, fields)
             }
+            Pattern::Bound {
+                identifier,
+                pattern,
+            } => write!(f, "{} @ {}", identifier, pattern),
             Pattern::EnumVariant {
                 enum_annotation,
                 path,
-                binding,
-                fields,
+                inner,
             } => {
                 write!(f, "{}", Pattern::variant_path_name(enum_annotation, path))?;
 
-                if let Some(binding) = binding {
-                    return write!(f, " {}", binding);
+                match inner {
+                    Some(inner) => write!(f, " {}", inner),
+                    None => Ok(()),
                 }
-
-                if fields.is_empty() {
-                    return Ok(());
-                }
-
-                write!(f, " ")?;
-                write_fields(f, fields)
             }
         }
     }

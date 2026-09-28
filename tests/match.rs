@@ -1258,3 +1258,123 @@ fn a_pattern_may_shadow_a_name_from_the_enclosing_scope() {
     // Assert
     assert_eq!(result, Value::Number(value::Number::Int(5)));
 }
+
+// --- `@` bindings -----------------------------------------------------------
+
+#[test]
+fn a_field_can_be_bound_and_constrained_at_once() {
+    // Arrange: without `@` a field pattern can bind or constrain, not both.
+    let input = r#"
+        struct P { x: Int }
+        let p = P { x: 3 };
+        p match
+        | { x: n @ < 5 } => n,
+        | _ => 0
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, Value::Number(value::Number::Int(3)));
+}
+
+#[test]
+fn a_constrained_binding_that_fails_falls_through() {
+    // Arrange
+    let input = r#"
+        struct P { x: Int }
+        let p = P { x: 9 };
+        p match
+        | { x: n @ < 5 } => n,
+        | _ => 0
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, Value::Number(value::Number::Int(0)));
+}
+
+#[test]
+fn a_binding_inside_a_tuple_can_be_constrained() {
+    // Arrange
+    let input = r#"
+        let t = (3, 4);
+        t match
+        | (a @ < 5, b) => a + b,
+        | _ => 0
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, Value::Number(value::Number::Int(7)));
+}
+
+#[test]
+fn an_irrefutable_constrained_binding_works_in_a_declaration() {
+    // Arrange: `a @ _` binds and matches anything, so it is irrefutable.
+    let input = r#"
+        struct P { x: Int, y: Int }
+        let { x: a @ _, y: b } = P { x: 1, y: 2 };
+        a + b
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, Value::Number(value::Number::Int(3)));
+}
+
+#[test]
+fn a_constrained_binding_works_in_a_for_loop_pattern() {
+    // Arrange
+    let input = r#"
+        let mut total = 0;
+        for (a @ _, b) in [(1, 2), (3, 4)] => { total = total + a + b };
+        total
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, Value::Number(value::Number::Int(10)));
+}
+
+#[test]
+fn a_binding_on_both_sides_of_at_is_rejected() {
+    // Arrange: `x` would just be a second name for what `a` already binds.
+    let input = r#"
+        let t = (1, 2);
+        t match | (a @ x, b) => a
+    "#;
+
+    // Act
+    let result = try_create_typed_ast(input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("binds the same value twice"));
+}
+
+#[test]
+fn a_name_bound_on_both_sides_of_at_is_rejected_as_a_duplicate() {
+    // Arrange
+    let input = r#"
+        struct P { x: Int }
+        let p = P { x: 1 };
+        p match
+        | s @ { x: s } => 1,
+        | _ => 0
+    "#;
+
+    // Act
+    let result = try_create_typed_ast(input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("more than once"));
+}
