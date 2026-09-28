@@ -1,5 +1,5 @@
 use std::hash::Hash;
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use crate::ast::pattern::Pattern;
 use crate::display::{Indent, IndentDisplay};
@@ -196,9 +196,36 @@ pub struct EnumDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
     pub shared_fields: Vec<StructField>,
-    pub members: Vec<StructData>,
+    pub members: Vec<EnumVariant>,
     /// Bounds on the type parameters, from a `where` clause.
     pub where_clause: Vec<GenericConstraint>,
+}
+
+/// One variant of an enum. A variant is a struct unless it is written with the
+/// `enum` keyword, in which case it is an enum in its own right.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EnumVariant {
+    Struct(StructData),
+    Enum(EnumData),
+}
+
+impl EnumVariant {
+    pub fn type_identifier(&self) -> &TypeIdentifier {
+        match self {
+            EnumVariant::Struct(data) => &data.type_identifier,
+            EnumVariant::Enum(data) => &data.type_identifier,
+        }
+    }
+}
+
+/// A nested enum: a name, optional shared fields, and variants of its own. It
+/// takes no access modifier, type parameters or `where` clause — the enclosing
+/// declaration's already cover it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumData {
+    pub type_identifier: TypeIdentifier,
+    pub shared_fields: Vec<StructField>,
+    pub variants: Vec<EnumVariant>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -414,13 +441,6 @@ pub struct FieldInitializer {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct EnumMember {
-    pub identifier: String,
-    pub embedded_structs: Vec<TypeAnnotation>,
-    pub fields: Vec<EnumMemberField>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub struct FlagsMember {
     pub identifier: String,
     pub value: FlagsValue,
@@ -439,18 +459,6 @@ impl Display for FlagsValue {
             FlagsValue::Default => write!(f, "default"),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct EnumMemberField {
-    pub identifier: String,
-    pub type_annotation: TypeAnnotation,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum EnumMemberFieldInitializers {
-    None,
-    Named(HashMap<String, Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

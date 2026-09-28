@@ -666,26 +666,6 @@ impl TypeEnvironment {
                 .get(type_name)
                 .cloned()
                 .or_else(|| {
-                    type_name
-                        .contains("::")
-                        .then(|| {
-                            let parts: Vec<&str> = type_name.split("::").collect();
-                            let type_name = parts[0];
-                            let variant_name = parts[1];
-
-                            self.types
-                                .get(
-                                    &TypeIdentifier::MemberType(
-                                        Box::new(TypeIdentifier::Type(type_name.to_string())),
-                                        variant_name.to_string(),
-                                    )
-                                    .to_key(),
-                                )
-                                .cloned()
-                        })
-                        .flatten()
-                })
-                .or_else(|| {
                     self.parent
                         .as_ref()
                         .and_then(|p| p.borrow().get_type_from_annotation(type_annotation).ok())
@@ -759,19 +739,11 @@ impl TypeEnvironment {
             TypeIdentifier::Type(name) => Type::from_str(name).ok(),
             TypeIdentifier::GenericType(name, _) => Type::from_str(name).ok(),
             TypeIdentifier::ConcreteType(name, _) => Type::from_str(name).ok(),
-            TypeIdentifier::MemberType(type_identifier, member_name) => self
-                .get_type(format!(
-                    "{}::{}",
-                    type_identifier.to_key(),
-                    member_name.to_key()
-                ))
-                .or_else(|| {
-                    self.get_type(format!(
-                        "{}.{}",
-                        type_identifier.to_key(),
-                        member_name.to_key()
-                    ))
-                }),
+            TypeIdentifier::MemberType(type_identifier, member_name) => self.get_type(format!(
+                "{}::{}",
+                type_identifier.to_key(),
+                member_name.to_key()
+            )),
             TypeIdentifier::ModType(type_identifier, member_name) => self.get_type(format!(
                 "{}::{}",
                 type_identifier.to_key(),

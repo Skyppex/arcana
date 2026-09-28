@@ -9,7 +9,7 @@ use crate::{
 
 use super::{
     cursor::Cursor, expressions, fat_arrow_expr_or_block_expr, AccessModifier, AssociatedType,
-    Closure, EmbeddedStruct, EnumDeclaration, Expression, FunctionDeclaration,
+    Closure, EmbeddedStruct, EnumData, EnumDeclaration, EnumVariant, Expression, FunctionDeclaration,
     ImplementationDeclaration, ModPath, ModuleDeclaration, Parameter, ProtocolDeclaration,
     Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration,
     UseItem, ValueLiteral,
@@ -535,8 +535,31 @@ fn parse_enum_declaration_statement(
         return Err(format!("Expected {{ but found {:?}", cursor.first().kind));
     };
 
+    let (shared_fields, members) = parse_enum_body(cursor, context)?;
+
+    cursor.bump()?; // Consume the }
+
+    Ok(Statement::EnumDeclaration(EnumDeclaration {
+        access_modifier,
+        type_identifier: type_name,
+        shared_fields,
+        members,
+        where_clause,
+    }))
+}
+
+/// Parses the inside of an enum's braces, up to but not including the closing
+/// one: shared fields and variants, in any order.
+///
+/// A variant is a struct unless it is written `enum Name { .. }`, in which case
+/// it is an enum of its own and this recurses. `struct` may be written in front
+/// of a struct variant, but it is the default and so optional.
+fn parse_enum_body(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<(Vec<StructField>, Vec<EnumVariant>), String> {
     let mut shared_fields = vec![];
-    let mut members = vec![];
+    let mut members: Vec<EnumVariant> = vec![];
     let mut has_comma = true;
 
     while cursor.first().kind != TokenKind::CloseBrace {
@@ -551,32 +574,7 @@ fn parse_enum_declaration_statement(
         {
             shared_fields.push(parse_struct_field(cursor, false)?);
         } else {
-            let TokenKind::Identifier(identifier) = cursor.first().kind else {
-                return Err(format!(
-                    "Expected identifier but found {:?}",
-                    cursor.first().kind
-                ));
-            };
-
-            identifier.validate_type_identifier_name()?;
-
-            cursor.bump()?; // Consume the identifier
-
-            if cursor.first().kind == TokenKind::OpenBrace {
-                cursor.expect(TokenKind::OpenBrace)?; // Consume the {
-                members.push(parse_struct(
-                    TypeIdentifier::Type(identifier),
-                    cursor,
-                    context,
-                )?);
-                cursor.expect(TokenKind::CloseBrace)?; // Consume the }
-            } else {
-                members.push(StructData {
-                    type_identifier: TypeIdentifier::Type(identifier),
-                    embedded_structs: vec![],
-                    fields: vec![],
-                });
-            }
+            members.push(parse_enum_variant(cursor, context)?);
         }
 
         if cursor.first().kind == TokenKind::Comma {
@@ -586,14 +584,85 @@ fn parse_enum_declaration_statement(
         }
     }
 
-    cursor.bump()?; // Consume the }
+    Ok((shared_fields, members))
+}
 
-    Ok(Statement::EnumDeclaration(EnumDeclaration {
-        access_modifier,
-        type_identifier: type_name,
-        shared_fields,
-        members,
-        where_clause,
+fn parse_enum_variant(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<EnumVariant, String> {
+    let is_enum = match cursor.first().kind {
+        TokenKind::Keyword(Keyword::Enum) => {
+            cursor.bump()?; // Consume the enum keyword
+            true
+        }
+        // The default, so writing it changes nothing.
+        TokenKind::Keyword(Keyword::Struct) => {
+            cursor.bump()?; // Consume the struct keyword
+            false
+        }
+        _ => false,
+    };
+
+    let TokenKind::Identifier(identifier) = cursor.first().kind else {
+        return Err(format!(
+            "Expected variant name but found {:?}",
+            cursor.first().kind
+        ));
+    };
+
+    identifier.validate_type_identifier_name()?;
+
+    cursor.bump()?; // Consume the identifier
+
+    // A nested enum's parameters and bounds come from the enclosing
+    // declaration, so it may not declare its own.
+    if is_enum {
+        if cursor.first().kind == TokenKind::Less {
+            return Err(format!(
+                "Nested enum '{}' cannot declare type parameters; the enclosing enum's are in scope",
+                identifier
+            ));
+        }
+
+        if cursor.first().kind == TokenKind::Keyword(Keyword::Where) {
+            return Err(format!(
+                "Nested enum '{}' cannot have a where clause; put the bounds on the enclosing enum",
+                identifier
+            ));
+        }
+
+        let TokenKind::OpenBrace = cursor.first().kind else {
+            return Err(format!(
+                "Expected {{ after nested enum '{}' but found {:?}",
+                identifier,
+                cursor.first().kind
+            ));
+        };
+
+        cursor.expect(TokenKind::OpenBrace)?; // Consume the {
+        let (shared_fields, variants) = parse_enum_body(cursor, context)?;
+        cursor.expect(TokenKind::CloseBrace)?; // Consume the }
+
+        return Ok(EnumVariant::Enum(EnumData {
+            type_identifier: TypeIdentifier::Type(identifier),
+            shared_fields,
+            variants,
+        }));
+    }
+
+    if cursor.first().kind == TokenKind::OpenBrace {
+        cursor.expect(TokenKind::OpenBrace)?; // Consume the {
+        let data = parse_struct(TypeIdentifier::Type(identifier), cursor, context)?;
+        cursor.expect(TokenKind::CloseBrace)?; // Consume the }
+
+        return Ok(EnumVariant::Struct(data));
+    }
+
+    Ok(EnumVariant::Struct(StructData {
+        type_identifier: TypeIdentifier::Type(identifier),
+        embedded_structs: vec![],
+        fields: vec![],
     }))
 }
 

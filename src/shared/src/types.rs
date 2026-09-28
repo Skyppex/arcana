@@ -378,7 +378,7 @@ impl ToKey for TypeIdentifier {
             TypeIdentifier::GenericType(name, _) => name.to_string(),
             TypeIdentifier::ConcreteType(name, _) => name.to_string(),
             TypeIdentifier::MemberType(identifier, member_name) => {
-                format!("{}.{}", identifier.to_key(), member_name)
+                format!("{}::{}", identifier.to_key(), member_name)
             }
             TypeIdentifier::ModType(identifier, member_name) => {
                 format!("{}::{}", identifier.to_key(), member_name.to_key())
@@ -500,17 +500,22 @@ pub(super) fn parse_type_annotation(
                 cursor.bump()?; // Consume the >
             }
 
-            if cursor.first().kind == TokenKind::DoubleColon {
-                cursor.bump()?; // Consume the ::
+            // `A::B::C` — an enum's variant, a nested enum's variant, and so
+            // on down. Each segment has to be a *type* name: `A::B::some_fn` is
+            // a static member access on `A::B`, so the loop stops before it and
+            // leaves the `::` for the caller.
+            let mut type_name = type_name;
 
-                let TokenKind::Identifier(variant_name) = cursor.first().kind else {
-                    if cursor.first().kind != TokenKind::Less {
+            while cursor.first().kind == TokenKind::DoubleColon {
+                let TokenKind::Identifier(variant_name) = cursor.second().kind else {
+                    if cursor.second().kind != TokenKind::Less {
                         return Err(format!(
                             "Expected variant name but found {:?}",
-                            cursor.first().kind
+                            cursor.second().kind
                         ));
                     }
 
+                    cursor.bump()?; // Consume the ::
                     cursor.bump()?; // Consume the <
 
                     let generics = parse_comma_separated_type_annotations(
@@ -524,17 +529,14 @@ pub(super) fn parse_type_annotation(
                     return Ok(TypeAnnotation::ConcreteType(type_name, generics));
                 };
 
-                cursor.bump()?; // Consume the variant name
-
-                variant_name.validate_type_identifier_name()?;
-
-                let type_name = format!("{type_name}::{variant_name}");
-
-                if let Some(generics) = generics {
-                    return Ok(TypeAnnotation::ConcreteType(type_name, generics));
+                if variant_name.validate_type_identifier_name().is_err() {
+                    break;
                 }
 
-                return Ok(TypeAnnotation::Type(type_name));
+                cursor.bump()?; // Consume the ::
+                cursor.bump()?; // Consume the variant name
+
+                type_name = format!("{type_name}::{variant_name}");
             }
 
             if let Some(generics) = generics {

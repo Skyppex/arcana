@@ -41,7 +41,7 @@ pub enum TypedStatement {
     EnumDeclaration {
         type_identifier: TypeIdentifier,
         shared_fields: Vec<StructField>,
-        members: Vec<StructData>,
+        members: Vec<EnumVariant>,
         type_: Type,
     },
     UnionDeclaration {
@@ -174,7 +174,7 @@ impl Display for TypedStatement {
                 type_identifier,
                 members
                     .iter()
-                    .map(|m| m.type_identifier.to_key())
+                    .map(|m| m.type_identifier().to_key())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -729,6 +729,61 @@ pub struct StructData {
     pub embedded_structs: Vec<EmbeddedStruct>,
     pub fields: Vec<StructField>,
     pub type_: Type,
+}
+
+/// A checked enum variant: a struct, or a nested enum with variants of its own.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EnumVariant {
+    Struct(StructData),
+    Enum(EnumData),
+}
+
+impl EnumVariant {
+    pub fn type_identifier(&self) -> &TypeIdentifier {
+        match self {
+            EnumVariant::Struct(data) => &data.type_identifier,
+            EnumVariant::Enum(data) => &data.type_identifier,
+        }
+    }
+
+    pub fn type_(&self) -> &Type {
+        match self {
+            EnumVariant::Struct(data) => &data.type_,
+            EnumVariant::Enum(data) => &data.type_,
+        }
+    }
+}
+
+impl Display for EnumVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EnumVariant::Struct(data) => write!(f, "{}", data),
+            EnumVariant::Enum(data) => write!(f, "{}", data),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumData {
+    pub type_identifier: TypeIdentifier,
+    pub shared_fields: Vec<StructField>,
+    pub variants: Vec<EnumVariant>,
+    pub type_: Type,
+}
+
+impl Display for EnumData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "enum {} {{{}}}",
+            self.type_identifier,
+            self.variants
+                .iter()
+                .map(|v| v.type_identifier().to_key())
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
+    }
 }
 
 impl Display for StructData {

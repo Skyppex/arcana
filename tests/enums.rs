@@ -258,3 +258,28 @@ fn enum_can_be_matched_as_a_struct_over_shared_fields() {
     // Assert
     assert_eq!(result, int(5));
 }
+
+#[test]
+fn enum_variant_can_embed_a_struct() {
+    // Arrange
+    let input = r#"
+        struct Base { base: Int }
+
+        enum MyEnum {
+            WithEmbedded {
+                Base { base: 10 },
+                own: Int
+            },
+            Plain
+        }
+
+        let e = MyEnum::WithEmbedded { own: 5 };
+        e.base + e.own
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(15));
+}

@@ -1007,7 +1007,7 @@ pub fn check_type(
                 // As with structs, the literal names the variant but not the
                 // enum's type arguments. The expected type supplies them, and
                 // the variant is taken from the instantiated enum.
-                let type_ = match instantiated_variant(context.as_ref(), type_annotation, member) {
+                let type_ = match instantiated_variant(context.as_ref(), type_annotation) {
                     Some(instantiated) => instantiated,
                     None => type_environment
                         .borrow()
@@ -1901,11 +1901,11 @@ fn retype(expression: TypedExpression, type_: Type) -> TypedExpression {
 /// The variant of the expected enum that an enum literal names, when the
 /// expected type is an instantiation of that enum — the `Res<Int>::Ok` for a
 /// `Res::Ok { .. }` literal expected to be a `Res<Int>`.
-fn instantiated_variant(
-    expected: Option<&Type>,
-    annotation: &TypeAnnotation,
-    member: &str,
-) -> Option<Type> {
+///
+/// The variant may sit inside a nested enum, so the annotation's remaining
+/// segments are walked one level at a time: `Outer<Int>` + the annotation
+/// `Outer::Inner::Variant` follows `Inner` and then `Variant`.
+fn instantiated_variant(expected: Option<&Type>, annotation: &TypeAnnotation) -> Option<Type> {
     let Type::Enum(Enum {
         type_identifier,
         members,
@@ -1921,13 +1921,31 @@ fn instantiated_variant(
 
     // The literal's annotation is the qualified variant, `Res::Ok`.
     let annotation_name = annotation.name();
-    let (enum_name, _) = annotation_name.rsplit_once("::")?;
+    let path = annotation_name
+        .strip_prefix(type_identifier.name())?
+        .strip_prefix("::")?;
 
-    if enum_name != type_identifier.name() {
-        return None;
+    let mut owner = type_identifier;
+    let mut owner_members = members;
+    let mut found = None;
+
+    for segment in path.split("::") {
+        let member_type = get_enum_member(&owner_members, &owner, segment)?.clone();
+
+        if let Type::Enum(Enum {
+            type_identifier,
+            members,
+            ..
+        }) = &member_type
+        {
+            owner = type_identifier.clone();
+            owner_members = members.clone();
+        }
+
+        found = Some(member_type);
     }
 
-    get_enum_member(&members, &type_identifier, member).cloned()
+    found
 }
 
 /// Rejects a type argument list that doesn't match what the type declares,

@@ -2,7 +2,7 @@ use crate::{
     ast::pattern::{FieldPattern, Pattern},
     ast::{
         AccessModifier, ArrayItem, Assignment, AssociatedType, Binary, BinaryOperator, Call,
-        ClosureParameter, EmbeddedStruct, EnumDeclaration, EnumMember, EnumMemberField, Expression,
+        ClosureParameter, EmbeddedStruct, EnumData, EnumDeclaration, EnumVariant, Expression,
         FieldInitializer, FlagsMember, For, FunctionDeclaration, If, ImplementationDeclaration,
         Index, Match, MatchArm, Member, ModuleDeclaration, Parameter, ProtocolDeclaration,
         Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, Unary,
@@ -1426,49 +1426,6 @@ impl IndentDisplay for StructField {
     }
 }
 
-impl IndentDisplay for EnumMember {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        let mut result = String::new();
-        result.push_str(format!("<enum member> {}", self.identifier).as_str());
-        indent.increase();
-
-        for (i, field) in self.fields.iter().enumerate() {
-            if i < self.fields.len() - 1 {
-                result.push_str(
-                    format!("\n{}{}", indent.dash(), field.indent_display(indent)).as_str(),
-                );
-            } else {
-                indent.end_current();
-                result.push_str(
-                    format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str(),
-                );
-            }
-        }
-
-        indent.decrease();
-        result
-    }
-}
-
-impl IndentDisplay for EnumMemberField {
-    fn indent_display(&self, indent: &mut Indent) -> String {
-        let mut result = String::new();
-        result.push_str("<enum member field>\n");
-        indent.increase_leaf();
-        result.push_str(format!("{}identifier: {}\n", indent.dash(), &self.identifier).as_str());
-        result.push_str(
-            format!(
-                "{}type_annotation: {}",
-                indent.dash_end(),
-                self.type_annotation.indent_display(indent)
-            )
-            .as_str(),
-        );
-        indent.decrease();
-        result
-    }
-}
-
 impl IndentDisplay for FlagsMember {
     fn indent_display(&self, indent: &mut Indent) -> String {
         let mut result = String::new();
@@ -1536,6 +1493,53 @@ impl IndentDisplay for StructData {
                 indent.end_current();
                 result.push_str(
                     format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str(),
+                );
+            }
+        }
+
+        indent.decrease();
+        result
+    }
+}
+
+impl IndentDisplay for EnumVariant {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        match self {
+            EnumVariant::Struct(data) => data.indent_display(indent),
+            EnumVariant::Enum(data) => data.indent_display(indent),
+        }
+    }
+}
+
+impl IndentDisplay for EnumData {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str("<nested enum>");
+        indent.increase();
+        result.push_str(
+            format!(
+                "\n{}type_identifier: {}",
+                indent.dash(),
+                self.type_identifier.indent_display(indent)
+            )
+            .as_str(),
+        );
+
+        for shared_field in self.shared_fields.iter() {
+            result.push_str(
+                format!("\n{}{}", indent.dash(), shared_field.indent_display(indent)).as_str(),
+            );
+        }
+
+        for (i, variant) in self.variants.iter().enumerate() {
+            if i < self.variants.len() - 1 {
+                result.push_str(
+                    format!("\n{}{}", indent.dash(), variant.indent_display(indent)).as_str(),
+                );
+            } else {
+                indent.end_current();
+                result.push_str(
+                    format!("\n{}{}", indent.dash_end(), variant.indent_display(indent)).as_str(),
                 );
             }
         }
@@ -2957,6 +2961,45 @@ impl IndentDisplay for type_checker::model::StructData {
                 indent.end_current();
                 result.push_str(
                     format!("\n{}{}", indent.dash_end(), field.indent_display(indent)).as_str(),
+                );
+            }
+        }
+
+        indent.decrease();
+        result
+    }
+}
+
+impl IndentDisplay for type_checker::model::EnumVariant {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        match self {
+            type_checker::model::EnumVariant::Struct(data) => data.indent_display(indent),
+            type_checker::model::EnumVariant::Enum(data) => data.indent_display(indent),
+        }
+    }
+}
+
+impl IndentDisplay for type_checker::model::EnumData {
+    fn indent_display(&self, indent: &mut Indent) -> String {
+        let mut result = String::new();
+        result.push_str(format!("<nested enum> {}", self.type_).as_str());
+        indent.increase();
+
+        for shared_field in self.shared_fields.iter() {
+            result.push_str(
+                format!("\n{}{}", indent.dash(), shared_field.indent_display(indent)).as_str(),
+            );
+        }
+
+        for (i, variant) in self.variants.iter().enumerate() {
+            if i < self.variants.len() - 1 {
+                result.push_str(
+                    format!("\n{}{}", indent.dash(), variant.indent_display(indent)).as_str(),
+                );
+            } else {
+                indent.end_current();
+                result.push_str(
+                    format!("\n{}{}", indent.dash_end(), variant.indent_display(indent)).as_str(),
                 );
             }
         }

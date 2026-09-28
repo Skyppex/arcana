@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast::{Expression, Parameter, Statement, StructData},
+    ast::{EnumVariant, Expression, Parameter, Statement},
     types::{GenericType, TypeAnnotation, TypeIdentifier},
 };
 
@@ -23,7 +23,7 @@ pub enum DiscoveredType {
     Enum {
         type_identifier: TypeIdentifier,
         shared_fields: HashMap<String, TypeAnnotation>,
-        members: Vec<StructData>,
+        members: Vec<EnumVariant>,
     },
     Union(TypeIdentifier, Vec<TypeAnnotation>),
     TypeAlias(TypeIdentifier, Vec<TypeAnnotation>),

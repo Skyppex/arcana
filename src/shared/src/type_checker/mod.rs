@@ -197,6 +197,71 @@ fn substitute_fields(
         .collect()
 }
 
+/// Substitutes type arguments through an enum's members, recursing into nested
+/// enums so that `Outer<Int>::Inner::Variant` gets its parameters too.
+fn substitute_enum_members(
+    members: &HashMap<String, Type>,
+    owner: &TypeIdentifier,
+    type_map: &HashMap<&GenericType, &TypeAnnotation>,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rc<RefCell<TypeEnvironment>>,
+) -> Result<HashMap<String, Type>, String> {
+    let mut substituted = HashMap::new();
+
+    for (member_name, type_) in members.iter() {
+        // The member is re-parented onto the instantiated owner, under its own
+        // bare name — the key it is stored by is left exactly as it was, since
+        // callers look members up by whatever spelling the enum was built with
+        // (the built-in `Option` uses bare `Some`/`None`).
+        let member_identifier = TypeIdentifier::MemberType(
+            Box::new(owner.clone()),
+            member_name
+                .rsplit_once("::")
+                .map(|(_, name)| name.to_owned())
+                .unwrap_or_else(|| member_name.clone()),
+        );
+
+        let member_type = match type_ {
+            Type::Struct(r#struct) => Type::Struct(Struct {
+                type_identifier: member_identifier.clone(),
+                embedded_structs: r#struct.embedded_structs.clone(),
+                fields: substitute_fields(
+                    &r#struct.fields,
+                    type_map,
+                    discovered_types,
+                    type_environment.clone(),
+                )?,
+            }),
+            Type::Enum(nested) => Type::Enum(Enum {
+                type_identifier: member_identifier.clone(),
+                shared_fields: substitute_fields(
+                    &nested.shared_fields,
+                    type_map,
+                    discovered_types,
+                    type_environment.clone(),
+                )?,
+                members: substitute_enum_members(
+                    &nested.members,
+                    &member_identifier,
+                    type_map,
+                    discovered_types,
+                    type_environment.clone(),
+                )?,
+            }),
+            other => {
+                return Err(format!(
+                    "Enum members are not of type EnumMember {}",
+                    other.full_name()
+                ))
+            }
+        };
+
+        substituted.insert(member_name.clone(), member_type);
+    }
+
+    Ok(substituted)
+}
+
 pub fn get_field_by_name<'a>(
     struct_fields: &'a [StructField],
     field_name: &'a str,
@@ -771,37 +836,13 @@ impl Type {
                     type_environment.clone(),
                 )?;
 
-                let mut members = HashMap::new();
-
-                for (member_name, type_) in r#enum.members.iter() {
-                    let Type::Struct(r#struct) = type_ else {
-                        return Err(format!(
-                            "Enum members are not of type EnumMember {}",
-                            type_.full_name()
-                        ));
-                    };
-
-                    let fields = substitute_fields(
-                        &r#struct.fields,
-                        &type_map,
-                        discovered_types,
-                        type_environment.clone(),
-                    )?;
-
-                    let member_type = Type::Struct(Struct {
-                        type_identifier: TypeIdentifier::MemberType(
-                            Box::new(TypeIdentifier::ConcreteType(
-                                name.clone(),
-                                concrete_types.clone(),
-                            )),
-                            member_name.clone(),
-                        ),
-                        embedded_structs: r#struct.embedded_structs.clone(),
-                        fields,
-                    });
-
-                    members.insert(member_name.clone(), member_type);
-                }
+                let members = substitute_enum_members(
+                    &r#enum.members,
+                    &TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone()),
+                    &type_map,
+                    discovered_types,
+                    type_environment.clone(),
+                )?;
 
                 let enum_ = Type::Enum(Enum {
                     type_identifier,
@@ -1529,13 +1570,30 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 ..
             }),
             Type::Struct(Struct {
-                type_identifier: TypeIdentifier::MemberType(enum_name, discriminant_name),
+                type_identifier: member_identifier @ TypeIdentifier::MemberType(..),
                 ..
             }),
         ) => {
-            *type_identifier == **enum_name
-                && get_enum_member(members, type_identifier, discriminant_name).is_some()
+            // A variant is its enum, and — through a nested enum — any enum it
+            // is declared inside.
+            if let TypeIdentifier::MemberType(enum_name, discriminant_name) = member_identifier {
+                if *type_identifier == **enum_name {
+                    return get_enum_member(members, type_identifier, discriminant_name).is_some();
+                }
+            }
+
+            is_declared_in(member_identifier, type_identifier)
         }
+        // A nested enum is its enclosing enum.
+        (
+            Type::Enum(Enum {
+                type_identifier, ..
+            }),
+            Type::Enum(Enum {
+                type_identifier: member_identifier @ TypeIdentifier::MemberType(..),
+                ..
+            }),
+        ) => is_declared_in(member_identifier, type_identifier),
         (
             Type::Struct(Struct {
                 type_identifier: left_type_identifier,
@@ -1734,6 +1792,24 @@ pub fn runtime_type(type_: &Type) -> Type {
 /// Declared enums key their members by the member type's key (`E.A`), while the
 /// built-in `Option` keys them by the bare variant name, so both spellings are
 /// tried.
+/// Whether `member` is declared inside `enum_identifier`, at any depth.
+///
+/// `Outer::Inner::Variant` is declared in `Outer::Inner` and in `Outer`, so a
+/// value of it is assignable to either.
+fn is_declared_in(member: &TypeIdentifier, enum_identifier: &TypeIdentifier) -> bool {
+    let mut current = member;
+
+    while let TypeIdentifier::MemberType(parent, _) = current {
+        if **parent == *enum_identifier {
+            return true;
+        }
+
+        current = parent;
+    }
+
+    false
+}
+
 pub fn get_enum_member<'a>(
     members: &'a HashMap<String, Type>,
     enum_identifier: &TypeIdentifier,
@@ -1743,6 +1819,5 @@ pub fn get_enum_member<'a>(
 
     members
         .get(variant)
-        .or_else(|| members.get(&format!("{}.{}", enum_key, variant)))
         .or_else(|| members.get(&format!("{}::{}", enum_key, variant)))
 }
