@@ -520,6 +520,9 @@ fn parse_enum_declaration_statement(
 
     let where_clause = parse_where_clause(cursor)?;
 
+    // `enum Foo;` declares no variants, which the type checker rejects. It is
+    // parsed rather than refused here so the error names the problem instead of
+    // being a bare parse failure.
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
         return Ok(Statement::EnumDeclaration(EnumDeclaration {

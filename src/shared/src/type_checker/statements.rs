@@ -1308,6 +1308,16 @@ fn check_enum_shape(
     shared_fields: &[ast::StructField],
     members: &[ast::EnumVariant],
 ) -> Result<(), String> {
+    // An enum with no variants has no values, so nothing could ever construct
+    // or match one. Rejecting it here is what lets exhaustiveness checking
+    // assume every enum is inhabited.
+    if members.is_empty() {
+        return Err(format!(
+            "Enum '{}' has no variants; an enum with no variants has no values",
+            type_identifier
+        ));
+    }
+
     let mut shared_field_identifiers = HashSet::new();
 
     for field in shared_fields {

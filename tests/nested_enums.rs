@@ -383,3 +383,52 @@ fn matching_a_flat_enum_is_unaffected() {
     // Assert
     assert_eq!(result, int(1));
 }
+
+// --- Empty enums ------------------------------------------------------------
+
+#[test]
+fn an_enum_with_no_variants_is_rejected() {
+    // Arrange
+    let input = r#"
+        enum Empty { }
+        0
+    "#;
+
+    // Act
+    let result = try_create_typed_ast(input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("no variants"));
+}
+
+#[test]
+fn a_forward_declared_enum_is_rejected_as_having_no_variants() {
+    // Arrange: `enum Foo;` parses, so that the error names the real problem.
+    let input = r#"
+        enum Empty;
+        0
+    "#;
+
+    // Act
+    let result = try_create_typed_ast(input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("no variants"));
+}
+
+#[test]
+fn a_nested_enum_with_no_variants_is_rejected() {
+    // Arrange
+    let input = r#"
+        enum Outer { S1, enum Inner { } }
+        0
+    "#;
+
+    // Act
+    let result = try_create_typed_ast(input);
+
+    // Assert
+    let error = result.unwrap_err();
+    assert!(error.contains("Outer::Inner"), "{}", error);
+    assert!(error.contains("no variants"), "{}", error);
+}
