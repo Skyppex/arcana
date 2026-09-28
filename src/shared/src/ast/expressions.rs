@@ -1389,41 +1389,55 @@ fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, String> {
         TokenKind::GreaterEqual => {
             parse_comparison_pattern(cursor, ComparisonOperator::GreaterThanOrEqual)
         }
-        // `::First` — the enum comes from the matched value.
+        // `::First`, or `::E2::S3` down through nested enums. The path is
+        // resolved against the matched value's type.
         TokenKind::DoubleColon => {
-            cursor.bump()?; // Consume the ::
+            let mut path = vec![];
 
-            let TokenKind::Identifier(variant) = cursor.first().kind else {
-                return Err(format!(
-                    "Expected a variant name after :: but found {:?}",
-                    cursor.first().kind
-                ));
-            };
+            while cursor.first().kind == TokenKind::DoubleColon {
+                let TokenKind::Identifier(variant) = cursor.second().kind else {
+                    return Err(format!(
+                        "Expected a variant name after :: but found {:?}",
+                        cursor.second().kind
+                    ));
+                };
 
-            variant.validate_type_identifier_name()?;
-            cursor.bump()?; // Consume the variant name
+                variant.validate_type_identifier_name()?;
+
+                cursor.bump()?; // Consume the ::
+                cursor.bump()?; // Consume the variant name
+
+                path.push(variant);
+            }
+
+            let (binding, fields) = parse_variant_tail(cursor, &path)?;
 
             Ok(Pattern::EnumVariant {
                 enum_annotation: None,
-                variant,
-                fields: parse_optional_field_patterns(cursor)?,
+                path,
+                binding,
+                fields,
             })
         }
         // `MyEnum::First { .. }` or `Point { .. }`. A `::` anywhere in the name
         // makes it a variant; without one it is always a struct.
         TokenKind::Identifier(identifier) if identifier.validate_type_identifier_name().is_ok() => {
             let type_annotation = parse_type_annotation(cursor, false)?;
-            let fields = parse_optional_field_patterns(cursor)?;
 
             match split_variant_annotation(&type_annotation) {
-                Some((enum_annotation, variant)) => Ok(Pattern::EnumVariant {
-                    enum_annotation: Some(enum_annotation),
-                    variant,
-                    fields,
-                }),
+                Some((enum_annotation, path)) => {
+                    let (binding, fields) = parse_variant_tail(cursor, &path)?;
+
+                    Ok(Pattern::EnumVariant {
+                        enum_annotation: Some(enum_annotation),
+                        path,
+                        binding,
+                        fields,
+                    })
+                }
                 None => Ok(Pattern::Struct {
                     type_annotation: Some(type_annotation),
-                    fields,
+                    fields: parse_optional_field_patterns(cursor)?,
                 }),
             }
         }
@@ -1558,23 +1572,60 @@ fn parse_field_patterns(cursor: &mut Cursor) -> Result<Vec<FieldPattern>, String
     Ok(fields)
 }
 
-/// Splits `MyEnum::First` into the enum annotation and the variant name.
-/// Returns `None` for a plain type name, which is therefore a struct.
-fn split_variant_annotation(type_annotation: &TypeAnnotation) -> Option<(TypeAnnotation, String)> {
+/// Splits `MyEnum::First` or `E1::E2::S3` into the enum being named and the
+/// path of variants below it. Returns `None` for a plain type name, which is
+/// therefore a struct.
+///
+/// The split is at the *first* `::`: the leading segment names the enum, and
+/// everything after it is the path down through its variants.
+fn split_variant_annotation(
+    type_annotation: &TypeAnnotation,
+) -> Option<(TypeAnnotation, Vec<String>)> {
     let (name, generics) = match type_annotation {
         TypeAnnotation::Type(name) => (name, None),
         TypeAnnotation::ConcreteType(name, generics) => (name, Some(generics.clone())),
         _ => return None,
     };
 
-    let (enum_name, variant) = name.rsplit_once("::")?;
+    let (enum_name, path) = name.split_once("::")?;
 
     let enum_annotation = match generics {
         Some(generics) => TypeAnnotation::ConcreteType(enum_name.to_owned(), generics),
         None => TypeAnnotation::Type(enum_name.to_owned()),
     };
 
-    Some((enum_annotation, variant.to_owned()))
+    Some((
+        enum_annotation,
+        path.split("::").map(|s| s.to_owned()).collect(),
+    ))
+}
+
+/// What follows a variant path: a binding, or field patterns, but never both.
+///
+/// Binding the variant and looking into its fields are alternatives — once the
+/// value is bound its fields are reachable through it, so allowing both would
+/// be two spellings of one thing.
+fn parse_variant_tail(
+    cursor: &mut Cursor,
+    path: &[String],
+) -> Result<(Option<String>, Vec<FieldPattern>), String> {
+    if let TokenKind::Identifier(binding) = cursor.first().kind {
+        if binding.validate_variable_identifier_name().is_ok() {
+            cursor.bump()?; // Consume the binding
+
+            if cursor.first().kind == TokenKind::OpenBrace {
+                return Err(format!(
+                    "Pattern `::{}` binds `{}` and destructures its fields; a variant pattern may do one or the other, not both",
+                    path.join("::"),
+                    binding
+                ));
+            }
+
+            return Ok((Some(binding), vec![]));
+        }
+    }
+
+    Ok((None, parse_optional_field_patterns(cursor)?))
 }
 
 fn parse_rune(literal: &str) -> Result<char, String> {

@@ -26,6 +26,11 @@ pub enum AccessPath {
     Root,
     Field(Box<AccessPath>, String),
     TupleIndex(Box<AccessPath>, usize),
+    /// The same value, viewed as one of its nested enums. Projecting this is
+    /// the identity — only the static type changes — but it is a path of its
+    /// own so that the nested enum gets its own switch, with its own set of
+    /// constructors to be exhaustive over.
+    Narrow(Box<AccessPath>, String),
 }
 
 impl Display for AccessPath {
@@ -34,6 +39,7 @@ impl Display for AccessPath {
             AccessPath::Root => write!(f, "<matched value>"),
             AccessPath::Field(parent, name) => write!(f, "{}.{}", parent, name),
             AccessPath::TupleIndex(parent, index) => write!(f, "{}.{}", parent, index),
+            AccessPath::Narrow(parent, name) => write!(f, "{} as {}", parent, name),
         }
     }
 }
@@ -62,6 +68,13 @@ impl Occurrence {
     fn tuple_index(&self, index: usize, type_: Type) -> Self {
         Occurrence {
             path: AccessPath::TupleIndex(Box::new(self.path.clone()), index),
+            type_,
+        }
+    }
+
+    fn narrow(&self, name: &str, type_: Type) -> Self {
+        Occurrence {
+            path: AccessPath::Narrow(Box::new(self.path.clone()), name.to_owned()),
             type_,
         }
     }
@@ -377,10 +390,32 @@ fn compile_constructor_switch(
 
                     if &row_test == test {
                         let extra = match pattern {
-                            CheckedPattern::Variant { fields, .. } => fields
+                            CheckedPattern::Variant {
+                                binding, fields, ..
+                            } => fields
                                 .iter()
                                 .map(|field| field_obligation(occurrence, field.clone()))
+                                // Binding the variant binds the value that was
+                                // just tested, at this same occurrence.
+                                .chain(binding.iter().map(|identifier| {
+                                    (
+                                        occurrence.clone(),
+                                        CheckedPattern::Binding(identifier.clone()),
+                                    )
+                                }))
                                 .collect(),
+                            // The value does not change, only the type it is
+                            // matched at, so the rest of the pattern is an
+                            // obligation on the narrowed occurrence.
+                            CheckedPattern::NestedVariant {
+                                variant,
+                                type_,
+                                inner,
+                                ..
+                            } => vec![(
+                                occurrence.narrow(variant, type_.clone()),
+                                inner.as_ref().clone(),
+                            )],
                             _ => vec![],
                         };
 
@@ -506,7 +541,10 @@ fn pattern_test(pattern: &CheckedPattern) -> Test {
         CheckedPattern::Float(v) => Test::Float(*v),
         CheckedPattern::Rune(v) => Test::Rune(*v),
         CheckedPattern::String(v) => Test::String(v.clone()),
-        CheckedPattern::Variant { qualified_name, .. } => Test::Variant(qualified_name.clone()),
+        CheckedPattern::Variant { qualified_name, .. }
+        | CheckedPattern::NestedVariant { qualified_name, .. } => {
+            Test::Variant(qualified_name.clone())
+        }
         CheckedPattern::Comparison { operator, bound } => Test::Comparison {
             operator: *operator,
             bound: bound.clone(),

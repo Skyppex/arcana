@@ -44,13 +44,35 @@ pub enum Pattern {
         type_annotation: Option<TypeAnnotation>,
         fields: Vec<FieldPattern>,
     },
-    /// `MyEnum::First { x }` or `::First { x }`. The annotation is absent for
-    /// the unqualified form, where the enum comes from the matched value.
+    /// `MyEnum::First { x }`, `::First { x }`, `::E2::S3 { x }`, `::E2 e2`.
+    ///
+    /// The annotation is absent for the unqualified form, where the enum comes
+    /// from the matched value. `path` is the chain of variant names below that
+    /// enum, outermost first, so a variant of a nested enum is just a longer
+    /// path — the first segment is always resolved against the matched enum
+    /// itself and never searched for.
+    ///
+    /// A variant may either bind the value it matched or look into its fields,
+    /// never both, so at most one of `binding` and `fields` is non-empty.
     EnumVariant {
         enum_annotation: Option<TypeAnnotation>,
-        variant: String,
+        path: Vec<String>,
+        binding: Option<String>,
         fields: Vec<FieldPattern>,
     },
+}
+
+impl Pattern {
+    /// The path as written, for error messages: `E1::E2::S3` or `::E2::S3`.
+    pub fn variant_path_name(
+        enum_annotation: &Option<TypeAnnotation>,
+        path: &[String],
+    ) -> String {
+        match enum_annotation {
+            Some(annotation) => format!("{}::{}", annotation, path.join("::")),
+            None => format!("::{}", path.join("::")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -144,7 +166,18 @@ impl Pattern {
                     pattern.collect_bindings(names);
                 }
             }
-            Pattern::Struct { fields, .. } | Pattern::EnumVariant { fields, .. } => {
+            Pattern::Struct { fields, .. } => {
+                for field in fields {
+                    field.pattern.collect_bindings(names);
+                }
+            }
+            Pattern::EnumVariant {
+                binding, fields, ..
+            } => {
+                if let Some(binding) = binding {
+                    names.push(binding.clone());
+                }
+
                 for field in fields {
                     field.pattern.collect_bindings(names);
                 }
@@ -199,12 +232,14 @@ impl Display for Pattern {
             }
             Pattern::EnumVariant {
                 enum_annotation,
-                variant,
+                path,
+                binding,
                 fields,
             } => {
-                match enum_annotation {
-                    Some(enum_annotation) => write!(f, "{}::{}", enum_annotation, variant)?,
-                    None => write!(f, "::{}", variant)?,
+                write!(f, "{}", Pattern::variant_path_name(enum_annotation, path))?;
+
+                if let Some(binding) = binding {
+                    return write!(f, " {}", binding);
                 }
 
                 if fields.is_empty() {

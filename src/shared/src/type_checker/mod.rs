@@ -1584,7 +1584,7 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
 
             is_declared_in(member_identifier, type_identifier)
         }
-        // A nested enum is its enclosing enum.
+        // A nested enum is itself, and is also its enclosing enum.
         (
             Type::Enum(Enum {
                 type_identifier, ..
@@ -1593,7 +1593,9 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 type_identifier: member_identifier @ TypeIdentifier::MemberType(..),
                 ..
             }),
-        ) => is_declared_in(member_identifier, type_identifier),
+        ) => {
+            type_identifier == member_identifier || is_declared_in(member_identifier, type_identifier)
+        }
         (
             Type::Struct(Struct {
                 type_identifier: left_type_identifier,

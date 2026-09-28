@@ -48,7 +48,24 @@ pub enum CheckedPattern {
         /// the runtime value.
         qualified_name: String,
         variant: String,
+        /// Binds the matched value, at the variant's own type. Exclusive with
+        /// `fields`.
+        binding: Option<String>,
         fields: Vec<CheckedFieldPattern>,
+    },
+    /// A test for a variant that is itself an enum, narrowing the value to that
+    /// enum before applying `inner`.
+    ///
+    /// The narrowing is only a change of static type: the runtime value carries
+    /// its full path, so nothing is projected out of it.
+    NestedVariant {
+        /// Fully qualified, e.g. `E1::E2` — the prefix carried by the runtime
+        /// value of any variant declared inside it.
+        qualified_name: String,
+        variant: String,
+        /// The nested enum's type, which the narrowed value is matched at.
+        type_: Type,
+        inner: Box<CheckedPattern>,
     },
 }
 
@@ -113,6 +130,16 @@ impl Display for CheckedPattern {
                     .join(", ")
             ),
             CheckedPattern::Fields(fields) => write_fields(f, fields),
+            CheckedPattern::NestedVariant {
+                qualified_name,
+                inner,
+                ..
+            } => write!(f, "{} {}", qualified_name, inner),
+            CheckedPattern::Variant {
+                qualified_name,
+                binding: Some(binding),
+                ..
+            } => write!(f, "{} {}", qualified_name, binding),
             CheckedPattern::Variant {
                 qualified_name,
                 fields,
@@ -273,12 +300,14 @@ fn check_pattern_inner(
         }
         Pattern::EnumVariant {
             enum_annotation,
-            variant,
+            path,
+            binding,
             fields,
         } => check_variant_pattern(
             pattern,
             enum_annotation.as_ref(),
-            variant,
+            path,
+            binding.as_ref(),
             fields,
             type_,
             type_environment,
@@ -354,19 +383,16 @@ fn check_field_patterns(
 fn check_variant_pattern(
     pattern: &Pattern,
     enum_annotation: Option<&TypeAnnotation>,
-    variant: &str,
+    path: &[String],
+    binding: Option<&String>,
     fields: &[crate::ast::pattern::FieldPattern],
     type_: &Type,
     type_environment: &Rcrc<TypeEnvironment>,
     bindings: &mut Vec<PatternBinding>,
 ) -> Result<CheckedPattern, String> {
     match type_.clone().unsubstitute() {
-        Type::Enum(Enum {
-            type_identifier,
-            members,
-            ..
-        }) => {
-            let enum_annotation_of_type = TypeAnnotation::from(&type_identifier);
+        Type::Enum(enum_) => {
+            let enum_annotation_of_type = TypeAnnotation::from(&enum_.type_identifier);
 
             if let Some(enum_annotation) = enum_annotation {
                 if !type_annotation_equals(enum_annotation, &enum_annotation_of_type) {
@@ -377,28 +403,15 @@ fn check_variant_pattern(
                 }
             }
 
-            let Some(member_type) = get_enum_member(&members, &type_identifier, variant) else {
-                return Err(format!(
-                    "{} has no variant named `{}`",
-                    enum_annotation_of_type, variant
-                ));
-            };
-
-            let member_fields = variant_fields(member_type)?;
-            let owner = TypeAnnotation::Type(format!("{}::{}", enum_annotation_of_type, variant));
-
-            Ok(CheckedPattern::Variant {
-                qualified_name: member_type.clone().unsubstitute().to_key(),
-                variant: variant.to_owned(),
-                fields: check_field_patterns(
-                    fields,
-                    &member_fields,
-                    &owner,
-                    false,
-                    type_environment,
-                    bindings,
-                )?,
-            })
+            walk_variant_path(
+                pattern,
+                &enum_,
+                path,
+                binding,
+                fields,
+                type_environment,
+                bindings,
+            )
         }
         // The matched value is already narrowed to one variant, so the variant
         // is known statically: no test is needed, and a different variant can
@@ -419,11 +432,23 @@ fn check_variant_pattern(
                 }
             }
 
-            if member_name != variant {
+            let [variant] = path else {
                 return Err(format!(
                     "Pattern `{}` can never match: the value is always {}::{}",
                     pattern, enum_annotation_of_type, member_name
                 ));
+            };
+
+            if *member_name != *variant {
+                return Err(format!(
+                    "Pattern `{}` can never match: the value is always {}::{}",
+                    pattern, enum_annotation_of_type, member_name
+                ));
+            }
+
+            if let Some(binding) = binding {
+                bindings.push((binding.clone(), type_.clone()));
+                return Ok(CheckedPattern::Binding(binding.clone()));
             }
 
             let owner = TypeAnnotation::Type(format!("{}::{}", enum_annotation_of_type, variant));
@@ -444,9 +469,118 @@ fn check_variant_pattern(
     }
 }
 
-fn variant_fields(member_type: &Type) -> Result<Vec<crate::type_checker::StructField>, String> {
+/// Resolves a variant path one segment at a time, against the enum each segment
+/// belongs to.
+///
+/// Every segment but the last has to name a nested enum; the last may name
+/// either a nested enum or a struct variant, and is where the pattern's binding
+/// or field patterns apply.
+fn walk_variant_path(
+    pattern: &Pattern,
+    enum_: &Enum,
+    path: &[String],
+    binding: Option<&String>,
+    fields: &[crate::ast::pattern::FieldPattern],
+    type_environment: &Rcrc<TypeEnvironment>,
+    bindings: &mut Vec<PatternBinding>,
+) -> Result<CheckedPattern, String> {
+    let enum_annotation_of_type = TypeAnnotation::from(&enum_.type_identifier);
+
+    let Some((variant, rest)) = path.split_first() else {
+        return Err(format!("Pattern `{}` names no variant", pattern));
+    };
+
+    let Some(member_type) = get_enum_member(&enum_.members, &enum_.type_identifier, variant) else {
+        return Err(format!(
+            "{} has no variant named `{}`",
+            enum_annotation_of_type, variant
+        ));
+    };
+
+    let qualified_name = member_type.clone().unsubstitute().to_key();
+
+    // A segment in the middle of the path has to be an enum for the next
+    // segment to mean anything.
+    if !rest.is_empty() {
+        let Type::Enum(nested) = member_type.clone().unsubstitute() else {
+            return Err(format!(
+                "`{}` is not an enum, so it has no variant `{}`",
+                qualified_name, rest[0]
+            ));
+        };
+
+        return Ok(CheckedPattern::NestedVariant {
+            qualified_name,
+            variant: variant.clone(),
+            type_: member_type.clone(),
+            inner: Box::new(walk_variant_path(
+                pattern,
+                &nested,
+                rest,
+                binding,
+                fields,
+                type_environment,
+                bindings,
+            )?),
+        });
+    }
+
+    let owner = TypeAnnotation::Type(qualified_name.clone());
+
     match member_type.clone().unsubstitute() {
-        Type::Struct(Struct { fields, .. }) => Ok(fields),
+        // A nested enum: narrow to it, then bind it or read its shared fields.
+        Type::Enum(nested) => {
+            let inner = match binding {
+                Some(binding) => {
+                    bindings.push((binding.clone(), member_type.clone()));
+                    CheckedPattern::Binding(binding.clone())
+                }
+                None => CheckedPattern::Fields(check_field_patterns(
+                    fields,
+                    &nested.shared_fields,
+                    &owner,
+                    true,
+                    type_environment,
+                    bindings,
+                )?),
+            };
+
+            Ok(CheckedPattern::NestedVariant {
+                qualified_name,
+                variant: variant.clone(),
+                type_: member_type.clone(),
+                inner: Box::new(inner),
+            })
+        }
+        Type::Struct(Struct {
+            fields: member_fields,
+            ..
+        }) => {
+            if let Some(binding) = binding {
+                bindings.push((binding.clone(), member_type.clone()));
+
+                return Ok(CheckedPattern::Variant {
+                    qualified_name,
+                    variant: variant.clone(),
+                    binding: Some(binding.clone()),
+                    fields: vec![],
+                });
+            }
+
+            Ok(CheckedPattern::Variant {
+                qualified_name,
+                variant: variant.clone(),
+                binding: None,
+                fields: check_field_patterns(
+                    fields,
+                    &member_fields,
+                    &owner,
+                    false,
+                    type_environment,
+                    bindings,
+                )?,
+            })
+        }
         other => Err(format!("Expected an enum variant but found {}", other)),
     }
 }

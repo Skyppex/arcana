@@ -1,8 +1,8 @@
 //! An enum variant may itself be an enum, written `enum Name { .. }` in place
 //! of a struct variant.
 //!
-//! Matching over a nested enum is not implemented yet — see the tests at the
-//! bottom, which record that it is rejected rather than silently misbehaving.
+//! A variant of a nested enum is named by a longer path — `::E2::S3` — and a
+//! path may stop at any level and bind what it matched.
 
 mod common;
 
@@ -327,45 +327,6 @@ fn a_nested_enum_cannot_declare_its_own_type_parameters() {
     assert!(result.unwrap_err().contains("type parameters"));
 }
 
-// --- Matching is not implemented yet ----------------------------------------
-
-#[test]
-fn matching_a_nested_variant_is_rejected_for_now() {
-    // Arrange
-    let input = r#"
-        enum Outer { Struct { id: Int }, enum Inner { Variant, Other } }
-        let x: Outer = Outer::Inner::Variant;
-        x match
-        | Outer::Struct { id } => id,
-        | Outer::Inner::Variant => 1,
-        | Outer::Inner::Other => 2
-    "#;
-
-    // Act
-    let result = try_create_typed_ast(input);
-
-    // Assert: rejected, not miscompiled.
-    assert!(result.is_err());
-}
-
-#[test]
-fn matching_a_whole_nested_enum_is_rejected_for_now() {
-    // Arrange
-    let input = r#"
-        enum Outer { Struct { id: Int }, enum Inner { Variant, Other } }
-        let x: Outer = Outer::Inner::Variant;
-        x match
-        | Outer::Struct { id } => id,
-        | Outer::Inner => 1
-    "#;
-
-    // Act
-    let result = try_create_typed_ast(input);
-
-    // Assert: rejected, not miscompiled.
-    assert!(result.is_err());
-}
-
 #[test]
 fn matching_a_flat_enum_is_unaffected() {
     // Arrange
@@ -431,4 +392,357 @@ fn a_nested_enum_with_no_variants_is_rejected() {
     let error = result.unwrap_err();
     assert!(error.contains("Outer::Inner"), "{}", error);
     assert!(error.contains("no variants"), "{}", error);
+}
+
+// --- Matching ---------------------------------------------------------------
+
+/// The shape from the design discussion: struct variants, a nested enum, and a
+/// nested enum whose only variant is itself a nested enum.
+const E1: &str = r#"
+    enum E1 {
+        S1 { f1: Int },
+        enum E2 {
+            S2,
+            S3 { f2: Int }
+        },
+        enum E3 {
+            enum E4 {
+                S4,
+                S5 { f3: Int }
+            }
+        }
+    }
+"#;
+
+#[test]
+fn every_leaf_path_can_be_matched_exhaustively() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E3::E4::S5 {{ f3: 7 }};
+        e match
+        | ::S1 {{ f1: f }} => f,
+        | ::E2::S2 => 2,
+        | ::E2::S3 {{ f2: f }} => f,
+        | ::E3::E4::S4 => 4,
+        | ::E3::E4::S5 {{ f3: f }} => f
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(7));
+}
+
+#[test]
+fn an_arm_for_a_whole_nested_enum_covers_all_of_its_variants() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E2::S3 {{ f2: 5 }};
+        e match
+        | ::S1 s1 => 1,
+        | ::E2 e2 => 2,
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(2));
+}
+
+#[test]
+fn a_path_may_stop_at_an_intermediate_nested_enum() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E3::E4::S4;
+        e match
+        | ::S1 s1 => 1,
+        | ::E2 e2 => 2,
+        | ::E3::E4 e4 => 4
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(4));
+}
+
+#[test]
+fn a_bound_struct_variant_has_the_variants_own_type() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::S1 {{ f1: 9 }};
+        e match
+        | ::S1 s1 => s1.f1,
+        | ::E2 e2 => 2,
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(9));
+}
+
+#[test]
+fn a_bound_nested_enum_can_be_passed_where_that_enum_is_expected() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        fun take_e2(x: E1::E2): Int {{ 42 }}
+        let e: E1 = E1::E2::S2;
+        e match
+        | ::S1 s1 => 1,
+        | ::E2 e2 => take_e2(e2),
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(42));
+}
+
+#[test]
+fn a_bound_deep_nested_enum_has_its_own_type() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        fun take_e4(x: E1::E3::E4): Int {{ 44 }}
+        let e: E1 = E1::E3::E4::S4;
+        e match
+        | ::S1 s1 => 1,
+        | ::E2 e2 => 2,
+        | ::E3::E4 e4 => take_e4(e4)
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(44));
+}
+
+#[test]
+fn a_bound_leaf_widens_to_an_enclosing_enum() {
+    // Arrange: binding the deepest level loses nothing, because a variant is
+    // assignable to every enum it is declared inside.
+    let input = format!(
+        r#"{E1}
+        fun take_e2(x: E1::E2): Int {{ 42 }}
+        let e: E1 = E1::E2::S3 {{ f2: 1 }};
+        e match
+        | ::S1 s1 => 1,
+        | ::E2::S2 => 2,
+        | ::E2::S3 s3 => take_e2(s3),
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(42));
+}
+
+#[test]
+fn a_binder_of_the_wrong_variant_type_is_rejected() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        fun take_e2(x: E1::E2): Int {{ 42 }}
+        let e: E1 = E1::S1 {{ f1: 1 }};
+        e match
+        | ::S1 s1 => take_e2(s1),
+        | ::E2 e2 => 2,
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = try_create_typed_ast(&input);
+
+    // Assert
+    assert!(result.is_err());
+}
+
+#[test]
+fn a_variant_path_may_be_written_fully_qualified() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E2::S2;
+        e match
+        | E1::S1 {{ f1: f }} => f,
+        | E1::E2::S2 => 2,
+        | E1::E2::S3 {{ f2: f }} => f,
+        | E1::E3 x => 3
+    "#
+    );
+
+    // Act
+    let result = evaluate_expression(&input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(2));
+}
+
+#[test]
+fn a_nested_enums_shared_fields_are_readable_once_narrowed_to_it() {
+    // Arrange
+    let input = r#"
+        enum Outer {
+            S1,
+            enum Inner { tag: Int, A, B }
+        }
+        let e: Outer = Outer::Inner::B { tag: 6 };
+        e match
+        | ::S1 => 0,
+        | ::Inner { tag } => tag
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, int(6));
+}
+
+// --- Matching: rejections ---------------------------------------------------
+
+#[test]
+fn leaving_a_nested_leaf_uncovered_is_rejected() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E2::S2;
+        e match
+        | ::S1 s1 => 1,
+        | ::E2::S2 => 2,
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = try_create_typed_ast(&input);
+
+    // Assert
+    let error = result.unwrap_err();
+    assert!(error.contains("not exhaustive"), "{}", error);
+    assert!(error.contains("E1::E2::S3"), "{}", error);
+}
+
+#[test]
+fn leaving_a_whole_nested_enum_uncovered_is_rejected() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E2::S2;
+        e match
+        | ::S1 s1 => 1,
+        | ::E2 e2 => 2
+    "#
+    );
+
+    // Act
+    let result = try_create_typed_ast(&input);
+
+    // Assert
+    let error = result.unwrap_err();
+    assert!(error.contains("not exhaustive"), "{}", error);
+    assert!(error.contains("E1::E3"), "{}", error);
+}
+
+#[test]
+fn an_arm_subsumed_by_a_broader_path_is_unreachable() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E2::S2;
+        e match
+        | ::S1 s1 => 1,
+        | ::E2 e2 => 2,
+        | ::E2::S2 => 22,
+        | ::E3 e3 => 3
+    "#
+    );
+
+    // Act
+    let result = try_create_typed_ast(&input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("unreachable"));
+}
+
+#[test]
+fn binding_a_variant_and_destructuring_it_is_rejected() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E2::S2;
+        e match
+        | ::S1 s1 {{ f1: f }} => 1,
+        | _ => 0
+    "#
+    );
+
+    // Act
+    let result = try_create_typed_ast(&input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("one or the other"));
+}
+
+#[test]
+fn the_first_segment_is_rooted_and_never_searched_for() {
+    // Arrange: `S2` exists, but only inside `E2`, so `::S2` does not find it.
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E2::S2;
+        e match
+        | ::S2 => 2,
+        | _ => 0
+    "#
+    );
+
+    // Act
+    let result = try_create_typed_ast(&input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("has no variant named `S2`"));
+}
+
+#[test]
+fn a_path_through_a_struct_variant_is_rejected() {
+    // Arrange
+    let input = format!(
+        r#"{E1}
+        let e: E1 = E1::E2::S2;
+        e match
+        | ::S1::Nope => 1,
+        | _ => 0
+    "#
+    );
+
+    // Act
+    let result = try_create_typed_ast(&input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("is not an enum"));
 }

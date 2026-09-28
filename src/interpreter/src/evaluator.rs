@@ -415,6 +415,9 @@ fn evaluate_decision_tree(
 fn project(value: &Value, path: &AccessPath) -> Result<Value, String> {
     match path {
         AccessPath::Root => Ok(value.clone()),
+        // Narrowing to a nested enum is a change of static type only; the
+        // runtime value is the same one.
+        AccessPath::Narrow(parent, _) => project(value, parent),
         AccessPath::Field(parent, name) => {
             let parent = project(value, parent)?;
             let fields = match &parent {
@@ -466,7 +469,14 @@ fn test_matches(
                 enum_member: Struct { type_name, .. },
                 ..
             }),
-        ) => qualified_name == type_name,
+        ) => {
+            // A value carries the full path of the variant it holds, so a test
+            // for a nested enum matches every variant declared inside it. The
+            // tests at any one occurrence are disjoint prefixes, so this stays
+            // unambiguous.
+            type_name == qualified_name
+                || type_name.starts_with(&format!("{}::", qualified_name))
+        }
         (Test::Comparison { operator, bound }, value) => {
             let bound = resolve_bound(bound, environment)?;
 
