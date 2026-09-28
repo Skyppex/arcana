@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::Display;
 
 use crate::types::TypeAnnotation;
@@ -149,6 +150,22 @@ impl Pattern {
             Pattern::Tuple(patterns) => patterns.iter().all(|p| p.is_unconditionally_irrefutable()),
             _ => false,
         }
+    }
+
+    /// Rejects a pattern that binds one name twice.
+    ///
+    /// The two would name different values and only the last would survive, so
+    /// it is always a mistake rather than a shorthand for equality.
+    pub fn check_no_duplicate_bindings(&self) -> Result<(), String> {
+        let mut seen = HashSet::new();
+
+        for name in self.bindings() {
+            if !seen.insert(name.clone()) {
+                return Err(format!("Pattern `{}` binds `{}` more than once", self, name));
+            }
+        }
+
+        Ok(())
     }
 
     /// Every name this pattern binds, in source order.

@@ -183,6 +183,8 @@ pub fn check_pattern(
     type_: &Type,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<(CheckedPattern, Vec<PatternBinding>), String> {
+    pattern.check_no_duplicate_bindings()?;
+
     let mut bindings = vec![];
     let checked = check_pattern_inner(pattern, type_, &type_environment, &mut bindings)?;
     Ok((checked, bindings))

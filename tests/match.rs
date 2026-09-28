@@ -1180,3 +1180,81 @@ fn an_arm_separator_is_not_parsed_as_bitwise_or() {
     // Assert
     assert_eq!(result, Value::String("inner one".to_owned()));
 }
+
+// --- Duplicate bindings -----------------------------------------------------
+
+#[test]
+fn a_pattern_cannot_bind_one_name_twice() {
+    // Arrange
+    let input = r#"
+        let t = (1, 2);
+        t match | (a, a) => a
+    "#;
+
+    // Act
+    let result = try_create_typed_ast(input);
+
+    // Assert
+    let error = result.unwrap_err();
+    assert!(error.contains("binds `a` more than once"), "{}", error);
+}
+
+#[test]
+fn a_struct_pattern_cannot_bind_one_name_twice() {
+    // Arrange
+    let input = r#"
+        struct P { x: Int, y: Int }
+        let p = P { x: 1, y: 2 };
+        p match | { x: a, y: a } => a
+    "#;
+
+    // Act
+    let result = try_create_typed_ast(input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("more than once"));
+}
+
+#[test]
+fn a_destructuring_declaration_cannot_bind_one_name_twice() {
+    // Arrange
+    let input = r#"
+        struct P { x: Int, y: Int }
+        let { x: a, y: a } = P { x: 1, y: 2 };
+        a
+    "#;
+
+    // Act
+    let result = try_create_typed_ast(input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("more than once"));
+}
+
+#[test]
+fn a_for_loop_pattern_cannot_bind_one_name_twice() {
+    // Arrange
+    let input = "for (a, a) in [(1, 2)] => a";
+
+    // Act
+    let result = try_create_typed_ast(input);
+
+    // Assert
+    assert!(result.unwrap_err().contains("more than once"));
+}
+
+#[test]
+fn a_pattern_may_shadow_a_name_from_the_enclosing_scope() {
+    // Arrange
+    let input = r#"
+        let a = 1;
+        let t = (5, 6);
+        t match | (a, b) => a
+    "#;
+
+    // Act
+    let result = evaluate_expression(input, create_env(), false);
+
+    // Assert
+    assert_eq!(result, Value::Number(value::Number::Int(5)));
+}

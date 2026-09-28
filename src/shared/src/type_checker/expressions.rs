@@ -2719,6 +2719,8 @@ fn check_type_pattern(
     // Without a type there is nothing to resolve the pattern against, so its
     // names are introduced untyped, as they were before.
     let Some(known_type) = known_type else {
+        pattern.check_no_duplicate_bindings()?;
+
         for identifier in pattern.bindings() {
             type_environment
                 .borrow_mut()
