@@ -1,12 +1,6 @@
 let a = 0..10;
 a:[2u..8u]:[2u..4u]:println()
 
-[a; 3u]:println()
-[a; ..3u]:println()
-[a; 3u..]:println()
-[a; 3u..6u]:println()
-[a; 3u..=6u]:println()
-
 a:[3u]:println()
 a:[..3u]:println()
 a:[3u..]:println()

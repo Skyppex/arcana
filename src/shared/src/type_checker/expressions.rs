@@ -2828,6 +2828,205 @@ fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, Strin
     }
 }
 
+fn fold_literal_binop(
+    left: &LiteralType,
+    operator: &BinaryOperator,
+    right: &LiteralType,
+) -> Option<Type> {
+    match (left, operator, right) {
+        (LiteralType::IntValue(a), BinaryOperator::Add, LiteralType::IntValue(b)) => {
+            match a.checked_add(*b) {
+                Some(result) => Some(Type::int_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::IntValue(a), BinaryOperator::Subtract, LiteralType::IntValue(b)) => {
+            match a.checked_sub(*b) {
+                Some(result) => Some(Type::int_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::IntValue(a), BinaryOperator::Multiply, LiteralType::IntValue(b)) => {
+            match a.checked_mul(*b) {
+                Some(result) => Some(Type::int_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::IntValue(a), BinaryOperator::Divide, LiteralType::IntValue(b)) => {
+            if *b == 0 {
+                return None;
+            }
+            match a.checked_div(*b) {
+                Some(result) => Some(Type::int_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::IntValue(a), BinaryOperator::Modulo, LiteralType::IntValue(b)) => {
+            if *b == 0 {
+                return None;
+            }
+            match a.checked_rem(*b) {
+                Some(result) => Some(Type::int_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::IntValue(a), BinaryOperator::BitwiseAnd, LiteralType::IntValue(b)) => {
+            Some(Type::int_literal(a & b))
+        }
+        (LiteralType::IntValue(a), BinaryOperator::BitwiseOr, LiteralType::IntValue(b)) => {
+            Some(Type::int_literal(a | b))
+        }
+        (LiteralType::IntValue(a), BinaryOperator::BitwiseXor, LiteralType::IntValue(b)) => {
+            Some(Type::int_literal(a ^ b))
+        }
+        (LiteralType::IntValue(a), BinaryOperator::BitwiseLeftShift, LiteralType::IntValue(b)) => {
+            if *b >= 64 {
+                return None;
+            }
+            Some(Type::int_literal(a << b))
+        }
+        (LiteralType::IntValue(a), BinaryOperator::BitwiseRightShift, LiteralType::IntValue(b)) => {
+            if *b >= 64 {
+                return None;
+            }
+            Some(Type::int_literal(a >> b))
+        }
+        (LiteralType::UIntValue(a), BinaryOperator::Add, LiteralType::UIntValue(b)) => {
+            match a.checked_add(*b) {
+                Some(result) => Some(Type::uint_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::UIntValue(a), BinaryOperator::Subtract, LiteralType::UIntValue(b)) => {
+            match a.checked_sub(*b) {
+                Some(result) => Some(Type::uint_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::UIntValue(a), BinaryOperator::Multiply, LiteralType::UIntValue(b)) => {
+            match a.checked_mul(*b) {
+                Some(result) => Some(Type::uint_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::UIntValue(a), BinaryOperator::Divide, LiteralType::UIntValue(b)) => {
+            if *b == 0 {
+                return None;
+            }
+            match a.checked_div(*b) {
+                Some(result) => Some(Type::uint_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::UIntValue(a), BinaryOperator::Modulo, LiteralType::UIntValue(b)) => {
+            if *b == 0 {
+                return None;
+            }
+            match a.checked_rem(*b) {
+                Some(result) => Some(Type::uint_literal(result)),
+                None => None,
+            }
+        }
+        (LiteralType::UIntValue(a), BinaryOperator::BitwiseAnd, LiteralType::UIntValue(b)) => {
+            Some(Type::uint_literal(a & b))
+        }
+        (LiteralType::UIntValue(a), BinaryOperator::BitwiseOr, LiteralType::UIntValue(b)) => {
+            Some(Type::uint_literal(a | b))
+        }
+        (LiteralType::UIntValue(a), BinaryOperator::BitwiseXor, LiteralType::UIntValue(b)) => {
+            Some(Type::uint_literal(a ^ b))
+        }
+        (
+            LiteralType::UIntValue(a),
+            BinaryOperator::BitwiseLeftShift,
+            LiteralType::UIntValue(b),
+        ) => {
+            if *b >= 64 {
+                return None;
+            }
+            Some(Type::uint_literal(a << b))
+        }
+        (
+            LiteralType::UIntValue(a),
+            BinaryOperator::BitwiseRightShift,
+            LiteralType::UIntValue(b),
+        ) => {
+            if *b >= 64 {
+                return None;
+            }
+            Some(Type::uint_literal(a >> b))
+        }
+        (LiteralType::FloatValue(a), BinaryOperator::Add, LiteralType::FloatValue(b)) => {
+            Some(Type::float_literal(a + b))
+        }
+        (LiteralType::FloatValue(a), BinaryOperator::Subtract, LiteralType::FloatValue(b)) => {
+            Some(Type::float_literal(a - b))
+        }
+        (LiteralType::FloatValue(a), BinaryOperator::Multiply, LiteralType::FloatValue(b)) => {
+            Some(Type::float_literal(a * b))
+        }
+        (LiteralType::FloatValue(a), BinaryOperator::Divide, LiteralType::FloatValue(b)) => {
+            if *b == 0.0 {
+                return None;
+            }
+            Some(Type::float_literal(a / b))
+        }
+        (LiteralType::FloatValue(a), BinaryOperator::Modulo, LiteralType::FloatValue(b)) => {
+            Some(Type::float_literal(a % b))
+        }
+        (LiteralType::FloatValue(a), BinaryOperator::Equal, LiteralType::FloatValue(b)) => {
+            Some(Type::bool_literal(a == b))
+        }
+        (LiteralType::FloatValue(a), BinaryOperator::NotEqual, LiteralType::FloatValue(b)) => {
+            Some(Type::bool_literal(a != b))
+        }
+        (LiteralType::FloatValue(a), BinaryOperator::LessThan, LiteralType::FloatValue(b)) => {
+            Some(Type::bool_literal(a < b))
+        }
+        (
+            LiteralType::FloatValue(a),
+            BinaryOperator::LessThanOrEqual,
+            LiteralType::FloatValue(b),
+        ) => Some(Type::bool_literal(a <= b)),
+        (LiteralType::FloatValue(a), BinaryOperator::GreaterThan, LiteralType::FloatValue(b)) => {
+            Some(Type::bool_literal(a > b))
+        }
+        (
+            LiteralType::FloatValue(a),
+            BinaryOperator::GreaterThanOrEqual,
+            LiteralType::FloatValue(b),
+        ) => Some(Type::bool_literal(a >= b)),
+        (LiteralType::BoolValue(a), BinaryOperator::LogicalAnd, LiteralType::BoolValue(b)) => {
+            Some(Type::bool_literal(*a && *b))
+        }
+        (LiteralType::BoolValue(a), BinaryOperator::LogicalOr, LiteralType::BoolValue(b)) => {
+            Some(Type::bool_literal(*a || *b))
+        }
+        (LiteralType::BoolValue(a), BinaryOperator::Equal, LiteralType::BoolValue(b)) => {
+            Some(Type::bool_literal(a == b))
+        }
+        (LiteralType::BoolValue(a), BinaryOperator::NotEqual, LiteralType::BoolValue(b)) => {
+            Some(Type::bool_literal(a != b))
+        }
+        (LiteralType::StringValue(a), BinaryOperator::Add, LiteralType::StringValue(b)) => {
+            Some(Type::string_literal(format!("{}{}", a, b)))
+        }
+        (LiteralType::StringValue(a), BinaryOperator::Equal, LiteralType::StringValue(b)) => {
+            Some(Type::bool_literal(a == b))
+        }
+        (LiteralType::StringValue(a), BinaryOperator::NotEqual, LiteralType::StringValue(b)) => {
+            Some(Type::bool_literal(a != b))
+        }
+        (LiteralType::RuneValue(a), BinaryOperator::Equal, LiteralType::RuneValue(b)) => {
+            Some(Type::bool_literal(a == b))
+        }
+        (LiteralType::RuneValue(a), BinaryOperator::NotEqual, LiteralType::RuneValue(b)) => {
+            Some(Type::bool_literal(a != b))
+        }
+        _ => None,
+    }
+}
+
 fn get_binop_type(
     left_type: &Type,
     operator: &BinaryOperator,
@@ -2993,6 +3192,23 @@ fn get_binop_type(
                 get_binop_type(&Type::UInt, operator, &Type::UInt)
             } else {
                 Err(format!("{} is not a valid u64", value))
+            }
+        }
+        (
+            Type::Literal { type_: left_lt, .. },
+            operator,
+            Type::Literal {
+                type_: right_lt, ..
+            },
+        ) => {
+            if let Some(folded) = fold_literal_binop(left_lt, operator, right_lt) {
+                Ok(folded)
+            } else {
+                get_binop_type(
+                    &left_lt.get_runtime_type(),
+                    operator,
+                    &right_lt.get_runtime_type(),
+                )
             }
         }
         (Type::Literal { type_, .. }, operator, right_type) => {
