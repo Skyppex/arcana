@@ -353,6 +353,9 @@ impl FullName for TypeAlias {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Protocol {
     pub type_identifier: TypeIdentifier,
+    /// Names only: what each one stands for is chosen by each implementation,
+    /// which is what makes them different from type parameters.
+    pub associated_types: Vec<String>,
     pub functions: Vec<(TypeIdentifier, Type)>,
 }
 
@@ -447,6 +450,18 @@ pub enum Type {
         type_: Box<LiteralType>,
     },
     Tuple(Vec<Type>),
+    /// `T::Item` — a type reached through a protocol implementation rather than
+    /// written directly.
+    ///
+    /// It stays symbolic while `on` is still a type parameter: inside
+    /// `fun sum<I>(..) where I is Iterator`, `I::Item` names a type nobody has
+    /// chosen yet. Once `on` is a concrete type the projection is resolved
+    /// against that type's implementation.
+    AssociatedType {
+        on: Box<Type>,
+        protocol: String,
+        name: String,
+    },
     Any,        // not directly available in the language, but used for some built-ins
     Meta(Meta), // not directly available in the language, but used for some built-ins
 }
@@ -647,6 +662,9 @@ impl Type {
                 .type_annotation()
                 .unwrap_or_else(|| panic!("Closure has no type annotation")),
             Type::Literal { type_, .. } => TypeAnnotation::Literal(Box::new(*type_.clone())),
+            Type::AssociatedType { on, name, .. } => {
+                TypeAnnotation::Type(format!("{}::{}", on.type_annotation().name(), name))
+            }
             Type::Tuple(types) => {
                 TypeAnnotation::Tuple(types.iter().map(|t| t.type_annotation()).collect())
             }
@@ -857,6 +875,7 @@ impl Type {
             // signature of `from` as well as the protocol's own name.
             Type::Protocol(Protocol {
                 type_identifier,
+                associated_types,
                 functions,
             }) => {
                 let type_map = match &context {
@@ -890,6 +909,7 @@ impl Type {
                         type_identifier.name().to_owned(),
                         concrete_types.clone(),
                     ),
+                    associated_types: associated_types.clone(),
                     functions: cloned_functions,
                 }))
             }
@@ -1048,6 +1068,7 @@ impl FullName for Type {
     fn full_name(&self) -> String {
         match self {
             Type::Substitution { actual_type, .. } => actual_type.full_name(),
+            Type::AssociatedType { on, name, .. } => format!("{}::{}", on.full_name(), name),
             Type::Unknown => "{unknown}".to_string(),
             Type::Generic(GenericType { type_name }) => type_name.to_string(),
             Type::Void => "Void".to_string(),
@@ -1137,6 +1158,7 @@ impl Display for Type {
                 type_identifier,
                 actual_type,
             } => write!(f, "{} ==> {}", type_identifier, actual_type),
+            Type::AssociatedType { on, name, .. } => write!(f, "{}::{}", on, name),
             Type::Unknown => write!(f, "{{unknown}}"),
             Type::Generic(generic_type) => write!(f, "{}", generic_type.type_name),
             Type::Void => write!(f, "Void"),
@@ -1625,6 +1647,22 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 .zip(right_types.iter())
                 .all(|(l, r)| type_equals_unstrict(l, r))
         }
+        // Two projections are the same type when they are the same associated
+        // type taken on the same thing. A projection that is still symbolic is
+        // equal only to itself, which is what lets a generic signature mention
+        // `I::Item` without knowing what it is.
+        (
+            Type::AssociatedType {
+                on: left_on,
+                name: left_name,
+                ..
+            },
+            Type::AssociatedType {
+                on: right_on,
+                name: right_name,
+                ..
+            },
+        ) => left_name == right_name && type_equals(left_on, right_on),
         (Type::Array(left), Type::Array(right)) => type_equals(left, right),
         _ => left.to_key() == right.to_key(),
     }

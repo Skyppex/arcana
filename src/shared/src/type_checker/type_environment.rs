@@ -31,6 +31,10 @@ struct ImplementationRecord {
     type_annotation: TypeAnnotation,
     scoped_generics: Vec<GenericType>,
     where_clause: Vec<GenericConstraint>,
+    /// What this implementation chose for each of the protocol's associated
+    /// types. One implementation per type per protocol is what makes looking a
+    /// projection up here unambiguous.
+    associated_types: HashMap<String, Type>,
 }
 
 /// An implementation written for a bare type parameter — `imp<T> P for T` —
@@ -353,6 +357,7 @@ impl TypeEnvironment {
         type_annotation: TypeAnnotation,
         scoped_generics: Vec<GenericType>,
         where_clause: Vec<GenericConstraint>,
+        associated_types: HashMap<String, Type>,
     ) {
         let key = if covers_all_instantiations {
             Self::constructor_key(type_)
@@ -367,8 +372,30 @@ impl TypeEnvironment {
                 type_annotation,
                 scoped_generics,
                 where_clause,
+                associated_types,
             },
         );
+    }
+
+    /// What `type_` chose for `protocol`'s associated type `name`.
+    ///
+    /// Looked up by the type's instantiation first and then by its constructor,
+    /// so that `imp Iterator for Range` and `imp<T> Iterator for B<T>` are both
+    /// found.
+    pub fn get_associated_type(&self, type_: &Type, name: &str) -> Option<Type> {
+        for key in [Self::instantiation_key(type_), Self::constructor_key(type_)] {
+            if let Some(records) = self.implementations.get(&key) {
+                for record in records.values() {
+                    if let Some(bound) = record.associated_types.get(name) {
+                        return Some(bound.clone());
+                    }
+                }
+            }
+        }
+
+        self.parent
+            .as_ref()
+            .and_then(|parent| parent.borrow().get_associated_type(type_, name))
     }
 
     /// Records an implementation written for a bare type parameter, which
@@ -670,7 +697,17 @@ impl TypeEnvironment {
                         .as_ref()
                         .and_then(|p| p.borrow().get_type_from_annotation(type_annotation).ok())
                 })
-                .ok_or_else(|| format!("Type {} not found", type_name)),
+                .or_else(|| self.project_associated_type(type_name))
+                .ok_or_else(|| match type_name.strip_prefix("Self::") {
+                    // `::` already spells an enum's variants, so an associated
+                    // type is named on its own inside a protocol or its
+                    // implementations.
+                    Some(associated) => format!(
+                        "Type {} not found; an associated type is written `{}`, not `{}`",
+                        type_name, associated, type_name
+                    ),
+                    None => format!("Type {} not found", type_name),
+                }),
             TypeAnnotation::ConcreteType(type_name, concrete_types) => {
                 // The declaration may live in an enclosing scope, but the type
                 // arguments are written here — `imp<T> P for B<T>` resolves `B`
@@ -731,6 +768,36 @@ impl TypeEnvironment {
                     return_type: Box::new(return_type.unwrap_or(Type::Void)),
                 }))
             }
+        }
+    }
+
+    /// Resolves `T::Item` — a type reached through whatever implementation `T`
+    /// has, rather than one written out directly.
+    ///
+    /// When `T` is a concrete type the projection is looked up and replaced by
+    /// what that implementation chose. When `T` is still a type parameter there
+    /// is nothing to look up yet, so the projection is kept symbolic and
+    /// resolved once the parameter is instantiated.
+    fn project_associated_type(&self, name: &str) -> Option<Type> {
+        let (base, member) = name.rsplit_once("::")?;
+
+        let on = self
+            .get_type_from_annotation(&TypeAnnotation::Type(base.to_owned()))
+            .ok()?;
+
+        if let Some(bound) = self.get_associated_type(&on, member) {
+            return Some(bound);
+        }
+
+        // Only a type parameter may carry an unresolved projection; anything
+        // else would simply not have the associated type.
+        match on.clone().unsubstitute() {
+            Type::Generic(_) => Some(Type::AssociatedType {
+                on: Box::new(on),
+                protocol: String::new(),
+                name: member.to_owned(),
+            }),
+            _ => None,
         }
     }
 
@@ -1006,6 +1073,13 @@ fn substitute_self(type_: &Type, self_type: &Type) -> Type {
             }),
             return_type: Box::new(substitute_self(return_type, self_type)),
         }),
+        // `Self::Item` becomes `T::Item` — the projection survives, only what it
+        // is taken on changes.
+        Type::AssociatedType { on, protocol, name } => Type::AssociatedType {
+            on: Box::new(substitute_self(on, self_type)),
+            protocol: protocol.clone(),
+            name: name.clone(),
+        },
         Type::Array(inner) => Type::Array(Box::new(substitute_self(inner, self_type))),
         Type::Tuple(types) => Type::Tuple(
             types

@@ -19,7 +19,8 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    type_equals, type_equals_coerce, DiscoveredEmbeddedStruct, EmbeddedStruct, Enum, Function,
+    get_enum_member, type_equals, type_equals_coerce, DiscoveredEmbeddedStruct, EmbeddedStruct,
+    Enum, Function,
     Parameter, Protocol, Rcrc, Struct, StructField, Type, TypeAlias, Union,
 };
 
@@ -606,12 +607,35 @@ pub fn check_type(
                 type_environment.clone(),
             )));
 
+            let self_type = Type::Substitution {
+                type_identifier: TypeIdentifier::Type("Self".to_owned()),
+                actual_type: Box::new(Type::Unknown),
+            };
+
             protocol_type_environment
                 .borrow_mut()
-                .add_type(Type::Substitution {
-                    type_identifier: TypeIdentifier::Type("Self".to_owned()),
-                    actual_type: Box::new(Type::Unknown),
-                })?;
+                .add_type(self_type.clone())?;
+
+            // An associated type is a projection on `Self`: inside the protocol
+            // it is a type nobody has chosen yet, and each implementation
+            // chooses it. It is named unqualified — `Self::Item` would collide
+            // with an enum's variants, which `::` already spells.
+            let associated_type_names: Vec<String> = associated_types
+                .iter()
+                .map(|a| a.type_identifier.name().to_owned())
+                .collect();
+
+            for name in &associated_type_names {
+                let projection = Type::AssociatedType {
+                    on: Box::new(self_type.clone()),
+                    protocol: type_identifier.name().to_owned(),
+                    name: name.clone(),
+                };
+
+                protocol_type_environment
+                    .borrow_mut()
+                    .add_type_alias(name.clone(), projection);
+            }
 
             // A protocol's own type parameters have to be in scope for the
             // signatures that mention them, exactly as for a struct or enum.
@@ -662,6 +686,7 @@ pub fn check_type(
 
             let type_ = Type::Protocol(Protocol {
                 type_identifier: type_identifier.clone(),
+                associated_types: associated_type_names.clone(),
                 functions: function_tuples,
             });
 
@@ -678,7 +703,7 @@ pub fn check_type(
             scoped_generics,
             protocol_annotation,
             type_annotation,
-            associated_types: _,
+            associated_types,
             functions,
             where_clause,
         }) => {
@@ -760,11 +785,69 @@ pub fn check_type(
 
             let Type::Protocol(Protocol {
                 functions: protocol_functions,
+                associated_types: protocol_associated_types,
                 ..
-            }) = protocol_type
+            }) = protocol_type.clone()
             else {
                 return Err(format!("Expected protocol, found {}", protocol_type));
             };
+
+            let mut bound_associated_types = HashMap::new();
+
+            for associated_type in associated_types {
+                let name = associated_type.type_identifier.name().to_owned();
+
+                if !protocol_associated_types.contains(&name) {
+                    return Err(format!(
+                        "`{}` has no associated type `{}`",
+                        protocol_annotation, name
+                    ));
+                }
+
+                let Some(annotation) = &associated_type.default_type_annotation else {
+                    return Err(format!(
+                        "Associated type `{}` needs a type: write `type {} = ..;`",
+                        name, name
+                    ));
+                };
+
+                // `E::Item` cannot mean both a variant and a projection: inside
+                // the implementation the associated type would shadow the
+                // variant, and outside the variant would shadow the
+                // projection. Rejecting the collision is better than a name
+                // that means different things in different places.
+                if let Type::Enum(enum_) = imp_type.clone().unsubstitute() {
+                    if get_enum_member(&enum_.members, &enum_.type_identifier, &name).is_some() {
+                        return Err(format!(
+                            "`{}` has both a variant and an associated type named `{}`; `{}::{}` would be ambiguous",
+                            type_annotation, name, type_annotation, name
+                        ));
+                    }
+                }
+
+                let bound = check_type_annotation(
+                    annotation,
+                    discovered_types,
+                    implementation_type_environment.clone(),
+                )?;
+
+                implementation_type_environment
+                    .borrow_mut()
+                    .add_type_alias(name.clone(), bound.clone());
+
+                bound_associated_types.insert(name, bound);
+            }
+
+            // Every associated type the protocol declares has to be chosen, or
+            // a projection on this type would have nothing to resolve to.
+            for name in &protocol_associated_types {
+                if !bound_associated_types.contains_key(name) {
+                    return Err(format!(
+                        "Implementation of `{}` for `{}` is missing associated type `{}`",
+                        protocol_annotation, type_annotation, name
+                    ));
+                }
+            }
 
             // `imp<T> P for B<T>` covers every `B`; `imp P for B<Int>` covers
             // only that one, and the two cannot both exist because overlapping
@@ -793,6 +876,7 @@ pub fn check_type(
                     type_annotation.clone(),
                     scoped_generics.clone(),
                     where_clause.clone(),
+                    bound_associated_types.clone(),
                 );
             }
 
@@ -1244,10 +1328,14 @@ pub fn check_type_annotation(
         }
         Some(DiscoveredType::Protocol {
             type_identifier,
-            associated_types: _,
+            associated_types,
             function_identifiers,
         }) => Ok(Type::Protocol(Protocol {
             type_identifier: type_identifier.clone(),
+            associated_types: associated_types
+                .iter()
+                .map(|a| a.name().to_owned())
+                .collect(),
             functions: function_identifiers
                 .iter()
                 .map(|f| {
