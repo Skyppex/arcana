@@ -3,7 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 
 use interpreter::{Environment, Value};
 use shared::{
-    ast, lexer,
+    ast,
+    diagnostic::{Diagnostic, SourceFile},
+    lexer,
     type_checker::{
         self,
         model::{TypedExpression, TypedStatement},
@@ -51,12 +53,29 @@ pub fn create_simplified_ast(input: &str) -> TypedStatement {
 
 /// Like [`create_typed_ast`], but surfaces lex/parse/type errors instead of panicking.
 /// Use this to assert that a program is *rejected*.
-pub fn try_create_typed_ast(input: &str) -> Result<TypedStatement, String> {
+pub fn try_create_typed_ast(input: &str) -> Result<TypedStatement, Diagnostic> {
     let tokens = lexer::tokenize(input)?;
     let ast = ast::create_ast(tokens, false)?;
     let type_environment = core_type_environment();
 
     type_checker::create_typed_ast(ast, type_environment)
+}
+
+/// The name every diagnostic test compiles under, so expected output can name a
+/// file without each test repeating it.
+pub const TEST_FILE: &str = "t.ar";
+
+/// Compiles `input` and renders the error it produces, exactly as the driver
+/// would print it.
+///
+/// Panics if the program compiles: a test that expects a diagnostic and gets a
+/// working program has not found what it was looking for.
+pub fn render_error(input: &str) -> String {
+    let Err(error) = try_create_typed_ast(input) else {
+        panic!("expected the program to be rejected, but it compiled");
+    };
+
+    error.render(&SourceFile::new(TEST_FILE, input))
 }
 
 pub fn evaluate_expression(

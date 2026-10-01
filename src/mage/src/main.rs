@@ -1,6 +1,7 @@
 mod cli;
 mod config;
 mod interactive;
+mod report;
 mod utils;
 
 use clap::Parser;
@@ -19,8 +20,10 @@ use std::{
 use crate::cli::Cli;
 use interpreter::Environment;
 
+use report::Report;
 use shared::{
     ast::{self, create_ast},
+    diagnostic::{Diagnostic, SourceFile},
     pretty_print::PrettyPrint,
     type_checker::{create_typed_ast, discover_user_defined_types, TypeEnvironment},
 };
@@ -50,21 +53,21 @@ fn run() -> io::Result<()> {
             if bytes_read == 0 {
                 Ok(())
             } else {
-                run_script(input, None, &args)
+                run_script("<stdin>", input, None, &args)
             }
         }
     };
 
     if let Err(error) = result {
-        eprintln!("Fatal: {error}");
+        eprintln!("{error}");
         std::process::exit(1);
     }
 
     Ok(())
 }
 
-pub fn run_source(source: &str, args: &Cli) -> Result<(), String> {
-    let source = get_path(source).map_err(|e| e.to_string())?;
+pub fn run_source(source: &str, args: &Cli) -> Result<(), Report> {
+    let source = get_path(source).map_err(|error| Report::fatal(error.to_string()))?;
 
     let glob_pattern = format!("{}/**/*.ar", source.to_string_lossy()).replace('\\', "/");
     let project_files = glob(&glob_pattern).ok();
@@ -75,7 +78,7 @@ pub fn run_source(source: &str, args: &Cli) -> Result<(), String> {
                 .into_iter()
                 .map(|path| path.map(normalize_path))
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| e.to_string())
+                .map_err(|e| Report::fatal(e.to_string()))
         })
         .transpose()?;
 
@@ -83,25 +86,27 @@ pub fn run_source(source: &str, args: &Cli) -> Result<(), String> {
         let spell = source.join("spell.toml");
 
         if !spell.exists() {
-            return Err("spell.toml not found".to_string());
+            return Err(Report::fatal("spell.toml not found"));
         }
 
         let Some(project_files) = project_files else {
-            return Err("No files with extension .ar found in workspace".to_string());
+            return Err(Report::fatal("No files with extension .ar found in workspace"));
         };
 
-        let spell_content = std::fs::read_to_string(spell).map_err(|e| format!("{e}"))?;
+        let spell_content = std::fs::read_to_string(spell).map_err(|error| Report::fatal(error.to_string()))?;
 
         let spell_config = toml::from_str::<SpellConfig>(&spell_content)
-            .map_err(|e| format!("Failed to parse spell.toml: {e}"))?;
+            .map_err(|e| Report::fatal(format!("Failed to parse spell.toml: {e}")))?;
 
         return run_spell(spell_config, project_files, &source, args);
     }
 
-    let source =
-        std::fs::read_to_string(source).map_err(|error| format!("Failed to read file: {error}"))?;
+    let name = source.to_string_lossy().into_owned();
 
-    run_script(source, project_files, args)
+    let source = std::fs::read_to_string(source)
+        .map_err(|error| Report::fatal(format!("Failed to read file: {error}")))?;
+
+    run_script(&name, source, project_files, args)
 }
 
 fn run_spell(
@@ -109,12 +114,12 @@ fn run_spell(
     project_files: Vec<PathBuf>,
     source: &Path,
     args: &Cli,
-) -> Result<(), String> {
+) -> Result<(), Report> {
     let main = spell
         .main
         .map(|m| get_path(args.source.as_ref().unwrap_or(&".".to_string())).map(|p| p.join(m)))
         .transpose()
-        .map_err(|e| e.to_string())?
+        .map_err(|error| Report::fatal(error.to_string()))?
         .map(|p| source.join(&p))
         .unwrap_or(source.join("main.ar"));
 
@@ -139,10 +144,10 @@ fn run_spell(
     )?;
 
     let main_content = std::fs::read_to_string(main.clone())
-        .map_err(|error| format!("Failed to read main file: {error}"))?;
+        .map_err(|error| Report::fatal(format!("Failed to read main file: {error}")))?;
 
     let result = read_input(
-        main_content,
+        &SourceFile::new(main.to_string_lossy(), main_content),
         type_environment.clone(),
         environment.clone(),
         args,
@@ -177,10 +182,11 @@ fn run_spell(
 }
 
 fn run_script(
+    name: &str,
     content: String,
     project_files: Option<Vec<PathBuf>>,
     args: &Cli,
-) -> Result<(), String> {
+) -> Result<(), Report> {
     let mut lines = content.lines();
 
     let content = if let Some(first_line) = lines.next() {
@@ -211,7 +217,7 @@ fn run_script(
     }
 
     let result = read_input(
-        content,
+        &SourceFile::new(name, content),
         type_environment.clone(),
         environment.clone(),
         args,
@@ -259,29 +265,47 @@ pub const CORE_SOURCE: &str = include_str!("../../../core/lib.ar");
 /// every use of `Option`.
 pub fn load_core(
     type_environment: Rc<RefCell<TypeEnvironment>>,
-) -> Result<Rc<RefCell<TypeEnvironment>>, String> {
-    let tokens = shared::lexer::tokenize(CORE_SOURCE)?;
-    let (typed_core, core_type_environment) =
-        shared::type_checker::register_core(tokens, type_environment)?;
+) -> Result<Rc<RefCell<TypeEnvironment>>, Report> {
+    let file = SourceFile::new("core/lib.ar", CORE_SOURCE);
+    let report = Report::against(&file);
 
-    interpreter::evaluate(typed_core, Rc::new(RefCell::new(Environment::new())))?;
+    let tokens = shared::lexer::tokenize(&file.source).map_err(&report)?;
+    let (typed_core, core_type_environment) =
+        shared::type_checker::register_core(tokens, type_environment).map_err(&report)?;
+
+    interpreter::evaluate(typed_core, Rc::new(RefCell::new(Environment::new()))).map_err(&report)?;
 
     Ok(core_type_environment)
 }
 
+/// Compiles and runs one source file, reporting any error against it.
+///
+/// This is the boundary where a diagnostic stops being a value and becomes
+/// text: it is the innermost place that still knows which file the spans index.
 pub fn read_input(
-    input: String,
+    file: &SourceFile,
     type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>,
     args: &Cli,
     print_result: bool,
-) -> Result<(), String> {
+) -> Result<(), Report> {
+    compile(file, type_environment, environment, args, print_result)
+        .map_err(Report::against(file))
+}
+
+fn compile(
+    file: &SourceFile,
+    type_environment: Rc<RefCell<TypeEnvironment>>,
+    environment: Rc<RefCell<Environment>>,
+    args: &Cli,
+    print_result: bool,
+) -> Result<(), Diagnostic> {
     let print_tokens = args.logging.log_flags.tokens;
     let print_parser_ast = args.logging.log_flags.ast;
     let print_type_checker_ast = args.logging.log_flags.typed_ast;
     let print_simple_type_checker_ast = args.logging.log_flags.simple_typed_ast;
 
-    let tokens = shared::lexer::tokenize(&input)?;
+    let tokens = shared::lexer::tokenize(&file.source)?;
     if print_tokens {
         eprintln!("{}\n", tokens.prettify());
     }
@@ -305,7 +329,7 @@ pub fn read_input(
     let result = interpreter::evaluate(typed_program, environment)?;
 
     if print_tokens | print_parser_ast || print_type_checker_ast {
-        eprintln!("{input}");
+        eprintln!("{}", file.source);
     }
 
     if print_result && !result.is_void() {
@@ -315,34 +339,38 @@ pub fn read_input(
     Ok(())
 }
 
+/// Type checks and evaluates every module in the project.
+///
+/// Each module is compiled in an environment of its own, so each also keeps its
+/// own [`SourceFile`]: a span from one module means nothing against another, and
+/// an error has to be reported against the file that produced it.
 pub fn register_modules(
     project_files: Vec<PathBuf>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>,
     core_type_environment: &Rc<RefCell<TypeEnvironment>>,
-) -> Result<(), String> {
+) -> Result<(), Report> {
     let source_files = project_files
         .iter()
         .map(|project_file| {
             std::fs::read_to_string(project_file)
-                .map_err(|error| format!("Failed to read file: {error}"))
+                .map(|source| SourceFile::new(project_file.to_string_lossy(), source))
+                .map_err(|error| Report::fatal(format!("Failed to read file: {error}")))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let token_batches = source_files
-        .into_iter()
-        .map(|source| shared::lexer::tokenize(&source))
-        .collect::<Result<Vec<_>, _>>()?;
+    let discovery = source_files
+        .iter()
+        .map(|file| {
+            let report = Report::against(file);
 
-    let module_infos = token_batches
-        .into_iter()
-        .map(ast::discover_module)
-        .collect::<Result<Vec<_>, _>>()?;
+            let tokens = shared::lexer::tokenize(&file.source).map_err(&report)?;
+            let Some((_, module_path, module)) =
+                ast::discover_module(tokens).map_err(&report)?
+            else {
+                return Ok(None);
+            };
 
-    let discovery = module_infos
-        .into_iter()
-        .flatten()
-        .map(|(_, module_path, module)| {
             let mod_type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
                 type_environment.borrow().allow_override_types,
             )));
@@ -350,16 +378,27 @@ pub fn register_modules(
             // A module is checked in an environment of its own, so the prelude
             // has to be put there too — otherwise `Option` is in scope in the
             // main file and nowhere else.
-            shared::type_checker::add_prelude(mod_type_environment.clone(), core_type_environment)?;
+            shared::type_checker::add_prelude(mod_type_environment.clone(), core_type_environment)
+                .map_err(&report)?;
 
             let discovered_types =
-                discover_user_defined_types(module.clone(), mod_type_environment.clone())?;
+                discover_user_defined_types(module.clone(), mod_type_environment.clone())
+                    .map_err(&report)?;
 
-            Ok((discovered_types, module, module_path, mod_type_environment))
+            Ok(Some((
+                file,
+                discovered_types,
+                module,
+                module_path,
+                mod_type_environment,
+            )))
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect::<Result<Vec<_>, Report>>()?;
 
-    for (discovered_types, module, module_path, mod_type_environment) in discovery {
+    for (file, discovered_types, module, module_path, mod_type_environment) in
+        discovery.into_iter().flatten()
+    {
+        let report = Report::against(file);
         let mod_environment = Rc::new(RefCell::new(Environment::new()));
 
         mod_type_environment
@@ -370,9 +409,10 @@ pub fn register_modules(
             .borrow_mut()
             .add_module(module_path.clone(), mod_type_environment.clone());
 
-        let typed_module = create_typed_ast(module, mod_type_environment.clone())?;
+        let typed_module =
+            create_typed_ast(module, mod_type_environment.clone()).map_err(&report)?;
 
-        let value = interpreter::evaluate(typed_module, mod_environment.clone())?;
+        let value = interpreter::evaluate(typed_module, mod_environment.clone()).map_err(&report)?;
 
         environment
             .borrow_mut()

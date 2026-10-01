@@ -1,3 +1,5 @@
+use crate::ast::StatementKind;
+use crate::ast::ExpressionKind;
 use crate::{
     ast::pattern::{FieldPattern, Pattern},
     ast::{
@@ -91,8 +93,8 @@ pub trait IndentDisplay {
 
 impl IndentDisplay for Statement {
     fn indent_display(&self, indent: &mut Indent) -> String {
-        match self {
-            Statement::Program { statements } => {
+        match &self.kind {
+            StatementKind::Program { statements } => {
                 let mut result = String::new();
 
                 for (i, statement) in statements.iter().enumerate() {
@@ -104,7 +106,7 @@ impl IndentDisplay for Statement {
 
                 result
             }
-            Statement::ModuleDeclaration(ModuleDeclaration {
+            StatementKind::ModuleDeclaration(ModuleDeclaration {
                 access_modifier,
                 module_path,
             }) => {
@@ -126,7 +128,7 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
-            Statement::Use(Use { use_item }) => {
+            StatementKind::Use(Use { use_item }) => {
                 let mut result = String::new();
                 result.push_str("<use statement>\n");
                 indent.increase_leaf();
@@ -141,7 +143,7 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
-            Statement::StructDeclaration(StructDeclaration {
+            StatementKind::StructDeclaration(StructDeclaration {
                 access_modifier,
                 body,
                 where_clause: _,
@@ -198,7 +200,7 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
-            Statement::EnumDeclaration(EnumDeclaration {
+            StatementKind::EnumDeclaration(EnumDeclaration {
                 where_clause: _,
                 access_modifier,
                 type_identifier,
@@ -263,7 +265,7 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
-            Statement::UnionDeclaration(UnionDeclaration {
+            StatementKind::UnionDeclaration(UnionDeclaration {
                 access_modifier,
                 type_identifier,
                 literals,
@@ -303,7 +305,7 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
-            // Statement::FlagsDeclaration(FlagsDeclaration {
+            // StatementKind::FlagsDeclaration(FlagsDeclaration {
             //     access_modifier,
             //     type_name,
             //     members
@@ -322,7 +324,7 @@ impl IndentDisplay for Statement {
             //     indent.decrease();
             //     result
             // },
-            Statement::TypeAliasDeclaration(TypeAliasDeclaration {
+            StatementKind::TypeAliasDeclaration(TypeAliasDeclaration {
                 access_modifier,
                 type_identifier,
                 type_annotations,
@@ -367,7 +369,7 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
-            Statement::ProtocolDeclaration(ProtocolDeclaration {
+            StatementKind::ProtocolDeclaration(ProtocolDeclaration {
                 access_modifier,
                 type_identifier,
                 associated_types,
@@ -423,7 +425,7 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
-            Statement::ImplementationDeclaration(ImplementationDeclaration {
+            StatementKind::ImplementationDeclaration(ImplementationDeclaration {
                 where_clause: _,
                 scoped_generics,
                 protocol_annotation,
@@ -495,10 +497,10 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
-            Statement::FunctionDeclaration(function_declaration) => {
+            StatementKind::FunctionDeclaration(function_declaration) => {
                 function_declaration.indent_display(indent)
             }
-            Statement::Semi(statement) => {
+            StatementKind::Semi(statement) => {
                 let mut result = String::new();
                 result.push_str("<semi>\n");
                 indent.increase();
@@ -514,7 +516,7 @@ impl IndentDisplay for Statement {
                 indent.decrease();
                 result
             }
-            Statement::Expression(e) => e.indent_display(indent),
+            StatementKind::Expression(e) => e.indent_display(indent),
         }
     }
 }
@@ -621,9 +623,9 @@ impl IndentDisplay for FunctionDeclaration {
 
 impl IndentDisplay for Expression {
     fn indent_display(&self, indent: &mut Indent) -> String {
-        match self {
-            // Expression::None => String::new(),
-            Expression::VariableDeclaration(VariableDeclaration {
+        match &self.kind {
+            // ExpressionKind::None => String::new(),
+            ExpressionKind::VariableDeclaration(VariableDeclaration {
                 mutable,
                 type_annotation,
                 pattern,
@@ -661,7 +663,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::If(If {
+            ExpressionKind::If(If {
                 condition,
                 true_expression,
                 false_expression,
@@ -698,7 +700,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Match(Match { expression, arms }) => {
+            ExpressionKind::Match(Match { expression, arms }) => {
                 let mut result = String::new();
                 result.push_str("<match>");
                 indent.increase();
@@ -728,7 +730,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Assignment(Assignment {
+            ExpressionKind::Assignment(Assignment {
                 member,
                 initializer,
             }) => {
@@ -755,9 +757,9 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Member(m) => m.indent_display(indent),
-            Expression::Literal(l) => l.indent_display(indent),
-            Expression::Tuple(e) => {
+            ExpressionKind::Member(m) => m.indent_display(indent),
+            ExpressionKind::Literal(l) => l.indent_display(indent),
+            ExpressionKind::Tuple(e) => {
                 let mut result = String::new();
                 result.push_str("<tuple>");
                 indent.increase_leaf();
@@ -773,7 +775,7 @@ impl IndentDisplay for Expression {
 
                 result
             }
-            Expression::Closure(c) => {
+            ExpressionKind::Closure(c) => {
                 let mut result = String::new();
                 result.push_str("<closure>\n");
                 indent.increase();
@@ -805,7 +807,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Call(Call { callee, argument }) => {
+            ExpressionKind::Call(Call { callee, argument }) => {
                 let mut result = String::new();
                 result.push_str("<call>\n");
                 indent.increase();
@@ -826,7 +828,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Unary(Unary {
+            ExpressionKind::Unary(Unary {
                 operator,
                 expression,
             }) => {
@@ -853,7 +855,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Binary(Binary {
+            ExpressionKind::Binary(Binary {
                 left,
                 operator,
                 right,
@@ -884,7 +886,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Block(statements) => {
+            ExpressionKind::Block(statements) => {
                 let mut result = String::new();
                 result.push_str("<block>");
                 indent.increase();
@@ -911,7 +913,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Loop(body) => {
+            ExpressionKind::Loop(body) => {
                 let mut result = String::new();
                 result.push_str("<loop>");
                 indent.increase_leaf();
@@ -926,7 +928,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::While(While {
+            ExpressionKind::While(While {
                 condition,
                 body,
                 else_body,
@@ -970,7 +972,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::For(For {
+            ExpressionKind::For(For {
                 pattern: identifier,
                 iterable,
                 body,
@@ -1016,7 +1018,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Use(UseExpr { args, expr }) => {
+            ExpressionKind::Use(UseExpr { args, expr }) => {
                 let mut result = String::new();
                 result.push_str("<use-expr>");
                 indent.increase();
@@ -1035,7 +1037,7 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Break(e) => {
+            ExpressionKind::Break(e) => {
                 let mut result = String::new();
                 result.push_str("<break>\n");
                 indent.increase();
@@ -1051,12 +1053,12 @@ impl IndentDisplay for Expression {
                 indent.decrease();
                 result
             }
-            Expression::Continue => {
+            ExpressionKind::Continue => {
                 let mut result = String::new();
                 result.push_str("<continue>");
                 result
             }
-            Expression::Return(e) => {
+            ExpressionKind::Return(e) => {
                 let mut result = String::new();
                 result.push_str("<return>\n");
                 indent.increase();

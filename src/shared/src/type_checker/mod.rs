@@ -1,3 +1,4 @@
+use crate::diagnostic::Diagnostic;
 pub mod decision_tree;
 pub mod full_name;
 pub mod model;
@@ -102,7 +103,7 @@ fn check_generic_constraints(
     type_key: &str,
     type_map: &HashMap<&GenericType, &TypeAnnotation>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
-) -> Result<(), String> {
+) -> Result<(), Diagnostic> {
     let declared = type_environment
         .borrow()
         .get_generic_constraints(type_key)
@@ -156,10 +157,10 @@ fn check_generic_constraints(
                 .borrow()
                 .implements(&argument_type, &protocol_name)
             {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "`{}` does not satisfy the bound `{} is {}`: it does not implement `{}`",
                     argument, generic.type_name, constraint, protocol_name
-                ));
+                )));
             }
         }
     }
@@ -174,7 +175,7 @@ fn substitute_fields(
     type_map: &HashMap<&GenericType, &TypeAnnotation>,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
-) -> Result<Vec<StructField>, String> {
+) -> Result<Vec<StructField>, Diagnostic> {
     fields
         .iter()
         .map(|field| {
@@ -207,7 +208,7 @@ fn substitute_enum_members(
     type_map: &HashMap<&GenericType, &TypeAnnotation>,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
-) -> Result<HashMap<String, Type>, String> {
+) -> Result<HashMap<String, Type>, Diagnostic> {
     let mut substituted = HashMap::new();
 
     for (member_name, type_) in members.iter() {
@@ -251,10 +252,10 @@ fn substitute_enum_members(
                 )?,
             }),
             other => {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Enum members are not of type EnumMember {}",
                     other.full_name()
-                ))
+                )))
             }
         };
 
@@ -532,7 +533,7 @@ impl Type {
     pub fn option_of(
         concrete: Type,
         type_environment: &Rcrc<TypeEnvironment>,
-    ) -> Result<Type, String> {
+    ) -> Result<Type, Diagnostic> {
         let annotation = TypeAnnotation::ConcreteType(
             "Option".to_string(),
             vec![concrete.type_annotation()],
@@ -541,10 +542,10 @@ impl Type {
         type_environment
             .borrow()
             .get_type_from_annotation(&annotation)
-            .map_err(|e| format!("Could not resolve Option: {e}"))
+            .map_err(|e| Diagnostic::error(format!("Could not resolve Option: {e}")))
     }
 
-    pub fn from_value_literal(literal: &model::ValueLiteral) -> Result<Type, String> {
+    pub fn from_value_literal(literal: &model::ValueLiteral) -> Result<Type, Diagnostic> {
         match literal {
             model::ValueLiteral::Unit => Ok(Type::Unit),
             model::ValueLiteral::Int(v) => Ok(Type::Literal {
@@ -571,7 +572,7 @@ impl Type {
                 name: v.to_string(),
                 type_: Box::new(LiteralType::Bool),
             }),
-            _ => Err(format!("Cannot convert literal {:?} to type", literal)),
+            _ => Err(Diagnostic::error(format!("Cannot convert literal {:?} to type", literal))),
         }
     }
 
@@ -644,7 +645,7 @@ impl Type {
         discovered_types: &Vec<DiscoveredType>,
         type_environment: Rc<RefCell<TypeEnvironment>>,
         context: Option<HashMap<&GenericType, &TypeAnnotation>>,
-    ) -> Result<Type, String> {
+    ) -> Result<Type, Diagnostic> {
         match self {
             Type::Generic(generic) => {
                 let context = context.ok_or(format!(
@@ -707,7 +708,7 @@ impl Type {
                             Some(type_map.clone()),
                         )
                     })
-                    .collect::<Result<Vec<Type>, String>>()?;
+                    .collect::<Result<Vec<Type>, Diagnostic>>()?;
 
                 // An alias to a single type is that type once substituted.
                 if let [single] = cloned_types.as_slice() {
@@ -730,16 +731,16 @@ impl Type {
                             context.clone(),
                         )
                     })
-                    .collect::<Result<Vec<Type>, String>>()?;
+                    .collect::<Result<Vec<Type>, Diagnostic>>()?;
 
                 Ok(Type::Tuple(cloned_types))
             }
             Type::Struct(s) if !matches!(s.type_identifier, TypeIdentifier::MemberType(_, _)) => {
                 let TypeIdentifier::GenericType(name, generics) = s.type_identifier.clone() else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Cannot clone concrete types for struct {}",
                         self.full_name()
-                    ));
+                    )));
                 };
 
                 let type_map: HashMap<_, _> = generics.iter().zip(concrete_types.iter()).collect();
@@ -761,17 +762,17 @@ impl Type {
             }
             Type::Struct(s) if matches!(s.type_identifier, TypeIdentifier::MemberType(_, _)) => {
                 let TypeIdentifier::MemberType(enum_name, _) = s.type_identifier.clone() else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Cannot clone concrete types for struct {}",
                         self.full_name()
-                    ));
+                    )));
                 };
 
                 let TypeIdentifier::GenericType(name, generics) = *enum_name else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Cannot clone concrete types for struct {}",
                         self.full_name()
-                    ));
+                    )));
                 };
 
                 let type_map: HashMap<_, _> = generics.iter().zip(concrete_types.iter()).collect();
@@ -800,10 +801,10 @@ impl Type {
             Type::Enum(r#enum) => {
                 let TypeIdentifier::GenericType(name, generics) = r#enum.type_identifier.clone()
                 else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Cannot clone concrete types for enum {}",
                         self.full_name()
-                    ));
+                    )));
                 };
 
                 let type_map: HashMap<_, _> = generics.iter().zip(concrete_types.iter()).collect();
@@ -868,7 +869,7 @@ impl Type {
                             )?,
                         ))
                     })
-                    .collect::<Result<Vec<_>, String>>()?;
+                    .collect::<Result<Vec<_>, Diagnostic>>()?;
 
                 Ok(Type::Protocol(Protocol {
                     type_identifier: TypeIdentifier::ConcreteType(
@@ -894,10 +895,10 @@ impl Type {
                     (name, context)
                 } else {
                     let Some(TypeIdentifier::GenericType(name, generics)) = identifier else {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "Cannot clone concrete types for function {}",
                             self.full_name()
-                        ));
+                        )));
                     };
 
                     (Some(name), generics.iter().zip(&concrete_types).collect())

@@ -1,3 +1,4 @@
+use shared::diagnostic::Diagnostic;
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -94,10 +95,10 @@ impl Environment {
             })
     }
 
-    pub fn activate_scope(&mut self, scope: Scope) -> Result<(), String> {
+    pub fn activate_scope(&mut self, scope: Scope) -> Result<(), Diagnostic> {
         let scope_type: ScopeType = scope.clone().into();
         if !self.has_scope(&scope_type) {
-            return Err(format!("Scope '{:?}' not found", scope_type));
+            return Err(Diagnostic::error(format!("Scope '{:?}' not found", scope_type)));
         }
 
         match self.scopes.iter_mut().find(|s| s.scope_type == scope_type) {
@@ -218,7 +219,7 @@ impl Environment {
         }
     }
 
-    pub fn set_variable(&mut self, member: Member, value: Value) -> Result<Value, String> {
+    pub fn set_variable(&mut self, member: Member, value: Value) -> Result<Value, Diagnostic> {
         match member {
             Member::Identifier { symbol, type_: _ } => {
                 let variable = self
@@ -229,24 +230,24 @@ impl Environment {
                 if !matches!(variable.borrow().value, Value::Uninitialized)
                     && !variable.borrow().mutable
                 {
-                    return Err(format!("Cannot assign to immutable variable '{}'", symbol));
+                    return Err(Diagnostic::error(format!("Cannot assign to immutable variable '{}'", symbol)));
                 }
 
                 variable.borrow_mut().value = value.clone();
                 Ok(value)
             }
-            Member::StaticMemberAccess { .. } => Err("Cannot assign to static member".to_owned()),
+            Member::StaticMemberAccess { .. } => Err(Diagnostic::error("Cannot assign to static member")),
             Member::MemberAccess { member, .. } => {
                 self.set_variable(*member.clone(), value.clone())
             }
             Member::BuiltInFunction(BuiltInFunction {
                 type_identifier, ..
-            }) => Err(format!(
+            }) => Err(Diagnostic::error(format!(
                 "cannot assign to built-in function '{:?}'",
                 type_identifier
-            )),
+            ))),
             Member::Index { object, .. } => {
-                Err(format!("Cannot assign to indexed value of {}", object))
+                Err(Diagnostic::error(format!("Cannot assign to indexed value of {}", object)))
             }
         }
     }

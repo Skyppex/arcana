@@ -1,4 +1,5 @@
-use std::collections::HashSet;
+use crate::diagnostic::{Diagnostic, Span};
+use std::collections::HashMap;
 use std::fmt::Display;
 
 use crate::types::TypeAnnotation;
@@ -10,8 +11,32 @@ use crate::types::TypeAnnotation;
 /// without `::` is always a struct and never an enum variant. An enum variant
 /// *is* a struct, so once the variant is statically known the struct forms
 /// apply to it directly.
+#[derive(Debug, Clone)]
+pub struct Pattern {
+    pub kind: PatternKind,
+    pub span: Span,
+}
+
+impl Pattern {
+    pub fn new(kind: PatternKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+}
+
+/// Where a pattern was written is not part of what it is.
+///
+/// This matters more here than anywhere else: patterns are compared to find
+/// duplicate and unreachable arms, and to deduplicate decision-tree branches.
+/// A derived `PartialEq` would make two identical patterns written on different
+/// lines compare unequal, and those checks would quietly stop firing.
+impl PartialEq for Pattern {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum Pattern {
+pub enum PatternKind {
     /// `_`
     Wildcard,
     /// `unit`
@@ -133,10 +158,10 @@ pub struct FieldPattern {
 
 impl Display for FieldPattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.pattern {
+        match &self.pattern.kind {
             // `{ x }` rather than `{ x: x }`
-            Pattern::Binding(name) if name == &self.identifier => write!(f, "{}", name),
-            pattern => write!(f, "{}: {}", self.identifier, pattern),
+            PatternKind::Binding(name) if name == &self.identifier => write!(f, "{}", name),
+            _ => write!(f, "{}: {}", self.identifier, self.pattern),
         }
     }
 }
@@ -149,12 +174,12 @@ impl Pattern {
     /// pattern always is, an enum variant pattern is when the enum has a single
     /// variant — so those answer `false` here and are settled during checking.
     pub fn is_unconditionally_irrefutable(&self) -> bool {
-        match self {
-            Pattern::Wildcard | Pattern::Binding(_) | Pattern::Unit => true,
-            Pattern::Struct { fields, .. } => fields
+        match &self.kind {
+            PatternKind::Wildcard | PatternKind::Binding(_) | PatternKind::Unit => true,
+            PatternKind::Struct { fields, .. } => fields
                 .iter()
                 .all(|f| f.pattern.is_unconditionally_irrefutable()),
-            Pattern::Tuple(patterns) => patterns.iter().all(|p| p.is_unconditionally_irrefutable()),
+            PatternKind::Tuple(patterns) => patterns.iter().all(|p| p.is_unconditionally_irrefutable()),
             _ => false,
         }
     }
@@ -163,13 +188,20 @@ impl Pattern {
     ///
     /// The two would name different values and only the last would survive, so
     /// it is always a mistake rather than a shorthand for equality.
-    pub fn check_no_duplicate_bindings(&self) -> Result<(), String> {
-        let mut seen = HashSet::new();
+    pub fn check_no_duplicate_bindings(&self) -> Result<(), Diagnostic> {
+        let mut seen: HashMap<&str, Span> = HashMap::new();
 
-        for name in self.bindings() {
-            if !seen.insert(name.clone()) {
-                return Err(format!("Pattern `{}` binds `{}` more than once", self, name));
+        for (name, span) in self.bindings_with_spans() {
+            if let Some(first) = seen.get(name) {
+                return Err(Diagnostic::error(format!(
+                    "Pattern `{}` binds `{}` more than once",
+                    self, name
+                ))
+                .labelled(span, "bound again here")
+                .and(*first, "first bound here"));
             }
+
+            seen.insert(name, span);
         }
 
         Ok(())
@@ -177,32 +209,40 @@ impl Pattern {
 
     /// Every name this pattern binds, in source order.
     pub fn bindings(&self) -> Vec<String> {
+        self.bindings_with_spans()
+            .into_iter()
+            .map(|(name, _)| name.to_owned())
+            .collect()
+    }
+
+    /// Every name this pattern binds, with where it was bound, in source order.
+    fn bindings_with_spans(&self) -> Vec<(&str, Span)> {
         let mut names = vec![];
         self.collect_bindings(&mut names);
         names
     }
 
-    fn collect_bindings(&self, names: &mut Vec<String>) {
-        match self {
-            Pattern::Binding(name) => names.push(name.clone()),
-            Pattern::Tuple(patterns) => {
+    fn collect_bindings<'a>(&'a self, names: &mut Vec<(&'a str, Span)>) {
+        match &self.kind {
+            PatternKind::Binding(name) => names.push((name, self.span)),
+            PatternKind::Tuple(patterns) => {
                 for pattern in patterns {
                     pattern.collect_bindings(names);
                 }
             }
-            Pattern::Struct { fields, .. } => {
+            PatternKind::Struct { fields, .. } => {
                 for field in fields {
                     field.pattern.collect_bindings(names);
                 }
             }
-            Pattern::Bound {
+            PatternKind::Bound {
                 identifier,
                 pattern,
             } => {
-                names.push(identifier.clone());
+                names.push((identifier, self.span));
                 pattern.collect_bindings(names);
             }
-            Pattern::EnumVariant {
+            PatternKind::EnumVariant {
                 inner: Some(inner), ..
             } => inner.collect_bindings(names),
             _ => {}
@@ -210,20 +250,27 @@ impl Pattern {
     }
 }
 
+impl PatternKind {
+    /// Places this pattern at `span`.
+    pub fn at(self, span: Span) -> Pattern {
+        Pattern { kind: self, span }
+    }
+}
+
 impl Display for Pattern {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Pattern::Wildcard => write!(f, "_"),
-            Pattern::Unit => write!(f, "unit"),
-            Pattern::Bool(v) => write!(f, "{}", v),
-            Pattern::Int(v) => write!(f, "{}", v),
-            Pattern::UInt(v) => write!(f, "{}u", v),
-            Pattern::Float(v) => write!(f, "{}f", v),
-            Pattern::Rune(v) => write!(f, "'{}'", v),
-            Pattern::String(v) => write!(f, "\"{}\"", v),
-            Pattern::Binding(v) => write!(f, "{}", v),
-            Pattern::Comparison { operator, bound } => write!(f, "{} {}", operator, bound),
-            Pattern::Range {
+        match &self.kind {
+            PatternKind::Wildcard => write!(f, "_"),
+            PatternKind::Unit => write!(f, "unit"),
+            PatternKind::Bool(v) => write!(f, "{}", v),
+            PatternKind::Int(v) => write!(f, "{}", v),
+            PatternKind::UInt(v) => write!(f, "{}u", v),
+            PatternKind::Float(v) => write!(f, "{}f", v),
+            PatternKind::Rune(v) => write!(f, "'{}'", v),
+            PatternKind::String(v) => write!(f, "\"{}\"", v),
+            PatternKind::Binding(v) => write!(f, "{}", v),
+            PatternKind::Comparison { operator, bound } => write!(f, "{} {}", operator, bound),
+            PatternKind::Range {
                 lower,
                 upper,
                 inclusive,
@@ -234,7 +281,7 @@ impl Display for Pattern {
                 if *inclusive { "=" } else { "" },
                 upper
             ),
-            Pattern::Tuple(patterns) => write!(
+            PatternKind::Tuple(patterns) => write!(
                 f,
                 "({})",
                 patterns
@@ -243,7 +290,7 @@ impl Display for Pattern {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            Pattern::Struct {
+            PatternKind::Struct {
                 type_annotation,
                 fields,
             } => {
@@ -253,11 +300,11 @@ impl Display for Pattern {
 
                 write_fields(f, fields)
             }
-            Pattern::Bound {
+            PatternKind::Bound {
                 identifier,
                 pattern,
             } => write!(f, "{} @ {}", identifier, pattern),
-            Pattern::EnumVariant {
+            PatternKind::EnumVariant {
                 enum_annotation,
                 path,
                 inner,

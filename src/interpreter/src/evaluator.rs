@@ -1,3 +1,5 @@
+use shared::ast::PatternKind;
+use shared::diagnostic::Diagnostic;
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use shared::{
@@ -27,7 +29,7 @@ use super::{
 pub fn evaluate(
     typed_statement: TypedStatement,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     match typed_statement {
         TypedStatement::None => Ok(Value::Void),
         TypedStatement::Program { statements } => evaluate_program(statements, environment),
@@ -74,7 +76,7 @@ fn evaluate_use_item(
     use_item: UseItem,
     module_path: ModPath,
     environment: Rcrc<Environment>,
-) -> Result<Vec<Rcrc<Variable>>, String> {
+) -> Result<Vec<Rcrc<Variable>>, Diagnostic> {
     match use_item {
         UseItem::Item(item_name) => {
             if item_name.validate_type_identifier_name().is_ok() {
@@ -112,7 +114,7 @@ fn evaluate_implementation_declaration(
     environment: Rc<RefCell<Environment>>,
     type_annotation: TypeAnnotation,
     functions: Vec<(String, TypedStatement)>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     for (function_name, function) in functions {
         let parameter_type = match &function {
             TypedStatement::FunctionDeclaration { param, .. } => {
@@ -153,9 +155,9 @@ fn evaluate_function_declaration(
     identifier: TypeIdentifier,
     param: Option<TypedParameter>,
     body: Option<TypedExpression>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let Some(body) = body else {
-        return Err(format!("Function '{}' must have a body", identifier));
+        return Err(Diagnostic::error(format!("Function '{}' must have a body", identifier)));
     };
 
     let function_environment = Rc::new(RefCell::new(environment.deref().clone().borrow().clone()));
@@ -180,7 +182,7 @@ fn evaluate_function_declaration(
 pub(super) fn evaluate_expression(
     typed_expression: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     match typed_expression {
         // TypedExpression::None => Ok(Value::Void),
         TypedExpression::VariableDeclaration {
@@ -261,7 +263,7 @@ pub(super) fn evaluate_expression(
 fn evaluate_tuple(
     elements: Vec<TypedExpression>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let mut tuple = Vec::new();
 
     for element in elements {
@@ -274,7 +276,7 @@ fn evaluate_tuple(
 fn evaluate_program(
     statements: Vec<TypedStatement>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let mut value = Value::Void;
     for statement in statements {
         value = evaluate(statement, environment.clone())?;
@@ -291,7 +293,7 @@ fn evaluate_variable_declaration(
     pattern: Pattern,
     initializer: Option<Box<TypedExpression>>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let value = match initializer {
         Some(initializer) => evaluate_expression(*initializer, environment.clone())?,
         None => Value::Uninitialized,
@@ -315,12 +317,12 @@ fn evaluate_if(
     false_expression: Option<Box<TypedExpression>>,
     wraps_true_branch: bool,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let if_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
     let condition = evaluate_expression(*condition, if_environment.clone())?;
 
     let Value::Bool(condition) = condition else {
-        return Err(format!("If condition must be boolean '{}'", condition));
+        return Err(Diagnostic::error(format!("If condition must be boolean '{}'", condition)));
     };
 
     if !condition {
@@ -351,7 +353,7 @@ fn evaluate_match(
     expression: Box<TypedExpression>,
     decision_tree: Decision,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     // Evaluated once. Everything the tree tests is projected out of this value.
     let value = evaluate_expression(*expression, environment.clone())?;
     let match_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
@@ -363,7 +365,7 @@ fn evaluate_decision_tree(
     decision_tree: Decision,
     value: &Value,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let mut decision = decision_tree;
 
     loop {
@@ -383,7 +385,7 @@ fn evaluate_decision_tree(
                 return evaluate_expression(*body, arm_environment);
             }
             Decision::Failure { witness } => {
-                return Err(format!("No match found for '{}' {}", value, witness))
+                return Err(Diagnostic::error(format!("No match found for '{}' {}", value, witness)))
             }
             Decision::Switch {
                 occurrence,
@@ -401,10 +403,10 @@ fn evaluate_decision_tree(
                 decision = match matched.or(default.map(|d| *d)) {
                     Some(decision) => decision,
                     None => {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "No case matched '{}' and there is no default",
                             tested
-                        ))
+                        )))
                     }
                 };
             }
@@ -413,7 +415,7 @@ fn evaluate_decision_tree(
 }
 
 /// Reads the value at `path` out of the value being matched.
-fn project(value: &Value, path: &AccessPath) -> Result<Value, String> {
+fn project(value: &Value, path: &AccessPath) -> Result<Value, Diagnostic> {
     match path {
         AccessPath::Root => Ok(value.clone()),
         // Narrowing to a nested enum is a change of static type only; the
@@ -428,26 +430,26 @@ fn project(value: &Value, path: &AccessPath) -> Result<Value, String> {
                     enum_member: Struct { fields, .. },
                     ..
                 }) => fields,
-                other => return Err(format!("Expected a struct or enum, found '{}'", other)),
+                other => return Err(Diagnostic::error(format!("Expected a struct or enum, found '{}'", other))),
             };
 
             fields
                 .iter()
                 .find(|field| &field.identifier == name)
                 .map(|field| field.value.clone())
-                .ok_or(format!("Field '{}' not found on '{}'", name, parent))
+                .ok_or(Diagnostic::error(format!("Field '{}' not found on '{}'", name, parent)))
         }
         AccessPath::TupleIndex(parent, index) => {
             let parent = project(value, parent)?;
 
             let Value::Tuple(values) = &parent else {
-                return Err(format!("Expected a tuple, found '{}'", parent));
+                return Err(Diagnostic::error(format!("Expected a tuple, found '{}'", parent)));
             };
 
             values
                 .get(*index)
                 .cloned()
-                .ok_or(format!("Tuple has no element {}", index))
+                .ok_or(Diagnostic::error(format!("Tuple has no element {}", index)))
         }
     }
 }
@@ -456,7 +458,7 @@ fn test_matches(
     test: &Test,
     value: &Value,
     environment: &Rcrc<Environment>,
-) -> Result<bool, String> {
+) -> Result<bool, Diagnostic> {
     Ok(match (test, value) {
         (Test::Bool(expected), Value::Bool(actual)) => expected == actual,
         (Test::Int(expected), Value::Number(Number::Int(actual))) => expected == actual,
@@ -519,7 +521,7 @@ fn test_matches(
     })
 }
 
-fn resolve_bound(bound: &CheckedBound, environment: &Rcrc<Environment>) -> Result<Value, String> {
+fn resolve_bound(bound: &CheckedBound, environment: &Rcrc<Environment>) -> Result<Value, Diagnostic> {
     Ok(match bound {
         CheckedBound::Int(v) => Value::Number(Number::Int(*v)),
         CheckedBound::UInt(v) => Value::Number(Number::UInt(*v)),
@@ -527,10 +529,10 @@ fn resolve_bound(bound: &CheckedBound, environment: &Rcrc<Environment>) -> Resul
         CheckedBound::Rune(v) => Value::Rune(*v),
         CheckedBound::Variable(identifier) => {
             let Some(variable) = environment.borrow().get_variable(identifier) else {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Variable '{}' not found in environment",
                     identifier
-                ));
+                )));
             };
 
             let value = variable.borrow().value.clone();
@@ -539,7 +541,7 @@ fn resolve_bound(bound: &CheckedBound, environment: &Rcrc<Environment>) -> Resul
     })
 }
 
-fn compare(left: &Value, right: &Value) -> Result<Option<std::cmp::Ordering>, String> {
+fn compare(left: &Value, right: &Value) -> Result<Option<std::cmp::Ordering>, Diagnostic> {
     Ok(match (left, right) {
         (Value::Number(Number::Int(l)), Value::Number(Number::Int(r))) => l.partial_cmp(r),
         (Value::Number(Number::UInt(l)), Value::Number(Number::UInt(r))) => l.partial_cmp(r),
@@ -555,16 +557,16 @@ fn destructure_irrefutable(
     pattern: &Pattern,
     value: &Value,
     bindings: &mut Vec<(String, Value)>,
-) -> Result<(), String> {
-    match pattern {
-        Pattern::Wildcard | Pattern::Unit => Ok(()),
-        Pattern::Binding(identifier) => {
+) -> Result<(), Diagnostic> {
+    match &pattern.kind {
+        PatternKind::Wildcard | PatternKind::Unit => Ok(()),
+        PatternKind::Binding(identifier) => {
             bindings.push((identifier.clone(), value.clone()));
             Ok(())
         }
-        Pattern::Tuple(patterns) => {
+        PatternKind::Tuple(patterns) => {
             let Value::Tuple(values) = value else {
-                return Err(format!("Expected a tuple, found '{}'", value));
+                return Err(Diagnostic::error(format!("Expected a tuple, found '{}'", value)));
             };
 
             for (pattern, value) in patterns.iter().zip(values) {
@@ -574,14 +576,14 @@ fn destructure_irrefutable(
             Ok(())
         }
         // `x @ p` binds and keeps matching the same value.
-        Pattern::Bound {
+        PatternKind::Bound {
             identifier,
             pattern,
         } => {
             bindings.push((identifier.clone(), value.clone()));
             destructure_irrefutable(pattern, value, bindings)
         }
-        Pattern::Struct { fields, .. } => {
+        PatternKind::Struct { fields, .. } => {
             for field in fields {
                 let field_value = project(
                     value,
@@ -595,11 +597,11 @@ fn destructure_irrefutable(
         }
         // The variant is statically known here, so the test is a no-op and only
         // the inner pattern binds anything.
-        Pattern::EnumVariant { inner, .. } => match inner {
+        PatternKind::EnumVariant { inner, .. } => match inner {
             Some(inner) => destructure_irrefutable(inner, value, bindings),
             None => Ok(()),
         },
-        other => Err(format!("Pattern '{}' is refutable", other)),
+        _ => Err(Diagnostic::error(format!("Pattern '{}' is refutable", pattern))),
     }
 }
 
@@ -607,7 +609,7 @@ fn evaluate_assignment(
     member: Box<Member>,
     initializer: Box<TypedExpression>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let value = evaluate_expression(*initializer, environment.clone())?;
     environment
         .borrow_mut()
@@ -615,7 +617,7 @@ fn evaluate_assignment(
     Ok(value)
 }
 
-fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Value, String> {
+fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Value, Diagnostic> {
     match member.clone() {
         Member::Identifier { symbol, .. } => Ok(environment
             .borrow()
@@ -645,7 +647,7 @@ fn evaluate_static_member_access(
     type_annotation: TypeAnnotation,
     environment: Rcrc<Environment>,
     member: Box<Member>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     Ok(environment
         .borrow()
         .get_static_member(&type_annotation, member.get_symbol())
@@ -659,16 +661,16 @@ fn evaluate_static_member_access(
 }
 
 /// Helper to extract a field from a value (struct, enum, or recursively from arrays)
-fn extract_field_from_value(value: Value, symbol: &str) -> Result<Value, String> {
+fn extract_field_from_value(value: Value, symbol: &str) -> Result<Value, Diagnostic> {
     match value {
         Value::Struct(Struct { type_name, fields }) => fields
             .iter()
             .find(|f| f.identifier == symbol)
             .map(|f| f.value.clone())
-            .ok_or(format!(
+            .ok_or(Diagnostic::error(format!(
                 "Field '{}' not found in struct '{}'",
                 symbol, type_name
-            )),
+            ))),
         Value::Enum(Enum {
             enum_member: Struct { type_name, fields },
             ..
@@ -676,21 +678,21 @@ fn extract_field_from_value(value: Value, symbol: &str) -> Result<Value, String>
             .iter()
             .find(|f| f.identifier == symbol)
             .map(|f| f.value.clone())
-            .ok_or(format!(
+            .ok_or(Diagnostic::error(format!(
                 "Field '{}' not found in enum member '{}'",
                 symbol, type_name
-            )),
+            ))),
         Value::Array(elements) => {
-            let results: Result<Vec<Value>, String> = elements
+            let results: Result<Vec<Value>, Diagnostic> = elements
                 .into_iter()
                 .map(|el| extract_field_from_value(el, symbol))
                 .collect();
             Ok(Value::Array(results?))
         }
-        other => Err(format!(
+        other => Err(Diagnostic::error(format!(
             "Cannot access field '{}' on value: '{}'",
             symbol, other
-        )),
+        ))),
     }
 }
 
@@ -698,7 +700,7 @@ fn evaluate_member_access(
     object: Box<TypedExpression>,
     environment: Rcrc<Environment>,
     member: Box<Member>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let value = evaluate_expression(*object, environment.clone())?;
 
     match value {
@@ -714,10 +716,10 @@ fn evaluate_member_access(
 
                 Ok(field.value.clone())
             }
-            Member::StaticMemberAccess { .. } => Err(format!(
+            Member::StaticMemberAccess { .. } => Err(Diagnostic::error(format!(
                 "Cannot access static member on an instance of a struct '{}'",
                 type_name
-            )),
+            ))),
             Member::MemberAccess { object, member, .. } => {
                 evaluate_member_access(object, environment, member)
             }
@@ -741,10 +743,10 @@ fn evaluate_member_access(
 
                 Ok(field.value.clone())
             }
-            Member::StaticMemberAccess { .. } => Err(format!(
+            Member::StaticMemberAccess { .. } => Err(Diagnostic::error(format!(
                 "Cannot access static member on an instance of a enum '{}'",
                 type_name
-            )),
+            ))),
             Member::MemberAccess { object, member, .. } => {
                 evaluate_member_access(object, environment, member)
             }
@@ -755,14 +757,14 @@ fn evaluate_member_access(
         },
         Value::Array(elements) => match *member.clone() {
             Member::Identifier { symbol, .. } => {
-                let results: Result<Vec<Value>, String> = elements
+                let results: Result<Vec<Value>, Diagnostic> = elements
                     .into_iter()
                     .map(|el| extract_field_from_value(el, &symbol))
                     .collect();
                 Ok(Value::Array(results?))
             }
             Member::StaticMemberAccess { .. } => {
-                Err("Cannot access static member on an array".to_string())
+                Err(Diagnostic::error("Cannot access static member on an array"))
             }
             Member::MemberAccess { object, member, .. } => {
                 // For chained access like arr.foo.bar, evaluate the inner access first
@@ -773,14 +775,14 @@ fn evaluate_member_access(
             }
             Member::Index { .. } => todo!("members on an indexed expression"),
         },
-        _ => Err(format!("Cannot access member value: '{}'", value)),
+        _ => Err(Diagnostic::error(format!("Cannot access member value: '{}'", value))),
     }
 }
 
 fn evaluate_literal(
     literal: ValueLiteral,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     match literal {
         ValueLiteral::Void => panic!("Void literals should never be evaluated"),
         ValueLiteral::Unit => Ok(Value::Unit),
@@ -802,7 +804,7 @@ fn evaluate_literal(
                         let values = evaluate_expression(expression, environment.clone())?;
 
                         let Value::Array(values) = values else {
-                            return Err(format!("Expected to spread an array, but got {}", values));
+                            return Err(Diagnostic::error(format!("Expected to spread an array, but got {}", values)));
                         };
 
                         for value in values {
@@ -874,7 +876,7 @@ fn evaluate_closure(
     param: Option<TypedClosureParameter>,
     body: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     Ok(Value::Function {
         param_name: param.map(|p| p.identifier),
         body: FunctionBody::Expr(body),
@@ -887,7 +889,7 @@ fn evaluate_call(
     argument: Option<Box<TypedExpression>>,
     type_: Type,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let callee_value = evaluate_expression(*callee, environment.clone())?;
 
     let evaluated_arg = argument
@@ -900,7 +902,7 @@ fn evaluate_call(
         environment,
     } = callee_value
     else {
-        return Err(format!("Cannot call non-function value '{}'", callee_value));
+        return Err(Diagnostic::error(format!("Cannot call non-function value '{}'", callee_value)));
     };
 
     let function_environment = Rc::new(RefCell::new(Environment::new_scope(
@@ -925,17 +927,17 @@ fn evaluate_call(
         match v {
             Some(v) => {
                 if type_ == Type::Void {
-                    return Err("Cannot return a value from a void function".to_string());
+                    return Err(Diagnostic::error("Cannot return a value from a void function"));
                 }
 
                 value = v.clone();
             }
             None => {
                 if type_ != Type::Void {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Cannot return void from a non-void function. Expected type '{}', found type 'void'",
                         type_
-                    ));
+                    )));
                 }
 
                 value = Value::Void;
@@ -954,51 +956,51 @@ fn evaluate_unary(
     operator: UnaryOperator,
     expression: Box<TypedExpression>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let value = evaluate_expression(*expression, environment)?;
 
     match operator {
         UnaryOperator::Identity => match value {
             Value::Number(number) => Ok(Value::Number(number)),
-            _ => Err(format!(
+            _ => Err(Diagnostic::error(format!(
                 "Cannot apply unary operator '+' to non-number value '{}'",
                 value
-            )),
+            ))),
         },
         UnaryOperator::Negate => match value {
             Value::Number(number) => match number {
                 Number::Int(v) => Ok(Value::Number(Number::Int(-v))),
                 Number::Float(v) => Ok(Value::Number(Number::Float(-v))),
-                other => Err(format!(
+                other => Err(Diagnostic::error(format!(
                     "Cannot apply unary operator '-' to unsigned integers '{}'",
                     other
-                )),
+                ))),
             },
-            _ => Err(format!(
+            _ => Err(Diagnostic::error(format!(
                 "Cannot apply unary operator '-' to non-number value '{}'",
                 value
-            )),
+            ))),
         },
         UnaryOperator::BitwiseNot => match value {
             Value::Number(number) => match number {
                 Number::Int(v) => Ok(Value::Number(Number::Int(!v))),
                 Number::UInt(v) => Ok(Value::Number(Number::UInt(!v))),
-                other => Err(format!(
+                other => Err(Diagnostic::error(format!(
                     "Cannot apply unary operator '~' to floating point numbers '{}'",
                     other
-                )),
+                ))),
             },
-            _ => Err(format!(
+            _ => Err(Diagnostic::error(format!(
                 "Cannot apply unary operator '~' to non-number value '{}'",
                 value
-            )),
+            ))),
         },
         UnaryOperator::LogicalNot => match value {
             Value::Bool(v) => Ok(Value::Bool(!v)),
-            _ => Err(format!(
+            _ => Err(Diagnostic::error(format!(
                 "Cannot apply unary operator '!' to non-boolean value '{}'",
                 value
-            )),
+            ))),
         },
     }
 }
@@ -1008,14 +1010,14 @@ fn evaluate_binary(
     operator: BinaryOperator,
     right: Box<TypedExpression>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     evaluate_binop::evaluate_binop(*left, operator, *right, environment)
 }
 
 fn evaluate_block(
     statements: Vec<TypedStatement>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let block_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
     let mut value = Value::Void;
 
@@ -1038,7 +1040,7 @@ fn evaluate_block(
 fn evaluate_loop(
     body: Box<TypedExpression>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let loop_environment = Rc::new(RefCell::new(Environment::new_scopes(
         environment,
         [Scope::Break(None), Scope::Continue],
@@ -1080,7 +1082,7 @@ fn evaluate_while(
     body: Box<TypedExpression>,
     else_body: Option<Box<TypedExpression>>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let while_environment = Rc::new(RefCell::new(Environment::new_scopes(
         environment,
         [ScopeType::Break, ScopeType::Continue],
@@ -1115,7 +1117,7 @@ fn evaluate_while(
                     break;
                 }
             }
-            _ => return Err(format!("While condition must be boolean '{}'", value)),
+            _ => return Err(Diagnostic::error(format!("While condition must be boolean '{}'", value))),
         }
 
         evaluate_expression(*body.clone(), while_environment.clone())?;
@@ -1155,7 +1157,7 @@ fn evaluate_for(
     body: Box<TypedExpression>,
     else_body: Option<Box<TypedExpression>>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let for_environment = Rc::new(RefCell::new(Environment::new_scopes(
         environment,
         [ScopeType::Break, ScopeType::Continue],
@@ -1164,7 +1166,7 @@ fn evaluate_for(
     let value = evaluate_expression(*iterable.clone(), for_environment.clone())?;
     let array = match value {
         Value::Array(array) => array,
-        _ => return Err(format!("For iterable must be an array '{}'", value)),
+        _ => return Err(Diagnostic::error(format!("For iterable must be an array '{}'", value))),
     };
 
     if array.is_empty() {
@@ -1263,9 +1265,9 @@ fn evaluate_for(
 fn evaluate_break(
     expression: Option<Box<TypedExpression>>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     if !environment.borrow().has_scope(&ScopeType::Break) {
-        return Err("Cannot break outside of a loop".to_string());
+        return Err(Diagnostic::error("Cannot break outside of a loop"));
     };
 
     match expression {
@@ -1285,9 +1287,9 @@ fn evaluate_break(
     }
 }
 
-fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, String> {
+fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, Diagnostic> {
     if !environment.borrow().has_scope(&ScopeType::Continue) {
-        return Err("Cannot continue outside of a loop".to_string());
+        return Err(Diagnostic::error("Cannot continue outside of a loop"));
     };
 
     environment.borrow_mut().activate_scope(Scope::Continue)?;
@@ -1297,9 +1299,9 @@ fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, String> {
 fn evaluate_return(
     expression: Option<Box<TypedExpression>>,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     if !environment.borrow().has_scope(&ScopeType::Return) {
-        return Err("Cannot return outside of a function".to_string());
+        return Err(Diagnostic::error("Cannot return outside of a function"));
     };
 
     match expression {
@@ -1344,7 +1346,7 @@ fn evaluate_index(
     object: Box<TypedExpression>,
     index: Index,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let object_value = evaluate_expression(*object, environment.clone())?;
 
     match index {
@@ -1358,7 +1360,7 @@ fn evaluate_index(
             };
 
             let Value::Array(values) = object_value else {
-                return Err(format!("Cannot index non-array value '{}'", object_value));
+                return Err(Diagnostic::error(format!("Cannot index non-array value '{}'", object_value)));
             };
 
             let value = values
@@ -1383,17 +1385,17 @@ fn evaluate_index(
 
             // slice array allowing for start and/or end to be None
             let Value::Array(values) = object_value else {
-                return Err(format!("Cannot index non-array value '{}'", object_value));
+                return Err(Diagnostic::error(format!("Cannot index non-array value '{}'", object_value)));
             };
 
             let start_index = match start_value {
                 Some(Value::Number(Number::UInt(index))) => index as usize,
                 Some(Value::Number(Number::Int(index))) => index as usize,
                 Some(_) => {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Expected unsigned integer for start index, found '{}'",
                         start_value.unwrap()
-                    ))
+                    )))
                 }
                 None => 0, // default to 0 if no start is provided
             };
@@ -1402,38 +1404,38 @@ fn evaluate_index(
                 Some(Value::Number(Number::UInt(index))) => index as usize,
                 Some(Value::Number(Number::Int(index))) => index as usize,
                 Some(_) => {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Expected unsigned integer for end index, found '{}'",
                         end_value.unwrap()
-                    ))
+                    )))
                 }
                 None => values.len(), // default to length of array if no end is provided
             };
 
             if start_index > end_index {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Start index '{}' cannot be greater than end index '{}'",
                     start_index, end_index
-                ));
+                )));
             }
 
             if inclusive {
                 if end_index >= values.len() {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "End index '{}' is out of bounds for array of length '{}'",
                         end_index,
                         values.len()
-                    ));
+                    )));
                 }
 
                 Ok(Value::Array(values[start_index..=end_index].to_vec()))
             } else {
                 if end_index > values.len() {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "End index '{}' is out of bounds for array of length '{}'",
                         end_index,
                         values.len()
-                    ));
+                    )));
                 }
 
                 Ok(Value::Array(values[start_index..end_index].to_vec()))

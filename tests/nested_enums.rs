@@ -141,7 +141,7 @@ fn a_nested_variant_is_assignable_to_the_outermost_enum() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.is_ok(), "{}", result.unwrap_err());
+    assert!(result.is_ok(), "{}", result.unwrap_err().to_string());
 }
 
 #[test]
@@ -157,7 +157,7 @@ fn a_nested_variant_is_assignable_to_its_own_enum() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.is_ok(), "{}", result.unwrap_err());
+    assert!(result.is_ok(), "{}", result.unwrap_err().to_string());
 }
 
 #[test]
@@ -250,7 +250,7 @@ fn an_enum_with_a_nested_enum_cannot_have_shared_fields() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    let error = result.unwrap_err();
+    let error = result.unwrap_err().to_string();
     assert!(error.contains("Outer"), "{}", error);
     assert!(error.contains("Inner"), "{}", error);
     assert!(error.contains("shared fields"), "{}", error);
@@ -268,7 +268,7 @@ fn the_shared_field_rule_applies_to_nested_enums_too() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    let error = result.unwrap_err();
+    let error = result.unwrap_err().to_string();
     assert!(error.contains("Outer::Inner"), "{}", error);
     assert!(error.contains("Deep"), "{}", error);
 }
@@ -285,7 +285,7 @@ fn sibling_variants_cannot_share_a_name() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("Dup"));
+    assert!(result.unwrap_err().to_string().contains("Dup"));
 }
 
 #[test]
@@ -324,7 +324,7 @@ fn a_nested_enum_cannot_declare_its_own_type_parameters() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("type parameters"));
+    assert!(result.unwrap_err().to_string().contains("type parameters"));
 }
 
 #[test]
@@ -359,7 +359,7 @@ fn an_enum_with_no_variants_is_rejected() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("no variants"));
+    assert!(result.unwrap_err().to_string().contains("no variants"));
 }
 
 #[test]
@@ -374,7 +374,7 @@ fn a_forward_declared_enum_is_rejected_as_having_no_variants() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("no variants"));
+    assert!(result.unwrap_err().to_string().contains("no variants"));
 }
 
 #[test]
@@ -389,7 +389,7 @@ fn a_nested_enum_with_no_variants_is_rejected() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    let error = result.unwrap_err();
+    let error = result.unwrap_err().to_string();
     assert!(error.contains("Outer::Inner"), "{}", error);
     assert!(error.contains("no variants"), "{}", error);
 }
@@ -643,7 +643,7 @@ fn leaving_a_nested_leaf_uncovered_is_rejected() {
     let result = try_create_typed_ast(&input);
 
     // Assert
-    let error = result.unwrap_err();
+    let error = result.unwrap_err().to_string();
     assert!(error.contains("not exhaustive"), "{}", error);
     assert!(error.contains("E1::E2::S3"), "{}", error);
 }
@@ -664,7 +664,7 @@ fn leaving_a_whole_nested_enum_uncovered_is_rejected() {
     let result = try_create_typed_ast(&input);
 
     // Assert
-    let error = result.unwrap_err();
+    let error = result.unwrap_err().to_string();
     assert!(error.contains("not exhaustive"), "{}", error);
     assert!(error.contains("E1::E3"), "{}", error);
 }
@@ -687,7 +687,7 @@ fn an_arm_subsumed_by_a_broader_path_is_unreachable() {
     let result = try_create_typed_ast(&input);
 
     // Assert
-    assert!(result.unwrap_err().contains("unreachable"));
+    assert!(result.unwrap_err().to_string().contains("unreachable"));
 }
 
 #[test]
@@ -706,7 +706,7 @@ fn binding_a_variant_and_destructuring_it_is_rejected() {
     let result = try_create_typed_ast(&input);
 
     // Assert
-    assert!(result.unwrap_err().contains("one or the other"));
+    assert!(result.unwrap_err().to_string().contains("one or the other"));
 }
 
 #[test]
@@ -725,7 +725,7 @@ fn the_first_segment_is_rooted_and_never_searched_for() {
     let result = try_create_typed_ast(&input);
 
     // Assert
-    assert!(result.unwrap_err().contains("has no variant named `S2`"));
+    assert!(result.unwrap_err().to_string().contains("has no variant named `S2`"));
 }
 
 #[test]
@@ -744,7 +744,7 @@ fn a_path_through_a_struct_variant_is_rejected() {
     let result = try_create_typed_ast(&input);
 
     // Assert
-    assert!(result.unwrap_err().contains("is not an enum"));
+    assert!(result.unwrap_err().to_string().contains("is not an enum"));
 }
 
 // --- `@` on variant patterns ------------------------------------------------
@@ -835,5 +835,5 @@ fn a_constrained_variant_binding_does_not_cover_the_whole_variant() {
     let result = try_create_typed_ast(&input);
 
     // Assert
-    assert!(result.unwrap_err().contains("not exhaustive"));
+    assert!(result.unwrap_err().to_string().contains("not exhaustive"));
 }

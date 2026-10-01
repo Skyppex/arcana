@@ -1,6 +1,6 @@
+use shared::ast::PatternKind;
 mod common;
 
-use shared::ast::pattern::Pattern;
 
 use common::{
     create_env, create_typed_ast, evaluate_expression, try_create_typed_ast, StatementExt,
@@ -76,7 +76,7 @@ fn variable_declaration_has_correct_identifier() {
 
     match expression {
         TypedExpression::VariableDeclaration { pattern, .. } => {
-            assert_eq!(pattern, Pattern::Binding("x".to_owned()));
+            assert_eq!(pattern.kind, PatternKind::Binding("x".to_owned()));
         }
         _ => panic!("Expected a variable declaration, but found {expression:?}"),
     }

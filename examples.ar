@@ -1,33 +1,11 @@
-fun mul_add(left: Int, right: Int): Int => left * right + left;
+enum E {
+    First { value: Int },
+    Second { text: String },
+}
 
-let x = 10;
-let y = 20;
+let e: E = E::First { value: 5 };
 
-let result = x:mul_add(y);
-// because x and y and #100 and #200
-// i expect this to become: let result = 100:mul_add(200);
-
-result:println();
-
-let a = true;
-let b = false;
-
-let result2 = if a || b {
-    "yup"
-} else {
-    "nope"
-};
-
-result2:println();
-
-// because a || b has a type of #true, the else block is unreachable. in this
-// case i'd probably want a warning about unreachable code, but for i just want
-// simplification. it should turn into:
-// let result2 = { "yup" };
-// you can't reliably reduce the block down to "yup" because blocks might have
-// other code running with side effects. i don't see any reason to do any
-// inspection on blocks to determine if they are "pure" as of now.
-// the a and b declarations should be dropped here because their type is a
-// literal value which should be substituted wherever it appears. if the
-// substitution works correctly you should be able to naively just never declare
-// those variables. same goes for x and y in this example.
+e match
+| ::First { value: > 3 } => 100,
+| ::First { value: <= 3 } => 150,
+| ::Second { text } => { text:println(); 200 },

@@ -134,7 +134,7 @@ fn an_implementation_must_choose_every_associated_type() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    let error = result.unwrap_err();
+    let error = result.unwrap_err().to_string();
     assert!(error.contains("missing associated type"), "{}", error);
     assert!(error.contains("Item"), "{}", error);
 }
@@ -153,7 +153,7 @@ fn an_implementation_cannot_choose_a_type_the_protocol_never_declared() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("has no associated type `Nope`"));
+    assert!(result.unwrap_err().to_string().contains("has no associated type `Nope`"));
 }
 
 #[test]
@@ -171,7 +171,7 @@ fn an_associated_type_is_written_unqualified() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    let error = result.unwrap_err();
+    let error = result.unwrap_err().to_string();
     assert!(error.contains("written `Item`"), "{}", error);
 }
 
@@ -190,7 +190,7 @@ fn a_variant_and_an_associated_type_cannot_share_a_name() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    let error = result.unwrap_err();
+    let error = result.unwrap_err().to_string();
     assert!(error.contains("would be ambiguous"), "{}", error);
 }
 

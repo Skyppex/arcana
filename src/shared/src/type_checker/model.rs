@@ -1,3 +1,4 @@
+use crate::ast::ExpressionKind;
 use std::fmt::Display;
 use std::hash::Hash;
 
@@ -1275,7 +1276,7 @@ impl Display for TypedMatchArm {
 
 impl Expression {
     pub fn get_built_in_function_identifier(&self) -> Option<BuiltInFunction> {
-        let Expression::Member(ast::Member::Identifier { symbol, .. }) = self else {
+        let ExpressionKind::Member(ast::Member::Identifier { symbol, .. }) = &self.kind else {
             return None;
         };
 

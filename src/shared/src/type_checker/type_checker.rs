@@ -1,3 +1,4 @@
+use crate::diagnostic::Diagnostic;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -56,7 +57,7 @@ pub enum DiscoveredType {
 pub fn discover_user_defined_types(
     program: Statement,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Vec<DiscoveredType>, String> {
+) -> Result<Vec<DiscoveredType>, Diagnostic> {
     // Discover user-defined types. Only store their names and fields with type names.
     let discovered_types = statements::discover_user_defined_types(&program)?;
 
@@ -78,7 +79,7 @@ pub fn discover_user_defined_types(
 ///
 /// This needs only the names written in the source, so it runs during
 /// discovery, before anything is type checked.
-fn check_implementations_do_not_overlap(discovered_types: &[DiscoveredType]) -> Result<(), String> {
+fn check_implementations_do_not_overlap(discovered_types: &[DiscoveredType]) -> Result<(), Diagnostic> {
     let aliases = alias_table(discovered_types);
 
     let implementations = discovered_types
@@ -118,12 +119,12 @@ fn check_implementations_do_not_overlap(discovered_types: &[DiscoveredType]) -> 
                 continue;
             }
 
-            return Err(format!(
+            return Err(Diagnostic::error(format!(
                 "Conflicting implementations of `{}` for `{}` and `{}`: both can apply to the same type",
                 protocol,
                 type_annotation,
                 other_type
-            ));
+            )));
         }
     }
 
@@ -246,14 +247,14 @@ pub fn type_check_program(
     program: &Statement,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<TypedStatement, String> {
+) -> Result<TypedStatement, Diagnostic> {
     statements::check_type(program, discovered_types, type_environment)
 }
 
 pub fn create_typed_ast(
     program: Statement,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<TypedStatement, String> {
+) -> Result<TypedStatement, Diagnostic> {
     // Discover user-defined types. Only store their names and fields with type names.
     let discovered_types = statements::discover_user_defined_types(&program)?;
 
@@ -284,9 +285,9 @@ pub const PRELUDE: &[&str] = &["Option", "Result"];
 pub fn register_core(
     source_tokens: Vec<crate::lexer::token::Token>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<(TypedStatement, Rcrc<TypeEnvironment>), String> {
+) -> Result<(TypedStatement, Rcrc<TypeEnvironment>), Diagnostic> {
     let Some((_, module_path, module)) = crate::ast::discover_module(source_tokens)? else {
-        return Err("The core library must declare the module it belongs to".to_string());
+        return Err(Diagnostic::error("The core library must declare the module it belongs to"));
     };
 
     let core_type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
@@ -317,7 +318,7 @@ pub fn register_core(
 pub fn add_prelude(
     type_environment: Rcrc<TypeEnvironment>,
     core_type_environment: &Rcrc<TypeEnvironment>,
-) -> Result<(), String> {
+) -> Result<(), Diagnostic> {
     for name in PRELUDE {
         let type_ = core_type_environment
             .borrow()

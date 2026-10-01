@@ -1,22 +1,23 @@
+use crate::diagnostic::Diagnostic;
 use std::fmt::Display;
 
 use regex;
 
 use num_traits::int::PrimInt;
 
-use crate::{ast::AccessModifier, pretty_print::PrettyPrint};
+use crate::{ast::AccessModifier, diagnostic::Span, pretty_print::PrettyPrint};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
-    pub length: u32,
+    pub span: Span,
 }
 
 impl<T: IntoIterator<Item = Token> + Clone> PrettyPrint for T {
     fn prettify(&self) -> String {
         self.clone()
             .into_iter()
-            .map(|token| format!("{:?} -> {}", token.kind, token.length))
+            .map(|token| format!("{:?} -> {}", token.kind, token.span.len()))
             .collect::<Vec<String>>()
             .join("\n")
     }
@@ -223,14 +224,14 @@ pub enum Keyword {
 }
 
 pub trait IdentifierType {
-    fn validate_type_identifier_name(&self) -> Result<(), String>;
-    fn validate_function_identifier_name(&self) -> Result<(), String>;
-    fn validate_variable_identifier_name(&self) -> Result<(), String>;
-    fn validate_module_identifier_name(&self) -> Result<(), String>;
+    fn validate_type_identifier_name(&self) -> Result<(), Diagnostic>;
+    fn validate_function_identifier_name(&self) -> Result<(), Diagnostic>;
+    fn validate_variable_identifier_name(&self) -> Result<(), Diagnostic>;
+    fn validate_module_identifier_name(&self) -> Result<(), Diagnostic>;
 }
 
 impl IdentifierType for str {
-    fn validate_type_identifier_name(&self) -> Result<(), String> {
+    fn validate_type_identifier_name(&self) -> Result<(), Diagnostic> {
         const TYPE_IDENT_REGEX: &str = r"^[A-Z]\w*$";
         let regex = regex::Regex::new(TYPE_IDENT_REGEX);
 
@@ -239,17 +240,17 @@ impl IdentifierType for str {
                 if re.is_match(self) {
                     Ok(())
                 } else {
-                    Err(format!(
+                    Err(Diagnostic::error(format!(
                         "Expected type parameter name. {} doesn't follow the pattern: {}",
                         self, TYPE_IDENT_REGEX
-                    ))
+                    )))
                 }
             }
             Err(_) => panic!("invalid regex"),
         }
     }
 
-    fn validate_function_identifier_name(&self) -> Result<(), String> {
+    fn validate_function_identifier_name(&self) -> Result<(), Diagnostic> {
         const FUNCTION_IDENT_REGEX: &str = r"^[_a-z][_a-z\d]*$";
         let regex = regex::Regex::new(FUNCTION_IDENT_REGEX);
 
@@ -258,17 +259,17 @@ impl IdentifierType for str {
                 if re.is_match(self) {
                     Ok(())
                 } else {
-                    Err(format!(
+                    Err(Diagnostic::error(format!(
                         "Expected function name. {} doesn't follow the pattern: {}",
                         self, FUNCTION_IDENT_REGEX
-                    ))
+                    )))
                 }
             }
             Err(_) => panic!("invalid regex"),
         }
     }
 
-    fn validate_variable_identifier_name(&self) -> Result<(), String> {
+    fn validate_variable_identifier_name(&self) -> Result<(), Diagnostic> {
         const VARIABLE_IDENT_REGEX: &str = r"^[_a-z][_a-z\d]*$";
         let regex = regex::Regex::new(VARIABLE_IDENT_REGEX);
 
@@ -277,17 +278,17 @@ impl IdentifierType for str {
                 if re.is_match(self) {
                     Ok(())
                 } else {
-                    Err(format!(
+                    Err(Diagnostic::error(format!(
                         "Expected variable name. {} doesn't follow the pattern: {}",
                         self, VARIABLE_IDENT_REGEX
-                    ))
+                    )))
                 }
             }
             Err(_) => panic!("invalid regex"),
         }
     }
 
-    fn validate_module_identifier_name(&self) -> Result<(), String> {
+    fn validate_module_identifier_name(&self) -> Result<(), Diagnostic> {
         const MODULE_IDENT_REGEX: &str = r"^[_a-z][_a-z\d]*$";
         let regex = regex::Regex::new(MODULE_IDENT_REGEX);
 
@@ -296,10 +297,10 @@ impl IdentifierType for str {
                 if re.is_match(self) {
                     Ok(())
                 } else {
-                    Err(format!(
+                    Err(Diagnostic::error(format!(
                         "Expected module name. {} doesn't follow the pattern: {}",
                         self, MODULE_IDENT_REGEX
-                    ))
+                    )))
                 }
             }
             Err(_) => panic!("invalid regex"),
@@ -308,19 +309,19 @@ impl IdentifierType for str {
 }
 
 impl IdentifierType for String {
-    fn validate_type_identifier_name(&self) -> Result<(), String> {
+    fn validate_type_identifier_name(&self) -> Result<(), Diagnostic> {
         self.as_str().validate_type_identifier_name()
     }
 
-    fn validate_function_identifier_name(&self) -> Result<(), String> {
+    fn validate_function_identifier_name(&self) -> Result<(), Diagnostic> {
         self.as_str().validate_function_identifier_name()
     }
 
-    fn validate_variable_identifier_name(&self) -> Result<(), String> {
+    fn validate_variable_identifier_name(&self) -> Result<(), Diagnostic> {
         self.as_str().validate_variable_identifier_name()
     }
 
-    fn validate_module_identifier_name(&self) -> Result<(), String> {
+    fn validate_module_identifier_name(&self) -> Result<(), Diagnostic> {
         self.as_str().validate_module_identifier_name()
     }
 }

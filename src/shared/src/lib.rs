@@ -1,5 +1,6 @@
 pub mod ast;
 pub mod built_in;
+pub mod diagnostic;
 pub mod display;
 pub mod lexer;
 pub mod pretty_print;

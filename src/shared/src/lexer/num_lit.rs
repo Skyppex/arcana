@@ -1,9 +1,10 @@
+use crate::diagnostic::Diagnostic;
 use super::{
     cursor::Cursor,
     token::{IntLiteral, IntLiteralBase, Literal, NumericLiteralType, Token, TokenKind},
 };
 
-pub fn parse_float_literal_starting_with_dot(cursor: &mut Cursor) -> Result<Token, String> {
+pub fn parse_float_literal_starting_with_dot(cursor: &mut Cursor) -> Result<Token, Diagnostic> {
     let mut value = String::from(".");
     cursor.bump(); // consume the dot
 
@@ -17,13 +18,17 @@ pub fn parse_float_literal_starting_with_dot(cursor: &mut Cursor) -> Result<Toke
     if let Some(suffix) = parse_suffix(cursor) {
         match suffix {
             NumericLiteralType::Float => {}
-            _ => return Err("Invalid suffix for float literal".to_string()),
+            _ => {
+                return Err(
+                    Diagnostic::error("Invalid suffix for float literal").at(cursor.token_span())
+                )
+            }
         }
     }
 
     Ok(Token {
         kind,
-        length: cursor.position_within_token(),
+        span: cursor.token_span(),
     })
 }
 
@@ -58,7 +63,7 @@ pub fn parse_numeric_literal(cursor: &mut Cursor) -> Token {
 
     Token {
         kind,
-        length: cursor.position_within_token(),
+        span: cursor.token_span(),
     }
 }
 

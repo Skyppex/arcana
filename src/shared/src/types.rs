@@ -1,3 +1,4 @@
+use crate::diagnostic::Diagnostic;
 use std::{fmt::Display, hash::Hash, ops::Deref, str::FromStr};
 
 use crate::{
@@ -275,11 +276,11 @@ impl TypeIdentifier {
         }
     }
 
-    pub fn validate_function_identifier(&self) -> Result<(), String> {
+    pub fn validate_function_identifier(&self) -> Result<(), Diagnostic> {
         self.name().validate_function_identifier_name()
     }
 
-    pub fn validate_type_identifier(&self) -> Result<(), String> {
+    pub fn validate_type_identifier(&self) -> Result<(), Diagnostic> {
         self.name().validate_type_identifier_name()
     }
 
@@ -422,17 +423,17 @@ pub struct GenericConstraint {
 pub(super) fn parse_optional_type_annotation(
     cursor: &mut Cursor,
     allow_void: bool,
-) -> Result<Option<TypeAnnotation>, String> {
+) -> Result<Option<TypeAnnotation>, Diagnostic> {
     if cursor.first().kind != TokenKind::Colon {
         Ok(None)
     } else {
         cursor.bump()?; // Consume the :
 
         if !can_be_type_annotation(cursor) {
-            return Err(format!(
+            return Err(Diagnostic::error(format!(
                 "Expected type annotation but found {:?}",
                 cursor.first().kind
-            ));
+            )));
         }
 
         Ok(Some(parse_type_annotation(cursor, allow_void)?))
@@ -460,11 +461,11 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
 pub(super) fn parse_type_annotation(
     cursor: &mut Cursor,
     allow_void: bool,
-) -> Result<TypeAnnotation, String> {
+) -> Result<TypeAnnotation, Diagnostic> {
     match cursor.first().kind {
         TokenKind::Literal(token::Literal::Void) => {
             if !allow_void {
-                return Err("Void type is not allowed here".to_string());
+                return Err(Diagnostic::error("Void type is not allowed here"));
             }
 
             cursor.bump()?; // Consume the void
@@ -486,7 +487,7 @@ pub(super) fn parse_type_annotation(
             if type_name.validate_type_identifier_name().is_err()
                 && type_name.validate_function_identifier_name().is_err()
             {
-                return Err(format!("Invalid type name: {}", type_name));
+                return Err(Diagnostic::error(format!("Invalid type name: {}", type_name)));
             }
 
             let mut generics = None;
@@ -512,10 +513,10 @@ pub(super) fn parse_type_annotation(
             while cursor.first().kind == TokenKind::DoubleColon {
                 let TokenKind::Identifier(variant_name) = cursor.second().kind else {
                     if cursor.second().kind != TokenKind::Less {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "Expected variant name but found {:?}",
                             cursor.second().kind
-                        ));
+                        )));
                     }
 
                     cursor.bump()?; // Consume the ::
@@ -572,7 +573,7 @@ pub(super) fn parse_type_annotation(
             let type_annotation = parse_type_annotation(cursor, allow_void)?;
 
             if cursor.first().kind != TokenKind::CloseBracket {
-                return Err(format!("Expected ] but found {:?}", cursor.first().kind));
+                return Err(Diagnostic::error(format!("Expected ] but found {:?}", cursor.first().kind)));
             }
 
             cursor.bump()?; // Consume the ]
@@ -581,7 +582,7 @@ pub(super) fn parse_type_annotation(
         TokenKind::OpenParen => {
             cursor.bump()?; // Consume the (
             if cursor.first().kind == TokenKind::CloseParen {
-                return Err("Use 'Unit' instead of '()'".to_string());
+                return Err(Diagnostic::error("Use 'Unit' instead of '()'"));
             }
 
             let type_annotation = parse_type_annotation(cursor, allow_void)?;
@@ -600,7 +601,7 @@ pub(super) fn parse_type_annotation(
             cursor.bump()?; // Consume the fun
 
             if cursor.first().kind != TokenKind::OpenParen {
-                return Err(format!("Expected ( but found {:?}", cursor.first().kind));
+                return Err(Diagnostic::error(format!("Expected ( but found {:?}", cursor.first().kind)));
             }
 
             cursor.bump()?; // Consume the (
@@ -617,17 +618,17 @@ pub(super) fn parse_type_annotation(
 
             unwrap_function_annotation(params, return_type_annotation)
         }
-        _ => Err(format!(
+        _ => Err(Diagnostic::error(format!(
             "Expected type identifier but found {:?}",
             cursor.first().kind
-        )),
+        ))),
     }
 }
 
 fn unwrap_function_annotation(
     params: Vec<TypeAnnotation>,
     return_type_annotation: Option<TypeAnnotation>,
-) -> Result<TypeAnnotation, String> {
+) -> Result<TypeAnnotation, Diagnostic> {
     match params.first().cloned() {
         None => Ok(TypeAnnotation::Function(
             None,
@@ -650,7 +651,7 @@ fn unwrap_function_annotation(
 fn unwrap_function_annotation_recurse(
     params: Vec<TypeAnnotation>,
     return_type_annotation: Option<TypeAnnotation>,
-) -> Result<Option<TypeAnnotation>, String> {
+) -> Result<Option<TypeAnnotation>, Diagnostic> {
     match params.last().cloned() {
         None => Ok(return_type_annotation),
         Some(last) => {
@@ -671,7 +672,7 @@ fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(
     cursor: &mut Cursor,
     check: F,
     allow_void: bool,
-) -> Result<Vec<TypeAnnotation>, String> {
+) -> Result<Vec<TypeAnnotation>, Diagnostic> {
     let mut types = Vec::new();
 
     while check(cursor.first().kind) {
@@ -689,14 +690,14 @@ fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(
 pub(super) fn parse_type_identifier(
     cursor: &mut Cursor,
     use_double_colon: bool,
-) -> Result<TypeIdentifier, String> {
+) -> Result<TypeIdentifier, Diagnostic> {
     match cursor.first().kind {
         TokenKind::Identifier(type_name) => {
             cursor.bump()?; // Consume the type identifier
 
             if use_double_colon {
                 if cursor.first().kind != TokenKind::DoubleColon {
-                    return Err(format!("Expected :: but found {:?}", cursor.first().kind));
+                    return Err(Diagnostic::error(format!("Expected :: but found {:?}", cursor.first().kind)));
                 }
 
                 cursor.bump()?; // Consume the ::
@@ -712,23 +713,23 @@ pub(super) fn parse_type_identifier(
 
             Ok(TypeIdentifier::Type(type_name))
         }
-        _ => Err(format!(
+        _ => Err(Diagnostic::error(format!(
             "Expected type identifier but found {:?}",
             cursor.first().kind
-        )),
+        ))),
     }
 }
 
-pub fn parse_generic_type_parameters(cursor: &mut Cursor) -> Result<Vec<GenericType>, String> {
+pub fn parse_generic_type_parameters(cursor: &mut Cursor) -> Result<Vec<GenericType>, Diagnostic> {
     cursor.expect(TokenKind::Less)?;
     let mut generics = Vec::new();
 
     while cursor.first().kind != TokenKind::Greater {
         let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-            return Err(format!(
+            return Err(Diagnostic::error(format!(
                 "Expected type identifier but found {:?}",
                 cursor.first().kind
-            ));
+            )));
         };
 
         generics.push(GenericType { type_name });
@@ -742,15 +743,15 @@ pub fn parse_generic_type_parameters(cursor: &mut Cursor) -> Result<Vec<GenericT
     Ok(generics)
 }
 
-pub fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericType>, String> {
+pub fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericType>, Diagnostic> {
     let mut types = Vec::new();
 
     while cursor.first().kind != TokenKind::Greater {
         let TokenKind::Identifier(type_name) = cursor.bump()?.kind else {
-            return Err(format!(
+            return Err(Diagnostic::error(format!(
                 "Expected type identifier but found {:?}",
                 cursor.first().kind
-            ));
+            )));
         };
 
         type_name.validate_type_identifier_name()?;
@@ -765,7 +766,7 @@ pub fn parse_generics_in_type_name(cursor: &mut Cursor) -> Result<Vec<GenericTyp
     Ok(types)
 }
 
-fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, String> {
+fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, Diagnostic> {
     match cursor.first().kind {
         TokenKind::Literal(token::Literal::Bool(value)) => {
             cursor.bump()?; // Consume the bool
@@ -803,7 +804,7 @@ fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, String> {
                     cursor.bump()?; // Consume the float
                     Ok(LiteralType::FloatValue(value))
                 }
-                _ => Err(format!("Cannot negate type: {:?}", cursor.first().kind)),
+                _ => Err(Diagnostic::error(format!("Cannot negate type: {:?}", cursor.first().kind))),
             }
         }
         TokenKind::Minus => {
@@ -818,23 +819,23 @@ fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, String> {
                     cursor.bump()?; // Consume the float
                     Ok(LiteralType::FloatValue(-value))
                 }
-                _ => Err(format!("Cannot negate type: {:?}", cursor.first().kind)),
+                _ => Err(Diagnostic::error(format!("Cannot negate type: {:?}", cursor.first().kind))),
             }
         }
         TokenKind::Identifier(identifier) => {
             if identifier.validate_type_identifier_name().is_ok() {
                 cursor.bump()?; // Consume the identifier
-                return LiteralType::from_str(&identifier);
+                return LiteralType::from_str(&identifier).map_err(Diagnostic::from);
             }
 
-            Err(format!(
+            Err(Diagnostic::error(format!(
                 "Expected type identifier but found '{}'",
                 identifier
-            ))
+            )))
         }
-        _ => Err(format!(
+        _ => Err(Diagnostic::error(format!(
             "Expected literal type but found {:?}",
             cursor.first().kind
-        )),
+        ))),
     }
 }

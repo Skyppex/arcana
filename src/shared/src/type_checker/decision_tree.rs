@@ -8,6 +8,7 @@
 //! over its shared fields fall out for free: such a row simply has no
 //! obligation on the value being discriminated, so it belongs to every branch.
 
+use crate::diagnostic::Diagnostic;
 use std::fmt::Display;
 
 use crate::{
@@ -297,7 +298,7 @@ pub fn compile_match(
     matchee_type: Type,
     arms: &[CompilableArm],
     body_type: Type,
-) -> Result<CompiledMatch, String> {
+) -> Result<CompiledMatch, Diagnostic> {
     let root = Occurrence::root(matchee_type);
 
     let rows = arms
@@ -334,7 +335,7 @@ fn compile_rows(
     arms: &[CompilableArm],
     body_type: &Type,
     reached: &mut [bool],
-) -> Result<Decision, String> {
+) -> Result<Decision, Diagnostic> {
     let Some(first) = rows.first() else {
         return Ok(Decision::Failure {
             witness: String::new(),
@@ -373,7 +374,7 @@ fn compile_constructor_switch(
     arms: &[CompilableArm],
     body_type: &Type,
     reached: &mut [bool],
-) -> Result<Decision, String> {
+) -> Result<Decision, Diagnostic> {
     let mut tests: Vec<Test> = vec![];
 
     for row in &rows {
@@ -460,13 +461,13 @@ fn compile_constructor_switch(
     }
 
     if default_rows.is_empty() {
-        return Err(non_exhaustive_error(occurrence, &missing));
+        return Err(Diagnostic::error(non_exhaustive_error(occurrence, &missing)));
     }
 
     let default = compile_rows(default_rows, arms, body_type, reached)?;
 
     if let Decision::Failure { .. } = default {
-        return Err(non_exhaustive_error(occurrence, &missing));
+        return Err(Diagnostic::error(non_exhaustive_error(occurrence, &missing)));
     }
 
     Ok(Decision::Switch {
@@ -486,7 +487,7 @@ fn compile_predicate_switch(
     arms: &[CompilableArm],
     body_type: &Type,
     reached: &mut [bool],
-) -> Result<Decision, String> {
+) -> Result<Decision, Diagnostic> {
     let mut case_rows = vec![];
 
     for row in &rows {
@@ -514,13 +515,13 @@ fn compile_predicate_switch(
         .collect::<Vec<_>>();
 
     if default_rows.is_empty() {
-        return Err(non_exhaustive_error(occurrence, &None));
+        return Err(Diagnostic::error(non_exhaustive_error(occurrence, &None)));
     }
 
     let default = compile_rows(default_rows, arms, body_type, reached)?;
 
     if let Decision::Failure { .. } = default {
-        return Err(non_exhaustive_error(occurrence, &None));
+        return Err(Diagnostic::error(non_exhaustive_error(occurrence, &None)));
     }
 
     Ok(Decision::Switch {

@@ -7,14 +7,15 @@ use std::{
     rc::Rc,
 };
 
-use crate::{cli::Cli, read_input};
+use crate::{cli::Cli, read_input, report::Report};
 use interpreter::Environment;
 use shared::{
+    diagnostic::SourceFile,
     type_checker::{Type, TypeEnvironment},
     types::ToKey,
 };
 
-pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
+pub(crate) fn interactive(args: &Cli) -> Result<(), Report> {
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
     )));
@@ -147,16 +148,16 @@ pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
             continue;
         }
 
-        if let Err(message) = read_input(
-            input.clone(),
+        // The report already quotes the offending line, so the input is not
+        // echoed back after it.
+        if let Err(report) = read_input(
+            &SourceFile::new("<repl>", input.clone()),
             type_environment.clone(),
             environment.clone(),
             args,
             true,
         ) {
-            println!("Error: {message}");
-            println!();
-            println!("{input}");
+            println!("{report}");
         }
 
         println!()

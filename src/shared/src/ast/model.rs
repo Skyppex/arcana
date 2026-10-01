@@ -2,12 +2,34 @@ use std::hash::Hash;
 use std::fmt::Display;
 
 use crate::ast::pattern::Pattern;
+use crate::diagnostic::Span;
 use crate::display::{Indent, IndentDisplay};
 use crate::pretty_print::PrettyPrint;
 use crate::types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier};
 
+/// A statement, and where it was written.
+#[derive(Debug, Clone)]
+pub struct Statement {
+    pub kind: StatementKind,
+    pub span: Span,
+}
+
+impl Statement {
+    pub fn new(kind: StatementKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+}
+
+/// Where a statement was written is not part of what it is — see the same
+/// reasoning on [`Expression`].
+impl PartialEq for Statement {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum Statement {
+pub enum StatementKind {
     Program { statements: Vec<Statement> },
     ModuleDeclaration(ModuleDeclaration),
     Use(Use),
@@ -22,6 +44,13 @@ pub enum Statement {
     Expression(Expression),
 }
 
+impl StatementKind {
+    /// Places this statement at `span`.
+    pub fn at(self, span: Span) -> Statement {
+        Statement { kind: self, span }
+    }
+}
+
 impl PrettyPrint for Statement {
     fn prettify(&self) -> String {
         let mut indent = Indent::new();
@@ -31,8 +60,36 @@ impl PrettyPrint for Statement {
 
 type Block = Vec<Statement>;
 
+/// An expression, and where it was written.
+///
+/// The span runs from the expression's first token through its last, so it is
+/// what a type error can point at without knowing anything about the shape of
+/// what failed.
+#[derive(Debug, Clone)]
+pub struct Expression {
+    pub kind: ExpressionKind,
+    pub span: Span,
+}
+
+impl Expression {
+    pub fn new(kind: ExpressionKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+}
+
+/// Where an expression was written is not part of *what it is*: two
+/// structurally identical expressions written in different places are equal.
+///
+/// Deriving this would silently change the behaviour of everything in the
+/// compiler that compares syntax, and would do it invisibly.
+impl PartialEq for Expression {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expression {
+pub enum ExpressionKind {
     // None, // For testing purposes
     VariableDeclaration(VariableDeclaration),
     If(If),
@@ -54,6 +111,13 @@ pub enum Expression {
     Break(Option<Box<Expression>>),
     Continue,
     Return(Option<Box<Expression>>),
+}
+
+impl ExpressionKind {
+    /// Places this expression at `span`.
+    pub fn at(self, span: Span) -> Expression {
+        Expression { kind: self, span }
+    }
 }
 
 impl PrettyPrint for Expression {

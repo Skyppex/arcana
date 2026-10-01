@@ -1,3 +1,4 @@
+use crate::diagnostic::Diagnostic;
 use std::{fmt::Display, vec};
 
 use super::{type_equals_coerce, Type};
@@ -13,7 +14,7 @@ impl Scope {
         !self.types.is_empty()
     }
 
-    pub fn fold(&self) -> Result<Type, String> {
+    pub fn fold(&self) -> Result<Type, Diagnostic> {
         let type_ = self.types.iter().try_fold(Type::Void, |acc, t| {
             if acc == Type::Void || type_equals_coerce(&acc, t) {
                 Ok(t.clone())

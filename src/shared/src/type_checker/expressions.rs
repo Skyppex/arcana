@@ -1,3 +1,5 @@
+use crate::ast::ExpressionKind;
+use crate::diagnostic::{Diagnostic, Span, Spanned};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
@@ -31,15 +33,32 @@ use super::{
 
 use crate::ast::pattern::Pattern;
 
+/// Type checks one expression, pointing any error at it.
+///
+/// The span is attached here rather than at each of the hundred-odd places that
+/// can fail, and [`Spanned::at`] only fills an *empty* primary — so an error
+/// raised while checking a sub-expression keeps that sub-expression's span, and
+/// anything raised directly by this arm gets the whole expression's. Each error
+/// therefore ends up pointing at the smallest piece of syntax that knew about
+/// it, without any site having to say so.
 pub fn check_type(
     expression: &Expression,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
     context: Option<Type>,
-) -> Result<TypedExpression, String> {
-    match expression {
-        // Expression::None => Ok(TypedExpression::None),
-        Expression::Break(e) => match e {
+) -> Result<TypedExpression, Diagnostic> {
+    check_type_of(expression, discovered_types, type_environment, context).at(expression.span)
+}
+
+fn check_type_of(
+    expression: &Expression,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rc<RefCell<TypeEnvironment>>,
+    context: Option<Type>,
+) -> Result<TypedExpression, Diagnostic> {
+    match &expression.kind {
+        // ExpressionKind::None => Ok(TypedExpression::None),
+        ExpressionKind::Break(e) => match e {
             Some(e) => {
                 let typed_expression =
                     check_type(e, discovered_types, type_environment.clone(), None)?;
@@ -57,8 +76,8 @@ pub fn check_type(
                 Ok(TypedExpression::Break(None))
             }
         },
-        Expression::Continue => Ok(TypedExpression::Continue),
-        Expression::Return(e) => match e {
+        ExpressionKind::Continue => Ok(TypedExpression::Continue),
+        ExpressionKind::Return(e) => match e {
             Some(e) => {
                 let typed_expression =
                     check_type(e, discovered_types, type_environment.clone(), None)?;
@@ -76,7 +95,7 @@ pub fn check_type(
                 Ok(TypedExpression::Return(None))
             }
         },
-        Expression::Closure(closure) => {
+        ExpressionKind::Closure(closure) => {
             let closure_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
@@ -104,7 +123,7 @@ pub fn check_type(
                     });
 
                     let Some(type_) = type_ else {
-                        return Err("Could not infer type of closure parameter".to_string());
+                        return Err(Diagnostic::error("Could not infer type of closure parameter"));
                     };
 
                     closure_environment
@@ -164,15 +183,15 @@ pub fn check_type(
                 type_,
             })
         }
-        Expression::Call(call) => {
+        ExpressionKind::Call(call) => {
             // A static member may come from several implementations — `C::from`
             // for both `From<A>` and `From<B>`. Which one is meant is settled
             // by the argument, so that is checked before the callee.
-            if let Expression::Member(ast::Member::StaticMemberAccess {
+            if let ExpressionKind::Member(ast::Member::StaticMemberAccess {
                 type_annotation,
                 member,
                 ..
-            }) = call.callee.as_ref()
+            }) = &call.callee.kind
             {
                 if let (ast::Member::Identifier { symbol, .. }, Some(argument)) =
                     (member.as_ref(), &call.argument)
@@ -193,9 +212,9 @@ pub fn check_type(
             // call carries none of its own. Both spellings answer the same
             // question and fold the same way.
             if let (
-                Expression::Member(ast::Member::ParamPropagation { object, member, .. }),
+                ExpressionKind::Member(ast::Member::ParamPropagation { object, member, .. }),
                 None,
-            ) = (call.callee.as_ref(), &call.argument)
+            ) = (&call.callee.kind, &call.argument)
             {
                 if is_typeof(member) {
                     let argument =
@@ -221,19 +240,19 @@ pub fn check_type(
             let callee_type = callee.get_type();
 
             if !matches!(&callee_type, &Type::Function(_)) {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Expected function type, found {}",
                     callee.get_type()
-                ));
+                )));
             }
 
             let return_type = match callee_type.clone() {
                 Type::Function(Function { return_type, .. }) => *return_type,
                 _ => {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Expected function type, found {}",
                         callee.get_type()
-                    ));
+                    )));
                 }
             };
 
@@ -266,10 +285,10 @@ pub fn check_type(
             })) = &callee
             {
                 let Some(argument) = &arg_typed_expression else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "{}, and needs a value to report on",
                         TYPEOF_IS_NOT_A_VALUE
-                    ));
+                    )));
                 };
 
                 return Ok(typeof_literal(argument));
@@ -283,9 +302,9 @@ pub fn check_type(
             // parameter is specialised here: its body may dispatch on the
             // implementation's parameters, which only exist while checking.
             if let (
-                Expression::Member(ast::Member::ParamPropagation { object, member, .. }),
+                ExpressionKind::Member(ast::Member::ParamPropagation { object, member, .. }),
                 None,
-            ) = (call.callee.as_ref(), &call.argument)
+            ) = (&call.callee.kind, &call.argument)
             {
                 if let ast::Member::Identifier { symbol, .. } = member.as_ref() {
                     if let Some(specialised) = specialise_universal_member(
@@ -352,11 +371,11 @@ pub fn check_type(
                 }) = callee.get_type()
                 {
                     if !type_equals(&param.type_, &arg.get_type()) {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "Argument type {} does not match parameter type {}",
                             arg.get_type(),
                             param.type_
-                        ));
+                        )));
                     }
                 } else if let Type::Function(Function { param: None, .. }) = callee_type {
                     callee = TypedExpression::Call {
@@ -367,17 +386,17 @@ pub fn check_type(
                     return_type = match return_type {
                         Type::Function(Function { return_type, .. }) => *return_type,
                         _ => {
-                            return Err(format!(
+                            return Err(Diagnostic::error(format!(
                                 "Expected function type with a return type, found {}",
                                 callee.get_type()
-                            ));
+                            )));
                         }
                     };
                 } else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Expected function type with a parameter, found {}",
                         callee.get_type()
-                    ));
+                    )));
                 };
             }
 
@@ -389,7 +408,7 @@ pub fn check_type(
                 type_: return_type,
             })
         }
-        Expression::VariableDeclaration(VariableDeclaration {
+        ExpressionKind::VariableDeclaration(VariableDeclaration {
             mutable,
             type_annotation,
             pattern,
@@ -414,11 +433,11 @@ pub fn check_type(
                         .get_type_from_annotation(type_annotation)?;
 
                     if !type_equals(&type_, &initializer.get_type()) {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "Initializer type {} does not match variable type {}",
                             initializer.get_type(),
                             type_
-                        ));
+                        )));
                     }
 
                     Some(initializer)
@@ -471,7 +490,7 @@ pub fn check_type(
                 type_: Type::Bool,
             })
         }
-        Expression::If(If {
+        ExpressionKind::If(If {
             condition,
             true_expression,
             false_expression,
@@ -488,10 +507,10 @@ pub fn check_type(
             )?;
 
             if !type_equals(&Type::Bool, &if_condition.get_type()) {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "If condition must be of type bool but found {}",
                     if_condition.get_type()
-                ));
+                )));
             };
 
             let if_block = check_type(
@@ -559,7 +578,7 @@ pub fn check_type(
                 type_,
             })
         }
-        Expression::Match(Match { expression, arms }) => {
+        ExpressionKind::Match(Match { expression, arms }) => {
             let match_environment = Rc::new(RefCell::new(TypeEnvironment::new_parent(
                 type_environment.clone(),
             )));
@@ -574,7 +593,7 @@ pub fn check_type(
             let matchee_type = runtime_type(&expression.get_type());
 
             if arms.is_empty() {
-                return Err("Match must have at least one arm".to_string());
+                return Err(Diagnostic::error("Match must have at least one arm"));
             }
 
             // Each arm is checked once, in a scope holding the bindings its own
@@ -632,10 +651,10 @@ pub fn check_type(
             let compiled = compile_match(matchee_type, &compilable, type_.clone())?;
 
             if let Some(arm) = compiled.unreachable_arms.first() {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Match arm `{}` is unreachable",
                     typed_arms[*arm].pattern
-                ));
+                )));
             }
 
             Ok(TypedExpression::Match {
@@ -645,14 +664,14 @@ pub fn check_type(
                 type_,
             })
         }
-        Expression::Assignment(Assignment {
+        ExpressionKind::Assignment(Assignment {
             member,
             initializer,
         }) => {
             let identifier = member.get_symbol();
 
             let mut member = check_type(
-                &Expression::Member(*member.clone()),
+                &ExpressionKind::Member(*member.clone()).at(expression.span),
                 discovered_types,
                 type_environment.clone(),
                 None,
@@ -675,7 +694,7 @@ pub fn check_type(
                     .add_variable(identifier.clone(), member_type.clone());
 
                 let TypedExpression::Member(mem) = member else {
-                    return Err("Expected member expression".to_string());
+                    return Err(Diagnostic::error("Expected member expression"));
                 };
 
                 let mem = match mem {
@@ -690,11 +709,11 @@ pub fn check_type(
             }
 
             if !type_equals(&member_type, &initializer.get_type()) {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Member type {} does not match initializer type {}",
                     member.get_type(),
                     initializer.get_type()
-                ));
+                )));
             }
 
             let TypedExpression::Member(member) = member else {
@@ -707,12 +726,12 @@ pub fn check_type(
                 type_: initializer.get_type(),
             })
         }
-        Expression::Member(member) => match member {
+        ExpressionKind::Member(member) => match member {
             crate::ast::Member::Identifier { symbol, generics } => {
                 // `typeof` is answered while checking and has no value to carry
                 // into the program, so it cannot be referred to as one.
                 if is_typeof(member) {
-                    return Err(TYPEOF_IS_NOT_A_VALUE.to_string());
+                    return Err(Diagnostic::error(TYPEOF_IS_NOT_A_VALUE));
                 }
 
                 let variable = type_environment.borrow().get_variable(symbol);
@@ -777,7 +796,7 @@ pub fn check_type(
                 check_type_index(object, index, discovered_types, type_environment, context)
             }
         },
-        Expression::Literal(l) => match l {
+        ExpressionKind::Literal(l) => match l {
             ast::ValueLiteral::Unit => Ok(TypedExpression::Literal {
                 literal: ValueLiteral::Unit,
                 type_: Type::Unit,
@@ -807,7 +826,7 @@ pub fn check_type(
                 type_: Type::bool_literal(*v),
             }),
             ast::ValueLiteral::Array(items) => {
-                let v: Result<(Vec<ArrayItem>, Type), String> = {
+                let v: Result<(Vec<ArrayItem>, Type), Diagnostic> = {
                     let mut v_: Vec<ArrayItem> = vec![];
                     let mut previous_type = Type::Unknown;
 
@@ -830,10 +849,10 @@ pub fn check_type(
                                 if !type_equals(&previous_type, &Type::Unknown)
                                     && !type_equals_unstrict(&type_, &previous_type)
                                 {
-                                    return Err(format!(
+                                    return Err(Diagnostic::error(format!(
                                             "Array element type {:?} does not match previous element type {:?}",
                                             type_, previous_type
-                                    ));
+                                    )));
                                 }
 
                                 // The array's element type covers every
@@ -854,19 +873,19 @@ pub fn check_type(
                                 let type_ = if let Type::Array(inner_type) = value.get_type() {
                                     *inner_type
                                 } else {
-                                    return Err(format!(
+                                    return Err(Diagnostic::error(format!(
                                         "Exprected to spread and array but found {:?}",
                                         value.get_type()
-                                    ));
+                                    )));
                                 };
 
                                 if !type_equals(&previous_type, &Type::Unknown)
                                     && !type_equals_unstrict(&type_, &previous_type)
                                 {
-                                    return Err(format!(
+                                    return Err(Diagnostic::error(format!(
                                         "Array element type {:?} does not match previous element type {:?}",
                                         type_, previous_type
-                                    ));
+                                    )));
                                 }
 
                                 // The array's element type covers every
@@ -961,19 +980,19 @@ pub fn check_type(
                 {
                     match (initializer, &field.default_value) {
                         (None, None) => {
-                            return Err(format!(
+                            return Err(Diagnostic::error(format!(
                                 "Field '{}' is missing from struct initializer",
                                 field.field_name
-                            ))
+                            )))
                         }
                         (None, Some(default_value)) => {
                             let field_type = field.field_type.clone();
 
                             if !type_equals(&field_type, default_value) {
-                                return Err(format!(
+                                return Err(Diagnostic::error(format!(
                                     "Field type {} does not match initializer type {}",
                                     field_type, default_value
-                                ));
+                                )));
                             }
 
                             let lit = ValueLiteral::try_from(default_value.clone())?;
@@ -993,10 +1012,10 @@ pub fn check_type(
                             let initializer_type = initializer.get_type();
 
                             if !type_equals(&field_type, &initializer_type) {
-                                return Err(format!(
+                                return Err(Diagnostic::error(format!(
                                     "Field type {} does not match initializer type {}",
                                     field_type, initializer_type
-                                ));
+                                )));
                             }
                         }
                     }
@@ -1068,19 +1087,19 @@ pub fn check_type(
                 {
                     match (initializer, &struct_field.default_value) {
                         (None, None) => {
-                            return Err(format!(
+                            return Err(Diagnostic::error(format!(
                                 "Field '{}' is missing from struct initializer",
                                 struct_field.field_name
-                            ))
+                            )))
                         }
                         (None, Some(default_value)) => {
                             let field_type = struct_field.field_type.clone();
 
                             if !type_equals(&field_type, default_value) {
-                                return Err(format!(
+                                return Err(Diagnostic::error(format!(
                                     "Field type {} does not match initializer type {}",
                                     field_type, default_value
-                                ));
+                                )));
                             }
 
                             let lit = ValueLiteral::try_from(default_value.clone())?;
@@ -1100,10 +1119,10 @@ pub fn check_type(
                             let initializer_type = initializer.get_type();
 
                             if !type_equals(&field_type, &initializer_type) {
-                                return Err(format!(
+                                return Err(Diagnostic::error(format!(
                                     "Field type {} does not match initializer type {}",
                                     field_type, initializer_type
-                                ));
+                                )));
                             }
                         }
                     }
@@ -1120,7 +1139,7 @@ pub fn check_type(
                 })
             }
         },
-        Expression::Tuple(elements) => {
+        ExpressionKind::Tuple(elements) => {
             let typed_elements = elements
                 .iter()
                 .map(|element| {
@@ -1131,7 +1150,7 @@ pub fn check_type(
                         context.clone(),
                     )
                 })
-                .collect::<Result<Vec<TypedExpression>, String>>()?;
+                .collect::<Result<Vec<TypedExpression>, Diagnostic>>()?;
 
             let types = typed_elements.iter().map(|e| e.get_type()).collect();
 
@@ -1140,7 +1159,7 @@ pub fn check_type(
                 type_: Type::Tuple(types),
             })
         }
-        Expression::Unary(unary) => {
+        ExpressionKind::Unary(unary) => {
             let expression =
                 check_type(&unary.expression, discovered_types, type_environment, None)?;
             let type_ = expression.get_deep_type();
@@ -1160,7 +1179,7 @@ pub fn check_type(
                 type_: type_.clone(),
             })
         }
-        Expression::Binary(Binary {
+        ExpressionKind::Binary(Binary {
             left,
             operator,
             right,
@@ -1176,11 +1195,11 @@ pub fn check_type(
                 BinaryOperator::Range | BinaryOperator::RangeInclusive
             ) && !type_equals_coerce(&right.get_type(), &left.get_type())
             {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Range operator requires both sides to be of the same type, found {} and {}",
                     left.get_type(),
                     right.get_type()
-                ));
+                )));
             }
 
             Ok(TypedExpression::Binary {
@@ -1190,7 +1209,7 @@ pub fn check_type(
                 type_,
             })
         }
-        Expression::Block(statements) => {
+        ExpressionKind::Block(statements) => {
             let mut typed_statements: Vec<TypedStatement> = vec![];
 
             for statement in statements {
@@ -1216,7 +1235,7 @@ pub fn check_type(
                 type_,
             }))
         }
-        Expression::Loop(body) => {
+        ExpressionKind::Loop(body) => {
             let loop_environment = Rc::new(RefCell::new(TypeEnvironment::new_scope(
                 type_environment,
                 ScopeType::Break,
@@ -1240,7 +1259,7 @@ pub fn check_type(
                 }),
             }
         }
-        Expression::While(While {
+        ExpressionKind::While(While {
             condition,
             body,
             else_body,
@@ -1261,7 +1280,7 @@ pub fn check_type(
             )?;
 
             if !type_equals(&Type::Bool, &condition.get_type()) {
-                return Err("While condition must be of type bool".to_string());
+                return Err(Diagnostic::error("While condition must be of type bool"));
             };
 
             let body = check_type(body, discovered_types, while_environment.clone(), None)?;
@@ -1301,8 +1320,8 @@ pub fn check_type(
                 None => {
                     if !type_equals(&type_, &Type::Void) {
                         return Err(
-                            "Must have an else block if the while block breaks with a value"
-                                .to_string(),
+                            Diagnostic::error("Must have an else block if the while block breaks with a value"
+                                ),
                         );
                     }
                 }
@@ -1315,7 +1334,7 @@ pub fn check_type(
                 type_: type_.clone(),
             })
         }
-        Expression::For(For {
+        ExpressionKind::For(For {
             pattern,
             iterable,
             body,
@@ -1337,10 +1356,10 @@ pub fn check_type(
             )?;
 
             let Type::Array(inner_type) = iterable.get_type() else {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "For iterable must be of type array, found {}",
                     iterable.get_type()
-                ));
+                )));
             };
 
             check_type_pattern(
@@ -1391,8 +1410,8 @@ pub fn check_type(
                 None => {
                     if !type_equals(&type_, &Type::Void) {
                         return Err(
-                            "Must have an else block if the for block breaks with a value"
-                                .to_string(),
+                            Diagnostic::error("Must have an else block if the for block breaks with a value"
+                                ),
                         );
                     }
                 }
@@ -1406,26 +1425,26 @@ pub fn check_type(
                 type_: type_.clone(),
             })
         }
-        Expression::Use(UseExpr { args, expr }) => {
+        ExpressionKind::Use(UseExpr { args, expr }) => {
             let typed_expr = check_type(expr, discovered_types, type_environment, context)?;
 
             let expr_type = typed_expr.get_type();
 
             let Type::Function(function) = expr_type else {
-                return Err("Right hand side of a use expression must be a function.".to_string());
+                return Err(Diagnostic::error("Right hand side of a use expression must be a function."));
             };
 
             let Some(Parameter { type_, .. }) = function.param else {
                 return Err(
-                    "Last argument of a function in a use expression must be a function"
-                        .to_string(),
+                    Diagnostic::error("Last argument of a function in a use expression must be a function"
+                        ),
                 );
             };
 
             let Type::Function(Function { param, .. }) = *type_ else {
                 return Err(
-                    "Last argument of a function in a use expression must be a function"
-                        .to_string(),
+                    Diagnostic::error("Last argument of a function in a use expression must be a function"
+                        ),
                 );
             };
 
@@ -1564,7 +1583,7 @@ fn infer_call_type_arguments(
     expected_type: Option<&Type>,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Option<(Type, TypeBindings)>, String> {
+) -> Result<Option<(Type, TypeBindings)>, Diagnostic> {
     let Type::Function(Function {
         identifier: Some(TypeIdentifier::GenericType(_, generics)),
         param,
@@ -1623,7 +1642,7 @@ fn specialise_universal_member(
     symbol: &str,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Option<TypedExpression>, String> {
+) -> Result<Option<TypedExpression>, Diagnostic> {
     let object = check_type(object, discovered_types, type_environment.clone(), None)?;
     let object_type = object.get_type();
 
@@ -1665,7 +1684,7 @@ fn specialise_universal_member(
         body: Some(body),
         ..
     } = statements::check_type(
-        &ast::Statement::FunctionDeclaration(declaration),
+        &ast::StatementKind::FunctionDeclaration(declaration).at(Span::SYNTHETIC),
         discovered_types,
         specialised_environment,
     )?
@@ -1711,10 +1730,10 @@ fn written_type_arguments(
     callee: &Expression,
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Option<TypeBindings> {
-    let Expression::Member(ast::Member::Identifier {
+    let ExpressionKind::Member(ast::Member::Identifier {
         symbol,
         generics: Some(arguments),
-    }) = callee
+    }) = &callee.kind
     else {
         return None;
     };
@@ -1744,7 +1763,7 @@ fn specialise_generic_call(
     bindings: &TypeBindings,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Option<TypedExpression>, String> {
+) -> Result<Option<TypedExpression>, Diagnostic> {
     let TypedExpression::Member(Member::Identifier { symbol, .. }) = callee else {
         return Ok(None);
     };
@@ -1781,7 +1800,7 @@ fn specialise_generic_call(
         body: Some(body),
         ..
     } = statements::check_type(
-        &ast::Statement::FunctionDeclaration(declaration),
+        &ast::StatementKind::FunctionDeclaration(declaration).at(Span::SYNTHETIC),
         discovered_types,
         specialised_environment,
     )?
@@ -1820,7 +1839,7 @@ fn infer_struct_type_arguments(
     field_initializers: &[ast::model::FieldInitializer],
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Type, String> {
+) -> Result<Type, Diagnostic> {
     let Type::Struct(Struct {
         type_identifier: TypeIdentifier::GenericType(_, generics),
         fields,
@@ -1970,7 +1989,7 @@ fn instantiated_variant(expected: Option<&Type>, annotation: &TypeAnnotation) ->
 
 /// Rejects a type argument list that doesn't match what the type declares,
 /// which would otherwise be silently truncated during substitution.
-fn check_type_argument_count(type_: &Type, given: usize, symbol: &str) -> Result<(), String> {
+fn check_type_argument_count(type_: &Type, given: usize, symbol: &str) -> Result<(), Diagnostic> {
     let declared = match type_ {
         Type::Function(Function {
             identifier: Some(TypeIdentifier::GenericType(_, generics)),
@@ -1996,14 +2015,14 @@ fn check_type_argument_count(type_: &Type, given: usize, symbol: &str) -> Result
         return Ok(());
     }
 
-    Err(format!(
+    Err(Diagnostic::error(format!(
         "`{}` takes {} type argument{}, but {} {} given",
         symbol,
         declared,
         if declared == 1 { "" } else { "s" },
         given,
         if given == 1 { "was" } else { "were" }
-    ))
+    )))
 }
 
 const TYPEOF_IS_NOT_A_VALUE: &str =
@@ -2020,7 +2039,7 @@ fn check_overloaded_static_call(
     argument: &Expression,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Option<TypedExpression>, String> {
+) -> Result<Option<TypedExpression>, Diagnostic> {
     let object_type =
         check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
 
@@ -2046,7 +2065,7 @@ fn check_overloaded_static_call(
         .collect::<Vec<_>>();
 
     let [member_type] = matching.as_slice() else {
-        return Err(format!(
+        return Err(Diagnostic::error(format!(
             "{} of `{}` {} for an argument of type {}",
             symbol,
             object_type.full_name(),
@@ -2056,14 +2075,14 @@ fn check_overloaded_static_call(
                 "has more than one implementation"
             },
             argument_type
-        ));
+        )));
     };
 
     let Type::Function(Function {
         param, return_type, ..
     }) = member_type
     else {
-        return Err(format!("{} is not a function", symbol));
+        return Err(Diagnostic::error(format!("{} is not a function", symbol)));
     };
 
     // The chosen candidate is named so that evaluation reaches the same one
@@ -2100,31 +2119,31 @@ pub fn dispatches_on_type_parameter(
             .any(|generic| generic.type_name == annotation.name())
     };
 
-    match expression {
-        Expression::Member(ast::Member::StaticMemberAccess {
+    match &expression.kind {
+        ExpressionKind::Member(ast::Member::StaticMemberAccess {
             type_annotation, ..
         }) => names_a_parameter(type_annotation),
-        Expression::Member(ast::Member::MemberAccess { object, .. }) => {
+        ExpressionKind::Member(ast::Member::MemberAccess { object, .. }) => {
             dispatches_on_type_parameter(object, generics)
         }
-        Expression::Member(ast::Member::ParamPropagation { object, .. }) => {
+        ExpressionKind::Member(ast::Member::ParamPropagation { object, .. }) => {
             dispatches_on_type_parameter(object, generics)
         }
-        Expression::Call(call) => {
+        ExpressionKind::Call(call) => {
             dispatches_on_type_parameter(&call.callee, generics)
                 || call
                     .argument
                     .as_ref()
                     .is_some_and(|argument| dispatches_on_type_parameter(argument, generics))
         }
-        Expression::Block(statements) => statements
+        ExpressionKind::Block(statements) => statements
             .iter()
             .any(|statement| statement_dispatches_on_type_parameter(statement, generics)),
-        Expression::Binary(binary) => {
+        ExpressionKind::Binary(binary) => {
             dispatches_on_type_parameter(&binary.left, generics)
                 || dispatches_on_type_parameter(&binary.right, generics)
         }
-        Expression::Unary(unary) => dispatches_on_type_parameter(&unary.expression, generics),
+        ExpressionKind::Unary(unary) => dispatches_on_type_parameter(&unary.expression, generics),
         _ => false,
     }
 }
@@ -2134,11 +2153,11 @@ fn statement_dispatches_on_type_parameter(
     statement: &ast::Statement,
     generics: &[crate::types::GenericType],
 ) -> bool {
-    match statement {
-        ast::Statement::Expression(expression) => {
+    match &statement.kind {
+        ast::StatementKind::Expression(expression) => {
             dispatches_on_type_parameter(expression, generics)
         }
-        ast::Statement::Semi(statement) => {
+        ast::StatementKind::Semi(statement) => {
             statement_dispatches_on_type_parameter(statement, generics)
         }
         _ => false,
@@ -2229,7 +2248,7 @@ fn check_type_static_member_access(
     type_environment: Rcrc<TypeEnvironment>,
     member: &ast::Member,
     context: Option<Type>,
-) -> Result<TypedExpression, String> {
+) -> Result<TypedExpression, Diagnostic> {
     let object_type =
         check_type_annotation(type_annotation, discovered_types, type_environment.clone())?;
 
@@ -2242,10 +2261,10 @@ fn check_type_static_member_access(
                     .borrow()
                     .get_static_member(&object_type, &symbol)
                 else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Type parameter '{}' has no bound providing '{}'",
                         generic.type_name, symbol
-                    ));
+                    )));
                 };
 
                 Ok(TypedExpression::Member(Member::StaticMemberAccess {
@@ -2263,10 +2282,10 @@ fn check_type_static_member_access(
                     .borrow()
                     .get_static_member(&object_type, &symbol)
                 else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Struct '{}' does not have a static member called '{}'",
                         struct_.type_identifier, symbol
-                    ));
+                    )));
                 };
 
                 let identifier_type = static_member_type.clone();
@@ -2286,17 +2305,17 @@ fn check_type_static_member_access(
                     .borrow()
                     .get_static_member(&object_type, &symbol)
                 else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "EnumMember '{}' does not have a static member called '{}'",
                         enum_.type_identifier, symbol
-                    ));
+                    )));
                 };
 
                 if !type_environment.borrow().lookup_type(&static_member_type) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Unexpected type: {}",
                         static_member_type.full_name()
-                    ));
+                    )));
                 }
 
                 let identifier_type = static_member_type.clone();
@@ -2311,11 +2330,11 @@ fn check_type_static_member_access(
                     type_: static_member_type.clone(),
                 }))
             }
-            _ => Err(format!(
+            _ => Err(Diagnostic::error(format!(
                 "Unexpected member access: {} on type {}",
                 symbol,
                 object_type.full_name()
-            )),
+            ))),
         },
         ast::Member::StaticMemberAccess {
             type_annotation,
@@ -2354,7 +2373,7 @@ fn check_type_member_access(
     type_environment: Rcrc<TypeEnvironment>,
     member: &ast::Member,
     context: Option<Type>,
-) -> Result<TypedExpression, String> {
+) -> Result<TypedExpression, Diagnostic> {
     let object_type_expression =
         check_type(object, discovered_types, type_environment.clone(), None)?;
 
@@ -2377,7 +2396,7 @@ fn check_type_member_access_recurse(
     object_typed_expression: TypedExpression,
     discovered_types: &Vec<DiscoveredType>,
     context: Option<Type>,
-) -> Result<TypedExpression, String> {
+) -> Result<TypedExpression, Diagnostic> {
     match member.clone() {
         ast::Member::Identifier { symbol, .. } => match object_type {
             Type::Struct(struct_) => {
@@ -2390,7 +2409,7 @@ fn check_type_member_access_recurse(
                     .clone();
 
                 if !type_environment.borrow().lookup_type(&field_type) {
-                    return Err(format!("Unexpected type: {}", field_type.full_name()));
+                    return Err(Diagnostic::error(format!("Unexpected type: {}", field_type.full_name())));
                 }
 
                 let identifier_type = field_type.clone();
@@ -2419,7 +2438,7 @@ fn check_type_member_access_recurse(
                     .clone();
 
                 if !type_environment.borrow().lookup_type(&field_type) {
-                    return Err(format!("Unexpected type: {}", field_type.full_name()));
+                    return Err(Diagnostic::error(format!("Unexpected type: {}", field_type.full_name())));
                 }
 
                 let identifier_type = field_type.clone();
@@ -2456,11 +2475,11 @@ fn check_type_member_access_recurse(
                     type_: field_type,
                 }))
             }
-            _ => Err(format!(
+            _ => Err(Diagnostic::error(format!(
                 "Unexpected member access: {} on type {}",
                 symbol,
                 object_type.full_name()
-            )),
+            ))),
         },
         ast::Member::StaticMemberAccess {
             type_annotation,
@@ -2499,18 +2518,18 @@ fn check_type_param_propagation(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
-) -> Result<TypedExpression, String> {
+) -> Result<TypedExpression, Diagnostic> {
     let ast::Member::Identifier { .. } = member.clone() else {
-        return Err("Param propagation must be followed by a member access".to_string());
+        return Err(Diagnostic::error("Param propagation must be followed by a member access"));
     };
 
     // `x:typeof()` is folded by the caller. Reaching here means the call was
     // left off, which would leave `typeof` standing as a value.
     if is_typeof(member) {
-        return Err(format!(
+        return Err(Diagnostic::error(format!(
             "{}, so `:typeof` must be called",
             TYPEOF_IS_NOT_A_VALUE
-        ));
+        )));
     }
 
     let object_type_expression =
@@ -2525,7 +2544,7 @@ fn check_type_param_propagation(
     });
 
     let Some(Type::Function(Function { param, .. })) = member_type else {
-        return Err(format!("{} is not a function", member));
+        return Err(Diagnostic::error(format!("{} is not a function", member)));
     };
 
     let Some(param) = param else {
@@ -2555,7 +2574,7 @@ fn check_type_param_propagation_recurse(
     member: &ast::Member,
     type_environment: Rcrc<TypeEnvironment>,
     object_typed_expression: TypedExpression,
-) -> Result<TypedExpression, String> {
+) -> Result<TypedExpression, Diagnostic> {
     match member.clone() {
         ast::Member::Identifier { symbol, .. } => {
             let type_ = type_environment
@@ -2579,7 +2598,7 @@ fn check_type_param_propagation_recurse(
                 param, return_type, ..
             }) = type_.clone()
             else {
-                return Err(format!("{} is not a function", symbol));
+                return Err(Diagnostic::error(format!("{} is not a function", symbol)));
             };
 
             let Some(param) = param else {
@@ -2639,7 +2658,7 @@ fn check_type_index(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
     context: Option<Type>,
-) -> Result<TypedExpression, String> {
+) -> Result<TypedExpression, Diagnostic> {
     let typed_object = check_type(
         object,
         discovered_types,
@@ -2650,7 +2669,7 @@ fn check_type_index(
     let object_type = typed_object.get_type();
 
     let Type::Array(ref inner_type) = object_type else {
-        return Err("Indexing can only be done on arrays".to_string());
+        return Err(Diagnostic::error("Indexing can only be done on arrays"));
     };
 
     let (typed_index, return_type) = match index {
@@ -2660,10 +2679,10 @@ fn check_type_index(
             let index_type = typed_index.get_type();
 
             if !type_equals_coerce(&Type::UInt, &index_type) {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Indexing requires an integer, found {}",
                     index_type.full_name()
-                ));
+                )));
             }
 
             (Index::Value(Box::new(typed_index)), *inner_type.clone())
@@ -2689,10 +2708,10 @@ fn check_type_index(
                 let index_type = start.get_type();
 
                 if !type_equals_coerce(&Type::UInt, &index_type) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Indexing requires an integer, found {}",
                         index_type.full_name()
-                    ));
+                    )));
                 }
             }
 
@@ -2712,10 +2731,10 @@ fn check_type_index(
                 let index_type = end.get_type();
 
                 if !type_equals_coerce(&Type::UInt, &index_type) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Indexing requires an integer, found {}",
                         index_type.full_name()
-                    ));
+                    )));
                 }
             }
 
@@ -2742,7 +2761,7 @@ fn check_type_pattern(
     initializer_type: Option<&Type>,
     type_environment: Rcrc<TypeEnvironment>,
     context: Option<Type>,
-) -> Result<(), String> {
+) -> Result<(), Diagnostic> {
     let known_type = context.or_else(|| initializer_type.cloned());
 
     // Without a type there is nothing to resolve the pattern against, so its
@@ -2764,7 +2783,7 @@ fn check_type_pattern(
     // Declarations and loops bind unconditionally, so a pattern that can fail
     // has nowhere to fail to.
     if is_refutable(&checked) {
-        return Err(format!("Pattern `{}` is refutable", pattern));
+        return Err(Diagnostic::error(format!("Pattern `{}` is refutable", pattern)));
     }
 
     for (identifier, binding_type) in bindings {
@@ -2787,7 +2806,7 @@ fn is_refutable(pattern: &CheckedPattern) -> bool {
     }
 }
 
-fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, String> {
+fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, Diagnostic> {
     match (operator, operand) {
         (UnaryOperator::Identity, Type::Int) => Ok(Type::Int),
         (UnaryOperator::Identity, Type::UInt) => Ok(Type::UInt),
@@ -2831,10 +2850,10 @@ fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, Strin
                 type_: type_.clone(),
             }),
             LiteralType::BoolValue(value) => Ok(Type::bool_literal(!value)),
-            _ => Err(format!(
+            _ => Err(Diagnostic::error(format!(
                 "Invalid unary operator {:?} for type {}",
                 operator, operand
-            )),
+            ))),
         },
         (UnaryOperator::BitwiseNot, Type::Int) => Ok(Type::Int),
         (UnaryOperator::BitwiseNot, Type::UInt) => Ok(Type::UInt),
@@ -2845,15 +2864,15 @@ fn get_unop_type(operator: &UnaryOperator, operand: &Type) -> Result<Type, Strin
             }),
             LiteralType::IntValue(value) => Ok(Type::int_literal(!value)),
             LiteralType::UIntValue(value) => Ok(Type::uint_literal(!value)),
-            _ => Err(format!(
+            _ => Err(Diagnostic::error(format!(
                 "Invalid unary operator {:?} for type {}",
                 operator, operand
-            )),
+            ))),
         },
-        _ => Err(format!(
+        _ => Err(Diagnostic::error(format!(
             "Invalid unary operator {:?} for type {}",
             operator, operand
-        )),
+        ))),
     }
 }
 
@@ -3060,7 +3079,7 @@ fn get_binop_type(
     left_type: &Type,
     operator: &BinaryOperator,
     right_type: &Type,
-) -> Result<Type, String> {
+) -> Result<Type, Diagnostic> {
     match (left_type, operator, right_type) {
         (Type::Int, BinaryOperator::Add, Type::Int) => Ok(Type::Int),
         (Type::UInt, BinaryOperator::Add, Type::UInt) => Ok(Type::UInt),
@@ -3132,10 +3151,10 @@ fn get_binop_type(
                 }
 
                 if !type_equals(&acc, &t) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Binary operator {:?} is not supported for types {:?} and {:?}",
                         operator, acc, t
-                    ));
+                    )));
                 }
             }
 
@@ -3153,10 +3172,10 @@ fn get_binop_type(
                 }
 
                 if !type_equals(&acc, &t) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Binary operator {:?} is not supported for types {:?} and {:?}",
                         operator, acc, t
-                    ));
+                    )));
                 }
             }
 
@@ -3181,7 +3200,7 @@ fn get_binop_type(
             if *value < i64::MAX as u64 {
                 get_binop_type(&Type::UInt, operator, &Type::UInt)
             } else {
-                Err(format!("{} is not a valid i64", value))
+                Err(Diagnostic::error(format!("{} is not a valid i64", value)))
             }
         }
         (Type::Literal { type_, .. }, operator, Type::UInt)
@@ -3194,7 +3213,7 @@ fn get_binop_type(
             if *value >= 0 {
                 get_binop_type(&Type::UInt, operator, &Type::UInt)
             } else {
-                Err(format!("{} is not a valid u64", value))
+                Err(Diagnostic::error(format!("{} is not a valid u64", value)))
             }
         }
         (Type::Int, operator, Type::Literal { type_, .. })
@@ -3207,7 +3226,7 @@ fn get_binop_type(
             if *value < i64::MAX as u64 {
                 get_binop_type(&Type::UInt, operator, &Type::UInt)
             } else {
-                Err(format!("{} is not a valid i64", value))
+                Err(Diagnostic::error(format!("{} is not a valid i64", value)))
             }
         }
         (Type::UInt, operator, Type::Literal { type_, .. })
@@ -3220,7 +3239,7 @@ fn get_binop_type(
             if *value >= 0 {
                 get_binop_type(&Type::UInt, operator, &Type::UInt)
             } else {
-                Err(format!("{} is not a valid u64", value))
+                Err(Diagnostic::error(format!("{} is not a valid u64", value)))
             }
         }
         (
@@ -3260,9 +3279,9 @@ fn get_binop_type(
         (Type::Array(left), BinaryOperator::Add, right) if type_equals(left, right) => {
             Ok(Type::Array(left.clone()))
         }
-        _ => Err(format!(
+        _ => Err(Diagnostic::error(format!(
             "Unexpected binary operator {:?} for types {:?} and {:?}",
             operator, left_type, right_type,
-        )),
+        ))),
     }
 }

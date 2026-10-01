@@ -1,3 +1,4 @@
+use crate::diagnostic::Diagnostic;
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -186,9 +187,9 @@ impl TypeEnvironment {
             })
     }
 
-    pub fn activate_scope(&mut self, scope_type: ScopeType, type_: Type) -> Result<(), String> {
+    pub fn activate_scope(&mut self, scope_type: ScopeType, type_: Type) -> Result<(), Diagnostic> {
         if !self.has_scope(&scope_type) {
-            return Err(format!("Scope '{:?}' not found", scope_type));
+            return Err(Diagnostic::error(format!("Scope '{:?}' not found", scope_type)));
         }
 
         match self.scopes.iter_mut().find(|s| s.scope_type == scope_type) {
@@ -220,7 +221,7 @@ impl TypeEnvironment {
         &mut self,
         mod_path: impl AsRef<ModPath>,
         item_name: impl ToKey,
-    ) -> Result<(), String> {
+    ) -> Result<(), Diagnostic> {
         let mod_path = mod_path.as_ref();
         let item_name = item_name.to_key();
 
@@ -237,9 +238,9 @@ impl TypeEnvironment {
         self.add_type(type_)
     }
 
-    pub fn add_type(&mut self, type_: Type) -> Result<(), String> {
+    pub fn add_type(&mut self, type_: Type) -> Result<(), Diagnostic> {
         if !self.allow_override_types && self.types.contains_key(&type_.to_key()) {
-            return Err(format!("Type {} already exists", type_.full_name()));
+            return Err(Diagnostic::error(format!("Type {} already exists", type_.full_name())));
         }
 
         self.types.insert(type_.to_key(), type_);
@@ -291,7 +292,7 @@ impl TypeEnvironment {
         type_: Type,
         name: String,
         member_type: Type,
-    ) -> Result<(), String> {
+    ) -> Result<(), Diagnostic> {
         self.add_static_member_covering(type_, name, member_type, true)
     }
 
@@ -306,7 +307,7 @@ impl TypeEnvironment {
         name: String,
         member_type: Type,
         covers_all_instantiations: bool,
-    ) -> Result<(), String> {
+    ) -> Result<(), Diagnostic> {
         let key = if covers_all_instantiations {
             Self::constructor_key(&type_)
         } else {
@@ -331,10 +332,10 @@ impl TypeEnvironment {
             if self.allow_override_types {
                 candidates.retain(|candidate| !parameter_types_match(candidate, &member_type));
             } else {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "`{}` already provides `{}` taking the same argument",
                     type_, name
-                ));
+                )));
             }
         }
 
@@ -640,7 +641,7 @@ impl TypeEnvironment {
             .unwrap_or_default()
     }
 
-    pub fn add_generic_constraint(&mut self, constraint: &GenericConstraint) -> Result<(), String> {
+    pub fn add_generic_constraint(&mut self, constraint: &GenericConstraint) -> Result<(), Diagnostic> {
         let GenericConstraint {
             generic: GenericType { type_name },
             constraints,
@@ -649,7 +650,7 @@ impl TypeEnvironment {
         for constraint in constraints {
             let constraint_type = self.get_type_from_annotation(constraint)?;
             let Some(generic_type) = self.get_type(type_name) else {
-                return Err(format!("Type {} not found", type_name));
+                return Err(Diagnostic::error(format!("Type {} not found", type_name)));
             };
 
             let generic_annotation = generic_type.type_annotation();
@@ -686,7 +687,7 @@ impl TypeEnvironment {
     pub fn get_type_from_annotation(
         &self,
         type_annotation: &TypeAnnotation,
-    ) -> Result<Type, String> {
+    ) -> Result<Type, Diagnostic> {
         match type_annotation {
             TypeAnnotation::Type(type_name) => self
                 .types
@@ -708,11 +709,11 @@ impl TypeEnvironment {
                     // `::` already spells an enum's variants, so an associated
                     // type is named on its own inside a protocol or its
                     // implementations.
-                    Some(associated) => format!(
+                    Some(associated) => Diagnostic::error(format!(
                         "Type {} not found; an associated type is written `{}`, not `{}`",
                         type_name, associated, type_name
-                    ),
-                    None => format!("Type {} not found", type_name),
+                    )),
+                    None => Diagnostic::error(format!("Type {} not found", type_name)),
                 }),
             TypeAnnotation::ConcreteType(type_name, concrete_types) => {
                 // The declaration may live in an enclosing scope, but the type
@@ -723,7 +724,7 @@ impl TypeEnvironment {
                 let Some(declaration) =
                     self.find_generic_declaration(type_name, concrete_types.len())
                 else {
-                    return Err(format!("Type {} not found", type_name));
+                    return Err(Diagnostic::error(format!("Type {} not found", type_name)));
                 };
 
                 declaration.clone_with_concrete_types(

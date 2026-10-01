@@ -20,7 +20,7 @@ fn assert_error_contains(input: &str, needle: &str) {
     match try_create_typed_ast(input) {
         Ok(_) => panic!("expected an error mentioning {needle:?}, but the program type-checked"),
         Err(e) => assert!(
-            e.to_lowercase().contains(&needle.to_lowercase()),
+            e.to_string().to_lowercase().contains(&needle.to_lowercase()),
             "expected an error mentioning {needle:?}, got: {e}"
         ),
     }
@@ -1195,7 +1195,7 @@ fn a_pattern_cannot_bind_one_name_twice() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    let error = result.unwrap_err();
+    let error = result.unwrap_err().to_string();
     assert!(error.contains("binds `a` more than once"), "{}", error);
 }
 
@@ -1212,7 +1212,7 @@ fn a_struct_pattern_cannot_bind_one_name_twice() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("more than once"));
+    assert!(result.unwrap_err().to_string().contains("more than once"));
 }
 
 #[test]
@@ -1228,7 +1228,7 @@ fn a_destructuring_declaration_cannot_bind_one_name_twice() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("more than once"));
+    assert!(result.unwrap_err().to_string().contains("more than once"));
 }
 
 #[test]
@@ -1240,7 +1240,7 @@ fn a_for_loop_pattern_cannot_bind_one_name_twice() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("more than once"));
+    assert!(result.unwrap_err().to_string().contains("more than once"));
 }
 
 #[test]
@@ -1358,7 +1358,7 @@ fn a_binding_on_both_sides_of_at_is_rejected() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("binds the same value twice"));
+    assert!(result.unwrap_err().to_string().contains("binds the same value twice"));
 }
 
 #[test]
@@ -1376,5 +1376,5 @@ fn a_name_bound_on_both_sides_of_at_is_rejected_as_a_duplicate() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().contains("more than once"));
+    assert!(result.unwrap_err().to_string().contains("more than once"));
 }

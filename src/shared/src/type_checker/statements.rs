@@ -1,3 +1,5 @@
+use crate::ast::StatementKind;
+use crate::diagnostic::{Diagnostic, Spanned};
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -24,9 +26,9 @@ use super::{
     Parameter, Protocol, Rcrc, Struct, StructField, Type, TypeAlias, Union,
 };
 
-pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, String> {
-    match statement {
-        Statement::Program { statements } => {
+pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, Diagnostic> {
+    match &statement.kind {
+        StatementKind::Program { statements } => {
             let mut discovered_types = vec![];
 
             for statement in statements {
@@ -35,9 +37,9 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
 
             Ok(discovered_types)
         }
-        Statement::ModuleDeclaration(_) => Ok(vec![]),
-        Statement::Use(Use { use_item }) => discover_types_from_use_item(use_item, ModPath::root()),
-        Statement::StructDeclaration(ast::StructDeclaration {
+        StatementKind::ModuleDeclaration(_) => Ok(vec![]),
+        StatementKind::Use(Use { use_item }) => discover_types_from_use_item(use_item, ModPath::root()),
+        StatementKind::StructDeclaration(ast::StructDeclaration {
             body:
                 StructData {
                     type_identifier,
@@ -64,7 +66,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .map(|field| (field.identifier.clone(), field.type_annotation.clone()))
                 .collect(),
         }]),
-        Statement::EnumDeclaration(ast::EnumDeclaration {
+        StatementKind::EnumDeclaration(ast::EnumDeclaration {
             type_identifier,
             shared_fields,
             members,
@@ -85,7 +87,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
 
             Ok(nested.into_iter().chain(Some(enum_)).collect())
         }
-        Statement::UnionDeclaration(ast::UnionDeclaration {
+        StatementKind::UnionDeclaration(ast::UnionDeclaration {
             access_modifier: _,
             type_identifier,
             literals,
@@ -96,7 +98,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .map(|literal| TypeAnnotation::Literal(Box::new(literal.clone().into())))
                 .collect(),
         )]),
-        Statement::TypeAliasDeclaration(ast::TypeAliasDeclaration {
+        StatementKind::TypeAliasDeclaration(ast::TypeAliasDeclaration {
             access_modifier: _,
             type_identifier,
             type_annotations,
@@ -104,7 +106,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             type_identifier.clone(),
             type_annotations.clone(),
         )]),
-        Statement::ProtocolDeclaration(ProtocolDeclaration {
+        StatementKind::ProtocolDeclaration(ProtocolDeclaration {
             access_modifier: _,
             type_identifier,
             associated_types,
@@ -122,7 +124,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .map(|f| f.type_identifier)
                 .collect(),
         }]),
-        Statement::ImplementationDeclaration(ImplementationDeclaration {
+        StatementKind::ImplementationDeclaration(ImplementationDeclaration {
             scoped_generics,
             protocol_annotation,
             type_annotation,
@@ -132,7 +134,7 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             type_annotation: type_annotation.clone(),
             scoped_generics: scoped_generics.clone(),
         }]),
-        Statement::FunctionDeclaration(ast::FunctionDeclaration {
+        StatementKind::FunctionDeclaration(ast::FunctionDeclaration {
             type_identifier,
             param,
             return_type_annotation,
@@ -144,15 +146,15 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
                 .clone()
                 .unwrap_or(Type::Void.type_annotation()),
         }]),
-        Statement::Semi(_) => Ok(vec![]),
-        Statement::Expression(_) => Ok(vec![]),
+        StatementKind::Semi(_) => Ok(vec![]),
+        StatementKind::Expression(_) => Ok(vec![]),
     }
 }
 
 fn discover_types_from_use_item(
     use_item: &ast::UseItem,
     mod_path: ModPath,
-) -> Result<Vec<DiscoveredType>, String> {
+) -> Result<Vec<DiscoveredType>, Diagnostic> {
     match use_item {
         ast::UseItem::Item(item_name) => {
             let mut type_identifier = None;
@@ -190,14 +192,27 @@ fn discover_types_from_use_item(
     }
 }
 
+/// Type checks one statement, pointing any error at it.
+///
+/// Same arrangement as [`expressions::check_type`]: the span is attached once,
+/// here, and only fills a primary that is still empty — so an error from
+/// somewhere deeper keeps the tighter span it already has.
 pub fn check_type(
     statement: &Statement,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<TypedStatement, String> {
-    match statement {
-        Statement::Program { statements } => {
-            let statements: Result<Vec<TypedStatement>, String> = statements
+) -> Result<TypedStatement, Diagnostic> {
+    check_type_of(statement, discovered_types, type_environment).at(statement.span)
+}
+
+fn check_type_of(
+    statement: &Statement,
+    discovered_types: &Vec<DiscoveredType>,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<TypedStatement, Diagnostic> {
+    match &statement.kind {
+        StatementKind::Program { statements } => {
+            let statements: Result<Vec<TypedStatement>, Diagnostic> = statements
                 .iter()
                 .map(|s| check_type(s, discovered_types, type_environment.clone()))
                 .collect();
@@ -206,7 +221,7 @@ pub fn check_type(
                 statements: statements?,
             })
         }
-        Statement::ModuleDeclaration(ModuleDeclaration {
+        StatementKind::ModuleDeclaration(ModuleDeclaration {
             access_modifier,
             module_path,
         }) => Ok(TypedStatement::ModuleDeclaration {
@@ -216,10 +231,10 @@ pub fn check_type(
             module_path: module_path.clone(),
             type_: Type::Void,
         }),
-        Statement::Use(Use { use_item }) => {
+        StatementKind::Use(Use { use_item }) => {
             check_use_item(use_item, ModPath::root(), type_environment.clone())
         }
-        Statement::StructDeclaration(ast::StructDeclaration {
+        StatementKind::StructDeclaration(ast::StructDeclaration {
             access_modifier: _,
             body:
                 StructData {
@@ -254,7 +269,7 @@ pub fn check_type(
                 .borrow_mut()
                 .add_generic_constraints(type_identifier.to_key(), where_clause.clone());
 
-            let embedded_structs: Result<Vec<_>, String> = embedded_structs
+            let embedded_structs: Result<Vec<_>, Diagnostic> = embedded_structs
                 .iter()
                 .map(|e| {
                     let embedded_type = check_type_annotation(
@@ -269,7 +284,7 @@ pub fn check_type(
 
             let embedded_structs = embedded_structs?;
 
-            let fields: Result<Vec<model::StructField>, String> = fields
+            let fields: Result<Vec<model::StructField>, Diagnostic> = fields
                 .iter()
                 .map(|field| {
                     match check_type_annotation(
@@ -293,15 +308,15 @@ pub fn check_type(
 
             for (embedded_struct_type, field_initializers) in embedded_structs.iter().rev() {
                 let Type::Struct(embedded_struct) = embedded_struct_type else {
-                    return Err("Embedded struct must be a struct".to_string());
+                    return Err(Diagnostic::error("Embedded struct must be a struct"));
                 };
 
                 for field in embedded_struct.fields.clone() {
                     if fields.iter().any(|f| f.identifier == field.field_name) {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "Embedded field {} already exists in struct {}",
                             field.field_name, type_identifier
-                        ));
+                        )));
                     }
 
                     let default_value = field_initializers
@@ -353,7 +368,7 @@ pub fn check_type(
                 }
             }
 
-            let embedded_structs: Result<Vec<EmbeddedStruct>, String> = recursive_embedded_structs
+            let embedded_structs: Result<Vec<EmbeddedStruct>, Diagnostic> = recursive_embedded_structs
                 .iter()
                 .map(|(es, fis)| {
                     let mut field_initializers = vec![];
@@ -380,7 +395,7 @@ pub fn check_type(
 
             let embedded_structs = embedded_structs?;
 
-            let field_types: Result<Vec<StructField>, String> = fields
+            let field_types: Result<Vec<StructField>, Diagnostic> = fields
                 .clone()
                 .iter()
                 .map(|f| {
@@ -393,10 +408,10 @@ pub fn check_type(
                                 let default_type = default_value.get_type();
 
                                 if !type_equals(&f.type_, &default_type) {
-                                    return Err(format!(
+                                    return Err(Diagnostic::error(format!(
                                         "Default value for field '{}' must be of type '{}'",
                                         f.identifier, f.type_
-                                    ));
+                                    )));
                                 }
 
                                 default_type
@@ -425,7 +440,7 @@ pub fn check_type(
                 },
             ))
         }
-        Statement::EnumDeclaration(ast::EnumDeclaration {
+        StatementKind::EnumDeclaration(ast::EnumDeclaration {
             access_modifier: _,
             type_identifier,
             shared_fields,
@@ -493,7 +508,7 @@ pub fn check_type(
                 type_: enum_type,
             })
         }
-        Statement::UnionDeclaration(UnionDeclaration {
+        StatementKind::UnionDeclaration(UnionDeclaration {
             access_modifier: _,
             type_identifier,
             literals,
@@ -519,7 +534,7 @@ pub fn check_type(
                         union_type_environment.clone(),
                     )
                 })
-                .collect::<Result<Vec<Type>, String>>()?;
+                .collect::<Result<Vec<Type>, Diagnostic>>()?;
 
             let literal_type =
                 literal_types
@@ -556,7 +571,7 @@ pub fn check_type(
                 type_,
             })
         }
-        Statement::TypeAliasDeclaration(ast::TypeAliasDeclaration {
+        StatementKind::TypeAliasDeclaration(ast::TypeAliasDeclaration {
             access_modifier: _,
             type_identifier,
             type_annotations,
@@ -582,7 +597,7 @@ pub fn check_type(
                         type_decl_type_environment.clone(),
                     )
                 })
-                .collect::<Result<Vec<Type>, String>>()?;
+                .collect::<Result<Vec<Type>, Diagnostic>>()?;
 
             let type_ = Type::TypeAlias(TypeAlias {
                 type_identifier: type_identifier.clone(),
@@ -597,7 +612,7 @@ pub fn check_type(
                 type_,
             })
         }
-        Statement::ProtocolDeclaration(ProtocolDeclaration {
+        StatementKind::ProtocolDeclaration(ProtocolDeclaration {
             access_modifier: _,
             type_identifier,
             associated_types,
@@ -647,12 +662,12 @@ pub fn check_type(
                 }
             }
 
-            let functions: Result<Vec<TypedStatement>, String> = functions
+            let functions: Result<Vec<TypedStatement>, Diagnostic> = functions
                 .clone()
                 .into_iter()
                 .map(|function| {
                     check_type(
-                        &Statement::FunctionDeclaration(function),
+                        &StatementKind::FunctionDeclaration(function).at(statement.span),
                         discovered_types,
                         Rc::clone(&protocol_type_environment),
                     )
@@ -699,7 +714,7 @@ pub fn check_type(
                 type_,
             })
         }
-        Statement::ImplementationDeclaration(ImplementationDeclaration {
+        StatementKind::ImplementationDeclaration(ImplementationDeclaration {
             scoped_generics,
             protocol_annotation,
             type_annotation,
@@ -739,10 +754,10 @@ pub fn check_type(
                         .borrow()
                         .lookup_type(&generic_type)
                     {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "Generic type '{}' not found in protocol annotation",
                             generic_type
-                        ));
+                        )));
                     }
                 }
             }
@@ -760,10 +775,10 @@ pub fn check_type(
                         .borrow()
                         .lookup_type(&generic_type)
                     {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "Generic type '{}' not found in type annotation",
                             generic_type
-                        ));
+                        )));
                     }
                 }
             }
@@ -789,7 +804,7 @@ pub fn check_type(
                 ..
             }) = protocol_type.clone()
             else {
-                return Err(format!("Expected protocol, found {}", protocol_type));
+                return Err(Diagnostic::error(format!("Expected protocol, found {}", protocol_type)));
             };
 
             let mut bound_associated_types = HashMap::new();
@@ -798,17 +813,17 @@ pub fn check_type(
                 let name = associated_type.type_identifier.name().to_owned();
 
                 if !protocol_associated_types.contains(&name) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "`{}` has no associated type `{}`",
                         protocol_annotation, name
-                    ));
+                    )));
                 }
 
                 let Some(annotation) = &associated_type.default_type_annotation else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Associated type `{}` needs a type: write `type {} = ..;`",
                         name, name
-                    ));
+                    )));
                 };
 
                 // `E::Item` cannot mean both a variant and a projection: inside
@@ -818,10 +833,10 @@ pub fn check_type(
                 // that means different things in different places.
                 if let Type::Enum(enum_) = imp_type.clone().unsubstitute() {
                     if get_enum_member(&enum_.members, &enum_.type_identifier, &name).is_some() {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "`{}` has both a variant and an associated type named `{}`; `{}::{}` would be ambiguous",
                             type_annotation, name, type_annotation, name
-                        ));
+                        )));
                     }
                 }
 
@@ -842,10 +857,10 @@ pub fn check_type(
             // a projection on this type would have nothing to resolve to.
             for name in &protocol_associated_types {
                 if !bound_associated_types.contains_key(name) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Implementation of `{}` for `{}` is missing associated type `{}`",
                         protocol_annotation, type_annotation, name
-                    ));
+                    )));
                 }
             }
 
@@ -890,21 +905,21 @@ pub fn check_type(
                     .find(|f| f.type_identifier == protocol_function_identifier);
 
                 let Some(function) = function else {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Protocol function '{}' not implemented",
                         protocol_function_identifier
-                    ));
+                    )));
                 };
 
                 if function.body.is_none() {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Protocol function '{}' must have a body",
                         protocol_function_identifier
-                    ));
+                    )));
                 };
 
                 let typed_function = check_type(
-                    &Statement::FunctionDeclaration(function.clone()),
+                    &StatementKind::FunctionDeclaration(function.clone()).at(statement.span),
                     discovered_types,
                     implementation_type_environment.clone(),
                 )?;
@@ -950,7 +965,7 @@ pub fn check_type(
                 type_: Type::Void,
             })
         }
-        Statement::FunctionDeclaration(ast::FunctionDeclaration {
+        StatementKind::FunctionDeclaration(ast::FunctionDeclaration {
             access_modifier: _,
             type_identifier,
             param,
@@ -1039,7 +1054,7 @@ pub fn check_type(
                     }?;
 
                     if param_name.is_empty() {
-                        return Err("Parameter must have a name".to_string());
+                        return Err(Diagnostic::error("Parameter must have a name"));
                     }
 
                     Some(Parameter {
@@ -1115,10 +1130,10 @@ pub fn check_type(
                 .unwrap_or_else(|| Ok(body_typed_expression.get_type()))?;
 
             if !type_equals(&return_type, &Type::Void) && !type_equals(&return_type, &body_type) {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Function body's return type {} does not match function return type {}",
                     body_type, return_type
-                ));
+                )));
             }
 
             type_environment.borrow_mut().add_type(type_.clone())?;
@@ -1135,12 +1150,12 @@ pub fn check_type(
                 type_,
             })
         }
-        Statement::Semi(s) => Ok(TypedStatement::Semi(Box::new(check_type(
+        StatementKind::Semi(s) => Ok(TypedStatement::Semi(Box::new(check_type(
             s,
             discovered_types,
             type_environment,
         )?))),
-        Statement::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(
+        StatementKind::Expression(e) => Ok(TypedStatement::Expression(expressions::check_type(
             e,
             discovered_types,
             type_environment,
@@ -1153,7 +1168,7 @@ fn check_use_item(
     use_item: &UseItem,
     mod_path: ModPath,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<TypedStatement, String> {
+) -> Result<TypedStatement, Diagnostic> {
     match use_item {
         UseItem::Item(item_name) => {
             type_environment
@@ -1169,7 +1184,7 @@ fn check_use_item(
                 .map(|use_item| {
                     check_use_item(use_item, mod_path.clone(), type_environment.clone())
                 })
-                .collect::<Result<Vec<_>, String>>()?;
+                .collect::<Result<Vec<_>, Diagnostic>>()?;
         }
     }
 
@@ -1183,7 +1198,7 @@ pub fn check_type_annotation(
     type_annotation: &TypeAnnotation,
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Type, String> {
+) -> Result<Type, Diagnostic> {
     if let Ok(type_) = type_environment
         .borrow()
         .get_type_from_annotation(type_annotation)
@@ -1251,7 +1266,7 @@ pub fn check_type_annotation(
                         )?,
                     })
                 })
-                .collect::<Result<Vec<_>, String>>()?,
+                .collect::<Result<Vec<_>, Diagnostic>>()?,
             fields: {
                 let mut map = Vec::new();
 
@@ -1288,7 +1303,7 @@ pub fn check_type_annotation(
                 .map(|literal| {
                     check_type_annotation(literal, discovered_types, type_environment.clone())
                 })
-                .collect::<Result<Vec<Type>, String>>()?;
+                .collect::<Result<Vec<Type>, Diagnostic>>()?;
 
             let literal_type =
                 literal_types
@@ -1319,7 +1334,7 @@ pub fn check_type_annotation(
                 .map(|literal| {
                     check_type_annotation(literal, discovered_types, type_environment.clone())
                 })
-                .collect::<Result<Vec<Type>, String>>()?;
+                .collect::<Result<Vec<Type>, Diagnostic>>()?;
 
             Ok(Type::TypeAlias(TypeAlias {
                 type_identifier: type_identifier.clone(),
@@ -1395,25 +1410,25 @@ fn check_enum_shape(
     type_identifier: &TypeIdentifier,
     shared_fields: &[ast::StructField],
     members: &[ast::EnumVariant],
-) -> Result<(), String> {
+) -> Result<(), Diagnostic> {
     // An enum with no variants has no values, so nothing could ever construct
     // or match one. Rejecting it here is what lets exhaustiveness checking
     // assume every enum is inhabited.
     if members.is_empty() {
-        return Err(format!(
+        return Err(Diagnostic::error(format!(
             "Enum '{}' has no variants; an enum with no variants has no values",
             type_identifier
-        ));
+        )));
     }
 
     let mut shared_field_identifiers = HashSet::new();
 
     for field in shared_fields {
         if !shared_field_identifiers.insert(field.identifier.clone()) {
-            return Err(format!(
+            return Err(Diagnostic::error(format!(
                 "Shared field '{}' previously defined in shared fields of enum '{}'",
                 field.identifier, type_identifier
-            ));
+            )));
         }
     }
 
@@ -1422,11 +1437,11 @@ fn check_enum_shape(
             .iter()
             .find(|member| matches!(member, ast::EnumVariant::Enum(_)))
         {
-            return Err(format!(
+            return Err(Diagnostic::error(format!(
                 "Enum '{}' declares shared fields and the enum variant '{}'; an enum with a nested enum cannot declare shared fields",
                 type_identifier,
                 nested.type_identifier()
-            ));
+            )));
         }
     }
 
@@ -1434,11 +1449,11 @@ fn check_enum_shape(
 
     for member in members {
         if !variant_identifiers.insert(member.type_identifier().to_key()) {
-            return Err(format!(
+            return Err(Diagnostic::error(format!(
                 "Variant '{}' previously defined in enum '{}'",
                 member.type_identifier(),
                 type_identifier
-            ));
+            )));
         }
 
         match member {
@@ -1447,17 +1462,17 @@ fn check_enum_shape(
 
                 for field in &data.fields {
                     if shared_field_identifiers.contains(&field.identifier) {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "Field '{}' previously defined in shared fields of enum '{}'",
                             field.identifier, data.type_identifier
-                        ));
+                        )));
                     }
 
                     if !field_identifiers.insert(field.identifier.clone()) {
-                        return Err(format!(
+                        return Err(Diagnostic::error(format!(
                             "Field '{}' previously defined in member '{}' of enum '{}'",
                             field.identifier, data.type_identifier, type_identifier
-                        ));
+                        )));
                     }
                 }
             }
@@ -1538,7 +1553,7 @@ fn check_enum_shared_fields(
     shared_fields: &[ast::StructField],
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Vec<model::StructField>, String> {
+) -> Result<Vec<model::StructField>, Diagnostic> {
     shared_fields
         .iter()
         .map(|field| {
@@ -1575,7 +1590,7 @@ fn check_enum_variants(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     enum_type_environment: Rcrc<TypeEnvironment>,
-) -> Result<(Vec<model::EnumVariant>, HashMap<String, Type>), String> {
+) -> Result<(Vec<model::EnumVariant>, HashMap<String, Type>), Diagnostic> {
     let mut checked = vec![];
     let mut member_types = HashMap::new();
 
@@ -1654,8 +1669,8 @@ fn check_struct_variant(
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     enum_type_environment: Rcrc<TypeEnvironment>,
-) -> Result<model::StructData, String> {
-    let embedded_structs: Result<Vec<_>, String> = member
+) -> Result<model::StructData, Diagnostic> {
+    let embedded_structs: Result<Vec<_>, Diagnostic> = member
         .embedded_structs
         .iter()
         .map(|e| {
@@ -1671,7 +1686,7 @@ fn check_struct_variant(
 
     let embedded_structs = embedded_structs?;
 
-    let fields: Result<Vec<model::StructField>, String> = member
+    let fields: Result<Vec<model::StructField>, Diagnostic> = member
         .fields
         .iter()
         .map(|field| {
@@ -1695,15 +1710,15 @@ fn check_struct_variant(
 
     for (embedded_struct, field_initializers) in embedded_structs.iter().rev() {
         let Type::Struct(embedded_struct) = embedded_struct else {
-            return Err("Embedded struct must be a struct".to_string());
+            return Err(Diagnostic::error("Embedded struct must be a struct"));
         };
 
         for field in embedded_struct.fields.clone() {
             if fields.iter().any(|f| f.identifier == field.field_name) {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Embedded field {} already exists in struct {}",
                     field.field_name, owner
-                ));
+                )));
             }
 
             let default_value = field_initializers
@@ -1755,7 +1770,7 @@ fn check_struct_variant(
         }
     }
 
-    let embedded_structs: Result<Vec<EmbeddedStruct>, String> = recursive_embedded_structs
+    let embedded_structs: Result<Vec<EmbeddedStruct>, Diagnostic> = recursive_embedded_structs
         .iter()
         .map(|(es, fis)| {
             let mut field_initializers = vec![];
@@ -1826,7 +1841,7 @@ fn discovered_enum_type(
     members: &[ast::EnumVariant],
     discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<Type, String> {
+) -> Result<Type, Diagnostic> {
     let mut checked_shared_fields = Vec::new();
 
     for (identifier, type_annotation) in shared_fields {

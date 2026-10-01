@@ -1,3 +1,4 @@
+use shared::diagnostic::Diagnostic;
 use shared::type_checker::model::{BinaryOperator, TypedExpression};
 
 use crate::{environment::Rcrc, evaluator::evaluate_expression, value::Enum, Environment};
@@ -9,7 +10,7 @@ pub(crate) fn evaluate_binop(
     operator: BinaryOperator,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     match operator {
         BinaryOperator::Add => evaluate_add(left, right, environment),
         BinaryOperator::Subtract => evaluate_subtract(left, right, environment),
@@ -40,7 +41,7 @@ fn evaluate_add(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -53,7 +54,7 @@ fn evaluate_add(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left + right)))
             }
-            (left, right) => Err(format!("Cannot add {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot add {:?} and {:?}", left, right))),
         },
         (Value::String(left), Value::String(right)) => Ok(Value::String(left + &right)),
         (Value::Array(left), Value::Array(right)) => {
@@ -62,7 +63,7 @@ fn evaluate_add(
         (Value::Array(left), right) => Ok(Value::Array(
             left.into_iter().chain(std::iter::once(right)).collect(),
         )),
-        (left, right) => Err(format!("Cannot add {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot add {:?} and {:?}", left, right))),
     }
 }
 
@@ -70,7 +71,7 @@ fn evaluate_subtract(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -83,9 +84,9 @@ fn evaluate_subtract(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left - right)))
             }
-            (left, right) => Err(format!("Cannot subtract {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot subtract {:?} and {:?}", left, right))),
         },
-        (left, right) => Err(format!("Cannot subtract {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot subtract {:?} and {:?}", left, right))),
     }
 }
 
@@ -93,7 +94,7 @@ fn evaluate_multiply(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -106,9 +107,9 @@ fn evaluate_multiply(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left * right)))
             }
-            (left, right) => Err(format!("Cannot multiply {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot multiply {:?} and {:?}", left, right))),
         },
-        (left, right) => Err(format!("Cannot multiply {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot multiply {:?} and {:?}", left, right))),
     }
 }
 
@@ -116,7 +117,7 @@ fn evaluate_divide(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -129,9 +130,9 @@ fn evaluate_divide(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left / right)))
             }
-            (left, right) => Err(format!("Cannot divide {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot divide {:?} and {:?}", left, right))),
         },
-        (left, right) => Err(format!("Cannot divide {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot divide {:?} and {:?}", left, right))),
     }
 }
 
@@ -139,7 +140,7 @@ fn evaluate_modulo(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -152,9 +153,9 @@ fn evaluate_modulo(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left % right)))
             }
-            (left, right) => Err(format!("Cannot modulo {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot modulo {:?} and {:?}", left, right))),
         },
-        (left, right) => Err(format!("Cannot modulo {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot modulo {:?} and {:?}", left, right))),
     }
 }
 
@@ -162,7 +163,7 @@ fn evaluate_bitwise_and(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -172,9 +173,9 @@ fn evaluate_bitwise_and(
             (Number::UInt(left), Number::UInt(right)) => {
                 Ok(Value::Number(Number::UInt(left & right)))
             }
-            (left, right) => Err(format!("Cannot bitwise and {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot bitwise and {:?} and {:?}", left, right))),
         },
-        (left, right) => Err(format!("Cannot bitwise and {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot bitwise and {:?} and {:?}", left, right))),
     }
 }
 
@@ -182,7 +183,7 @@ fn evaluate_bitwise_or(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -192,9 +193,9 @@ fn evaluate_bitwise_or(
             (Number::UInt(left), Number::UInt(right)) => {
                 Ok(Value::Number(Number::UInt(left | right)))
             }
-            (left, right) => Err(format!("Cannot bitwise or {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot bitwise or {:?} and {:?}", left, right))),
         },
-        (left, right) => Err(format!("Cannot bitwise or {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot bitwise or {:?} and {:?}", left, right))),
     }
 }
 
@@ -202,7 +203,7 @@ fn evaluate_bitwise_xor(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -212,9 +213,9 @@ fn evaluate_bitwise_xor(
             (Number::UInt(left), Number::UInt(right)) => {
                 Ok(Value::Number(Number::UInt(left ^ right)))
             }
-            (left, right) => Err(format!("Cannot bitwise xor {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot bitwise xor {:?} and {:?}", left, right))),
         },
-        (left, right) => Err(format!("Cannot bitwise xor {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot bitwise xor {:?} and {:?}", left, right))),
     }
 }
 
@@ -222,7 +223,7 @@ fn evaluate_bitwise_left_shift(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -234,15 +235,15 @@ fn evaluate_bitwise_left_shift(
             (Number::UInt(left), Number::UInt(right)) => {
                 Ok(Value::Number(Number::UInt(left << right)))
             }
-            (left, right) => Err(format!(
+            (left, right) => Err(Diagnostic::error(format!(
                 "Cannot bitwise left shift {:?} and {:?}",
                 left, right
-            )),
+            ))),
         },
-        (left, right) => Err(format!(
+        (left, right) => Err(Diagnostic::error(format!(
             "Cannot bitwise left shift {:?} and {:?}",
             left, right
-        )),
+        ))),
     }
 }
 
@@ -250,7 +251,7 @@ fn evaluate_bitwise_right_shift(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -262,15 +263,15 @@ fn evaluate_bitwise_right_shift(
             (Number::UInt(left), Number::UInt(right)) => {
                 Ok(Value::Number(Number::UInt(left >> right)))
             }
-            (left, right) => Err(format!(
+            (left, right) => Err(Diagnostic::error(format!(
                 "Cannot bitwise right shift {:?} and {:?}",
                 left, right
-            )),
+            ))),
         },
-        (left, right) => Err(format!(
+        (left, right) => Err(Diagnostic::error(format!(
             "Cannot bitwise right shift {:?} and {:?}",
             left, right
-        )),
+        ))),
     }
 }
 
@@ -278,7 +279,7 @@ fn evaluate_boolean_logical_and(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
 
     if let Value::Bool(false) = left {
@@ -290,10 +291,10 @@ fn evaluate_boolean_logical_and(
     match right {
         Value::Bool(false) => Ok(Value::Bool(false)),
         Value::Bool(true) => Ok(left),
-        _ => Err(format!(
+        _ => Err(Diagnostic::error(format!(
             "Cannot boolean logical and {:?} and {:?}",
             left, right
-        )),
+        ))),
     }
 }
 
@@ -301,7 +302,7 @@ fn evaluate_boolean_logical_or(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
 
     if let Value::Bool(true) = left {
@@ -313,10 +314,10 @@ fn evaluate_boolean_logical_or(
     match right {
         Value::Bool(true) => Ok(Value::Bool(true)),
         Value::Bool(false) => Ok(left),
-        _ => Err(format!(
+        _ => Err(Diagnostic::error(format!(
             "Cannot boolean logical or {:?} and {:?}",
             left, right
-        )),
+        ))),
     }
 }
 
@@ -324,7 +325,7 @@ fn evaluate_equal(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -335,7 +336,7 @@ fn evaluate_equal(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left == right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left == right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left == right)),
-            (left, right) => Err(format!("Cannot equal {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot equal {:?} and {:?}", left, right))),
         },
         (Value::Rune(left), Value::Rune(right)) => Ok(Value::Bool(left == right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left == right)),
@@ -349,7 +350,7 @@ fn evaluate_equal(
                 ..
             }),
         ) => Ok(Value::Bool(left_enum_member == right_enum_member)),
-        (left, right) => Err(format!("Cannot equal {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot equal {:?} and {:?}", left, right))),
     }
 }
 
@@ -357,7 +358,7 @@ fn evaluate_not_equal(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -368,11 +369,11 @@ fn evaluate_not_equal(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left != right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left != right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left != right)),
-            (left, right) => Err(format!("Cannot not equal {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot not equal {:?} and {:?}", left, right))),
         },
         (Value::Rune(left), Value::Rune(right)) => Ok(Value::Bool(left != right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left != right)),
-        (left, right) => Err(format!("Cannot not equal {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot not equal {:?} and {:?}", left, right))),
     }
 }
 
@@ -380,7 +381,7 @@ fn evaluate_less_than(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -389,9 +390,9 @@ fn evaluate_less_than(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left < right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left < right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left < right)),
-            (left, right) => Err(format!("Cannot less than {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot less than {:?} and {:?}", left, right))),
         },
-        (left, right) => Err(format!("Cannot less than {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot less than {:?} and {:?}", left, right))),
     }
 }
 
@@ -399,7 +400,7 @@ fn evaluate_less_than_or_equal(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -408,15 +409,15 @@ fn evaluate_less_than_or_equal(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left <= right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left <= right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left <= right)),
-            (left, right) => Err(format!(
+            (left, right) => Err(Diagnostic::error(format!(
                 "Cannot less than or equal {:?} and {:?}",
                 left, right
-            )),
+            ))),
         },
-        (left, right) => Err(format!(
+        (left, right) => Err(Diagnostic::error(format!(
             "Cannot less than or equal {:?} and {:?}",
             left, right
-        )),
+        ))),
     }
 }
 
@@ -424,7 +425,7 @@ fn evaluate_greater_than(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -433,9 +434,9 @@ fn evaluate_greater_than(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left > right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left > right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left > right)),
-            (left, right) => Err(format!("Cannot greater than {:?} and {:?}", left, right)),
+            (left, right) => Err(Diagnostic::error(format!("Cannot greater than {:?} and {:?}", left, right))),
         },
-        (left, right) => Err(format!("Cannot greater than {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot greater than {:?} and {:?}", left, right))),
     }
 }
 
@@ -443,7 +444,7 @@ fn evaluate_greater_than_or_equal(
     left: TypedExpression,
     right: TypedExpression,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -452,15 +453,15 @@ fn evaluate_greater_than_or_equal(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left >= right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left >= right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left >= right)),
-            (left, right) => Err(format!(
+            (left, right) => Err(Diagnostic::error(format!(
                 "Cannot greater than or equal {:?} and {:?}",
                 left, right
-            )),
+            ))),
         },
-        (left, right) => Err(format!(
+        (left, right) => Err(Diagnostic::error(format!(
             "Cannot greater than or equal {:?} and {:?}",
             left, right
-        )),
+        ))),
     }
 }
 
@@ -469,7 +470,7 @@ fn evaluate_range(
     right: TypedExpression,
     inclusive: bool,
     environment: Rcrc<Environment>,
-) -> Result<Value, String> {
+) -> Result<Value, Diagnostic> {
     let left = evaluate_expression(left, environment.clone())?;
     let right = evaluate_expression(right, environment)?;
 
@@ -495,7 +496,7 @@ fn evaluate_range(
                     .map(|v| Value::Number(Number::UInt(v)))
                     .collect(),
             )),
-            (left, right, _) => Err(format!("Cannot range {:?} and {:?}", left, right)),
+            (left, right, _) => Err(Diagnostic::error(format!("Cannot range {:?} and {:?}", left, right))),
         },
         (Value::Rune(left), Value::Rune(right)) => {
             if !inclusive {
@@ -504,6 +505,6 @@ fn evaluate_range(
                 Ok(Value::Array((left..=right).map(Value::Rune).collect()))
             }
         }
-        (left, right) => Err(format!("Cannot range {:?} and {:?}", left, right)),
+        (left, right) => Err(Diagnostic::error(format!("Cannot range {:?} and {:?}", left, right))),
     }
 }

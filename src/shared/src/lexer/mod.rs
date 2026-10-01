@@ -1,4 +1,7 @@
+use crate::diagnostic::Diagnostic;
 use cursor::Cursor;
+
+use crate::diagnostic::Span;
 use num_lit::parse_float_literal_starting_with_dot;
 use token::{Literal, Token, TokenKind};
 
@@ -8,19 +11,21 @@ pub mod cursor;
 mod num_lit;
 pub mod token;
 
-pub fn tokenize(source_code: &str) -> Result<Vec<Token>, String> {
+pub fn tokenize(source_code: &str) -> Result<Vec<Token>, Diagnostic> {
     let mut tokens = Vec::new();
     let mut cursor = cursor::Cursor::new(source_code);
 
+    // Stop at the first bad token rather than collecting results: a character
+    // the lexer does not recognise is never consumed, so carrying on would spin
+    // on it forever.
     while !cursor.is_end_of_file() {
-        let token = tokenize_next(&mut cursor);
-        tokens.push(token);
+        tokens.push(tokenize_next(&mut cursor)?);
     }
 
-    transpose(tokens)
+    Ok(tokens)
 }
 
-fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
+fn tokenize_next(cursor: &mut Cursor) -> Result<Token, Diagnostic> {
     cursor.reset_position_within_token();
 
     match cursor.first() {
@@ -30,7 +35,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
 
             Ok(Token {
                 kind: TokenKind::WhiteSpace,
-                length: cursor.position_within_token(),
+                span: cursor.token_span(),
             })
         }
         '(' => Ok(create_token(TokenKind::OpenParen, cursor)),
@@ -90,14 +95,13 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
                 cursor.eat_while(|c| !is_end_of_line_comment(c));
                 Ok(Token {
                     kind: TokenKind::LineComment,
-                    length: cursor.position_within_token(),
+                    span: cursor.token_span(),
                 })
             }
             '-' => {
                 cursor.bump();
                 cursor.bump();
 
-                let mut length = 2;
                 // let mut nested = 1;
 
                 while !cursor.is_end_of_file() {
@@ -115,11 +119,9 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
                     if cursor.first() == '-' && cursor.second() == '/' {
                         cursor.bump();
                         cursor.bump();
-                        length += 2;
                         break;
                     } else {
                         cursor.bump();
-                        length += 1;
                     }
 
                     // if nested == 0 {
@@ -129,7 +131,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
 
                 Ok(Token {
                     kind: TokenKind::BlockComment,
-                    length,
+                    span: cursor.token_span(),
                 })
             }
             '=' => {
@@ -230,7 +232,7 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             cursor.bump();
             Ok(Token {
                 kind: TokenKind::Literal(Literal::String(string)),
-                length: cursor.position_within_token(),
+                span: cursor.token_span(),
             })
         }
         '\'' => {
@@ -255,12 +257,12 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
             cursor.bump();
             Ok(Token {
                 kind: TokenKind::Literal(Literal::Rune(string)),
-                length: cursor.position_within_token(),
+                span: cursor.token_span(),
             })
         }
         '\0' => Ok(Token {
             kind: TokenKind::EndOfFile,
-            length: cursor.position_within_token(),
+            span: cursor.token_span(),
         }),
         c => {
             if is_identifier_start(c) {
@@ -273,17 +275,26 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, String> {
                 if let Some(keyword) = get_reserved_keyword(&string) {
                     return Ok(Token {
                         kind: keyword,
-                        length: cursor.position_within_token(),
+                        span: cursor.token_span(),
                     });
                 }
 
                 return Ok(Token {
                     kind: TokenKind::Identifier(string),
-                    length: cursor.position_within_token(),
+                    span: cursor.token_span(),
                 });
             }
 
-            Err(format!("Unrecognized character: {0}", cursor.first()))
+            // Nothing has been consumed, so the token span is empty here;
+            // widen it over the offending character so it gets a caret.
+            let span = cursor.token_span();
+
+            Err(
+                Diagnostic::error(format!("Unrecognized character: {c}")).at(Span::new(
+                    span.start,
+                    span.start + c.len_utf8() as u32,
+                )),
+            )
         }
     }
 }
@@ -385,19 +396,7 @@ fn create_token(kind: TokenKind, cursor: &mut Cursor<'_>) -> Token {
     cursor.bump();
     Token {
         kind,
-        length: cursor.position_within_token(),
+        span: cursor.token_span(),
     }
 }
 
-fn transpose(tokens: Vec<Result<Token, String>>) -> Result<Vec<Token>, String> {
-    let mut tks = Vec::new();
-
-    for token in tokens {
-        match token {
-            Ok(token) => tks.push(token),
-            Err(err) => return Err(err),
-        }
-    }
-
-    Ok(tks)
-}

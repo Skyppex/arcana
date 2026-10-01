@@ -1,3 +1,5 @@
+use crate::ast::pattern::PatternKind;
+use crate::diagnostic::{Diagnostic, Spanned};
 use std::fmt::Display;
 
 use crate::{
@@ -173,7 +175,7 @@ pub fn check_pattern(
     pattern: &Pattern,
     type_: &Type,
     type_environment: Rcrc<TypeEnvironment>,
-) -> Result<(CheckedPattern, Vec<PatternBinding>), String> {
+) -> Result<(CheckedPattern, Vec<PatternBinding>), Diagnostic> {
     pattern.check_no_duplicate_bindings()?;
 
     let mut bindings = vec![];
@@ -181,21 +183,35 @@ pub fn check_pattern(
     Ok((checked, bindings))
 }
 
+/// Checks one pattern, pointing any error at it.
+///
+/// Same arrangement as the expression and statement checkers: attaching the
+/// span once here, and only to an empty primary, leaves an error from a
+/// sub-pattern pointing at that sub-pattern.
 fn check_pattern_inner(
     pattern: &Pattern,
     type_: &Type,
     type_environment: &Rcrc<TypeEnvironment>,
     bindings: &mut Vec<PatternBinding>,
-) -> Result<CheckedPattern, String> {
-    match pattern {
-        Pattern::Wildcard => Ok(CheckedPattern::Wildcard),
-        Pattern::Binding(identifier) => {
+) -> Result<CheckedPattern, Diagnostic> {
+    check_pattern_of(pattern, type_, type_environment, bindings).at(pattern.span)
+}
+
+fn check_pattern_of(
+    pattern: &Pattern,
+    type_: &Type,
+    type_environment: &Rcrc<TypeEnvironment>,
+    bindings: &mut Vec<PatternBinding>,
+) -> Result<CheckedPattern, Diagnostic> {
+    match &pattern.kind {
+        PatternKind::Wildcard => Ok(CheckedPattern::Wildcard),
+        PatternKind::Binding(identifier) => {
             bindings.push((identifier.clone(), type_.clone()));
             Ok(CheckedPattern::Binding(identifier.clone()))
         }
         // `x @ p` binds the value and goes on matching it, so both apply at the
         // same type.
-        Pattern::Bound {
+        PatternKind::Bound {
             identifier,
             pattern: inner,
         } => {
@@ -212,39 +228,39 @@ fn check_pattern_inner(
             })
         }
         // Unit has exactly one value, so matching it tests nothing.
-        Pattern::Unit => {
+        PatternKind::Unit => {
             expect_type(&Type::Unit, type_, pattern)?;
             Ok(CheckedPattern::Wildcard)
         }
-        Pattern::Bool(v) => {
+        PatternKind::Bool(v) => {
             expect_type(&Type::Bool, type_, pattern)?;
             Ok(CheckedPattern::Bool(*v))
         }
-        Pattern::Int(v) => {
+        PatternKind::Int(v) => {
             expect_type(&Type::Int, type_, pattern)?;
             Ok(CheckedPattern::Int(*v))
         }
-        Pattern::UInt(v) => {
+        PatternKind::UInt(v) => {
             expect_type(&Type::UInt, type_, pattern)?;
             Ok(CheckedPattern::UInt(*v))
         }
-        Pattern::Float(v) => {
+        PatternKind::Float(v) => {
             expect_type(&Type::Float, type_, pattern)?;
             Ok(CheckedPattern::Float(*v))
         }
-        Pattern::Rune(v) => {
+        PatternKind::Rune(v) => {
             expect_type(&Type::Rune, type_, pattern)?;
             Ok(CheckedPattern::Rune(*v))
         }
-        Pattern::String(v) => {
+        PatternKind::String(v) => {
             expect_type(&Type::String, type_, pattern)?;
             Ok(CheckedPattern::String(v.clone()))
         }
-        Pattern::Comparison { operator, bound } => Ok(CheckedPattern::Comparison {
+        PatternKind::Comparison { operator, bound } => Ok(CheckedPattern::Comparison {
             operator: *operator,
             bound: check_bound(bound, type_, type_environment)?,
         }),
-        Pattern::Range {
+        PatternKind::Range {
             lower,
             upper,
             inclusive,
@@ -253,21 +269,21 @@ fn check_pattern_inner(
             upper: check_bound(upper, type_, type_environment)?,
             inclusive: *inclusive,
         }),
-        Pattern::Tuple(patterns) => {
+        PatternKind::Tuple(patterns) => {
             let Type::Tuple(element_types) = type_.clone().unsubstitute() else {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Pattern `{}` expects a tuple but the matched value is {}",
                     pattern, type_
-                ));
+                )));
             };
 
             if element_types.len() != patterns.len() {
-                return Err(format!(
+                return Err(Diagnostic::error(format!(
                     "Pattern `{}` has {} elements but the matched tuple has {}",
                     pattern,
                     patterns.len(),
                     element_types.len()
-                ));
+                )));
             }
 
             let mut checked = vec![];
@@ -283,7 +299,7 @@ fn check_pattern_inner(
 
             Ok(CheckedPattern::Tuple(checked))
         }
-        Pattern::Struct {
+        PatternKind::Struct {
             type_annotation,
             fields,
         } => {
@@ -291,10 +307,10 @@ fn check_pattern_inner(
 
             if let Some(type_annotation) = type_annotation {
                 if !type_annotation_equals(type_annotation, &owner) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Pattern `{}` names {} but the matched value is {}",
                         pattern, type_annotation, owner
-                    ));
+                    )));
                 }
             }
 
@@ -309,7 +325,7 @@ fn check_pattern_inner(
 
             Ok(CheckedPattern::Fields(checked))
         }
-        Pattern::EnumVariant {
+        PatternKind::EnumVariant {
             enum_annotation,
             path,
             inner,
@@ -330,7 +346,7 @@ fn check_pattern_inner(
 fn struct_pattern_fields(
     type_: &Type,
     pattern: &Pattern,
-) -> Result<(Vec<crate::type_checker::StructField>, TypeAnnotation, bool), String> {
+) -> Result<(Vec<crate::type_checker::StructField>, TypeAnnotation, bool), Diagnostic> {
     match type_.clone().unsubstitute() {
         Type::Struct(Struct {
             type_identifier,
@@ -344,10 +360,10 @@ fn struct_pattern_fields(
             shared_fields,
             ..
         }) => Ok((shared_fields, TypeAnnotation::from(&type_identifier), true)),
-        other => Err(format!(
+        other => Err(Diagnostic::error(format!(
             "Pattern `{}` expects a struct but the matched value is {}",
             pattern, other
-        )),
+        ))),
     }
 }
 
@@ -358,21 +374,21 @@ fn check_field_patterns(
     shared_only: bool,
     type_environment: &Rcrc<TypeEnvironment>,
     bindings: &mut Vec<PatternBinding>,
-) -> Result<Vec<CheckedFieldPattern>, String> {
+) -> Result<Vec<CheckedFieldPattern>, Diagnostic> {
     let mut checked = vec![];
 
     for field in fields {
         let Some(struct_field) = get_field_by_name(available_fields, &field.identifier) else {
             return if shared_only {
-                Err(format!(
+                Err(Diagnostic::error(format!(
                     "Field `{}` is not shared by all variants of {}; match on a variant first",
                     field.identifier, owner
-                ))
+                )))
             } else {
-                Err(format!(
+                Err(Diagnostic::error(format!(
                     "Field `{}` does not exist on {}",
                     field.identifier, owner
-                ))
+                )))
             };
         };
 
@@ -396,17 +412,17 @@ fn check_variant_pattern(
     type_: &Type,
     type_environment: &Rcrc<TypeEnvironment>,
     bindings: &mut Vec<PatternBinding>,
-) -> Result<CheckedPattern, String> {
+) -> Result<CheckedPattern, Diagnostic> {
     match type_.clone().unsubstitute() {
         Type::Enum(enum_) => {
             let enum_annotation_of_type = TypeAnnotation::from(&enum_.type_identifier);
 
             if let Some(enum_annotation) = enum_annotation {
                 if !type_annotation_equals(enum_annotation, &enum_annotation_of_type) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Pattern `{}` names enum {} but the matched value is {}",
                         pattern, enum_annotation, enum_annotation_of_type
-                    ));
+                    )));
                 }
             }
 
@@ -423,29 +439,29 @@ fn check_variant_pattern(
 
             if let Some(enum_annotation) = enum_annotation {
                 if !type_annotation_equals(enum_annotation, &enum_annotation_of_type) {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Pattern `{}` names enum {} but the matched value is {}",
                         pattern, enum_annotation, enum_annotation_of_type
-                    ));
+                    )));
                 }
             }
 
             match path {
                 [variant] if *variant == member_name => {}
                 _ => {
-                    return Err(format!(
+                    return Err(Diagnostic::error(format!(
                         "Pattern `{}` can never match: the value is always {}::{}",
                         pattern, enum_annotation_of_type, member_name
-                    ))
+                    )))
                 }
             }
 
             check_variant_inner(inner, type_, type_environment, bindings)
         }
-        other => Err(format!(
+        other => Err(Diagnostic::error(format!(
             "Pattern `{}` expects an enum but the matched value is {}",
             pattern, other
-        )),
+        ))),
     }
 }
 
@@ -462,18 +478,18 @@ fn walk_variant_path(
     inner: Option<&Pattern>,
     type_environment: &Rcrc<TypeEnvironment>,
     bindings: &mut Vec<PatternBinding>,
-) -> Result<CheckedPattern, String> {
+) -> Result<CheckedPattern, Diagnostic> {
     let enum_annotation_of_type = TypeAnnotation::from(&enum_.type_identifier);
 
     let Some((variant, rest)) = path.split_first() else {
-        return Err(format!("Pattern `{}` names no variant", pattern));
+        return Err(Diagnostic::error(format!("Pattern `{}` names no variant", pattern)));
     };
 
     let Some(member_type) = get_enum_member(&enum_.members, &enum_.type_identifier, variant) else {
-        return Err(format!(
+        return Err(Diagnostic::error(format!(
             "{} has no variant named `{}`",
             enum_annotation_of_type, variant
-        ));
+        )));
     };
 
     let qualified_name = member_type.clone().unsubstitute().to_key();
@@ -482,10 +498,10 @@ fn walk_variant_path(
     // segment to mean anything.
     if !rest.is_empty() {
         let Type::Enum(nested) = member_type.clone().unsubstitute() else {
-            return Err(format!(
+            return Err(Diagnostic::error(format!(
                 "`{}` is not an enum, so it has no variant `{}`",
                 qualified_name, rest[0]
-            ));
+            )));
         };
 
         return Ok(CheckedPattern::NestedVariant {
@@ -533,7 +549,7 @@ fn check_variant_inner(
     member_type: &Type,
     type_environment: &Rcrc<TypeEnvironment>,
     bindings: &mut Vec<PatternBinding>,
-) -> Result<CheckedPattern, String> {
+) -> Result<CheckedPattern, Diagnostic> {
     let Some(inner) = inner else {
         return Ok(CheckedPattern::Wildcard);
     };
@@ -545,7 +561,7 @@ fn check_bound(
     bound: &Bound,
     type_: &Type,
     type_environment: &Rcrc<TypeEnvironment>,
-) -> Result<CheckedBound, String> {
+) -> Result<CheckedBound, Diagnostic> {
     let (checked, bound_type) = match bound {
         Bound::Int(v) => (CheckedBound::Int(*v), Type::Int),
         Bound::UInt(v) => (CheckedBound::UInt(*v), Type::UInt),
@@ -553,7 +569,7 @@ fn check_bound(
         Bound::Rune(v) => (CheckedBound::Rune(*v), Type::Rune),
         Bound::Variable(identifier) => {
             let Some(variable_type) = type_environment.borrow().get_variable(identifier) else {
-                return Err(format!("Variable `{}` not found", identifier));
+                return Err(Diagnostic::error(format!("Variable `{}` not found", identifier)));
             };
 
             (
@@ -564,22 +580,22 @@ fn check_bound(
     };
 
     if !type_equals(&bound_type, type_) && !type_equals(type_, &bound_type) {
-        return Err(format!(
+        return Err(Diagnostic::error(format!(
             "Bound `{}` is {} but the matched value is {}",
             bound, bound_type, type_
-        ));
+        )));
     }
 
     Ok(checked)
 }
 
-fn expect_type(expected: &Type, actual: &Type, pattern: &Pattern) -> Result<(), String> {
+fn expect_type(expected: &Type, actual: &Type, pattern: &Pattern) -> Result<(), Diagnostic> {
     if type_equals(expected, actual) {
         return Ok(());
     }
 
-    Err(format!(
+    Err(Diagnostic::error(format!(
         "Pattern `{}` is {} but the matched value is {}",
         pattern, expected, actual
-    ))
+    )))
 }

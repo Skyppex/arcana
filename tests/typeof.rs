@@ -16,7 +16,7 @@ fn assert_error_contains(input: &str, needle: &str) {
     match try_create_typed_ast(input) {
         Ok(_) => panic!("expected an error mentioning {needle:?}, but the program type-checked"),
         Err(e) => assert!(
-            e.contains(needle),
+            e.to_string().contains(needle),
             "expected an error mentioning {needle:?}, got: {e}"
         ),
     }
