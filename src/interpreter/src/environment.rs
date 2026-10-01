@@ -98,7 +98,10 @@ impl Environment {
     pub fn activate_scope(&mut self, scope: Scope) -> Result<(), Diagnostic> {
         let scope_type: ScopeType = scope.clone().into();
         if !self.has_scope(&scope_type) {
-            return Err(Diagnostic::error(format!("Scope '{:?}' not found", scope_type)));
+            return Err(Diagnostic::error(format!(
+                "Scope '{:?}' not found",
+                scope_type
+            )));
         }
 
         match self.scopes.iter_mut().find(|s| s.scope_type == scope_type) {
@@ -230,13 +233,18 @@ impl Environment {
                 if !matches!(variable.borrow().value, Value::Uninitialized)
                     && !variable.borrow().mutable
                 {
-                    return Err(Diagnostic::error(format!("Cannot assign to immutable variable '{}'", symbol)));
+                    return Err(Diagnostic::error(format!(
+                        "Cannot assign to immutable variable '{}'",
+                        symbol
+                    )));
                 }
 
                 variable.borrow_mut().value = value.clone();
                 Ok(value)
             }
-            Member::StaticMemberAccess { .. } => Err(Diagnostic::error("Cannot assign to static member")),
+            Member::StaticMemberAccess { .. } => {
+                Err(Diagnostic::error("Cannot assign to static member"))
+            }
             Member::MemberAccess { member, .. } => {
                 self.set_variable(*member.clone(), value.clone())
             }
@@ -246,9 +254,10 @@ impl Environment {
                 "cannot assign to built-in function '{:?}'",
                 type_identifier
             ))),
-            Member::Index { object, .. } => {
-                Err(Diagnostic::error(format!("Cannot assign to indexed value of {}", object)))
-            }
+            Member::Index { object, .. } => Err(Diagnostic::error(format!(
+                "Cannot assign to indexed value of {}",
+                object
+            ))),
         }
     }
 

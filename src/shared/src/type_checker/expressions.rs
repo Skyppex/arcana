@@ -1,3 +1,7 @@
+use crate::type_checker::{
+    purity::{carry_body_purity, purity_of},
+    Purity,
+};
 use crate::ast::ExpressionKind;
 use crate::diagnostic::{Diagnostic, Span, Spanned};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
@@ -123,7 +127,9 @@ fn check_type_of(
                     });
 
                     let Some(type_) = type_ else {
-                        return Err(Diagnostic::error("Could not infer type of closure parameter"));
+                        return Err(Diagnostic::error(
+                            "Could not infer type of closure parameter",
+                        ));
                     };
 
                     closure_environment
@@ -168,12 +174,19 @@ fn check_type_of(
             };
 
             let type_ = Type::Function(Function {
+                purity: purity_of(&body),
                 identifier: None,
                 param: param.clone().map(|p| super::Parameter {
                     identifier: p.identifier,
                     type_: p.type_,
                 }),
-                return_type: Box::new(return_type.clone()),
+                // The return type comes from the annotation when there is one,
+                // and an annotation says nothing about bodies — so a nested
+                // closure's purity has to be taken from the body it wraps.
+                return_type: Box::new(carry_body_purity(
+                    return_type.clone(),
+                    Some(body.get_type()),
+                )),
             });
 
             Ok(TypedExpression::Closure {
@@ -1319,10 +1332,9 @@ fn check_type_of(
                 }
                 None => {
                     if !type_equals(&type_, &Type::Void) {
-                        return Err(
-                            Diagnostic::error("Must have an else block if the while block breaks with a value"
-                                ),
-                        );
+                        return Err(Diagnostic::error(
+                            "Must have an else block if the while block breaks with a value",
+                        ));
                     }
                 }
             };
@@ -1409,10 +1421,9 @@ fn check_type_of(
                 }
                 None => {
                     if !type_equals(&type_, &Type::Void) {
-                        return Err(
-                            Diagnostic::error("Must have an else block if the for block breaks with a value"
-                                ),
-                        );
+                        return Err(Diagnostic::error(
+                            "Must have an else block if the for block breaks with a value",
+                        ));
                     }
                 }
             };
@@ -1431,21 +1442,21 @@ fn check_type_of(
             let expr_type = typed_expr.get_type();
 
             let Type::Function(function) = expr_type else {
-                return Err(Diagnostic::error("Right hand side of a use expression must be a function."));
+                return Err(Diagnostic::error(
+                    "Right hand side of a use expression must be a function.",
+                ));
             };
 
             let Some(Parameter { type_, .. }) = function.param else {
-                return Err(
-                    Diagnostic::error("Last argument of a function in a use expression must be a function"
-                        ),
-                );
+                return Err(Diagnostic::error(
+                    "Last argument of a function in a use expression must be a function",
+                ));
             };
 
             let Type::Function(Function { param, .. }) = *type_ else {
-                return Err(
-                    Diagnostic::error("Last argument of a function in a use expression must be a function"
-                        ),
-                );
+                return Err(Diagnostic::error(
+                    "Last argument of a function in a use expression must be a function",
+                ));
             };
 
             todo!()
@@ -1588,6 +1599,7 @@ fn infer_call_type_arguments(
         identifier: Some(TypeIdentifier::GenericType(_, generics)),
         param,
         return_type,
+        ..
     }) = callee_type
     else {
         return Ok(None);
@@ -1693,6 +1705,7 @@ fn specialise_universal_member(
     };
 
     let closure_type = Type::Function(Function {
+        purity: purity_of(&body),
         identifier: None,
         param: param.as_ref().map(|param| Parameter {
             identifier: param.identifier.clone(),
@@ -1809,6 +1822,7 @@ fn specialise_generic_call(
     };
 
     let closure_type = Type::Function(Function {
+        purity: purity_of(&body),
         identifier: None,
         param: param.as_ref().map(|param| Parameter {
             identifier: param.identifier.clone(),
@@ -2201,8 +2215,7 @@ pub fn option_inner(type_: &Type) -> Option<Type> {
 
     // The library's own `Option` keys its variants by their qualified names, so
     // the lookup goes through `get_enum_member` rather than the bare name.
-    let Type::Struct(Struct { fields, .. }) =
-        get_enum_member(members, type_identifier, "Some")?
+    let Type::Struct(Struct { fields, .. }) = get_enum_member(members, type_identifier, "Some")?
     else {
         return None;
     };
@@ -2409,7 +2422,10 @@ fn check_type_member_access_recurse(
                     .clone();
 
                 if !type_environment.borrow().lookup_type(&field_type) {
-                    return Err(Diagnostic::error(format!("Unexpected type: {}", field_type.full_name())));
+                    return Err(Diagnostic::error(format!(
+                        "Unexpected type: {}",
+                        field_type.full_name()
+                    )));
                 }
 
                 let identifier_type = field_type.clone();
@@ -2438,7 +2454,10 @@ fn check_type_member_access_recurse(
                     .clone();
 
                 if !type_environment.borrow().lookup_type(&field_type) {
-                    return Err(Diagnostic::error(format!("Unexpected type: {}", field_type.full_name())));
+                    return Err(Diagnostic::error(format!(
+                        "Unexpected type: {}",
+                        field_type.full_name()
+                    )));
                 }
 
                 let identifier_type = field_type.clone();
@@ -2520,7 +2539,9 @@ fn check_type_param_propagation(
     context: Option<Type>,
 ) -> Result<TypedExpression, Diagnostic> {
     let ast::Member::Identifier { .. } = member.clone() else {
-        return Err(Diagnostic::error("Param propagation must be followed by a member access"));
+        return Err(Diagnostic::error(
+            "Param propagation must be followed by a member access",
+        ));
     };
 
     // `x:typeof()` is folded by the caller. Reaching here means the call was
@@ -2617,22 +2638,25 @@ fn check_type_param_propagation_recurse(
 
             // This version will return a function requiring parens for it to be called
             // 16:sqrt will produce a closure that needs to be called. 16:sqrt() will produce 4
+            let body = TypedExpression::Call {
+                callee: Box::new(TypedExpression::Member(Member::Identifier {
+                    symbol: symbol.clone(),
+                    type_: type_.clone(),
+                })),
+                argument: Some(Box::new(object_typed_expression)),
+                type_: *return_type.clone(),
+            };
+
             Ok(TypedExpression::Closure {
                 param: None,
                 return_type: *return_type.clone(),
-                body: Box::new(TypedExpression::Call {
-                    callee: Box::new(TypedExpression::Member(Member::Identifier {
-                        symbol: symbol.clone(),
-                        type_: type_.clone(),
-                    })),
-                    argument: Some(Box::new(object_typed_expression)),
-                    type_: *return_type.clone(),
-                }),
                 type_: Type::Function(Function {
+                    purity: purity_of(&body),
                     identifier: None,
                     param: None,
                     return_type,
                 }),
+                body: Box::new(body),
             })
 
             // // This version will call a function without requiring parens. 16:sqrt will just produce 4
@@ -2783,7 +2807,10 @@ fn check_type_pattern(
     // Declarations and loops bind unconditionally, so a pattern that can fail
     // has nowhere to fail to.
     if is_refutable(&checked) {
-        return Err(Diagnostic::error(format!("Pattern `{}` is refutable", pattern)));
+        return Err(Diagnostic::error(format!(
+            "Pattern `{}` is refutable",
+            pattern
+        )));
     }
 
     for (identifier, binding_type) in bindings {

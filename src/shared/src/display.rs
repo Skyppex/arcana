@@ -1,5 +1,5 @@
-use crate::ast::StatementKind;
 use crate::ast::ExpressionKind;
+use crate::ast::StatementKind;
 use crate::{
     ast::pattern::{FieldPattern, Pattern},
     ast::{

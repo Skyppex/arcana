@@ -1,3 +1,7 @@
+use crate::type_checker::{
+    purity::{carry_body_purity, purity_of},
+    Purity,
+};
 use crate::ast::StatementKind;
 use crate::diagnostic::{Diagnostic, Spanned};
 use std::{
@@ -16,17 +20,18 @@ use crate::{
 };
 
 use super::{
-    expressions,
+    expressions, get_enum_member,
     model::{self, FieldInitializer, Typed, TypedExpression, TypedParameter, TypedStatement},
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    get_enum_member, type_equals, type_equals_coerce, DiscoveredEmbeddedStruct, EmbeddedStruct,
-    Enum, Function,
+    type_equals, type_equals_coerce, DiscoveredEmbeddedStruct, EmbeddedStruct, Enum, Function,
     Parameter, Protocol, Rcrc, Struct, StructField, Type, TypeAlias, Union,
 };
 
-pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<DiscoveredType>, Diagnostic> {
+pub fn discover_user_defined_types(
+    statement: &Statement,
+) -> Result<Vec<DiscoveredType>, Diagnostic> {
     match &statement.kind {
         StatementKind::Program { statements } => {
             let mut discovered_types = vec![];
@@ -38,7 +43,9 @@ pub fn discover_user_defined_types(statement: &Statement) -> Result<Vec<Discover
             Ok(discovered_types)
         }
         StatementKind::ModuleDeclaration(_) => Ok(vec![]),
-        StatementKind::Use(Use { use_item }) => discover_types_from_use_item(use_item, ModPath::root()),
+        StatementKind::Use(Use { use_item }) => {
+            discover_types_from_use_item(use_item, ModPath::root())
+        }
         StatementKind::StructDeclaration(ast::StructDeclaration {
             body:
                 StructData {
@@ -368,30 +375,31 @@ fn check_type_of(
                 }
             }
 
-            let embedded_structs: Result<Vec<EmbeddedStruct>, Diagnostic> = recursive_embedded_structs
-                .iter()
-                .map(|(es, fis)| {
-                    let mut field_initializers = vec![];
+            let embedded_structs: Result<Vec<EmbeddedStruct>, Diagnostic> =
+                recursive_embedded_structs
+                    .iter()
+                    .map(|(es, fis)| {
+                        let mut field_initializers = vec![];
 
-                    for fi in fis {
-                        field_initializers.push(FieldInitializer {
-                            identifier: fi.identifier.clone(),
-                            initializer: expressions::check_type(
-                                &fi.initializer,
-                                discovered_types,
-                                type_environment.clone(),
-                                None,
-                            )?,
+                        for fi in fis {
+                            field_initializers.push(FieldInitializer {
+                                identifier: fi.identifier.clone(),
+                                initializer: expressions::check_type(
+                                    &fi.initializer,
+                                    discovered_types,
+                                    type_environment.clone(),
+                                    None,
+                                )?,
+                            })
+                        }
+
+                        Ok(EmbeddedStruct {
+                            type_annotation: es.type_annotation(),
+                            field_initializers,
+                            type_: es.clone(),
                         })
-                    }
-
-                    Ok(EmbeddedStruct {
-                        type_annotation: es.type_annotation(),
-                        field_initializers,
-                        type_: es.clone(),
                     })
-                })
-                .collect();
+                    .collect();
 
             let embedded_structs = embedded_structs?;
 
@@ -682,9 +690,11 @@ fn check_type_of(
                         type_identifier: identifier,
                         param,
                         return_type,
+                        body,
                         ..
                     } => {
                         let type_ = Type::Function(Function {
+                            purity: body.as_ref().map_or(Purity::Impure, purity_of),
                             identifier: Some(identifier.clone()),
                             param: param.clone().map(|p| Parameter {
                                 identifier: p.identifier,
@@ -804,7 +814,10 @@ fn check_type_of(
                 ..
             }) = protocol_type.clone()
             else {
-                return Err(Diagnostic::error(format!("Expected protocol, found {}", protocol_type)));
+                return Err(Diagnostic::error(format!(
+                    "Expected protocol, found {}",
+                    protocol_type
+                )));
             };
 
             let mut bound_associated_types = HashMap::new();
@@ -1083,6 +1096,10 @@ fn check_type_of(
 
             if *signature_only {
                 let type_ = Type::Function(Function {
+                    // A requirement, not an implementation: there is no body
+                    // here, and nothing can be assumed about the ones that will
+                    // satisfy it.
+                    purity: Purity::Impure,
                     identifier: Some(type_identifier.clone()),
                     param: param.clone(),
                     return_type: Box::new(return_type.clone()),
@@ -1106,9 +1123,15 @@ fn check_type_of(
             let return_scope = body_environment.borrow().get_scope(&ScopeType::Return);
 
             let type_ = Type::Function(Function {
+                purity: body_typed_expression
+                    .as_ref()
+                    .map_or(Purity::Impure, purity_of),
                 identifier: Some(type_identifier.clone()),
                 param: param.clone(),
-                return_type: Box::new(return_type.clone()),
+                return_type: Box::new(carry_body_purity(
+                    return_type.clone(),
+                    body_typed_expression.as_ref().map(|body| body.get_type()),
+                )),
             });
 
             let Some(body_typed_expression) = body_typed_expression else {
@@ -1382,6 +1405,10 @@ pub fn check_type_annotation(
             };
 
             Ok(Type::Function(Function {
+                // Built from a signature alone, with no body to look
+                // at, so nothing can be concluded. Impure is the safe
+                // answer: it only costs optimisation.
+                purity: Purity::Impure,
                 identifier: Some(type_identifier.clone()),
                 param,
                 return_type: Box::new(check_type_annotation(
@@ -1502,10 +1529,8 @@ fn discover_enum_variants(
     let mut discovered = vec![];
 
     for member in members {
-        let member_identifier = TypeIdentifier::MemberType(
-            Box::new(owner.clone()),
-            member.type_identifier().to_key(),
-        );
+        let member_identifier =
+            TypeIdentifier::MemberType(Box::new(owner.clone()), member.type_identifier().to_key());
 
         match member {
             ast::EnumVariant::Struct(data) => discovered.push(DiscoveredType::Struct {
@@ -1595,10 +1620,8 @@ fn check_enum_variants(
     let mut member_types = HashMap::new();
 
     for variant in variants {
-        let member_identifier = TypeIdentifier::MemberType(
-            Box::new(owner.clone()),
-            variant.type_identifier().to_key(),
-        );
+        let member_identifier =
+            TypeIdentifier::MemberType(Box::new(owner.clone()), variant.type_identifier().to_key());
 
         let checked_variant = match variant {
             ast::EnumVariant::Struct(member) => model::EnumVariant::Struct(check_struct_variant(
@@ -1641,7 +1664,9 @@ fn check_enum_variants(
                     members: nested_member_types,
                 });
 
-                type_environment.borrow_mut().add_type(nested_type.clone())?;
+                type_environment
+                    .borrow_mut()
+                    .add_type(nested_type.clone())?;
 
                 model::EnumVariant::Enum(model::EnumData {
                     type_identifier: member_identifier.clone(),
@@ -1819,7 +1844,9 @@ fn check_struct_variant(
             .collect(),
     });
 
-    type_environment.borrow_mut().add_type(enum_member.clone())?;
+    type_environment
+        .borrow_mut()
+        .add_type(enum_member.clone())?;
 
     Ok(model::StructData {
         type_identifier: member_identifier.clone(),

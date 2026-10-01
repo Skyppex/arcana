@@ -3,6 +3,7 @@ pub mod decision_tree;
 pub mod full_name;
 pub mod model;
 pub mod pattern;
+pub mod purity;
 pub mod simplification;
 #[allow(clippy::module_inception)]
 pub mod type_checker;
@@ -13,9 +14,9 @@ mod scope;
 mod statements;
 
 pub use expressions::{is_option, option_inner};
-pub use simplification::simplify;
 pub use full_name::*;
 use num_traits::Zero;
+pub use simplification::simplify;
 pub use type_checker::*;
 pub use type_environment::*;
 
@@ -374,11 +375,66 @@ impl FullName for Protocol {
     }
 }
 
+/// Whether evaluating something can be observed.
+///
+/// One bit covering two properties that only come apart for `rand`: being
+/// *effect-free*, which is what licenses deleting something, and being
+/// *deterministic*, which is what licenses substituting its value. They are
+/// merged conservatively, so `rand` is `Impure` despite having no effects.
+///
+/// Nothing ever *requires* purity: it is inferred, never written, and
+/// `type_equals` does not look at it, so an impure function stays assignable
+/// wherever a pure one is. It exists only so the simplification pass can tell
+/// what it is allowed to throw away.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Purity {
+    Pure,
+    /// The default, because every way of being wrong about purity except this
+    /// one is a miscompile.
+    #[default]
+    Impure,
+}
+
+impl Purity {
+    pub fn is_pure(self) -> bool {
+        self == Purity::Pure
+    }
+
+    /// Pure only if both are. The whole analysis is this operation applied over
+    /// a tree.
+    pub fn and(self, other: Purity) -> Purity {
+        match (self, other) {
+            (Purity::Pure, Purity::Pure) => Purity::Pure,
+            _ => Purity::Impure,
+        }
+    }
+
+    pub fn of(pure: bool) -> Purity {
+        if pure {
+            Purity::Pure
+        } else {
+            Purity::Impure
+        }
+    }
+}
+
+impl std::iter::FromIterator<Purity> for Purity {
+    fn from_iter<I: IntoIterator<Item = Purity>>(iter: I) -> Purity {
+        iter.into_iter().fold(Purity::Pure, Purity::and)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub identifier: Option<TypeIdentifier>,
     pub param: Option<Parameter>,
     pub return_type: Box<Type>,
+    /// Whether calling this function can be observed — the purity of its body.
+    ///
+    /// Deliberately absent from [`Function::full_name`], which names its fields
+    /// explicitly: function types are keyed into the environment by that string,
+    /// and a purity bit in the key would silently break every lookup.
+    pub purity: Purity,
 }
 
 impl Function {
@@ -534,10 +590,8 @@ impl Type {
         concrete: Type,
         type_environment: &Rcrc<TypeEnvironment>,
     ) -> Result<Type, Diagnostic> {
-        let annotation = TypeAnnotation::ConcreteType(
-            "Option".to_string(),
-            vec![concrete.type_annotation()],
-        );
+        let annotation =
+            TypeAnnotation::ConcreteType("Option".to_string(), vec![concrete.type_annotation()]);
 
         type_environment
             .borrow()
@@ -572,7 +626,10 @@ impl Type {
                 name: v.to_string(),
                 type_: Box::new(LiteralType::Bool),
             }),
-            _ => Err(Diagnostic::error(format!("Cannot convert literal {:?} to type", literal))),
+            _ => Err(Diagnostic::error(format!(
+                "Cannot convert literal {:?} to type",
+                literal
+            ))),
         }
     }
 
@@ -884,6 +941,7 @@ impl Type {
                 identifier,
                 param,
                 return_type,
+                purity,
             }) => {
                 let (name, type_map) = if let Some(context) = context {
                     let name = if let Some(TypeIdentifier::GenericType(name, _)) = identifier {
@@ -935,6 +993,9 @@ impl Type {
                 )?;
 
                 Ok(Type::Function(Function {
+                    // Instantiating type arguments does not change what the
+                    // body does.
+                    purity: *purity,
                     identifier: name.map(|name| {
                         TypeIdentifier::ConcreteType(name.clone(), concrete_types.clone())
                     }),
@@ -1583,7 +1644,8 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
                 ..
             }),
         ) => {
-            type_identifier == member_identifier || is_declared_in(member_identifier, type_identifier)
+            type_identifier == member_identifier
+                || is_declared_in(member_identifier, type_identifier)
         }
         (
             Type::Struct(Struct {

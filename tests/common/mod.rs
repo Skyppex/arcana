@@ -86,7 +86,8 @@ pub fn evaluate_expression(
     let tokens = lexer::tokenize(input).unwrap();
     let ast = ast::create_ast(tokens, false).unwrap();
     let type_environment = core_type_environment();
-    let typed_ast = type_checker::simplify(type_checker::create_typed_ast(ast, type_environment).unwrap());
+    let typed_ast =
+        type_checker::simplify(type_checker::create_typed_ast(ast, type_environment).unwrap());
 
     if unwrap_semi {
         interpreter::evaluate(typed_ast.unwrap_semi(), environment).unwrap()

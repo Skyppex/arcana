@@ -1,8 +1,8 @@
-use crate::diagnostic::Diagnostic;
 use super::{
     cursor::Cursor,
     token::{IntLiteral, IntLiteralBase, Literal, NumericLiteralType, Token, TokenKind},
 };
+use crate::diagnostic::Diagnostic;
 
 pub fn parse_float_literal_starting_with_dot(cursor: &mut Cursor) -> Result<Token, Diagnostic> {
     let mut value = String::from(".");

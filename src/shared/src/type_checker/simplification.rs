@@ -11,9 +11,8 @@
 //! `100` and then has an ordinary constant to fold.
 
 use crate::type_checker::{
-    model::{
-        Block, Member, Typed, TypedExpression, TypedMatchArm, TypedStatement, ValueLiteral,
-    },
+    model::{Block, Typed, TypedExpression, TypedMatchArm, TypedStatement, ValueLiteral},
+    purity::{escapes, purity_of},
     Type,
 };
 
@@ -22,23 +21,29 @@ pub fn simplify(statement: TypedStatement) -> TypedStatement {
     simplify_statement(statement).unwrap_or(TypedStatement::None)
 }
 
-/// Whether replacing this expression with its value would lose anything.
+/// Whether this expression can be thrown away — replaced by its value, or
+/// dropped outright.
 ///
-/// This is deliberately a question about the *shape* of the node rather than
-/// about purity: a call may well have a literal type — `fun f(): #1` — and
-/// replacing the call would throw away whatever else it did. Only nodes that
-/// plainly do nothing but produce a value qualify, and a compound node only
-/// qualifies when its parts do.
-fn is_inert(expression: &TypedExpression) -> bool {
-    match expression {
-        TypedExpression::Literal { .. } => true,
-        // A plain name. Field access and indexing are left out: the thing being
-        // accessed may be anything at all, including a call.
-        TypedExpression::Member(Member::Identifier { .. }) => true,
-        TypedExpression::Unary { expression, .. } => is_inert(expression),
-        TypedExpression::Binary { left, right, .. } => is_inert(left) && is_inert(right),
-        _ => false,
-    }
+/// Three independent things have to hold, and only the first is about purity:
+///
+/// 1. **Nothing observable happens.** [`purity_of`] answers this, which is why
+///    `fun f(): #1` now folds to `1` where the old shape-based test could never
+///    allow it.
+/// 2. **Control does not leave.** `{ return 1; 2 }` is pure by every rule and
+///    has type `#2`; replacing it with `2` would delete the `return`. This is
+///    not a purity question and must not be folded into one.
+/// 3. **It is not a loop.** A pure loop may never finish, and deleting it would
+///    make the program terminate. Proving otherwise is out of scope.
+fn is_discardable(expression: &TypedExpression) -> bool {
+    purity_of(expression).is_pure() && !escapes(expression)
+}
+
+/// Loops are never discarded, however pure — see [`is_discardable`].
+fn is_loop(expression: &TypedExpression) -> bool {
+    matches!(
+        expression,
+        TypedExpression::Loop { .. } | TypedExpression::While { .. } | TypedExpression::For { .. }
+    )
 }
 
 /// The literal an expression's type says it is, when there is one.
@@ -52,7 +57,7 @@ fn known_value(type_: &Type) -> Option<ValueLiteral> {
 
 /// Rewrites an expression to the literal its type names, where that is safe.
 fn substitute(expression: TypedExpression) -> TypedExpression {
-    if !is_inert(&expression) {
+    if !is_discardable(&expression) {
         return expression;
     }
 
@@ -69,9 +74,7 @@ fn simplify_statement(statement: TypedStatement) -> Option<TypedStatement> {
         TypedStatement::Program { statements } => TypedStatement::Program {
             statements: simplify_statements(statements),
         },
-        TypedStatement::Semi(inner) => {
-            TypedStatement::Semi(Box::new(simplify_statement(*inner)?))
-        }
+        TypedStatement::Semi(inner) => TypedStatement::Semi(Box::new(simplify_statement(*inner)?)),
         TypedStatement::Expression(expression) => {
             let expression = simplify_expression(expression);
 
@@ -145,7 +148,52 @@ fn simplify_statement(statement: TypedStatement) -> Option<TypedStatement> {
 }
 
 fn simplify_statements(statements: Vec<TypedStatement>) -> Vec<TypedStatement> {
-    statements.into_iter().filter_map(simplify_statement).collect()
+    // Which statement, if any, the block takes its value from. Positions are
+    // taken before anything is removed, because that is what decides whether a
+    // statement's value is used.
+    let last = statements.len().saturating_sub(1);
+
+    statements
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, statement)| {
+            let statement = simplify_statement(statement)?;
+
+            if is_deletable(&statement, index == last) {
+                return None;
+            }
+
+            Some(statement)
+        })
+        .collect()
+}
+
+/// Whether a statement can be removed from the block it is in.
+///
+/// `used` says the block takes its value from this statement — the final one,
+/// unless a semicolon threw that value away.
+fn is_deletable(statement: &TypedStatement, used: bool) -> bool {
+    let expression = match statement {
+        // A semicolon discards the value, so even a final statement is unused.
+        TypedStatement::Semi(inner) => return is_deletable(inner, false),
+        TypedStatement::Expression(expression) => expression,
+        // Declarations run nothing, but other statements refer to them.
+        // Removing one is not a question about effects.
+        _ => return false,
+    };
+
+    if used {
+        return false;
+    }
+
+    // Bindings are left to the rule in `simplify_statement`, which deletes
+    // exactly the ones whose value was substituted everywhere it was used.
+    // Whether a binding is dead is a question about references, not effects.
+    if matches!(expression, TypedExpression::VariableDeclaration { .. }) {
+        return false;
+    }
+
+    is_discardable(expression)
 }
 
 fn simplify_expression(expression: TypedExpression) -> TypedExpression {

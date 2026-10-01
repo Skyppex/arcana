@@ -157,7 +157,10 @@ fn evaluate_function_declaration(
     body: Option<TypedExpression>,
 ) -> Result<Value, Diagnostic> {
     let Some(body) = body else {
-        return Err(Diagnostic::error(format!("Function '{}' must have a body", identifier)));
+        return Err(Diagnostic::error(format!(
+            "Function '{}' must have a body",
+            identifier
+        )));
     };
 
     let function_environment = Rc::new(RefCell::new(environment.deref().clone().borrow().clone()));
@@ -322,7 +325,10 @@ fn evaluate_if(
     let condition = evaluate_expression(*condition, if_environment.clone())?;
 
     let Value::Bool(condition) = condition else {
-        return Err(Diagnostic::error(format!("If condition must be boolean '{}'", condition)));
+        return Err(Diagnostic::error(format!(
+            "If condition must be boolean '{}'",
+            condition
+        )));
     };
 
     if !condition {
@@ -385,7 +391,10 @@ fn evaluate_decision_tree(
                 return evaluate_expression(*body, arm_environment);
             }
             Decision::Failure { witness } => {
-                return Err(Diagnostic::error(format!("No match found for '{}' {}", value, witness)))
+                return Err(Diagnostic::error(format!(
+                    "No match found for '{}' {}",
+                    value, witness
+                )))
             }
             Decision::Switch {
                 occurrence,
@@ -430,20 +439,31 @@ fn project(value: &Value, path: &AccessPath) -> Result<Value, Diagnostic> {
                     enum_member: Struct { fields, .. },
                     ..
                 }) => fields,
-                other => return Err(Diagnostic::error(format!("Expected a struct or enum, found '{}'", other))),
+                other => {
+                    return Err(Diagnostic::error(format!(
+                        "Expected a struct or enum, found '{}'",
+                        other
+                    )))
+                }
             };
 
             fields
                 .iter()
                 .find(|field| &field.identifier == name)
                 .map(|field| field.value.clone())
-                .ok_or(Diagnostic::error(format!("Field '{}' not found on '{}'", name, parent)))
+                .ok_or(Diagnostic::error(format!(
+                    "Field '{}' not found on '{}'",
+                    name, parent
+                )))
         }
         AccessPath::TupleIndex(parent, index) => {
             let parent = project(value, parent)?;
 
             let Value::Tuple(values) = &parent else {
-                return Err(Diagnostic::error(format!("Expected a tuple, found '{}'", parent)));
+                return Err(Diagnostic::error(format!(
+                    "Expected a tuple, found '{}'",
+                    parent
+                )));
             };
 
             values
@@ -521,7 +541,10 @@ fn test_matches(
     })
 }
 
-fn resolve_bound(bound: &CheckedBound, environment: &Rcrc<Environment>) -> Result<Value, Diagnostic> {
+fn resolve_bound(
+    bound: &CheckedBound,
+    environment: &Rcrc<Environment>,
+) -> Result<Value, Diagnostic> {
     Ok(match bound {
         CheckedBound::Int(v) => Value::Number(Number::Int(*v)),
         CheckedBound::UInt(v) => Value::Number(Number::UInt(*v)),
@@ -566,7 +589,10 @@ fn destructure_irrefutable(
         }
         PatternKind::Tuple(patterns) => {
             let Value::Tuple(values) = value else {
-                return Err(Diagnostic::error(format!("Expected a tuple, found '{}'", value)));
+                return Err(Diagnostic::error(format!(
+                    "Expected a tuple, found '{}'",
+                    value
+                )));
             };
 
             for (pattern, value) in patterns.iter().zip(values) {
@@ -601,7 +627,10 @@ fn destructure_irrefutable(
             Some(inner) => destructure_irrefutable(inner, value, bindings),
             None => Ok(()),
         },
-        _ => Err(Diagnostic::error(format!("Pattern '{}' is refutable", pattern))),
+        _ => Err(Diagnostic::error(format!(
+            "Pattern '{}' is refutable",
+            pattern
+        ))),
     }
 }
 
@@ -775,7 +804,10 @@ fn evaluate_member_access(
             }
             Member::Index { .. } => todo!("members on an indexed expression"),
         },
-        _ => Err(Diagnostic::error(format!("Cannot access member value: '{}'", value))),
+        _ => Err(Diagnostic::error(format!(
+            "Cannot access member value: '{}'",
+            value
+        ))),
     }
 }
 
@@ -804,7 +836,10 @@ fn evaluate_literal(
                         let values = evaluate_expression(expression, environment.clone())?;
 
                         let Value::Array(values) = values else {
-                            return Err(Diagnostic::error(format!("Expected to spread an array, but got {}", values)));
+                            return Err(Diagnostic::error(format!(
+                                "Expected to spread an array, but got {}",
+                                values
+                            )));
                         };
 
                         for value in values {
@@ -902,7 +937,10 @@ fn evaluate_call(
         environment,
     } = callee_value
     else {
-        return Err(Diagnostic::error(format!("Cannot call non-function value '{}'", callee_value)));
+        return Err(Diagnostic::error(format!(
+            "Cannot call non-function value '{}'",
+            callee_value
+        )));
     };
 
     let function_environment = Rc::new(RefCell::new(Environment::new_scope(
@@ -927,7 +965,9 @@ fn evaluate_call(
         match v {
             Some(v) => {
                 if type_ == Type::Void {
-                    return Err(Diagnostic::error("Cannot return a value from a void function"));
+                    return Err(Diagnostic::error(
+                        "Cannot return a value from a void function",
+                    ));
                 }
 
                 value = v.clone();
@@ -1117,7 +1157,12 @@ fn evaluate_while(
                     break;
                 }
             }
-            _ => return Err(Diagnostic::error(format!("While condition must be boolean '{}'", value))),
+            _ => {
+                return Err(Diagnostic::error(format!(
+                    "While condition must be boolean '{}'",
+                    value
+                )))
+            }
         }
 
         evaluate_expression(*body.clone(), while_environment.clone())?;
@@ -1166,7 +1211,12 @@ fn evaluate_for(
     let value = evaluate_expression(*iterable.clone(), for_environment.clone())?;
     let array = match value {
         Value::Array(array) => array,
-        _ => return Err(Diagnostic::error(format!("For iterable must be an array '{}'", value))),
+        _ => {
+            return Err(Diagnostic::error(format!(
+                "For iterable must be an array '{}'",
+                value
+            )))
+        }
     };
 
     if array.is_empty() {
@@ -1360,7 +1410,10 @@ fn evaluate_index(
             };
 
             let Value::Array(values) = object_value else {
-                return Err(Diagnostic::error(format!("Cannot index non-array value '{}'", object_value)));
+                return Err(Diagnostic::error(format!(
+                    "Cannot index non-array value '{}'",
+                    object_value
+                )));
             };
 
             let value = values
@@ -1385,7 +1438,10 @@ fn evaluate_index(
 
             // slice array allowing for start and/or end to be None
             let Value::Array(values) = object_value else {
-                return Err(Diagnostic::error(format!("Cannot index non-array value '{}'", object_value)));
+                return Err(Diagnostic::error(format!(
+                    "Cannot index non-array value '{}'",
+                    object_value
+                )));
             };
 
             let start_index = match start_value {

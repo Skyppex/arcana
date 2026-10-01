@@ -1,6 +1,6 @@
 use shared::ast::PatternKind;
+use shared::type_checker::Purity;
 mod common;
-
 
 use common::{
     create_env, create_typed_ast, evaluate_expression, try_create_typed_ast, StatementExt,
@@ -287,6 +287,7 @@ fn variable_declaration_function_type_is_used_to_infer_closure_parameter_types()
     assert_eq!(
         initializer.get_type(),
         Type::Function(shared::type_checker::Function {
+            purity: Purity::Pure,
             identifier: None,
             param: Some(shared::type_checker::Parameter {
                 // The closure names this one; the nested ones fall back to the
@@ -295,18 +296,21 @@ fn variable_declaration_function_type_is_used_to_infer_closure_parameter_types()
                 type_: Box::new(Type::Int)
             }),
             return_type: Box::new(Type::Function(shared::type_checker::Function {
+            purity: Purity::Pure,
                 identifier: None,
                 param: Some(shared::type_checker::Parameter {
                     identifier: "Float".to_string(),
                     type_: Box::new(Type::Float)
                 }),
                 return_type: Box::new(Type::Function(shared::type_checker::Function {
+            purity: Purity::Pure,
                     identifier: None,
                     param: Some(shared::type_checker::Parameter {
                         identifier: "String".to_string(),
                         type_: Box::new(Type::String)
                     }),
                     return_type: Box::new(Type::Function(shared::type_checker::Function {
+            purity: Purity::Pure,
                         identifier: None,
                         param: Some(shared::type_checker::Parameter {
                             identifier: "UInt".to_string(),

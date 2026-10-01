@@ -1,4 +1,5 @@
 use common::{create_typed_ast, StatementExt, VecStatementExt};
+use shared::type_checker::Purity;
 use shared::{
     type_checker::{
         model::{Typed, TypedStatement},
@@ -41,6 +42,7 @@ pub fn function_declaration_has_correct_type() {
     assert_eq!(
         statement.get_type(),
         Type::Function(Function {
+            purity: Purity::Pure,
             identifier: Some(TypeIdentifier::Type("foo".to_string())),
             param: None,
             return_type: Box::new(Type::Void),
@@ -62,6 +64,7 @@ pub fn function_declaration_has_correct_type_with_param_and_return() {
     assert_eq!(
         statement.get_type(),
         Type::Function(Function {
+            purity: Purity::Pure,
             identifier: Some(TypeIdentifier::Type("foo".to_string())),
             param: Some(Parameter {
                 identifier: "x".to_string(),
@@ -86,12 +89,14 @@ pub fn function_declaration_with_two_params_has_correct_type() {
     assert_eq!(
         statement.get_type(),
         Type::Function(Function {
+            purity: Purity::Pure,
             identifier: Some(TypeIdentifier::Type("foo".to_string())),
             param: Some(Parameter {
                 identifier: "x".to_string(),
                 type_: Box::new(Type::Int),
             }),
             return_type: Box::new(Type::Function(Function {
+            purity: Purity::Pure,
                 identifier: None,
                 param: Some(Parameter {
                     identifier: "Int".to_string(),
@@ -118,18 +123,21 @@ pub fn function_declaration_with_multiple_params_has_correct_type() {
     assert_eq!(
         statement.get_type(),
         Type::Function(Function {
+            purity: Purity::Pure,
             identifier: Some(TypeIdentifier::Type("foo".to_string())),
             param: Some(Parameter {
                 identifier: "x".to_string(),
                 type_: Box::new(Type::Int),
             }),
             return_type: Box::new(Type::Function(Function {
+            purity: Purity::Pure,
                 identifier: None,
                 param: Some(Parameter {
                     identifier: "Int".to_string(),
                     type_: Box::new(Type::Int),
                 }),
                 return_type: Box::new(Type::Function(Function {
+            purity: Purity::Pure,
                     identifier: None,
                     param: Some(Parameter {
                         identifier: "Int".to_string(),

@@ -1,3 +1,4 @@
+use crate::type_checker::Purity;
 use crate::diagnostic::Diagnostic;
 use std::{
     cell::RefCell,
@@ -189,7 +190,10 @@ impl TypeEnvironment {
 
     pub fn activate_scope(&mut self, scope_type: ScopeType, type_: Type) -> Result<(), Diagnostic> {
         if !self.has_scope(&scope_type) {
-            return Err(Diagnostic::error(format!("Scope '{:?}' not found", scope_type)));
+            return Err(Diagnostic::error(format!(
+                "Scope '{:?}' not found",
+                scope_type
+            )));
         }
 
         match self.scopes.iter_mut().find(|s| s.scope_type == scope_type) {
@@ -240,7 +244,10 @@ impl TypeEnvironment {
 
     pub fn add_type(&mut self, type_: Type) -> Result<(), Diagnostic> {
         if !self.allow_override_types && self.types.contains_key(&type_.to_key()) {
-            return Err(Diagnostic::error(format!("Type {} already exists", type_.full_name())));
+            return Err(Diagnostic::error(format!(
+                "Type {} already exists",
+                type_.full_name()
+            )));
         }
 
         self.types.insert(type_.to_key(), type_);
@@ -641,7 +648,10 @@ impl TypeEnvironment {
             .unwrap_or_default()
     }
 
-    pub fn add_generic_constraint(&mut self, constraint: &GenericConstraint) -> Result<(), Diagnostic> {
+    pub fn add_generic_constraint(
+        &mut self,
+        constraint: &GenericConstraint,
+    ) -> Result<(), Diagnostic> {
         let GenericConstraint {
             generic: GenericType { type_name },
             constraints,
@@ -767,6 +777,10 @@ impl TypeEnvironment {
                     .transpose()?;
 
                 Ok(Type::Function(super::Function {
+                    // Built from a signature alone, with no body to look
+                    // at, so nothing can be concluded. Impure is the safe
+                    // answer: it only costs optimisation.
+                    purity: Purity::Impure,
                     identifier: None,
                     param: param_type.map(|pt| Parameter {
                         identifier: pt.full_name(),
@@ -1090,7 +1104,9 @@ fn substitute_self(type_: &Type, self_type: &Type) -> Type {
             identifier,
             param,
             return_type,
+            purity,
         }) => Type::Function(Function {
+            purity: *purity,
             identifier: identifier.clone(),
             param: param.as_ref().map(|param| Parameter {
                 identifier: param.identifier.clone(),
@@ -1176,7 +1192,9 @@ fn substitute_generic(type_: &Type, name: &str, replacement: &Type) -> Type {
             identifier,
             param,
             return_type,
+            purity,
         }) => Type::Function(Function {
+            purity: *purity,
             identifier: identifier.clone(),
             param: param.as_ref().map(|param| Parameter {
                 identifier: param.identifier.clone(),

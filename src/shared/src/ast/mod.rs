@@ -47,6 +47,7 @@ pub fn fat_arrow_expr_or_block_expr(
         _ => Err(Diagnostic::error(format!(
             "Expected => or {{ but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span)),
+        ))
+        .at(cursor.first().span)),
     }
 }

@@ -482,7 +482,10 @@ fn walk_variant_path(
     let enum_annotation_of_type = TypeAnnotation::from(&enum_.type_identifier);
 
     let Some((variant, rest)) = path.split_first() else {
-        return Err(Diagnostic::error(format!("Pattern `{}` names no variant", pattern)));
+        return Err(Diagnostic::error(format!(
+            "Pattern `{}` names no variant",
+            pattern
+        )));
     };
 
     let Some(member_type) = get_enum_member(&enum_.members, &enum_.type_identifier, variant) else {
@@ -569,7 +572,10 @@ fn check_bound(
         Bound::Rune(v) => (CheckedBound::Rune(*v), Type::Rune),
         Bound::Variable(identifier) => {
             let Some(variable_type) = type_environment.borrow().get_variable(identifier) else {
-                return Err(Diagnostic::error(format!("Variable `{}` not found", identifier)));
+                return Err(Diagnostic::error(format!(
+                    "Variable `{}` not found",
+                    identifier
+                )));
             };
 
             (

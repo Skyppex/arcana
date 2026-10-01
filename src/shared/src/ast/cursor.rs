@@ -78,7 +78,10 @@ impl Cursor {
     }
 
     pub(crate) fn first_no_skip(&self) -> Token {
-        self.tokens.clone().pop().unwrap_or(self.end_of_file.clone())
+        self.tokens
+            .clone()
+            .pop()
+            .unwrap_or(self.end_of_file.clone())
     }
 
     pub(crate) fn second(&self) -> Token {
@@ -164,7 +167,10 @@ impl Cursor {
         }
     }
 
-    pub(crate) fn optional_bump(&mut self, optional: TokenKind) -> Result<Option<Token>, Diagnostic> {
+    pub(crate) fn optional_bump(
+        &mut self,
+        optional: TokenKind,
+    ) -> Result<Option<Token>, Diagnostic> {
         loop {
             if matches!(
                 self.first_no_skip().kind,

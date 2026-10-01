@@ -169,10 +169,7 @@ mod tests {
     /// still has to render.
     #[test]
     fn clamps_an_offset_past_the_end() {
-        assert_eq!(
-            file("ab").location(999),
-            Location { line: 1, column: 3 }
-        );
+        assert_eq!(file("ab").location(999), Location { line: 1, column: 3 });
     }
 
     #[test]

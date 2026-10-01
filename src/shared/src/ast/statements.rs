@@ -1,5 +1,5 @@
-use crate::ast::StatementKind;
 use crate::ast::ExpressionKind;
+use crate::ast::StatementKind;
 use crate::diagnostic::{Diagnostic, Span};
 use crate::{
     ast::Use,
@@ -12,10 +12,10 @@ use crate::{
 
 use super::{
     cursor::Cursor, expressions, fat_arrow_expr_or_block_expr, AccessModifier, AssociatedType,
-    Closure, EmbeddedStruct, EnumData, EnumDeclaration, EnumVariant, Expression, FunctionDeclaration,
-    ImplementationDeclaration, ModPath, ModuleDeclaration, Parameter, ProtocolDeclaration,
-    Statement, StructData, StructDeclaration, StructField, TypeAliasDeclaration, UnionDeclaration,
-    UseItem, ValueLiteral,
+    Closure, EmbeddedStruct, EnumData, EnumDeclaration, EnumVariant, Expression,
+    FunctionDeclaration, ImplementationDeclaration, ModPath, ModuleDeclaration, Parameter,
+    ProtocolDeclaration, Statement, StructData, StructDeclaration, StructField,
+    TypeAliasDeclaration, UnionDeclaration, UseItem, ValueLiteral,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -48,7 +48,8 @@ pub fn parse_module(
         return Err(Diagnostic::error(format!(
             "Expected identifier but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     };
 
     cursor.bump()?; // Consume the identifier
@@ -64,7 +65,8 @@ pub fn parse_module(
             return Err(Diagnostic::error(format!(
                 "Expected identifier but found {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         cursor.bump()?; // Consume the identifier
@@ -84,7 +86,10 @@ pub fn parse_module(
     )))
 }
 
-pub fn parse_file(cursor: &mut Cursor, context: &ParseContext) -> Result<Vec<Statement>, Diagnostic> {
+pub fn parse_file(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Vec<Statement>, Diagnostic> {
     parse_mod_statement(cursor, context)
 }
 
@@ -120,7 +125,8 @@ fn parse_mod_statement(
         return Err(Diagnostic::error(format!(
             "Expected identifier but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     };
 
     cursor.bump()?; // Consume the identifier
@@ -136,7 +142,8 @@ fn parse_mod_statement(
             return Err(Diagnostic::error(format!(
                 "Expected identifier but found {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         cursor.bump()?; // Consume the identifier
@@ -171,7 +178,10 @@ pub fn parse_statements(
     Ok(statements)
 }
 
-pub fn parse_statement(cursor: &mut Cursor, context: &ParseContext) -> Result<Statement, Diagnostic> {
+pub fn parse_statement(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Statement, Diagnostic> {
     let start = cursor.span();
     match parse_use(cursor, context) {
         Ok(s) => {
@@ -221,7 +231,11 @@ fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, Diagnostic> {
 
             while cursor.first().kind != TokenKind::CloseBrace {
                 if !has_comma {
-                    return Err(Diagnostic::error(format!("Expected , but found {:?}", cursor.first().kind)).at(cursor.first().span));
+                    return Err(Diagnostic::error(format!(
+                        "Expected , but found {:?}",
+                        cursor.first().kind
+                    ))
+                    .at(cursor.first().span));
                 }
 
                 has_comma = true;
@@ -241,7 +255,8 @@ fn parse_use_item(cursor: &mut Cursor) -> Result<UseItem, Diagnostic> {
         _ => Err(Diagnostic::error(format!(
             "Expected identifier or {{ but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span)),
+        ))
+        .at(cursor.first().span)),
     }
 }
 
@@ -272,13 +287,19 @@ fn parse_function_declaration_statement(
     type_identifier.validate_function_identifier()?;
 
     let TokenKind::OpenParen = cursor.bump()?.kind else {
-        return Err(Diagnostic::error(format!("Expected ( but found {:?}", cursor.first().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected ( but found {:?}", cursor.first().kind))
+                .at(cursor.first().span),
+        );
     };
 
     let params = parse_parameters(cursor)?;
 
     let TokenKind::CloseParen = cursor.bump()?.kind else {
-        return Err(Diagnostic::error(format!("Expected ) but found {:?}", cursor.first().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected ) but found {:?}", cursor.first().kind))
+                .at(cursor.first().span),
+        );
     };
 
     let mut return_type_annotation = None;
@@ -290,7 +311,8 @@ fn parse_function_declaration_statement(
             return Err(Diagnostic::error(format!(
                 "Expected type annotation but found {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         }
 
         return_type_annotation = Some(parse_type_annotation(cursor, true)?);
@@ -312,7 +334,8 @@ fn parse_function_declaration_statement(
             body: None,
             signature_only: true,
             where_clause,
-        }).at(cursor.span_from(start)));
+        })
+        .at(cursor.span_from(start)));
     }
 
     let body = fat_arrow_expr_or_block_expr(cursor, context)?;
@@ -362,7 +385,6 @@ fn unwrap_parameters(
     where_clause: Vec<GenericConstraint>,
     span: Span,
 ) -> Result<Statement, Diagnostic> {
-
     match params.first().cloned() {
         None => Ok(StatementKind::FunctionDeclaration(FunctionDeclaration {
             access_modifier,
@@ -372,7 +394,8 @@ fn unwrap_parameters(
             body: Some(body),
             signature_only: false,
             where_clause,
-        }).at(span)),
+        })
+        .at(span)),
         Some(first) => {
             let (new_body, new_return_type_annotation) = unwrap_parameters_recurse(
                 params.into_iter().skip(1).collect(),
@@ -389,7 +412,8 @@ fn unwrap_parameters(
                 body: Some(new_body),
                 signature_only: false,
                 where_clause,
-            }).at(span))
+            })
+            .at(span))
         }
     }
 }
@@ -463,7 +487,8 @@ fn parse_struct_declaration_statement(
                 fields: vec![],
             },
             where_clause,
-        }).at(cursor.span_from(start)));
+        })
+        .at(cursor.span_from(start)));
     };
 
     cursor.bump()?; // Consume the {
@@ -476,7 +501,8 @@ fn parse_struct_declaration_statement(
         access_modifier,
         body,
         where_clause,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 fn parse_struct(
@@ -491,7 +517,11 @@ fn parse_struct(
 
     while cursor.first().kind != TokenKind::CloseBrace {
         if !has_comma {
-            return Err(Diagnostic::error(format!("Expected , but found {:?}", cursor.first().kind)).at(cursor.first().span));
+            return Err(Diagnostic::error(format!(
+                "Expected , but found {:?}",
+                cursor.first().kind
+            ))
+            .at(cursor.first().span));
         }
 
         has_comma = true;
@@ -550,11 +580,15 @@ fn parse_enum_declaration_statement(
             shared_fields: vec![],
             members: vec![],
             where_clause,
-        }).at(cursor.span_from(start)));
+        })
+        .at(cursor.span_from(start)));
     }
 
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
-        return Err(Diagnostic::error(format!("Expected {{ but found {:?}", cursor.first().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected {{ but found {:?}", cursor.first().kind))
+                .at(cursor.first().span),
+        );
     };
 
     let (shared_fields, members) = parse_enum_body(cursor, context)?;
@@ -567,7 +601,8 @@ fn parse_enum_declaration_statement(
         shared_fields,
         members,
         where_clause,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 /// Parses the inside of an enum's braces, up to but not including the closing
@@ -586,7 +621,11 @@ fn parse_enum_body(
 
     while cursor.first().kind != TokenKind::CloseBrace {
         if !has_comma {
-            return Err(Diagnostic::error(format!("Expected , but found {:?}", cursor.first().kind)).at(cursor.first().span));
+            return Err(Diagnostic::error(format!(
+                "Expected , but found {:?}",
+                cursor.first().kind
+            ))
+            .at(cursor.first().span));
         }
 
         has_comma = true;
@@ -630,7 +669,8 @@ fn parse_enum_variant(
         return Err(Diagnostic::error(format!(
             "Expected variant name but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     };
 
     identifier.validate_type_identifier_name()?;
@@ -651,7 +691,8 @@ fn parse_enum_variant(
             return Err(Diagnostic::error(format!(
                 "Nested enum '{}' cannot have a where clause; put the bounds on the enclosing enum",
                 identifier
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         }
 
         let TokenKind::OpenBrace = cursor.first().kind else {
@@ -659,7 +700,8 @@ fn parse_enum_variant(
                 "Expected {{ after nested enum '{}' but found {:?}",
                 identifier,
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         cursor.expect(TokenKind::OpenBrace)?; // Consume the {
@@ -714,13 +756,17 @@ fn parse_union_declaration_statement(
         return Err(Diagnostic::error(format!(
             "Expected identifier but found {:?}",
             cursor.prev().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     };
 
     type_name.validate_type_identifier_name()?;
 
     let TokenKind::OpenBrace = cursor.bump()?.kind else {
-        return Err(Diagnostic::error(format!("Expected {{ but found {:?}", cursor.prev().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected {{ but found {:?}", cursor.prev().kind))
+                .at(cursor.first().span),
+        );
     };
 
     let mut literals = vec![];
@@ -728,7 +774,11 @@ fn parse_union_declaration_statement(
 
     while cursor.first().kind != TokenKind::CloseBrace {
         if !has_comma {
-            return Err(Diagnostic::error(format!("Expected , but found {:?}", cursor.first().kind)).at(cursor.first().span));
+            return Err(Diagnostic::error(format!(
+                "Expected , but found {:?}",
+                cursor.first().kind
+            ))
+            .at(cursor.first().span));
         }
 
         has_comma = true;
@@ -755,7 +805,8 @@ fn parse_union_declaration_statement(
         access_modifier,
         type_identifier: TypeIdentifier::Type(type_name),
         literals: literals?,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 fn parse_type_alias_declaration(
@@ -784,7 +835,10 @@ fn parse_type_alias_declaration(
     type_identifier.name().validate_type_identifier_name()?;
 
     let TokenKind::Equal = cursor.bump()?.kind else {
-        return Err(Diagnostic::error(format!("Expected = but found {:?}", cursor.first().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected = but found {:?}", cursor.first().kind))
+                .at(cursor.first().span),
+        );
     };
 
     let mut type_annotations = vec![parse_type_annotation(cursor, false)?];
@@ -801,7 +855,8 @@ fn parse_type_alias_declaration(
         access_modifier,
         type_identifier,
         type_annotations,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 fn parse_protocol_declaration(
@@ -838,7 +893,8 @@ fn parse_protocol_declaration(
             type_identifier,
             associated_types: vec![],
             functions: vec![],
-        }).at(cursor.span_from(start)));
+        })
+        .at(cursor.span_from(start)));
     }
 
     cursor.expect(TokenKind::OpenBrace)?;
@@ -859,7 +915,8 @@ fn parse_protocol_declaration(
                 return Err(Diagnostic::error(format!(
                     "Expected type identifier but found {:?}",
                     cursor.first().kind
-                )).at(cursor.first().span));
+                ))
+                .at(cursor.first().span));
             }
 
             let type_annotation = parse_type_annotation(cursor, false)?;
@@ -891,7 +948,8 @@ fn parse_protocol_declaration(
             return Err(Diagnostic::error(format!(
                 "Expected function declaration but found {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         functions.push(function);
@@ -904,7 +962,8 @@ fn parse_protocol_declaration(
         type_identifier,
         associated_types,
         functions,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 fn parse_implementation_declaration(
@@ -929,7 +988,10 @@ fn parse_implementation_declaration(
     protocol_annotation.name().validate_type_identifier_name()?;
 
     let TokenKind::Keyword(Keyword::For) = cursor.bump()?.kind else {
-        return Err(Diagnostic::error(format!("Expected for but found {:?}", cursor.first().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected for but found {:?}", cursor.first().kind))
+                .at(cursor.first().span),
+        );
     };
 
     let type_annotation = parse_type_annotation(cursor, false)?;
@@ -942,16 +1004,17 @@ fn parse_implementation_declaration(
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
 
-        return Ok(StatementKind::ImplementationDeclaration(
-            ImplementationDeclaration {
+        return Ok(
+            StatementKind::ImplementationDeclaration(ImplementationDeclaration {
                 scoped_generics,
                 protocol_annotation,
                 type_annotation,
                 associated_types: vec![],
                 functions: vec![],
                 where_clause,
-            },
-        ).at(cursor.span_from(start)));
+            })
+            .at(cursor.span_from(start)),
+        );
     }
 
     cursor.expect(TokenKind::OpenBrace)?;
@@ -972,7 +1035,8 @@ fn parse_implementation_declaration(
                 return Err(Diagnostic::error(format!(
                     "Expected type identifier but found {:?}",
                     cursor.first().kind
-                )).at(cursor.first().span));
+                ))
+                .at(cursor.first().span));
             }
 
             let type_annotation = parse_type_annotation(cursor, false)?;
@@ -1004,7 +1068,8 @@ fn parse_implementation_declaration(
             return Err(Diagnostic::error(format!(
                 "Expected function declaration but found {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         functions.push(function);
@@ -1013,25 +1078,32 @@ fn parse_implementation_declaration(
     cursor.optional_bump(TokenKind::Semicolon)?;
     cursor.expect(TokenKind::CloseBrace)?;
 
-    Ok(StatementKind::ImplementationDeclaration(
-        ImplementationDeclaration {
+    Ok(
+        StatementKind::ImplementationDeclaration(ImplementationDeclaration {
             scoped_generics,
             protocol_annotation,
             type_annotation,
             associated_types,
             functions,
             where_clause,
-        },
-    ).at(cursor.span_from(start)))
+        })
+        .at(cursor.span_from(start)),
+    )
 }
 
-fn parse_expression_map(cursor: &mut Cursor, context: &ParseContext) -> Result<Statement, Diagnostic> {
+fn parse_expression_map(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Statement, Diagnostic> {
     let start = cursor.span();
     match expressions::parse_expression(cursor, context) {
         Ok(e) => {
             if let TokenKind::Semicolon = cursor.first().kind {
                 cursor.bump()?; // Consume the ;
-                return Ok(StatementKind::Semi(Box::new(StatementKind::Expression(e).at(cursor.span_from(start)))).at(cursor.span_from(start)));
+                return Ok(StatementKind::Semi(Box::new(
+                    StatementKind::Expression(e).at(cursor.span_from(start)),
+                ))
+                .at(cursor.span_from(start)));
             }
 
             Ok(StatementKind::Expression(e).at(cursor.span_from(start)))
@@ -1047,7 +1119,11 @@ fn parse_parameters(cursor: &mut Cursor) -> Result<Vec<Parameter>, Diagnostic> {
 
     while cursor.first().kind != TokenKind::CloseParen {
         if !has_comma {
-            return Err(Diagnostic::error(format!("Expected , but found {:?}", cursor.first().kind)).at(cursor.first().span));
+            return Err(Diagnostic::error(format!(
+                "Expected , but found {:?}",
+                cursor.first().kind
+            ))
+            .at(cursor.first().span));
         }
 
         has_comma = true;
@@ -1068,20 +1144,25 @@ fn parse_parameter(cursor: &mut Cursor) -> Result<Parameter, Diagnostic> {
         return Err(Diagnostic::error(format!(
             "Expected identifier but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     };
 
     identifier.validate_variable_identifier_name()?;
 
     let TokenKind::Colon = cursor.bump()?.kind else {
-        return Err(Diagnostic::error(format!("Expected : but found {:?}", cursor.first().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected : but found {:?}", cursor.first().kind))
+                .at(cursor.first().span),
+        );
     };
 
     if !can_be_type_annotation(cursor) {
         return Err(Diagnostic::error(format!(
             "Expected type identifier but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     }
 
     let type_annotation = parse_type_annotation(cursor, false)?;
@@ -1103,7 +1184,8 @@ fn parse_struct_field(
             return Err(Diagnostic::error(format!(
                 "Unexpected access modifier {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         }
 
         cursor.bump()?; // Consume the access modifier
@@ -1114,7 +1196,8 @@ fn parse_struct_field(
         return Err(Diagnostic::error(format!(
             "Expected identifier but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     };
 
     cursor.bump()?; // Consume the identifier
@@ -1122,7 +1205,10 @@ fn parse_struct_field(
     identifier.validate_variable_identifier_name()?;
 
     let TokenKind::Colon = cursor.bump()?.kind else {
-        return Err(Diagnostic::error(format!("Expected : but found {:?}", cursor.first().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected : but found {:?}", cursor.first().kind))
+                .at(cursor.first().span),
+        );
     };
 
     let mutable = match cursor.first().kind {
@@ -1137,7 +1223,8 @@ fn parse_struct_field(
         return Err(Diagnostic::error(format!(
             "Expected type identifier but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     }
 
     let type_annotation = parse_type_annotation(cursor, false)?;
@@ -1168,7 +1255,8 @@ fn parse_embedded_structs(
                     return Err(Diagnostic::error(format!(
                         "Expected type annotation for a struct but found {:?}",
                         type_annotation
-                    )).at(cursor.first().span));
+                    ))
+                    .at(cursor.first().span));
                 }
 
                 let field_initializers = if cursor.first().kind == TokenKind::OpenBrace {
@@ -1216,7 +1304,8 @@ fn parse_where_clause(cursor: &mut Cursor) -> Result<Vec<GenericConstraint>, Dia
             return Err(Diagnostic::error(format!(
                 "Expected a type parameter but found {:?}",
                 cursor.prev().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         cursor.expect(TokenKind::Keyword(Keyword::Is))?;

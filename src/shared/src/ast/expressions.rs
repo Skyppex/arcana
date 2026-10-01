@@ -16,7 +16,10 @@ use super::{
 
 use crate::types::parse_type_annotation;
 
-pub fn parse_expression(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, Diagnostic> {
+pub fn parse_expression(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, Diagnostic> {
     parse_break(cursor, context)
 }
 
@@ -66,7 +69,10 @@ fn parse_return(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressio
     Ok(ExpressionKind::Return(expression.map(Box::new)).at(cursor.span_from(start)))
 }
 
-fn parse_use_expression(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, Diagnostic> {
+fn parse_use_expression(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, Diagnostic> {
     let start = cursor.span();
     let TokenKind::Keyword(Keyword::Use) = cursor.first().kind else {
         return parse_trailing_closure(cursor, context);
@@ -81,7 +87,8 @@ fn parse_use_expression(cursor: &mut Cursor, context: &ParseContext) -> Result<E
     Ok(ExpressionKind::Use(UseExpr {
         args,
         expr: Box::new(expr),
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 fn parse_trailing_closure(
@@ -116,12 +123,16 @@ fn parse_trailing_closure(
         let Some(params) = params else {
             expression = ExpressionKind::Call(Call {
                 callee: Box::new(expression),
-                argument: Some(Box::new(ExpressionKind::Closure(Closure {
-                    param: None,
-                    return_type_annotation,
-                    body: Box::new(body),
-                }).at(cursor.span_from(start)))),
-            }).at(cursor.span_from(start));
+                argument: Some(Box::new(
+                    ExpressionKind::Closure(Closure {
+                        param: None,
+                        return_type_annotation,
+                        body: Box::new(body),
+                    })
+                    .at(cursor.span_from(start)),
+                )),
+            })
+            .at(cursor.span_from(start));
             continue;
         };
 
@@ -133,7 +144,8 @@ fn parse_trailing_closure(
                 body,
                 cursor.span_from(start),
             )?)),
-        }).at(cursor.span_from(start));
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(expression)
@@ -169,7 +181,8 @@ pub fn parse_while(cursor: &mut Cursor, context: &ParseContext) -> Result<Expres
             condition: Box::new(condition),
             body: Box::new(body),
             else_body: None,
-        }).at(cursor.span_from(start)));
+        })
+        .at(cursor.span_from(start)));
     }
 
     cursor.bump()?; // Consume the else
@@ -180,7 +193,8 @@ pub fn parse_while(cursor: &mut Cursor, context: &ParseContext) -> Result<Expres
         condition: Box::new(condition),
         body: Box::new(body),
         else_body: Some(Box::new(else_body)),
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 pub fn parse_for(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, Diagnostic> {
@@ -204,7 +218,8 @@ pub fn parse_for(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
             iterable: Box::new(iterable),
             body: Box::new(body),
             else_body: None,
-        }).at(cursor.span_from(start)));
+        })
+        .at(cursor.span_from(start)));
     }
 
     cursor.bump()?; // Consume the else
@@ -216,10 +231,14 @@ pub fn parse_for(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
         iterable: Box::new(iterable),
         body: Box::new(body),
         else_body: Some(Box::new(else_block)),
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
-fn parse_type_literal(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, Diagnostic> {
+fn parse_type_literal(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, Diagnostic> {
     let start = cursor.span();
 
     let TokenKind::Identifier(identifier) = cursor.first().kind else {
@@ -288,7 +307,8 @@ fn parse_struct_literal(
         return Ok(ExpressionKind::Literal(ValueLiteral::Struct {
             type_annotation,
             field_initializers: vec![],
-        }).at(cursor.span_from(start)));
+        })
+        .at(cursor.span_from(start)));
     }
 
     cursor.bump()?; // Consume the {
@@ -298,7 +318,8 @@ fn parse_struct_literal(
     Ok(ExpressionKind::Literal(ValueLiteral::Struct {
         type_annotation,
         field_initializers,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 pub fn parse_field_initializers(
@@ -310,7 +331,11 @@ pub fn parse_field_initializers(
 
     while cursor.first().kind != TokenKind::CloseBrace {
         if !has_comma {
-            return Err(Diagnostic::error(format!("Expected , but found {:?}", cursor.first().kind)).at(cursor.first().span));
+            return Err(Diagnostic::error(format!(
+                "Expected , but found {:?}",
+                cursor.first().kind
+            ))
+            .at(cursor.first().span));
         }
 
         has_comma = true;
@@ -334,11 +359,15 @@ fn parse_field_initializer(
         return Err(Diagnostic::error(format!(
             "Expected identifier but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     };
 
     let TokenKind::Colon = cursor.second().kind else {
-        return Err(Diagnostic::error(format!("Expected : but found {:?}", cursor.first().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected : but found {:?}", cursor.first().kind))
+                .at(cursor.first().span),
+        );
     };
 
     cursor.bump()?; // Consume the identifier
@@ -368,7 +397,8 @@ fn parse_enum_literal(
                 .unwrap()
                 .to_string(),
             field_initializers: vec![],
-        }).at(cursor.span_from(start)));
+        })
+        .at(cursor.span_from(start)));
     }
 
     cursor.expect(TokenKind::OpenBrace)?;
@@ -384,7 +414,8 @@ fn parse_enum_literal(
             .unwrap()
             .to_string(),
         field_initializers,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 fn parse_range(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, Diagnostic> {
@@ -414,7 +445,8 @@ fn parse_range(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression
                 (TokenKind::DoubleDot, true) => BinaryOperator::RangeInclusive,
                 _ => unreachable!("Expected .. but found {:?}", operator),
             },
-        }).at(cursor.span_from(start));
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(expression)
@@ -429,13 +461,17 @@ fn parse_assignment(cursor: &mut Cursor, context: &ParseContext) -> Result<Expre
         let initializer = parse_expression(cursor, context)?;
 
         let ExpressionKind::Member(member) = expression.kind else {
-            return Err(Diagnostic::error(format!("Expected member but found {:?}", expression)).at(cursor.first().span));
+            return Err(
+                Diagnostic::error(format!("Expected member but found {:?}", expression))
+                    .at(cursor.first().span),
+            );
         };
 
         expression = ExpressionKind::Assignment(Assignment {
             member: Box::new(member),
             initializer: Box::new(initializer),
-        }).at(cursor.span_from(start));
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(expression)
@@ -463,30 +499,37 @@ fn parse_compound_assignment(
         let initializer = parse_expression(cursor, context)?;
 
         let ExpressionKind::Member(ref member) = expression.kind else {
-            return Err(Diagnostic::error(format!("Expected member but found {:?}", expression)).at(cursor.first().span));
+            return Err(
+                Diagnostic::error(format!("Expected member but found {:?}", expression))
+                    .at(cursor.first().span),
+            );
         };
 
         expression = ExpressionKind::Assignment(Assignment {
             member: Box::new(member.clone()),
-            initializer: Box::new(ExpressionKind::Binary(Binary {
-                left: Box::new(expression),
-                right: Box::new(initializer),
-                operator: match operator {
-                    TokenKind::PlusEqual => BinaryOperator::Add,
-                    TokenKind::MinusEqual => BinaryOperator::Subtract,
-                    TokenKind::StarEqual => BinaryOperator::Multiply,
-                    TokenKind::SlashEqual => BinaryOperator::Divide,
-                    TokenKind::PercentEqual => BinaryOperator::Modulo,
-                    TokenKind::AmpersandEqual => BinaryOperator::BitwiseAnd,
-                    TokenKind::PipeEqual => BinaryOperator::BitwiseOr,
-                    TokenKind::CaretEqual => BinaryOperator::BitwiseXor,
-                    _ => unreachable!(
-                        "Expected +=, -=, *=, /=, %=, &=, |=, or ^=, but found {:?}",
-                        operator
-                    ),
-                },
-            }).at(cursor.span_from(start))),
-        }).at(cursor.span_from(start));
+            initializer: Box::new(
+                ExpressionKind::Binary(Binary {
+                    left: Box::new(expression),
+                    right: Box::new(initializer),
+                    operator: match operator {
+                        TokenKind::PlusEqual => BinaryOperator::Add,
+                        TokenKind::MinusEqual => BinaryOperator::Subtract,
+                        TokenKind::StarEqual => BinaryOperator::Multiply,
+                        TokenKind::SlashEqual => BinaryOperator::Divide,
+                        TokenKind::PercentEqual => BinaryOperator::Modulo,
+                        TokenKind::AmpersandEqual => BinaryOperator::BitwiseAnd,
+                        TokenKind::PipeEqual => BinaryOperator::BitwiseOr,
+                        TokenKind::CaretEqual => BinaryOperator::BitwiseXor,
+                        _ => unreachable!(
+                            "Expected +=, -=, *=, /=, %=, &=, |=, or ^=, but found {:?}",
+                            operator
+                        ),
+                    },
+                })
+                .at(cursor.span_from(start)),
+            ),
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(expression)
@@ -510,7 +553,12 @@ fn parse_closure(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
 
     let body = parse_expression(cursor, context)?;
 
-    unwrap_arguments(params, return_type_annotation, body, cursor.span_from(start))
+    unwrap_arguments(
+        params,
+        return_type_annotation,
+        body,
+        cursor.span_from(start),
+    )
 }
 
 fn parse_comma_separated_closure_params(
@@ -523,7 +571,8 @@ fn parse_comma_separated_closure_params(
             return Err(Diagnostic::error(format!(
                 "Expected identifier but found {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         cursor.bump()?; // Consume the identifier
@@ -558,7 +607,8 @@ fn unwrap_arguments(
             param: None,
             return_type_annotation,
             body: Box::new(body),
-        }).at(span)),
+        })
+        .at(span)),
         Some(first) => {
             let (new_body, new_return_type_annotation) = unwrap_arguments_recurse(
                 params.into_iter().skip(1).collect(),
@@ -571,7 +621,8 @@ fn unwrap_arguments(
                 param: Some(first),
                 return_type_annotation: new_return_type_annotation,
                 body: Box::new(new_body),
-            }).at(span))
+            })
+            .at(span))
         }
     }
 }
@@ -641,7 +692,8 @@ fn parse_match(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression
     Ok(ExpressionKind::Match(Match {
         expression: Box::new(expression),
         arms,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 fn parse_boolean_logical(
@@ -671,7 +723,8 @@ fn parse_boolean_logical(
                 TokenKind::Pipe => BinaryOperator::LogicalOr,
                 _ => unreachable!("Expected && or || but found {:?}", operator),
             },
-        }).at(cursor.span_from(start));
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(expression)
@@ -705,7 +758,8 @@ fn parse_comparison(cursor: &mut Cursor, context: &ParseContext) -> Result<Expre
                 TokenKind::LessEqual => BinaryOperator::LessThanOrEqual,
                 _ => unreachable!("Expected ==, !=, >, <, >=, or <= but found {:?}", operator),
             },
-        }).at(cursor.span_from(start));
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(expression)
@@ -747,7 +801,8 @@ fn parse_bitwise_logical(
                 TokenKind::Pipe => BinaryOperator::BitwiseOr,
                 _ => unreachable!("Expected >>, <<, ^, &, or | but found {:?}", operator),
             },
-        }).at(cursor.span_from(start));
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(expression)
@@ -769,13 +824,17 @@ fn parse_additive(cursor: &mut Cursor, context: &ParseContext) -> Result<Express
                 TokenKind::Minus => BinaryOperator::Subtract,
                 _ => unreachable!("Expected + or - but found {:?}", operator),
             },
-        }).at(cursor.span_from(start));
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(expression)
 }
 
-fn parse_multiplicative(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, Diagnostic> {
+fn parse_multiplicative(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, Diagnostic> {
     let start = cursor.span();
     let mut expression = parse_variable_declaration(cursor, context)?;
 
@@ -795,7 +854,8 @@ fn parse_multiplicative(cursor: &mut Cursor, context: &ParseContext) -> Result<E
                 TokenKind::Percent => BinaryOperator::Modulo,
                 _ => unreachable!("Expected *, /, or % but found {:?}", operator),
             },
-        }).at(cursor.span_from(start));
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(expression)
@@ -833,18 +893,21 @@ fn parse_variable_declaration(
                 type_annotation,
                 pattern,
                 initializer: Some(Box::new(initializer)),
-            }).at(cursor.span_from(start)))
+            })
+            .at(cursor.span_from(start)))
         }
         TokenKind::Semicolon => Ok(ExpressionKind::VariableDeclaration(VariableDeclaration {
             mutable,
             type_annotation,
             pattern,
             initializer: None,
-        }).at(cursor.span_from(start))),
+        })
+        .at(cursor.span_from(start))),
         _ => Err(Diagnostic::error(format!(
             "Expected = or ; but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span)),
+        ))
+        .at(cursor.first().span)),
     }
 }
 
@@ -876,7 +939,8 @@ fn parse_if(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, D
         condition: Box::new(if_condition),
         true_expression: Box::new(if_block),
         false_expression: r#else,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
 fn parse_unary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, Diagnostic> {
@@ -897,10 +961,12 @@ fn parse_unary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression
         {
             match right.kind {
                 ExpressionKind::Literal(ValueLiteral::Int(value)) => {
-                    return Ok(ExpressionKind::Literal(ValueLiteral::Int(-value)).at(cursor.span_from(start)));
+                    return Ok(ExpressionKind::Literal(ValueLiteral::Int(-value))
+                        .at(cursor.span_from(start)));
                 }
                 ExpressionKind::Literal(ValueLiteral::Float(value)) => {
-                    return Ok(ExpressionKind::Literal(ValueLiteral::Float(-value)).at(cursor.span_from(start)));
+                    return Ok(ExpressionKind::Literal(ValueLiteral::Float(-value))
+                        .at(cursor.span_from(start)));
                 }
                 _ => unreachable!("Checked in previous if"),
             }
@@ -916,13 +982,16 @@ fn parse_unary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression
         {
             match right.kind {
                 ExpressionKind::Literal(ValueLiteral::Int(value)) => {
-                    return Ok(ExpressionKind::Literal(ValueLiteral::Int(value)).at(cursor.span_from(start)));
+                    return Ok(ExpressionKind::Literal(ValueLiteral::Int(value))
+                        .at(cursor.span_from(start)));
                 }
                 ExpressionKind::Literal(ValueLiteral::UInt(value)) => {
-                    return Ok(ExpressionKind::Literal(ValueLiteral::UInt(value)).at(cursor.span_from(start)));
+                    return Ok(ExpressionKind::Literal(ValueLiteral::UInt(value))
+                        .at(cursor.span_from(start)));
                 }
                 ExpressionKind::Literal(ValueLiteral::Float(value)) => {
-                    return Ok(ExpressionKind::Literal(ValueLiteral::Float(value)).at(cursor.span_from(start)));
+                    return Ok(ExpressionKind::Literal(ValueLiteral::Float(value))
+                        .at(cursor.span_from(start)));
                 }
                 _ => unreachable!("Checked in previous if"),
             }
@@ -937,7 +1006,8 @@ fn parse_unary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression
                 _ => unreachable!("Expected +, -, !, or ~ but found {:?}", operator),
             },
             expression: Box::new(right),
-        }).at(cursor.span_from(start)));
+        })
+        .at(cursor.span_from(start)));
     }
 
     parse_call_or_param_propagation(cursor, context)
@@ -957,10 +1027,14 @@ fn parse_call_or_param_propagation(
         cursor.bump()?; // Consume the >
 
         let ExpressionKind::Member(member) = expression.kind.clone() else {
-            return Err(Diagnostic::error(format!("Expected member but found {:?}", expression)).at(cursor.first().span));
+            return Err(
+                Diagnostic::error(format!("Expected member but found {:?}", expression))
+                    .at(cursor.first().span),
+            );
         };
 
-        expression = ExpressionKind::Member(member.with_generics(generics)).at(cursor.span_from(start));
+        expression =
+            ExpressionKind::Member(member.with_generics(generics)).at(cursor.span_from(start));
     }
 
     parse_postfix(expression, cursor, context, true)
@@ -1002,20 +1076,24 @@ fn parse_postfix(
                     expression = ExpressionKind::Member(Member::Index {
                         object: Box::new(expression),
                         index,
-                    }).at(cursor.span_from(start));
+                    })
+                    .at(cursor.span_from(start));
                 } else {
                     let TokenKind::Identifier(identifier) = cursor.first().kind else {
                         return Err(Diagnostic::error(format!(
                             "Expected identifier but found {:?}",
                             cursor.first().kind
-                        )).at(cursor.first().span));
+                        ))
+                        .at(cursor.first().span));
                     };
 
-                    let ExpressionKind::Member(member) = parse_literal(cursor, context)?.kind else {
+                    let ExpressionKind::Member(member) = parse_literal(cursor, context)?.kind
+                    else {
                         return Err(Diagnostic::error(format!(
                             "Expected member but found {:?}",
                             cursor.first().kind
-                        )).at(cursor.first().span));
+                        ))
+                        .at(cursor.first().span));
                     };
 
                     expression = ExpressionKind::Member(Member::ParamPropagation {
@@ -1023,7 +1101,8 @@ fn parse_postfix(
                         member: Box::new(member),
                         symbol: identifier,
                         generics: None,
-                    }).at(cursor.span_from(start));
+                    })
+                    .at(cursor.span_from(start));
                 }
             }
             _ => break,
@@ -1063,7 +1142,10 @@ fn parse_call_expression(
 
 fn parse_args(cursor: &mut Cursor, context: &ParseContext) -> Result<Vec<Expression>, Diagnostic> {
     let TokenKind::OpenParen = cursor.bump()?.kind else {
-        return Err(Diagnostic::error(format!("Expected ( but found {:?}", cursor.first().kind)).at(cursor.first().span));
+        return Err(
+            Diagnostic::error(format!("Expected ( but found {:?}", cursor.first().kind))
+                .at(cursor.first().span),
+        );
     };
 
     if let TokenKind::CloseParen = cursor.first().kind {
@@ -1073,7 +1155,10 @@ fn parse_args(cursor: &mut Cursor, context: &ParseContext) -> Result<Vec<Express
     }
 }
 
-fn parse_args_list(cursor: &mut Cursor, context: &ParseContext) -> Result<Vec<Expression>, Diagnostic> {
+fn parse_args_list(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Vec<Expression>, Diagnostic> {
     let mut args = parse_expression(cursor, context).map(|e| vec![e])?;
 
     while let TokenKind::Comma = cursor.first().kind {
@@ -1085,7 +1170,10 @@ fn parse_args_list(cursor: &mut Cursor, context: &ParseContext) -> Result<Vec<Ex
     Ok(args)
 }
 
-fn parse_member_access(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, Diagnostic> {
+fn parse_member_access(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, Diagnostic> {
     let start = cursor.span();
     let mut object = parse_literal(cursor, context)?;
 
@@ -1114,7 +1202,8 @@ fn parse_member_access(cursor: &mut Cursor, context: &ParseContext) -> Result<Ex
             return Err(Diagnostic::error(format!(
                 "Expected identifier but found {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         if identifier.validate_function_identifier_name().is_err() {
@@ -1127,7 +1216,8 @@ fn parse_member_access(cursor: &mut Cursor, context: &ParseContext) -> Result<Ex
             return Err(Diagnostic::error(format!(
                 "Expected member but found {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         object = ExpressionKind::Member(Member::StaticMemberAccess {
@@ -1135,7 +1225,8 @@ fn parse_member_access(cursor: &mut Cursor, context: &ParseContext) -> Result<Ex
             member: Box::new(member),
             symbol: identifier,
             generics: None,
-        }).at(cursor.span_from(start));
+        })
+        .at(cursor.span_from(start));
     }
 
     Ok(object)
@@ -1157,14 +1248,16 @@ fn parse_field_access(
         return Err(Diagnostic::error(format!(
             "Expected identifier but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     };
 
     let ExpressionKind::Member(member) = parse_literal(cursor, context)?.kind else {
         return Err(Diagnostic::error(format!(
             "Expected member but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span));
+        ))
+        .at(cursor.first().span));
     };
 
     Ok(ExpressionKind::Member(Member::MemberAccess {
@@ -1172,10 +1265,14 @@ fn parse_field_access(
         member: Box::new(member),
         symbol: identifier,
         generics: None,
-    }).at(cursor.span_from(start)))
+    })
+    .at(cursor.span_from(start)))
 }
 
-pub fn parse_literal(cursor: &mut Cursor, context: &ParseContext) -> Result<Expression, Diagnostic> {
+pub fn parse_literal(
+    cursor: &mut Cursor,
+    context: &ParseContext,
+) -> Result<Expression, Diagnostic> {
     let start = cursor.span();
 
     let TokenKind::Literal(literal) = cursor.first().kind else {
@@ -1195,7 +1292,8 @@ fn parse_primary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
             Ok(ExpressionKind::Member(Member::Identifier {
                 symbol: identifier,
                 generics: None,
-            }).at(cursor.span_from(start)))
+            })
+            .at(cursor.span_from(start)))
         }
         TokenKind::OpenBrace => parse_block(cursor, context),
         TokenKind::OpenParen => {
@@ -1225,7 +1323,8 @@ fn parse_primary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
                 _ => Err(Diagnostic::error(format!(
                     "Expected ) or , but found {:?}",
                     cursor.first().kind
-                )).at(cursor.first().span)),
+                ))
+                .at(cursor.first().span)),
             }
         }
         TokenKind::OpenBracket => {
@@ -1299,7 +1398,8 @@ fn parse_primary(cursor: &mut Cursor, context: &ParseContext) -> Result<Expressi
         _ => Err(Diagnostic::error(format!(
             "Expected primary expression but found {:?}",
             cursor.first().kind
-        )).at(cursor.first().span)),
+        ))
+        .at(cursor.first().span)),
     }
 }
 
@@ -1393,7 +1493,8 @@ fn parse_pattern(cursor: &mut Cursor) -> Result<Pattern, Diagnostic> {
         lower: pattern_into_bound(pattern)?,
         upper: pattern_into_bound(upper)?,
         inclusive,
-    }.at(cursor.span_from(start)))
+    }
+    .at(cursor.span_from(start)))
 }
 
 fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, Diagnostic> {
@@ -1449,7 +1550,8 @@ fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, Diagnostic> {
                     return Err(Diagnostic::error(format!(
                         "Expected a variant name after :: but found {:?}",
                         cursor.second().kind
-                    )).at(cursor.first().span));
+                    ))
+                    .at(cursor.first().span));
                 };
 
                 variant.validate_type_identifier_name()?;
@@ -1466,7 +1568,8 @@ fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, Diagnostic> {
                 enum_annotation: None,
                 path,
                 inner,
-            }.at(cursor.span_from(start)))
+            }
+            .at(cursor.span_from(start)))
         }
         // `MyEnum::First { .. }` or `Point { .. }`. A `::` anywhere in the name
         // makes it a variant; without one it is always a struct.
@@ -1481,12 +1584,14 @@ fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, Diagnostic> {
                         enum_annotation: Some(enum_annotation),
                         path,
                         inner,
-                    }.at(cursor.span_from(start)))
+                    }
+                    .at(cursor.span_from(start)))
                 }
                 None => Ok(PatternKind::Struct {
                     type_annotation: Some(type_annotation),
                     fields: parse_optional_field_patterns(cursor)?,
-                }.at(cursor.span_from(start))),
+                }
+                .at(cursor.span_from(start))),
             }
         }
         TokenKind::Identifier(identifier)
@@ -1499,7 +1604,8 @@ fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, Diagnostic> {
         TokenKind::OpenBrace => Ok(PatternKind::Struct {
             type_annotation: None,
             fields: parse_field_patterns(cursor)?,
-        }.at(cursor.span_from(start))),
+        }
+        .at(cursor.span_from(start))),
         TokenKind::OpenParen => {
             cursor.bump()?; // Consume the (
 
@@ -1519,7 +1625,8 @@ fn parse_pattern_primary(cursor: &mut Cursor) -> Result<Pattern, Diagnostic> {
         _ => Err(Diagnostic::error(format!(
             "Unknown start of pattern: {:?}",
             cursor.first().kind
-        )).at(cursor.first().span)),
+        ))
+        .at(cursor.first().span)),
     }
 }
 
@@ -1533,7 +1640,8 @@ fn parse_comparison_pattern(
     Ok(PatternKind::Comparison {
         operator,
         bound: parse_bound(cursor)?,
-    }.at(cursor.span_from(start)))
+    }
+    .at(cursor.span_from(start)))
 }
 
 /// A comparison endpoint is a numeric or rune literal, or a variable holding
@@ -1554,7 +1662,8 @@ fn parse_bound(cursor: &mut Cursor) -> Result<Bound, Diagnostic> {
             return Err(Diagnostic::error(format!(
                 "Expected a number, rune or variable but found {:?}",
                 kind
-            )).at(cursor.first().span))
+            ))
+            .at(cursor.first().span))
         }
     };
 
@@ -1598,7 +1707,8 @@ fn parse_field_patterns(cursor: &mut Cursor) -> Result<Vec<FieldPattern>, Diagno
             return Err(Diagnostic::error(format!(
                 "Expected a field name but found {:?}",
                 cursor.first().kind
-            )).at(cursor.first().span));
+            ))
+            .at(cursor.first().span));
         };
 
         cursor.bump()?; // Consume the field name
@@ -1686,10 +1796,13 @@ fn parse_variant_tail(
         return Ok(None);
     }
 
-    Ok(Some(Box::new(PatternKind::Struct {
-        type_annotation: None,
-        fields: parse_field_patterns(cursor)?,
-    }.at(cursor.span_from(start)))))
+    Ok(Some(Box::new(
+        PatternKind::Struct {
+            type_annotation: None,
+            fields: parse_field_patterns(cursor)?,
+        }
+        .at(cursor.span_from(start)),
+    )))
 }
 
 /// A binding, plus the `@ p` that may follow it.
@@ -1733,13 +1846,24 @@ fn to_expression_literal(literal: token::Literal, span: Span) -> Result<Expressi
     match literal {
         token::Literal::Void => Err(Diagnostic::error("Void literals are not allowed")),
         token::Literal::Unit => Ok(ExpressionKind::Literal(ValueLiteral::Unit).at(span)),
-        token::Literal::Int(literal) => Ok(ExpressionKind::Literal(ValueLiteral::Int(literal.value)).at(span)),
-        token::Literal::UInt(literal) => Ok(ExpressionKind::Literal(ValueLiteral::UInt(literal.value)).at(span)),
-        token::Literal::Float(value) => Ok(ExpressionKind::Literal(ValueLiteral::Float(value)).at(span)),
-        token::Literal::String(value) => Ok(ExpressionKind::Literal(ValueLiteral::String(value)).at(span)),
+        token::Literal::Int(literal) => {
+            Ok(ExpressionKind::Literal(ValueLiteral::Int(literal.value)).at(span))
+        }
+        token::Literal::UInt(literal) => {
+            Ok(ExpressionKind::Literal(ValueLiteral::UInt(literal.value)).at(span))
+        }
+        token::Literal::Float(value) => {
+            Ok(ExpressionKind::Literal(ValueLiteral::Float(value)).at(span))
+        }
+        token::Literal::String(value) => {
+            Ok(ExpressionKind::Literal(ValueLiteral::String(value)).at(span))
+        }
         token::Literal::Rune(value) => Ok(ExpressionKind::Literal(ValueLiteral::Rune(
             value.parse::<char>().expect("Failed to parse rune literal"),
-        )).at(span)),
-        token::Literal::Bool(value) => Ok(ExpressionKind::Literal(ValueLiteral::Bool(value)).at(span)),
+        ))
+        .at(span)),
+        token::Literal::Bool(value) => {
+            Ok(ExpressionKind::Literal(ValueLiteral::Bool(value)).at(span))
+        }
     }
 }

@@ -3,6 +3,7 @@ mod common;
 use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
+    Purity,
     model::{Typed, TypedExpression},
     Function, Parameter, Type,
 };
@@ -43,6 +44,7 @@ fn closure_has_correct_type() {
     assert_eq!(
         expression.get_type(),
         Type::Function(Function {
+            purity: Purity::Pure,
             identifier: None,
             param: None,
             return_type: Box::new(Type::Void),
@@ -68,6 +70,7 @@ fn closure_has_correct_type_with_param_and_return() {
     assert_eq!(
         expression.get_type(),
         Type::Function(Function {
+            purity: Purity::Pure,
             identifier: None,
             param: Some(Parameter {
                 identifier: "x".to_string(),

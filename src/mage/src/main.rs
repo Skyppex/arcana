@@ -90,10 +90,13 @@ pub fn run_source(source: &str, args: &Cli) -> Result<(), Report> {
         }
 
         let Some(project_files) = project_files else {
-            return Err(Report::fatal("No files with extension .ar found in workspace"));
+            return Err(Report::fatal(
+                "No files with extension .ar found in workspace",
+            ));
         };
 
-        let spell_content = std::fs::read_to_string(spell).map_err(|error| Report::fatal(error.to_string()))?;
+        let spell_content =
+            std::fs::read_to_string(spell).map_err(|error| Report::fatal(error.to_string()))?;
 
         let spell_config = toml::from_str::<SpellConfig>(&spell_content)
             .map_err(|e| Report::fatal(format!("Failed to parse spell.toml: {e}")))?;
@@ -273,7 +276,8 @@ pub fn load_core(
     let (typed_core, core_type_environment) =
         shared::type_checker::register_core(tokens, type_environment).map_err(&report)?;
 
-    interpreter::evaluate(typed_core, Rc::new(RefCell::new(Environment::new()))).map_err(&report)?;
+    interpreter::evaluate(typed_core, Rc::new(RefCell::new(Environment::new())))
+        .map_err(&report)?;
 
     Ok(core_type_environment)
 }
@@ -289,8 +293,7 @@ pub fn read_input(
     args: &Cli,
     print_result: bool,
 ) -> Result<(), Report> {
-    compile(file, type_environment, environment, args, print_result)
-        .map_err(Report::against(file))
+    compile(file, type_environment, environment, args, print_result).map_err(Report::against(file))
 }
 
 fn compile(
@@ -365,8 +368,7 @@ pub fn register_modules(
             let report = Report::against(file);
 
             let tokens = shared::lexer::tokenize(&file.source).map_err(&report)?;
-            let Some((_, module_path, module)) =
-                ast::discover_module(tokens).map_err(&report)?
+            let Some((_, module_path, module)) = ast::discover_module(tokens).map_err(&report)?
             else {
                 return Ok(None);
             };
@@ -412,7 +414,8 @@ pub fn register_modules(
         let typed_module =
             create_typed_ast(module, mod_type_environment.clone()).map_err(&report)?;
 
-        let value = interpreter::evaluate(typed_module, mod_environment.clone()).map_err(&report)?;
+        let value =
+            interpreter::evaluate(typed_module, mod_environment.clone()).map_err(&report)?;
 
         environment
             .borrow_mut()

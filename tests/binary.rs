@@ -596,7 +596,10 @@ fn logical_and_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), LiteralType::BoolValue(false).get_type());
+    assert_eq!(
+        expression.get_type(),
+        LiteralType::BoolValue(false).get_type()
+    );
 }
 
 #[test]
@@ -613,7 +616,10 @@ fn logical_or_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), LiteralType::BoolValue(true).get_type());
+    assert_eq!(
+        expression.get_type(),
+        LiteralType::BoolValue(true).get_type()
+    );
 }
 
 #[test]

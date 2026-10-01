@@ -97,10 +97,7 @@ pub enum PatternKind {
 
 impl Pattern {
     /// The path as written, for error messages: `E1::E2::S3` or `::E2::S3`.
-    pub fn variant_path_name(
-        enum_annotation: &Option<TypeAnnotation>,
-        path: &[String],
-    ) -> String {
+    pub fn variant_path_name(enum_annotation: &Option<TypeAnnotation>, path: &[String]) -> String {
         match enum_annotation {
             Some(annotation) => format!("{}::{}", annotation, path.join("::")),
             None => format!("::{}", path.join("::")),
@@ -179,7 +176,9 @@ impl Pattern {
             PatternKind::Struct { fields, .. } => fields
                 .iter()
                 .all(|f| f.pattern.is_unconditionally_irrefutable()),
-            PatternKind::Tuple(patterns) => patterns.iter().all(|p| p.is_unconditionally_irrefutable()),
+            PatternKind::Tuple(patterns) => {
+                patterns.iter().all(|p| p.is_unconditionally_irrefutable())
+            }
             _ => false,
         }
     }

@@ -461,13 +461,17 @@ fn compile_constructor_switch(
     }
 
     if default_rows.is_empty() {
-        return Err(Diagnostic::error(non_exhaustive_error(occurrence, &missing)));
+        return Err(Diagnostic::error(non_exhaustive_error(
+            occurrence, &missing,
+        )));
     }
 
     let default = compile_rows(default_rows, arms, body_type, reached)?;
 
     if let Decision::Failure { .. } = default {
-        return Err(Diagnostic::error(non_exhaustive_error(occurrence, &missing)));
+        return Err(Diagnostic::error(non_exhaustive_error(
+            occurrence, &missing,
+        )));
     }
 
     Ok(Decision::Switch {

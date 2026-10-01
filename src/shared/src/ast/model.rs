@@ -1,5 +1,5 @@
-use std::hash::Hash;
 use std::fmt::Display;
+use std::hash::Hash;
 
 use crate::ast::pattern::Pattern;
 use crate::diagnostic::Span;

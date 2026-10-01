@@ -289,12 +289,8 @@ fn tokenize_next(cursor: &mut Cursor) -> Result<Token, Diagnostic> {
             // widen it over the offending character so it gets a caret.
             let span = cursor.token_span();
 
-            Err(
-                Diagnostic::error(format!("Unrecognized character: {c}")).at(Span::new(
-                    span.start,
-                    span.start + c.len_utf8() as u32,
-                )),
-            )
+            Err(Diagnostic::error(format!("Unrecognized character: {c}"))
+                .at(Span::new(span.start, span.start + c.len_utf8() as u32)))
         }
     }
 }
@@ -399,4 +395,3 @@ fn create_token(kind: TokenKind, cursor: &mut Cursor<'_>) -> Token {
         span: cursor.token_span(),
     }
 }
-

@@ -725,7 +725,10 @@ fn the_first_segment_is_rooted_and_never_searched_for() {
     let result = try_create_typed_ast(&input);
 
     // Assert
-    assert!(result.unwrap_err().to_string().contains("has no variant named `S2`"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("has no variant named `S2`"));
 }
 
 #[test]

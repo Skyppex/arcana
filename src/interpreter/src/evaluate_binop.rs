@@ -54,7 +54,10 @@ fn evaluate_add(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left + right)))
             }
-            (left, right) => Err(Diagnostic::error(format!("Cannot add {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot add {:?} and {:?}",
+                left, right
+            ))),
         },
         (Value::String(left), Value::String(right)) => Ok(Value::String(left + &right)),
         (Value::Array(left), Value::Array(right)) => {
@@ -63,7 +66,10 @@ fn evaluate_add(
         (Value::Array(left), right) => Ok(Value::Array(
             left.into_iter().chain(std::iter::once(right)).collect(),
         )),
-        (left, right) => Err(Diagnostic::error(format!("Cannot add {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot add {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -84,9 +90,15 @@ fn evaluate_subtract(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left - right)))
             }
-            (left, right) => Err(Diagnostic::error(format!("Cannot subtract {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot subtract {:?} and {:?}",
+                left, right
+            ))),
         },
-        (left, right) => Err(Diagnostic::error(format!("Cannot subtract {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot subtract {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -107,9 +119,15 @@ fn evaluate_multiply(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left * right)))
             }
-            (left, right) => Err(Diagnostic::error(format!("Cannot multiply {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot multiply {:?} and {:?}",
+                left, right
+            ))),
         },
-        (left, right) => Err(Diagnostic::error(format!("Cannot multiply {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot multiply {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -130,9 +148,15 @@ fn evaluate_divide(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left / right)))
             }
-            (left, right) => Err(Diagnostic::error(format!("Cannot divide {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot divide {:?} and {:?}",
+                left, right
+            ))),
         },
-        (left, right) => Err(Diagnostic::error(format!("Cannot divide {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot divide {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -153,9 +177,15 @@ fn evaluate_modulo(
             (Number::Float(left), Number::Float(right)) => {
                 Ok(Value::Number(Number::Float(left % right)))
             }
-            (left, right) => Err(Diagnostic::error(format!("Cannot modulo {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot modulo {:?} and {:?}",
+                left, right
+            ))),
         },
-        (left, right) => Err(Diagnostic::error(format!("Cannot modulo {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot modulo {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -173,9 +203,15 @@ fn evaluate_bitwise_and(
             (Number::UInt(left), Number::UInt(right)) => {
                 Ok(Value::Number(Number::UInt(left & right)))
             }
-            (left, right) => Err(Diagnostic::error(format!("Cannot bitwise and {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot bitwise and {:?} and {:?}",
+                left, right
+            ))),
         },
-        (left, right) => Err(Diagnostic::error(format!("Cannot bitwise and {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot bitwise and {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -193,9 +229,15 @@ fn evaluate_bitwise_or(
             (Number::UInt(left), Number::UInt(right)) => {
                 Ok(Value::Number(Number::UInt(left | right)))
             }
-            (left, right) => Err(Diagnostic::error(format!("Cannot bitwise or {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot bitwise or {:?} and {:?}",
+                left, right
+            ))),
         },
-        (left, right) => Err(Diagnostic::error(format!("Cannot bitwise or {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot bitwise or {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -213,9 +255,15 @@ fn evaluate_bitwise_xor(
             (Number::UInt(left), Number::UInt(right)) => {
                 Ok(Value::Number(Number::UInt(left ^ right)))
             }
-            (left, right) => Err(Diagnostic::error(format!("Cannot bitwise xor {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot bitwise xor {:?} and {:?}",
+                left, right
+            ))),
         },
-        (left, right) => Err(Diagnostic::error(format!("Cannot bitwise xor {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot bitwise xor {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -336,7 +384,10 @@ fn evaluate_equal(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left == right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left == right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left == right)),
-            (left, right) => Err(Diagnostic::error(format!("Cannot equal {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot equal {:?} and {:?}",
+                left, right
+            ))),
         },
         (Value::Rune(left), Value::Rune(right)) => Ok(Value::Bool(left == right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left == right)),
@@ -350,7 +401,10 @@ fn evaluate_equal(
                 ..
             }),
         ) => Ok(Value::Bool(left_enum_member == right_enum_member)),
-        (left, right) => Err(Diagnostic::error(format!("Cannot equal {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot equal {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -369,11 +423,17 @@ fn evaluate_not_equal(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left != right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left != right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left != right)),
-            (left, right) => Err(Diagnostic::error(format!("Cannot not equal {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot not equal {:?} and {:?}",
+                left, right
+            ))),
         },
         (Value::Rune(left), Value::Rune(right)) => Ok(Value::Bool(left != right)),
         (Value::String(left), Value::String(right)) => Ok(Value::Bool(left != right)),
-        (left, right) => Err(Diagnostic::error(format!("Cannot not equal {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot not equal {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -390,9 +450,15 @@ fn evaluate_less_than(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left < right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left < right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left < right)),
-            (left, right) => Err(Diagnostic::error(format!("Cannot less than {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot less than {:?} and {:?}",
+                left, right
+            ))),
         },
-        (left, right) => Err(Diagnostic::error(format!("Cannot less than {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot less than {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -434,9 +500,15 @@ fn evaluate_greater_than(
             (Number::Int(left), Number::Int(right)) => Ok(Value::Bool(left > right)),
             (Number::UInt(left), Number::UInt(right)) => Ok(Value::Bool(left > right)),
             (Number::Float(left), Number::Float(right)) => Ok(Value::Bool(left > right)),
-            (left, right) => Err(Diagnostic::error(format!("Cannot greater than {:?} and {:?}", left, right))),
+            (left, right) => Err(Diagnostic::error(format!(
+                "Cannot greater than {:?} and {:?}",
+                left, right
+            ))),
         },
-        (left, right) => Err(Diagnostic::error(format!("Cannot greater than {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot greater than {:?} and {:?}",
+            left, right
+        ))),
     }
 }
 
@@ -496,7 +568,10 @@ fn evaluate_range(
                     .map(|v| Value::Number(Number::UInt(v)))
                     .collect(),
             )),
-            (left, right, _) => Err(Diagnostic::error(format!("Cannot range {:?} and {:?}", left, right))),
+            (left, right, _) => Err(Diagnostic::error(format!(
+                "Cannot range {:?} and {:?}",
+                left, right
+            ))),
         },
         (Value::Rune(left), Value::Rune(right)) => {
             if !inclusive {
@@ -505,6 +580,9 @@ fn evaluate_range(
                 Ok(Value::Array((left..=right).map(Value::Rune).collect()))
             }
         }
-        (left, right) => Err(Diagnostic::error(format!("Cannot range {:?} and {:?}", left, right))),
+        (left, right) => Err(Diagnostic::error(format!(
+            "Cannot range {:?} and {:?}",
+            left, right
+        ))),
     }
 }

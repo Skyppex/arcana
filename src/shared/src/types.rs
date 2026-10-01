@@ -487,7 +487,10 @@ pub(super) fn parse_type_annotation(
             if type_name.validate_type_identifier_name().is_err()
                 && type_name.validate_function_identifier_name().is_err()
             {
-                return Err(Diagnostic::error(format!("Invalid type name: {}", type_name)));
+                return Err(Diagnostic::error(format!(
+                    "Invalid type name: {}",
+                    type_name
+                )));
             }
 
             let mut generics = None;
@@ -573,7 +576,10 @@ pub(super) fn parse_type_annotation(
             let type_annotation = parse_type_annotation(cursor, allow_void)?;
 
             if cursor.first().kind != TokenKind::CloseBracket {
-                return Err(Diagnostic::error(format!("Expected ] but found {:?}", cursor.first().kind)));
+                return Err(Diagnostic::error(format!(
+                    "Expected ] but found {:?}",
+                    cursor.first().kind
+                )));
             }
 
             cursor.bump()?; // Consume the ]
@@ -601,7 +607,10 @@ pub(super) fn parse_type_annotation(
             cursor.bump()?; // Consume the fun
 
             if cursor.first().kind != TokenKind::OpenParen {
-                return Err(Diagnostic::error(format!("Expected ( but found {:?}", cursor.first().kind)));
+                return Err(Diagnostic::error(format!(
+                    "Expected ( but found {:?}",
+                    cursor.first().kind
+                )));
             }
 
             cursor.bump()?; // Consume the (
@@ -697,7 +706,10 @@ pub(super) fn parse_type_identifier(
 
             if use_double_colon {
                 if cursor.first().kind != TokenKind::DoubleColon {
-                    return Err(Diagnostic::error(format!("Expected :: but found {:?}", cursor.first().kind)));
+                    return Err(Diagnostic::error(format!(
+                        "Expected :: but found {:?}",
+                        cursor.first().kind
+                    )));
                 }
 
                 cursor.bump()?; // Consume the ::
@@ -804,7 +816,10 @@ fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, Diagnostic> {
                     cursor.bump()?; // Consume the float
                     Ok(LiteralType::FloatValue(value))
                 }
-                _ => Err(Diagnostic::error(format!("Cannot negate type: {:?}", cursor.first().kind))),
+                _ => Err(Diagnostic::error(format!(
+                    "Cannot negate type: {:?}",
+                    cursor.first().kind
+                ))),
             }
         }
         TokenKind::Minus => {
@@ -819,7 +834,10 @@ fn parse_literal_type(cursor: &mut Cursor) -> Result<LiteralType, Diagnostic> {
                     cursor.bump()?; // Consume the float
                     Ok(LiteralType::FloatValue(-value))
                 }
-                _ => Err(Diagnostic::error(format!("Cannot negate type: {:?}", cursor.first().kind))),
+                _ => Err(Diagnostic::error(format!(
+                    "Cannot negate type: {:?}",
+                    cursor.first().kind
+                ))),
             }
         }
         TokenKind::Identifier(identifier) => {

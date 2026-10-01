@@ -281,7 +281,10 @@ mod tests {
         let source = "let x = y + 1;";
 
         assert_eq!(
-            render_against(source, Diagnostic::error("Unknown variable `y`").at(at(source, "y"))),
+            render_against(
+                source,
+                Diagnostic::error("Unknown variable `y`").at(at(source, "y"))
+            ),
             "\
 error: Unknown variable `y`
  --> t.ar:1:9
@@ -368,7 +371,9 @@ error: expected `Int`, found `String`
         assert_eq!(
             render_against(
                 source,
-                Diagnostic::error("something").at(at(source, "x")).note("a note")
+                Diagnostic::error("something")
+                    .at(at(source, "x"))
+                    .note("a note")
             ),
             "\
 error: something
@@ -388,7 +393,10 @@ note: a note"
         let source = "\tlet x = y;";
 
         assert_eq!(
-            render_against(source, Diagnostic::error("Unknown variable `y`").at(at(source, "y"))),
+            render_against(
+                source,
+                Diagnostic::error("Unknown variable `y`").at(at(source, "y"))
+            ),
             "\
 error: Unknown variable `y`
  --> t.ar:1:10
@@ -406,8 +414,10 @@ error: Unknown variable `y`
         assert_eq!(
             render_against(
                 source,
-                Diagnostic::error("match is not exhaustive")
-                    .labelled(Span::new(0, source.len() as u32), "not all cases are covered")
+                Diagnostic::error("match is not exhaustive").labelled(
+                    Span::new(0, source.len() as u32),
+                    "not all cases are covered"
+                )
             ),
             "\
 error: match is not exhaustive
@@ -424,7 +434,10 @@ error: match is not exhaustive
         let source = "\n".repeat(99) + "let x = y;";
 
         assert_eq!(
-            render_against(&source, Diagnostic::error("Unknown variable `y`").at(at(&source, "y"))),
+            render_against(
+                &source,
+                Diagnostic::error("Unknown variable `y`").at(at(&source, "y"))
+            ),
             "\
 error: Unknown variable `y`
    --> t.ar:100:9

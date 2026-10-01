@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    type_checker::{Function, Meta, Parameter, Type},
+    type_checker::{Function, Meta, Parameter, Purity, Type},
     types::TypeIdentifier,
 };
 
@@ -28,6 +28,7 @@ impl BuiltInFunction {
                 type_identifier: type_identifier.clone(),
                 function_type: BuiltInFunctionType::Input,
                 type_: Type::Function(Function {
+                    purity: built_in_function_type.purity(),
                     identifier: Some(type_identifier),
                     param: Some(Parameter {
                         identifier: "prompt".to_string(),
@@ -40,6 +41,7 @@ impl BuiltInFunction {
                 type_identifier: type_identifier.clone(),
                 function_type: BuiltInFunctionType::Print,
                 type_: Type::Function(Function {
+                    purity: built_in_function_type.purity(),
                     identifier: Some(type_identifier),
                     param: Some(Parameter {
                         identifier: "value".to_string(),
@@ -52,6 +54,7 @@ impl BuiltInFunction {
                 type_identifier: type_identifier.clone(),
                 function_type: BuiltInFunctionType::PrintLn,
                 type_: Type::Function(Function {
+                    purity: built_in_function_type.purity(),
                     identifier: Some(type_identifier),
                     param: Some(Parameter {
                         identifier: "value".to_string(),
@@ -64,6 +67,7 @@ impl BuiltInFunction {
                 type_identifier: type_identifier.clone(),
                 function_type: BuiltInFunctionType::EPrint,
                 type_: Type::Function(Function {
+                    purity: built_in_function_type.purity(),
                     identifier: Some(type_identifier),
                     param: Some(Parameter {
                         identifier: "value".to_string(),
@@ -76,6 +80,7 @@ impl BuiltInFunction {
                 type_identifier: type_identifier.clone(),
                 function_type: BuiltInFunctionType::EPrintLn,
                 type_: Type::Function(Function {
+                    purity: built_in_function_type.purity(),
                     identifier: Some(type_identifier),
                     param: Some(Parameter {
                         identifier: "value".to_string(),
@@ -88,6 +93,7 @@ impl BuiltInFunction {
                 type_identifier: type_identifier.clone(),
                 function_type: BuiltInFunctionType::Drop,
                 type_: Type::Function(Function {
+                    purity: built_in_function_type.purity(),
                     identifier: Some(type_identifier),
                     param: Some(Parameter {
                         identifier: "var".to_string(),
@@ -100,6 +106,7 @@ impl BuiltInFunction {
                 type_identifier: type_identifier.clone(),
                 function_type: BuiltInFunctionType::Len,
                 type_: Type::Function(Function {
+                    purity: built_in_function_type.purity(),
                     identifier: Some(type_identifier),
                     param: Some(Parameter {
                         identifier: "arr".to_string(),
@@ -112,6 +119,7 @@ impl BuiltInFunction {
                 type_identifier: type_identifier.clone(),
                 function_type: BuiltInFunctionType::TypeOf,
                 type_: Type::Function(Function {
+                    purity: built_in_function_type.purity(),
                     identifier: Some(type_identifier),
                     param: Some(Parameter {
                         identifier: "value".to_string(),
@@ -124,6 +132,7 @@ impl BuiltInFunction {
                 type_identifier: type_identifier.clone(),
                 function_type: BuiltInFunctionType::Rand,
                 type_: Type::Function(Function {
+                    purity: built_in_function_type.purity(),
                     identifier: Some(type_identifier),
                     param: Some(Parameter {
                         identifier: "arr".to_string(),
@@ -132,6 +141,33 @@ impl BuiltInFunction {
                     return_type: Box::new(Type::Any),
                 }),
             }),
+        }
+    }
+}
+
+impl BuiltInFunctionType {
+    /// Whether calling this built-in can be observed.
+    ///
+    /// Written out rather than inferred, because these are where every effect
+    /// in the language originates: nothing else is impure except by reaching
+    /// one of them.
+    pub fn purity(&self) -> Purity {
+        match self {
+            // Writes to a stream.
+            BuiltInFunctionType::Print
+            | BuiltInFunctionType::PrintLn
+            | BuiltInFunctionType::EPrint
+            | BuiltInFunctionType::EPrintLn => Purity::Impure,
+            // Reads a stream, and gives a different answer every time.
+            BuiltInFunctionType::Input => Purity::Impure,
+            // Removes a binding from the environment.
+            BuiltInFunctionType::Drop => Purity::Impure,
+            // Has no effects, but is not deterministic — and `Purity` merges
+            // those two properties, so it lands here. Deleting an unused
+            // `rand` would in fact be sound; substituting one call's value for
+            // another's would not.
+            BuiltInFunctionType::Rand => Purity::Impure,
+            BuiltInFunctionType::Len | BuiltInFunctionType::TypeOf => Purity::Pure,
         }
     }
 }

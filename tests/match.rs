@@ -20,7 +20,9 @@ fn assert_error_contains(input: &str, needle: &str) {
     match try_create_typed_ast(input) {
         Ok(_) => panic!("expected an error mentioning {needle:?}, but the program type-checked"),
         Err(e) => assert!(
-            e.to_string().to_lowercase().contains(&needle.to_lowercase()),
+            e.to_string()
+                .to_lowercase()
+                .contains(&needle.to_lowercase()),
             "expected an error mentioning {needle:?}, got: {e}"
         ),
     }
@@ -1358,7 +1360,10 @@ fn a_binding_on_both_sides_of_at_is_rejected() {
     let result = try_create_typed_ast(input);
 
     // Assert
-    assert!(result.unwrap_err().to_string().contains("binds the same value twice"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("binds the same value twice"));
 }
 
 #[test]

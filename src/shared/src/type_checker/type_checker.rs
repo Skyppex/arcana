@@ -79,7 +79,9 @@ pub fn discover_user_defined_types(
 ///
 /// This needs only the names written in the source, so it runs during
 /// discovery, before anything is type checked.
-fn check_implementations_do_not_overlap(discovered_types: &[DiscoveredType]) -> Result<(), Diagnostic> {
+fn check_implementations_do_not_overlap(
+    discovered_types: &[DiscoveredType],
+) -> Result<(), Diagnostic> {
     let aliases = alias_table(discovered_types);
 
     let implementations = discovered_types
@@ -287,7 +289,9 @@ pub fn register_core(
     type_environment: Rcrc<TypeEnvironment>,
 ) -> Result<(TypedStatement, Rcrc<TypeEnvironment>), Diagnostic> {
     let Some((_, module_path, module)) = crate::ast::discover_module(source_tokens)? else {
-        return Err(Diagnostic::error("The core library must declare the module it belongs to"));
+        return Err(Diagnostic::error(
+            "The core library must declare the module it belongs to",
+        ));
     };
 
     let core_type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
