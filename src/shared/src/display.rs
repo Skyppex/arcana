@@ -2188,6 +2188,7 @@ impl IndentDisplay for TypedExpression {
                 condition,
                 true_expression,
                 false_expression,
+                wraps_true_branch: _,
                 type_,
             } => {
                 let mut result = String::new();

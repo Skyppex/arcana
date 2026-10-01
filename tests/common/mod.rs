@@ -14,10 +14,31 @@ pub fn tokenize(input: &str) -> Vec<lexer::token::Token> {
     lexer::tokenize(input).unwrap()
 }
 
+/// A type environment with the core library loaded, as the compiler builds one.
+///
+/// The checker resolves `Option` from the library rather than synthesising it,
+/// so anything that type checks an `if` without an else needs the library
+/// present — tests included.
+pub fn core_type_environment() -> Rcrc<type_checker::TypeEnvironment> {
+    let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new(false)));
+
+    let core = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("core/lib.ar"),
+    )
+    .expect("failed to read core/lib.ar");
+
+    let tokens = lexer::tokenize(&core).expect("failed to tokenize the core library");
+
+    type_checker::register_core(tokens, type_environment.clone())
+        .expect("failed to register the core library");
+
+    type_environment
+}
+
 pub fn create_typed_ast(input: &str) -> TypedStatement {
     let tokens = lexer::tokenize(input).unwrap();
     let ast = ast::create_ast(tokens, false).unwrap();
-    let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new(false)));
+    let type_environment = core_type_environment();
 
     type_checker::create_typed_ast(ast, type_environment).unwrap()
 }
@@ -27,7 +48,7 @@ pub fn create_typed_ast(input: &str) -> TypedStatement {
 pub fn try_create_typed_ast(input: &str) -> Result<TypedStatement, String> {
     let tokens = lexer::tokenize(input)?;
     let ast = ast::create_ast(tokens, false)?;
-    let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new(false)));
+    let type_environment = core_type_environment();
 
     type_checker::create_typed_ast(ast, type_environment)
 }
@@ -39,7 +60,7 @@ pub fn evaluate_expression(
 ) -> Value {
     let tokens = lexer::tokenize(input).unwrap();
     let ast = ast::create_ast(tokens, false).unwrap();
-    let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new(false)));
+    let type_environment = core_type_environment();
     let typed_ast = type_checker::create_typed_ast(ast, type_environment).unwrap();
 
     if unwrap_semi {

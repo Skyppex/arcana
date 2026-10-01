@@ -57,7 +57,7 @@ fn generic_struct_with_several_parameters_can_be_declared() {
 fn generic_enum_can_be_declared() {
     // Arrange
     let input = r#"
-        enum Result<T> { Ok { value: T }, No }
+        enum Holder<T> { Held { value: T }, No }
         0
     "#;
 

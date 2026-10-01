@@ -542,6 +542,24 @@ pub(super) fn parse_type_annotation(
                 type_name = format!("{type_name}::{variant_name}");
             }
 
+            // Type arguments may come after the path as well as before it:
+            // `Outer<Int>::Inner` names a variant of an instantiated enum,
+            // while `core::Option<Int>` instantiates one reached through a
+            // module.
+            if generics.is_none() && cursor.first().kind == TokenKind::Less {
+                cursor.bump()?; // Consume the <
+
+                let trailing = parse_comma_separated_type_annotations(
+                    cursor,
+                    |kind| kind != TokenKind::Greater,
+                    allow_void,
+                )?;
+
+                cursor.bump()?; // Consume the >
+
+                return Ok(TypeAnnotation::ConcreteType(type_name, trailing));
+            }
+
             if let Some(generics) = generics {
                 return Ok(TypeAnnotation::ConcreteType(type_name, generics));
             }

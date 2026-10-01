@@ -1,0 +1,11 @@
+pub mod lib::iterator;
+
+pub proto Iterator {
+    type Item;
+    fun next(self: Self): Option<Item>;
+}
+
+pub proto DoubleSidedIterator 
+where imp: Iterator {
+    fun prev(self: Self): Option<Item>;
+}

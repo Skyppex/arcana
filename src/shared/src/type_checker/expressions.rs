@@ -514,6 +514,15 @@ pub fn check_type(
 
             let else_type = else_block.clone().map(|e| e.get_deep_type());
 
+            // An `if` is optional when some path through it yields no value:
+            // no else at all, or an else that is itself optional. In both of
+            // those the true branch yields a bare value and has to be wrapped
+            // to match; with a plain else, nothing is wrapped.
+            let wraps_true_branch = match &else_type {
+                Some(else_type) => is_option(else_type),
+                None => true,
+            };
+
             let type_ = match else_type {
                 // An `else if` chain can run out of branches, so an optional
                 // else makes the whole expression optional. The branches are
@@ -531,19 +540,20 @@ pub fn check_type(
                         ))?
                     };
 
-                    Type::option_of(joined)
+                    Type::option_of(joined, &type_environment)?
                 }
                 Some(else_type) => join_types(&if_block_type, &else_type).ok_or(format!(
                     "If block type {} does not match else block type {}",
                     if_block_type, else_type
                 ))?,
-                None => Type::option_of(if_block_type.clone()),
+                None => Type::option_of(if_block_type.clone(), &type_environment)?,
             };
 
             Ok(TypedExpression::If {
                 condition: Box::new(if_condition.clone()),
                 true_expression: Box::new(if_block.clone()),
                 false_expression: else_block.map(|e| Box::new(e.clone())),
+                wraps_true_branch,
                 type_,
             })
         }
@@ -1274,13 +1284,17 @@ pub fn check_type(
                 Some(else_body) => {
                     let else_type = else_body.get_type();
 
-                    if !type_equals(&type_, &Type::Void)
-                        && !type_equals_unstrict(&type_, &else_type)
-                    {
-                        return Err(format!("While block breaks with value of type {} which does not match else blocks type {}", type_, else_body.get_type()));
-                    }
-
-                    type_ = else_type
+                    // The loop yields a break value or, having run to
+                    // completion, the else value — so its type has to cover
+                    // both rather than only the one written last.
+                    type_ = if type_equals(&type_, &Type::Void) {
+                        else_type
+                    } else {
+                        join_types(&type_, &else_type).ok_or(format!(
+                            "While block breaks with value of type {} which does not match else blocks type {}",
+                            type_, else_type
+                        ))?
+                    };
                 }
                 None => {
                     if !type_equals(&type_, &Type::Void) {
@@ -1360,13 +1374,17 @@ pub fn check_type(
                 Some(else_body) => {
                     let else_type = else_body.get_type();
 
-                    if !type_equals(&type_, &Type::Void)
-                        && !type_equals_unstrict(&type_, &else_body.get_type())
-                    {
-                        return Err(format!("For block breaks with value of type {} which does not match else blocks type {}", type_, else_body.get_type()));
-                    }
-
-                    type_ = else_type
+                    // The loop yields a break value or, having run to
+                    // completion, the else value — so its type has to cover
+                    // both rather than only the one written last.
+                    type_ = if type_equals(&type_, &Type::Void) {
+                        else_type
+                    } else {
+                        join_types(&type_, &else_type).ok_or(format!(
+                            "For block breaks with value of type {} which does not match else blocks type {}",
+                            type_, else_type
+                        ))?
+                    };
                 }
                 None => {
                     if !type_equals(&type_, &Type::Void) {
@@ -2151,11 +2169,20 @@ pub fn option_inner(type_: &Type) -> Option<Type> {
         return None;
     }
 
-    let Type::Enum(Enum { members, .. }) = type_ else {
+    let Type::Enum(Enum {
+        type_identifier,
+        members,
+        ..
+    }) = type_
+    else {
         return None;
     };
 
-    let Type::Struct(Struct { fields, .. }) = members.get("Some")? else {
+    // The library's own `Option` keys its variants by their qualified names, so
+    // the lookup goes through `get_enum_member` rather than the bare name.
+    let Type::Struct(Struct { fields, .. }) =
+        get_enum_member(members, type_identifier, "Some")?
+    else {
         return None;
     };
 
@@ -2182,7 +2209,7 @@ pub fn is_option(type_: &Type) -> bool {
                 return false;
             }
 
-            members.get("Some").is_some_and(|member| {
+            get_enum_member(members, type_identifier, "Some").is_some_and(|member| {
                 let Type::Struct(Struct { fields, .. }) = member else {
                     return false;
                 };

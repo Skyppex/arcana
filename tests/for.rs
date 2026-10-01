@@ -8,7 +8,7 @@ use common::{
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
     model::{Typed, TypedExpression},
-    Type,
+    LiteralType, Type,
 };
 
 #[test]
@@ -65,7 +65,9 @@ fn for_has_correct_type_when_using_break() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Int);
+    // The loop yields either the break value (`2`) or the else value (`4`), so
+    // its type is the one that covers both.
+    assert_eq!(expression.get_type(), LiteralType::Int.get_type());
 }
 
 #[test]
@@ -85,7 +87,8 @@ fn for_does_not_require_body_or_else_body_to_be_a_block() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Int);
+    // Nothing breaks, so the loop yields the else value, `2 + 2`.
+    assert_eq!(expression.get_type(), LiteralType::IntValue(4).get_type());
 }
 
 #[test]

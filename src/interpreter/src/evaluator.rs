@@ -6,7 +6,6 @@ use shared::{
     lexer::token::IdentifierType,
     type_checker::{
         decision_tree::{AccessPath, Decision, Test},
-        is_option,
         model::*,
         overloaded_member_name,
         pattern::CheckedBound,
@@ -194,12 +193,13 @@ pub(super) fn evaluate_expression(
             condition,
             true_expression,
             false_expression,
-            type_,
+            wraps_true_branch,
+            ..
         } => evaluate_if(
             condition,
             true_expression,
             false_expression,
-            type_,
+            wraps_true_branch,
             environment,
         ),
         TypedExpression::Match {
@@ -313,7 +313,7 @@ fn evaluate_if(
     condition: Box<TypedExpression>,
     true_expression: Box<TypedExpression>,
     false_expression: Option<Box<TypedExpression>>,
-    type_: Type,
+    wraps_true_branch: bool,
     environment: Rcrc<Environment>,
 ) -> Result<Value, String> {
     let if_environment = Rc::new(RefCell::new(Environment::new_parent(environment.clone())));
@@ -323,27 +323,28 @@ fn evaluate_if(
         return Err(format!("If condition must be boolean '{}'", condition));
     };
 
-    // The whole expression is optional when some path through it produces no
-    // value — no else at all, or an `else if` chain that can run out. A branch
-    // that yields a bare value is wrapped to match.
-    let branch = if condition {
-        Some(true_expression)
-    } else {
-        false_expression
-    };
+    if !condition {
+        // No else at all means the expression is optional and this path is the
+        // one that produces nothing.
+        let Some(false_expression) = false_expression else {
+            return Ok(Value::option_none());
+        };
 
-    let Some(branch) = branch else {
-        return Ok(Value::option_none());
-    };
-
-    let wrap = is_option(&type_) && !is_option(&branch.get_type());
-    let value = evaluate_expression(*branch, if_environment)?;
-
-    if wrap {
-        Ok(Value::option_some(value))
-    } else {
-        Ok(value)
+        // An else is never wrapped: either it is already optional, or nothing
+        // here is wrapped at all.
+        return evaluate_expression(*false_expression, if_environment);
     }
+
+    let value = evaluate_expression(*true_expression, if_environment)?;
+
+    // Whether this has to be wrapped was settled while type checking, which is
+    // the only place that can see whether the expression as a whole is
+    // optional.
+    if wraps_true_branch {
+        return Ok(Value::option_some(value));
+    }
+
+    Ok(value)
 }
 
 fn evaluate_match(
@@ -474,8 +475,7 @@ fn test_matches(
             // for a nested enum matches every variant declared inside it. The
             // tests at any one occurrence are disjoint prefixes, so this stays
             // unambiguous.
-            type_name == qualified_name
-                || type_name.starts_with(&format!("{}::", qualified_name))
+            type_name == qualified_name || type_name.starts_with(&format!("{}::", qualified_name))
         }
         (Test::Comparison { operator, bound }, value) => {
             let bound = resolve_bound(bound, environment)?;

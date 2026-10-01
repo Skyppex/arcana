@@ -10,7 +10,6 @@ use utils::{get_path, normalize_path};
 
 use std::{
     cell::RefCell,
-    fs,
     io::{self, IsTerminal, Read},
     path::{Path, PathBuf},
     rc::Rc,
@@ -124,26 +123,6 @@ fn run_spell(
         .filter(|path| path != &main)
         .collect::<Vec<_>>();
 
-    let exe = std::env::current_exe()
-        .and_then(fs::canonicalize)
-        .expect("Failed to get current executable")
-        .parent()
-        .expect("Failed to get parent directory of executable")
-        .parent()
-        .expect("Failed to get parent directory of executable")
-        .parent()
-        .expect("Failed to get parent directory of executable")
-        .to_str()
-        .expect("Failed to convert path to string")
-        .to_string();
-
-    let lib_path = format!("{exe}/lib/lib.ar").replace('\\', "/");
-
-    let lib = get_path(&lib_path)
-        .map_err(|e| e.to_string())?
-        .to_str()
-        .ok_or_else(|| "Failed to convert path to string".to_string())?
-        .to_string();
 
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
@@ -151,17 +130,14 @@ fn run_spell(
 
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    register_modules(project_files, type_environment.clone(), environment.clone())?;
+    let core_type_environment = load_core(type_environment.clone())?;
 
-    if let Ok(lib) = std::fs::read_to_string(lib) {
-        read_input(
-            lib,
-            type_environment.clone(),
-            environment.clone(),
-            args,
-            false,
-        )?
-    }
+    register_modules(
+        project_files,
+        type_environment.clone(),
+        environment.clone(),
+        &core_type_environment,
+    )?;
 
     let main_content = std::fs::read_to_string(main.clone())
         .map_err(|error| format!("Failed to read main file: {error}"))?;
@@ -218,26 +194,6 @@ fn run_script(
         content
     };
 
-    let exe = std::env::current_exe()
-        .and_then(fs::canonicalize)
-        .expect("Failed to get current executable")
-        .parent()
-        .expect("Failed to get parent directory of executable")
-        .parent()
-        .expect("Failed to get parent directory of executable")
-        .parent()
-        .expect("Failed to get parent directory of executable")
-        .to_str()
-        .expect("Failed to convert path to string")
-        .to_string();
-
-    let lib_path = format!("{exe}/lib/lib.ar").replace('\\', "/");
-
-    let lib = get_path(&lib_path)
-        .map_err(|e| e.to_string())?
-        .to_str()
-        .ok_or_else(|| "Failed to convert path to string".to_string())?
-        .to_string();
 
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
@@ -245,18 +201,15 @@ fn run_script(
 
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    if let Some(project_files) = project_files {
-        register_modules(project_files, type_environment.clone(), environment.clone())?;
-    }
+    let core_type_environment = load_core(type_environment.clone())?;
 
-    if let Ok(lib) = std::fs::read_to_string(lib) {
-        read_input(
-            lib,
+    if let Some(project_files) = project_files {
+        register_modules(
+            project_files,
             type_environment.clone(),
             environment.clone(),
-            args,
-            false,
-        )?
+            &core_type_environment,
+        )?;
     }
 
     let result = read_input(
@@ -292,6 +245,30 @@ fn run_script(
     }
 
     result
+}
+
+/// The core library, compiled into the binary.
+///
+/// It is not looked for on disk: mage has to find it identically when run from
+/// a build directory, from the nix store, or from a REPL started anywhere, and
+/// every path-based scheme got one of those wrong. Editing the file rebuilds.
+pub const CORE_SOURCE: &str = include_str!("../../../core/lib.ar");
+
+/// Type checks the core library into `type_environment` and evaluates it.
+///
+/// Failure here is fatal rather than skipped: nothing resolves without the core
+/// library, so a silent skip turns one clear error into a confusing one at
+/// every use of `Option`.
+pub fn load_core(
+    type_environment: Rc<RefCell<TypeEnvironment>>,
+) -> Result<Rc<RefCell<TypeEnvironment>>, String> {
+    let tokens = shared::lexer::tokenize(CORE_SOURCE)?;
+    let (typed_core, core_type_environment) =
+        shared::type_checker::register_core(tokens, type_environment)?;
+
+    interpreter::evaluate(typed_core, Rc::new(RefCell::new(Environment::new())))?;
+
+    Ok(core_type_environment)
 }
 
 pub fn read_input(
@@ -337,6 +314,7 @@ pub fn register_modules(
     project_files: Vec<PathBuf>,
     type_environment: Rc<RefCell<TypeEnvironment>>,
     environment: Rc<RefCell<Environment>>,
+    core_type_environment: &Rc<RefCell<TypeEnvironment>>,
 ) -> Result<(), String> {
     let source_files = project_files
         .iter()
@@ -363,6 +341,14 @@ pub fn register_modules(
             let mod_type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
                 type_environment.borrow().allow_override_types,
             )));
+
+            // A module is checked in an environment of its own, so the prelude
+            // has to be put there too — otherwise `Option` is in scope in the
+            // main file and nowhere else.
+            shared::type_checker::add_prelude(
+                mod_type_environment.clone(),
+                core_type_environment,
+            )?;
 
             let discovered_types =
                 discover_user_defined_types(module.clone(), mod_type_environment.clone())?;

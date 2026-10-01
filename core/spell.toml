@@ -1,0 +1,9 @@
+[package]
+name = "my-package"
+version = "0.1.0"
+
+[bin]
+name = "my-package"
+path = "src/target/core"
+
+[dependencies]

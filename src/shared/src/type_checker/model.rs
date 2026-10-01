@@ -391,6 +391,15 @@ pub enum TypedExpression {
         condition: Box<TypedExpression>,
         true_expression: Box<TypedExpression>,
         false_expression: Option<Box<TypedExpression>>,
+        /// Whether the true branch yields a bare value where the expression as
+        /// a whole is optional, and so has to be wrapped in `Some` to match its
+        /// own type.
+        ///
+        /// Only the checker can tell: it depends on whether there is an else at
+        /// all, and on whether that else is itself optional. The false branch
+        /// never needs it — it is either already optional or there is no
+        /// wrapping to do.
+        wraps_true_branch: bool,
         type_: Type,
     },
     Match {

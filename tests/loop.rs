@@ -4,7 +4,7 @@ use common::{create_typed_ast, StatementExt, VecStatementExt};
 
 use shared::type_checker::{
     model::{Typed, TypedExpression},
-    Type,
+    LiteralType, Type,
 };
 
 #[test]
@@ -55,5 +55,7 @@ fn loop_has_correct_type_when_using_break() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Int);
+    // `1 + 1` folds to the literal `2`, and the loop yields exactly what it
+    // breaks with.
+    assert_eq!(expression.get_type(), LiteralType::IntValue(2).get_type());
 }

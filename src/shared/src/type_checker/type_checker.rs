@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::{
     ast::{EnumVariant, Expression, Parameter, Statement},
@@ -263,4 +265,67 @@ pub fn create_typed_ast(
 
     // Then check the types of the entire AST.
     statements::check_type(&program, &discovered_types, type_environment)
+}
+
+/// The names the core library puts in scope everywhere without an explicit
+/// `use`.
+///
+/// Keeping it an explicit list rather than "everything the module declares"
+/// means what is in scope by default is something you can read off, and the
+/// compiler binds to these by name knowing exactly which they are.
+pub const PRELUDE: &[&str] = &["Option", "Result"];
+
+/// Type checks the core library into a module of its own and puts the prelude
+/// names into `type_environment`.
+///
+/// The library declares `mod core;`, so its contents belong to that module
+/// rather than to whoever loads it; everything outside reaches them either
+/// through the prelude or by naming the module.
+pub fn register_core(
+    source_tokens: Vec<crate::lexer::token::Token>,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<(TypedStatement, Rcrc<TypeEnvironment>), String> {
+    let Some((_, module_path, module)) = crate::ast::discover_module(source_tokens)? else {
+        return Err("The core library must declare the module it belongs to".to_string());
+    };
+
+    let core_type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
+        type_environment.borrow().allow_override_types,
+    )));
+
+    let typed = create_typed_ast(module, core_type_environment.clone())?;
+
+    type_environment
+        .borrow_mut()
+        .add_module(module_path.clone(), core_type_environment.clone());
+
+    for name in PRELUDE {
+        type_environment
+            .borrow_mut()
+            .add_symbol(&module_path, *name)
+            .map_err(|e| format!("The core library does not export `{name}`: {e}"))?;
+    }
+
+    Ok((typed, core_type_environment))
+}
+
+/// Puts the prelude names into `type_environment`, taking them from an already
+/// registered core library.
+///
+/// Every module needs this: a module gets a type environment of its own, so
+/// without it `Option` would be in scope in the main file and nowhere else.
+pub fn add_prelude(
+    type_environment: Rcrc<TypeEnvironment>,
+    core_type_environment: &Rcrc<TypeEnvironment>,
+) -> Result<(), String> {
+    for name in PRELUDE {
+        let type_ = core_type_environment
+            .borrow()
+            .get_type(*name)
+            .ok_or_else(|| format!("The core library does not export `{name}`"))?;
+
+        type_environment.borrow_mut().add_type(type_)?;
+    }
+
+    Ok(())
 }

@@ -7,7 +7,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::{cli::Cli, read_input, utils::get_path};
+use crate::{cli::Cli, read_input};
 use interpreter::Environment;
 use shared::{
     type_checker::{Type, TypeEnvironment},
@@ -15,47 +15,13 @@ use shared::{
 };
 
 pub(crate) fn interactive(args: &Cli) -> Result<(), String> {
-    let exe = std::env::current_exe()
-        .and_then(fs::canonicalize)
-        .expect("Failed to get current executable")
-        .parent()
-        .expect("Failed to get parent directory of executable")
-        .parent()
-        .expect("Failed to get parent directory of executable")
-        .parent()
-        .expect("Failed to get parent directory of executable")
-        .to_str()
-        .expect("Failed to convert path to string")
-        .to_string();
-
-    let lib_path = format!("{exe}\\lib\\lib.ar").replace('\\', "/");
-
-    let lib = get_path(&lib_path)
-        .map_err(|e| e.to_string())?
-        .to_str()
-        .ok_or_else(|| "Failed to convert path to string".to_string())?
-        .to_string();
-
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
     )));
 
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    let lib_exists = std::fs::exists(&lib).map_err(|e| e.to_string())?;
-
-    if lib_exists {
-        match std::fs::read_to_string(lib) {
-            Ok(lib) => read_input(
-                lib,
-                type_environment.clone(),
-                environment.clone(),
-                args,
-                false,
-            )?,
-            Err(e) => panic!("Failed to read lib: {e}"),
-        }
-    }
+    crate::load_core(type_environment.clone())?;
 
     loop {
         let mut input = String::new();

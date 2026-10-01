@@ -1,0 +1,11 @@
+pub mod core;
+
+enum Option<T> {
+    Some { value: T },
+    None
+}
+
+enum Result<TValue, TError> {
+    Ok { value: TValue },
+    Err { error: TError }
+}

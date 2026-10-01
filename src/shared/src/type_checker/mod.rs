@@ -522,60 +522,24 @@ impl Type {
         })
     }
 
-    pub fn option_of(concrete: Type) -> Type {
-        let option_name = "Option".to_string();
-
-        let option_ident = TypeIdentifier::GenericType(
-            option_name,
-            vec![GenericType {
-                type_name: "T".to_string(),
-            }],
+    /// The `Option<T>` the core library declares, instantiated at `concrete`.
+    ///
+    /// Looked up rather than built here, so that the type an `if` without an
+    /// else produces is the very same type the library defines — not a
+    /// lookalike that only passes because comparison is structural.
+    pub fn option_of(
+        concrete: Type,
+        type_environment: &Rcrc<TypeEnvironment>,
+    ) -> Result<Type, String> {
+        let annotation = TypeAnnotation::ConcreteType(
+            "Option".to_string(),
+            vec![concrete.type_annotation()],
         );
 
-        let some_member_ident =
-            TypeIdentifier::MemberType(Box::new(option_ident.clone()), "Some".to_string());
-
-        Type::Enum(Enum {
-            type_identifier: option_ident,
-            shared_fields: Vec::new(),
-            members: vec![
-                (
-                    "Some".to_string(),
-                    Type::Struct(Struct {
-                        type_identifier: TypeIdentifier::MemberType(
-                            Box::new(TypeIdentifier::ConcreteType(
-                                "Option".to_string(),
-                                vec![concrete.type_annotation()],
-                            )),
-                            "Some".to_string(),
-                        ),
-                        embedded_structs: vec![],
-                        fields: vec![StructField {
-                            struct_name: some_member_ident.clone(),
-                            field_name: "value".to_string(),
-                            default_value: None,
-                            field_type: concrete.clone(),
-                        }],
-                    }),
-                ),
-                (
-                    "None".to_string(),
-                    Type::Struct(Struct {
-                        type_identifier: TypeIdentifier::MemberType(
-                            Box::new(TypeIdentifier::ConcreteType(
-                                "Option".to_string(),
-                                vec![concrete.type_annotation()],
-                            )),
-                            "None".to_string(),
-                        ),
-                        embedded_structs: vec![],
-                        fields: Vec::new(),
-                    }),
-                ),
-            ]
-            .into_iter()
-            .collect(),
-        })
+        type_environment
+            .borrow()
+            .get_type_from_annotation(&annotation)
+            .map_err(|e| format!("Could not resolve Option: {e}"))
     }
 
     pub fn from_value_literal(literal: &model::ValueLiteral) -> Result<Type, String> {

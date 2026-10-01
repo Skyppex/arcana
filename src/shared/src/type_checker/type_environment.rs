@@ -697,6 +697,12 @@ impl TypeEnvironment {
                         .as_ref()
                         .and_then(|p| p.borrow().get_type_from_annotation(type_annotation).ok())
                 })
+                .or_else(|| {
+                    let module = self.resolve_through_module(type_name)?;
+                    let item = type_name.rsplit_once("::")?.1;
+                    let found = module.borrow().get_type(item);
+                    found
+                })
                 .or_else(|| self.project_associated_type(type_name))
                 .ok_or_else(|| match type_name.strip_prefix("Self::") {
                     // `::` already spells an enum's variants, so an associated
@@ -944,6 +950,18 @@ impl TypeEnvironment {
     ///
     /// Separated from resolution so that substitution happens in the scope that
     /// wrote the type arguments, not the one that holds the declaration.
+    /// A type named through the module it lives in — `core::Option`.
+    ///
+    /// The prefix is a module path rather than a type, which is what separates
+    /// this from a variant path like `E::Some`: those resolve as types and
+    /// never reach here.
+    fn resolve_through_module(&self, name: &str) -> Option<Rcrc<Self>> {
+        let (module_path, _) = name.rsplit_once("::")?;
+        self.get_module(ModPath::new(
+            module_path.split("::").map(|s| s.to_owned()).collect(),
+        ))
+    }
+
     fn find_generic_declaration(&self, type_name: &str, arity: usize) -> Option<Type> {
         let key = TypeIdentifier::GenericType(
             type_name.to_owned(),
@@ -964,6 +982,12 @@ impl TypeEnvironment {
                 self.parent
                     .as_ref()
                     .and_then(|parent| parent.borrow().find_generic_declaration(type_name, arity))
+            })
+            .or_else(|| {
+                let module = self.resolve_through_module(type_name)?;
+                let item = type_name.rsplit_once("::")?.1;
+                let found = module.borrow().find_generic_declaration(item, arity);
+                found
             })
     }
 
