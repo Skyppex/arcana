@@ -56,6 +56,7 @@ pub struct LogFlags {
     pub tokens: bool,
     pub ast: bool,
     pub typed_ast: bool,
+    pub simple_typed_ast: bool,
 }
 
 impl FromStr for LogFlags {
@@ -66,6 +67,7 @@ impl FromStr for LogFlags {
             tokens: false,
             ast: false,
             typed_ast: false,
+            simple_typed_ast: false,
         };
 
         for flag in s.chars() {
@@ -73,6 +75,7 @@ impl FromStr for LogFlags {
                 'k' => flags.tokens = true,
                 'a' => flags.ast = true,
                 't' => flags.typed_ast = true,
+                's' => flags.simple_typed_ast = true,
                 _ => {}
             }
         }

@@ -2152,6 +2152,7 @@ impl IndentDisplay for TypedExpression {
                 mutable,
                 pattern,
                 initializer,
+                bound_type: _,
                 type_,
             } => {
                 let mut result = String::new();

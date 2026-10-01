@@ -43,6 +43,12 @@ pub fn create_typed_ast(input: &str) -> TypedStatement {
     type_checker::create_typed_ast(ast, type_environment).unwrap()
 }
 
+/// Like [`create_typed_ast`], but with the simplification pass applied, for
+/// asserting what that pass did to the tree.
+pub fn create_simplified_ast(input: &str) -> TypedStatement {
+    type_checker::simplify(create_typed_ast(input))
+}
+
 /// Like [`create_typed_ast`], but surfaces lex/parse/type errors instead of panicking.
 /// Use this to assert that a program is *rejected*.
 pub fn try_create_typed_ast(input: &str) -> Result<TypedStatement, String> {
@@ -61,7 +67,7 @@ pub fn evaluate_expression(
     let tokens = lexer::tokenize(input).unwrap();
     let ast = ast::create_ast(tokens, false).unwrap();
     let type_environment = core_type_environment();
-    let typed_ast = type_checker::create_typed_ast(ast, type_environment).unwrap();
+    let typed_ast = type_checker::simplify(type_checker::create_typed_ast(ast, type_environment).unwrap());
 
     if unwrap_semi {
         interpreter::evaluate(typed_ast.unwrap_semi(), environment).unwrap()

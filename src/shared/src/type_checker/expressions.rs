@@ -466,6 +466,8 @@ pub fn check_type(
                 mutable: *mutable,
                 pattern: pattern.clone(),
                 initializer: initializer.map(Box::new),
+                bound_type: type_,
+                // A declaration evaluates to whether it bound.
                 type_: Type::Bool,
             })
         }

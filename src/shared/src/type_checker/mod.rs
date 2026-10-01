@@ -2,6 +2,7 @@ pub mod decision_tree;
 pub mod full_name;
 pub mod model;
 pub mod pattern;
+pub mod simplification;
 #[allow(clippy::module_inception)]
 pub mod type_checker;
 pub mod type_environment;
@@ -11,6 +12,7 @@ mod scope;
 mod statements;
 
 pub use expressions::{is_option, option_inner};
+pub use simplification::simplify;
 pub use full_name::*;
 use num_traits::Zero;
 pub use type_checker::*;
@@ -1758,6 +1760,25 @@ pub fn join_types(left: &Type, right: &Type) -> Option<Type> {
             return Some(other.clone())
         }
         _ => {}
+    }
+
+    // Tuples join element by element. They need their own case because tuples
+    // compare unstrictly — `(#1, #2)` and `(#3, #4)` are "equal" as far as
+    // `type_equals` is concerned, so the checks below would answer with
+    // whichever side came first and claim a pair of 1 and 2.
+    if let (Type::Tuple(left), Type::Tuple(right)) =
+        (&left.clone().unsubstitute(), &right.clone().unsubstitute())
+    {
+        if left.len() != right.len() {
+            return None;
+        }
+
+        return left
+            .iter()
+            .zip(right.iter())
+            .map(|(l, r)| join_types(l, r))
+            .collect::<Option<Vec<_>>>()
+            .map(Type::Tuple);
     }
 
     let left_covers_right = type_equals(left, right);

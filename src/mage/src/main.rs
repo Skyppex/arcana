@@ -123,7 +123,6 @@ fn run_spell(
         .filter(|path| path != &main)
         .collect::<Vec<_>>();
 
-
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
     )));
@@ -193,7 +192,6 @@ fn run_script(
     } else {
         content
     };
-
 
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
@@ -281,6 +279,7 @@ pub fn read_input(
     let print_tokens = args.logging.log_flags.tokens;
     let print_parser_ast = args.logging.log_flags.ast;
     let print_type_checker_ast = args.logging.log_flags.typed_ast;
+    let print_simple_type_checker_ast = args.logging.log_flags.simple_typed_ast;
 
     let tokens = shared::lexer::tokenize(&input)?;
     if print_tokens {
@@ -295,6 +294,12 @@ pub fn read_input(
     let typed_program = create_typed_ast(program, type_environment)?;
     if print_type_checker_ast {
         eprintln!("{}\n", typed_program.prettify());
+    }
+
+    let typed_program = shared::type_checker::simplify(typed_program);
+
+    if print_simple_type_checker_ast {
+        eprintln!("SIMPLIFIED:\n\n{}\n", typed_program.prettify());
     }
 
     let result = interpreter::evaluate(typed_program, environment)?;
@@ -345,10 +350,7 @@ pub fn register_modules(
             // A module is checked in an environment of its own, so the prelude
             // has to be put there too — otherwise `Option` is in scope in the
             // main file and nowhere else.
-            shared::type_checker::add_prelude(
-                mod_type_environment.clone(),
-                core_type_environment,
-            )?;
+            shared::type_checker::add_prelude(mod_type_environment.clone(), core_type_environment)?;
 
             let discovered_types =
                 discover_user_defined_types(module.clone(), mod_type_environment.clone())?;

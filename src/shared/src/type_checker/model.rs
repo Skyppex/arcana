@@ -385,6 +385,13 @@ pub enum TypedExpression {
         mutable: bool,
         pattern: Pattern,
         initializer: Option<Box<TypedExpression>>,
+        /// The type the name was bound at, which is not the type of the
+        /// declaration itself — a declaration evaluates to whether it bound, so
+        /// `type_` is always `Bool`.
+        ///
+        /// It is not the initializer's type either: an annotation widens it,
+        /// and so does `mut`.
+        bound_type: Type,
         type_: Type,
     },
     If {
