@@ -92,8 +92,8 @@ impl TypedStatement {
 impl Typed for TypedStatement {
     fn get_type(&self) -> Type {
         match self {
-            TypedStatement::None => Type::Void,
-            TypedStatement::Program { .. } => Type::Void,
+            TypedStatement::None => Type::Never,
+            TypedStatement::Program { .. } => Type::Never,
             TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Use { type_, .. } => type_.clone(),
             TypedStatement::StructDeclaration(StructData { type_, .. }) => type_.clone(),
@@ -103,15 +103,15 @@ impl Typed for TypedStatement {
             TypedStatement::ProtocolDeclaration { type_, .. } => type_.clone(),
             TypedStatement::ImplementationDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
-            TypedStatement::Semi { .. } => Type::Void,
+            TypedStatement::Semi { .. } => Type::Never,
             TypedStatement::Expression(e) => e.get_type(),
         }
     }
 
     fn get_deep_type(&self) -> Type {
         match self {
-            TypedStatement::None => Type::Void,
-            TypedStatement::Program { .. } => Type::Void,
+            TypedStatement::None => Type::Never,
+            TypedStatement::Program { .. } => Type::Never,
             TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Use { type_, .. } => type_.clone(),
             TypedStatement::StructDeclaration(StructData { type_, .. }) => type_.clone(),
@@ -219,7 +219,6 @@ impl Display for TypedStatement {
                 type_annotation,
                 associated_types,
                 functions,
-                type_: _,
                 ..
             } => write!(
                 f,
@@ -478,7 +477,6 @@ pub enum TypedExpression {
 impl Typed for TypedExpression {
     fn get_type(&self) -> Type {
         match self {
-            // TypedExpression::None => Type::Void,
             TypedExpression::VariableDeclaration { type_, .. } => type_.clone(),
             TypedExpression::If { type_, .. } => type_.clone(),
             TypedExpression::Match { type_, .. } => type_.clone(),
@@ -494,16 +492,15 @@ impl Typed for TypedExpression {
             TypedExpression::Loop { type_, .. } => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
             TypedExpression::For { type_, .. } => type_.clone(),
-            TypedExpression::Break(_) => Type::Void,
-            TypedExpression::Continue => Type::Void,
-            TypedExpression::Return(_) => Type::Void,
+            TypedExpression::Break(_) => Type::Never,
+            TypedExpression::Continue => Type::Never,
+            TypedExpression::Return(_) => Type::Never,
         }
         .unsubstitute()
     }
 
     fn get_deep_type(&self) -> Type {
         match self {
-            // TypedExpression::None => Type::Void,
             TypedExpression::VariableDeclaration { type_, .. } => type_.clone(),
             TypedExpression::If { type_, .. } => type_.clone(),
             TypedExpression::Match { type_, .. } => type_.clone(),
@@ -525,9 +522,9 @@ impl Typed for TypedExpression {
             TypedExpression::Loop { type_, .. } => type_.clone(),
             TypedExpression::While { type_, .. } => type_.clone(),
             TypedExpression::For { type_, .. } => type_.clone(),
-            TypedExpression::Break(_) => Type::Void,
-            TypedExpression::Continue => Type::Void,
-            TypedExpression::Return(_) => Type::Void,
+            TypedExpression::Break(_) => Type::Never,
+            TypedExpression::Continue => Type::Never,
+            TypedExpression::Return(_) => Type::Never,
         }
         .unsubstitute()
     }
@@ -875,7 +872,6 @@ impl From<ast::AccessModifier> for AccessModifier {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueLiteral {
-    Void,
     Unit,
     Int(i64),
     UInt(u64),
@@ -910,7 +906,6 @@ impl Hash for ValueLiteral {
 impl Typed for ValueLiteral {
     fn get_type(&self) -> Type {
         match self {
-            ValueLiteral::Void => Type::Void,
             ValueLiteral::Unit => Type::Unit,
             ValueLiteral::Int(v) => Type::Literal {
                 name: v.to_string(),
@@ -944,7 +939,6 @@ impl Typed for ValueLiteral {
 
     fn get_deep_type(&self) -> Type {
         match self {
-            ValueLiteral::Void => Type::Void,
             ValueLiteral::Unit => Type::Unit,
             ValueLiteral::Int(_) => Type::Int,
             ValueLiteral::UInt(_) => Type::UInt,
@@ -984,7 +978,6 @@ impl TryFrom<Type> for ValueLiteral {
 impl Display for ValueLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ValueLiteral::Void => write!(f, "#Void"),
             ValueLiteral::Unit => write!(f, "#Unit"),
             ValueLiteral::Int(v) => write!(f, "#{}", v),
             ValueLiteral::UInt(v) => write!(f, "#{}", v),

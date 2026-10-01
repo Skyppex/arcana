@@ -1,9 +1,9 @@
+use crate::ast::StatementKind;
+use crate::diagnostic::{Diagnostic, Spanned};
 use crate::type_checker::{
     purity::{carry_body_purity, purity_of},
     Purity,
 };
-use crate::ast::StatementKind;
-use crate::diagnostic::{Diagnostic, Spanned};
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -14,7 +14,7 @@ use std::{
 use crate::{
     ast::{
         self, ImplementationDeclaration, ModPath, ModuleDeclaration, ProtocolDeclaration,
-        Statement, StructData, UnionDeclaration, Use, UseExpr, UseItem,
+        Statement, StructData, UnionDeclaration, Use, UseItem,
     },
     types::{ToKey, TypeAnnotation, TypeIdentifier},
 };
@@ -151,7 +151,7 @@ pub fn discover_user_defined_types(
             param: param.clone(),
             return_type_annotation: return_type_annotation
                 .clone()
-                .unwrap_or(Type::Void.type_annotation()),
+                .unwrap_or(Type::Never.type_annotation()),
         }]),
         StatementKind::Semi(_) => Ok(vec![]),
         StatementKind::Expression(_) => Ok(vec![]),
@@ -236,7 +236,7 @@ fn check_type_of(
                 .clone()
                 .map(|access_modifier| access_modifier.into()),
             module_path: module_path.clone(),
-            type_: Type::Void,
+            type_: Type::Never,
         }),
         StatementKind::Use(Use { use_item }) => {
             check_use_item(use_item, ModPath::root(), type_environment.clone())
@@ -548,8 +548,8 @@ fn check_type_of(
                 literal_types
                     .iter()
                     .map(|t| t.unstrict())
-                    .try_fold(Type::Void, |acc, t| {
-                        if type_equals(&acc.clone(), &Type::Void) {
+                    .try_fold(Type::Never, |acc, t| {
+                        if type_equals(&acc.clone(), &Type::Never) {
                             Ok(t.clone())
                         } else if !type_equals_coerce(&acc.clone(), &t) {
                             Err(format!(
@@ -975,7 +975,7 @@ fn check_type_of(
                 type_annotation: type_annotation.clone(),
                 associated_types: vec![],
                 functions: typed_functions,
-                type_: Type::Void,
+                type_: Type::Never,
             })
         }
         StatementKind::FunctionDeclaration(ast::FunctionDeclaration {
@@ -1036,7 +1036,7 @@ fn check_type_of(
             let return_type = check_type_annotation(
                 &return_type_annotation
                     .clone()
-                    .unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
+                    .unwrap_or(TypeAnnotation::Type(Type::Never.to_string())),
                 discovered_types,
                 function_type_environment.clone(),
             )?;
@@ -1152,7 +1152,7 @@ fn check_type_of(
                 .map(|s| s.fold())
                 .unwrap_or_else(|| Ok(body_typed_expression.get_type()))?;
 
-            if !type_equals(&return_type, &Type::Void) && !type_equals(&return_type, &body_type) {
+            if !type_equals(&return_type, &Type::Never) && !type_equals(&return_type, &body_type) {
                 return Err(Diagnostic::error(format!(
                     "Function body's return type {} does not match function return type {}",
                     body_type, return_type
@@ -1213,7 +1213,7 @@ fn check_use_item(
 
     Ok(TypedStatement::Use {
         use_item: use_item.clone(),
-        type_: Type::Void,
+        type_: Type::Never,
     })
 }
 
@@ -1332,8 +1332,8 @@ pub fn check_type_annotation(
                 literal_types
                     .iter()
                     .map(|t| t.unstrict())
-                    .try_fold(Type::Void, |acc, t| {
-                        if type_equals(&acc.clone(), &Type::Void) {
+                    .try_fold(Type::Never, |acc, t| {
+                        if type_equals(&acc.clone(), &Type::Never) {
                             Ok(t.clone())
                         } else if !type_equals_coerce(&acc.clone(), &t) {
                             Err(format!(
@@ -1418,9 +1418,9 @@ pub fn check_type_annotation(
                 )?),
             }))
         }
-        Some(DiscoveredType::UseItem { .. }) => Ok(Type::Void),
+        Some(DiscoveredType::UseItem { .. }) => Ok(Type::Never),
         // Implementations are not types, and are never found by name.
-        Some(DiscoveredType::Implementation { .. }) => Ok(Type::Void),
+        Some(DiscoveredType::Implementation { .. }) => Ok(Type::Never),
         None => type_environment
             .borrow()
             .get_type_from_annotation(type_annotation),

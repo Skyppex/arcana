@@ -40,8 +40,8 @@ pub enum TypeAnnotation {
 }
 
 impl TypeAnnotation {
-    pub fn void() -> Self {
-        TypeAnnotation::Type("void".to_string())
+    pub fn never() -> Self {
+        TypeAnnotation::Type("Never".to_string())
     }
 
     pub fn has_double_colon(&self) -> bool {
@@ -93,7 +93,7 @@ impl From<Type> for TypeAnnotation {
             }
             Type::Unknown => panic!("Cannot convert unknown type to type annotation"),
             Type::Generic(g) => TypeAnnotation::Type(g.type_name),
-            Type::Void => TypeAnnotation::Type("Void".to_string()),
+            Type::Never => TypeAnnotation::Type("Never".to_string()),
             Type::Unit => TypeAnnotation::Type("Unit".to_string()),
             Type::Int => TypeAnnotation::Type("Int".to_string()),
             Type::UInt => TypeAnnotation::Type("UInt".to_string()),
@@ -109,12 +109,12 @@ impl From<Type> for TypeAnnotation {
                 Some(Box::new(return_type.deref().clone().into())),
             ),
             Type::Tuple(e) => TypeAnnotation::Tuple(e.into_iter().map(|t| t.into()).collect()),
-            Type::Struct(_) => todo!(),
-            Type::Enum(_) => todo!(),
-            Type::Union(_) => todo!(),
-            Type::TypeAlias(_) => todo!(),
-            Type::Protocol(_) => todo!(),
-            Type::Literal { .. } => todo!(),
+            Type::Struct(s) => s.type_annotation(),
+            Type::Enum(e) => e.type_annotation(),
+            Type::Union(u) => u.type_annotation(),
+            Type::TypeAlias(t) => t.type_annotation(),
+            Type::Protocol(p) => p.type_annotation(),
+            Type::Literal { type_, .. } => TypeAnnotation::Literal(type_.clone()),
             Type::Any => panic!("Cannot convert Any type to type annotation"),
             Type::Meta(_) => panic!("Cannot convert meta type to type annotation"),
             Type::Range { .. } => panic!("Cannot convert range type to type annotation"),
@@ -422,7 +422,7 @@ pub struct GenericConstraint {
 
 pub(super) fn parse_optional_type_annotation(
     cursor: &mut Cursor,
-    allow_void: bool,
+    allow_never_type: bool,
 ) -> Result<Option<TypeAnnotation>, Diagnostic> {
     if cursor.first().kind != TokenKind::Colon {
         Ok(None)
@@ -436,7 +436,7 @@ pub(super) fn parse_optional_type_annotation(
             )));
         }
 
-        Ok(Some(parse_type_annotation(cursor, allow_void)?))
+        Ok(Some(parse_type_annotation(cursor, allow_never_type)?))
     }
 }
 
@@ -444,7 +444,6 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
     let mut cloned_cursor = cursor.clone();
 
     match cloned_cursor.first().kind {
-        TokenKind::Literal(token::Literal::Void) => true,
         TokenKind::Literal(token::Literal::Unit) => true,
         TokenKind::Hash => true,
         TokenKind::Identifier(_) => true,
@@ -460,17 +459,9 @@ pub(super) fn can_be_type_annotation(cursor: &Cursor) -> bool {
 
 pub(super) fn parse_type_annotation(
     cursor: &mut Cursor,
-    allow_void: bool,
+    allow_never_type: bool,
 ) -> Result<TypeAnnotation, Diagnostic> {
     match cursor.first().kind {
-        TokenKind::Literal(token::Literal::Void) => {
-            if !allow_void {
-                return Err(Diagnostic::error("Void type is not allowed here"));
-            }
-
-            cursor.bump()?; // Consume the void
-            Ok(TypeAnnotation::Type("void".to_string()))
-        }
         TokenKind::Literal(token::Literal::Unit) => {
             cursor.bump()?; // Consume the unit
             Ok(TypeAnnotation::Type("unit".to_string()))
@@ -501,7 +492,7 @@ pub(super) fn parse_type_annotation(
                 generics = Some(parse_comma_separated_type_annotations(
                     cursor,
                     |kind| kind != TokenKind::Greater,
-                    allow_void,
+                    allow_never_type,
                 )?);
 
                 cursor.bump()?; // Consume the >
@@ -528,7 +519,7 @@ pub(super) fn parse_type_annotation(
                     let generics = parse_comma_separated_type_annotations(
                         cursor,
                         |kind| kind != TokenKind::Greater,
-                        allow_void,
+                        allow_never_type,
                     )?;
 
                     cursor.bump()?; // Consume the >
@@ -556,7 +547,7 @@ pub(super) fn parse_type_annotation(
                 let trailing = parse_comma_separated_type_annotations(
                     cursor,
                     |kind| kind != TokenKind::Greater,
-                    allow_void,
+                    allow_never_type,
                 )?;
 
                 cursor.bump()?; // Consume the >
@@ -573,7 +564,7 @@ pub(super) fn parse_type_annotation(
         TokenKind::OpenBracket => {
             cursor.bump()?; // Consume the [
 
-            let type_annotation = parse_type_annotation(cursor, allow_void)?;
+            let type_annotation = parse_type_annotation(cursor, allow_never_type)?;
 
             if cursor.first().kind != TokenKind::CloseBracket {
                 return Err(Diagnostic::error(format!(
@@ -591,13 +582,13 @@ pub(super) fn parse_type_annotation(
                 return Err(Diagnostic::error("Use 'Unit' instead of '()'"));
             }
 
-            let type_annotation = parse_type_annotation(cursor, allow_void)?;
+            let type_annotation = parse_type_annotation(cursor, allow_never_type)?;
 
             let mut annotations = vec![type_annotation];
 
             while cursor.first().kind == TokenKind::Comma {
                 cursor.bump()?; // Consume the ,
-                annotations.push(parse_type_annotation(cursor, allow_void)?);
+                annotations.push(parse_type_annotation(cursor, allow_never_type)?);
             }
 
             cursor.bump()?; // Consume the )
@@ -618,7 +609,7 @@ pub(super) fn parse_type_annotation(
             let params = parse_comma_separated_type_annotations(
                 cursor,
                 |kind| kind != TokenKind::CloseParen,
-                allow_void,
+                allow_never_type,
             )?;
 
             cursor.bump()?; // Consume the )
@@ -680,12 +671,12 @@ fn unwrap_function_annotation_recurse(
 fn parse_comma_separated_type_annotations<F: Fn(TokenKind) -> bool>(
     cursor: &mut Cursor,
     check: F,
-    allow_void: bool,
+    allow_never_type: bool,
 ) -> Result<Vec<TypeAnnotation>, Diagnostic> {
     let mut types = Vec::new();
 
     while check(cursor.first().kind) {
-        let type_annotation = parse_type_annotation(cursor, allow_void)?;
+        let type_annotation = parse_type_annotation(cursor, allow_never_type)?;
         types.push(type_annotation);
 
         if cursor.first().kind == TokenKind::Comma {

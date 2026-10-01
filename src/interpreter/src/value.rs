@@ -8,7 +8,7 @@ use crate::{environment::Rcrc, Environment};
 #[derive(Clone, PartialEq)]
 pub enum Value {
     Uninitialized,
-    Void,
+    None,
     Unit,
     Bool(bool),
     Number(Number),
@@ -28,7 +28,7 @@ pub enum Value {
 impl Value {
     pub fn option_some(value: Value) -> Value {
         match value {
-            Value::Void => Value::Void,
+            Value::None => Value::None,
             v => Value::Enum(Enum {
                 type_name: "Option".to_owned(),
                 enum_member: Struct {
@@ -52,8 +52,8 @@ impl Value {
         })
     }
 
-    pub fn is_void(&self) -> bool {
-        *self == Value::Void
+    pub fn is_none_value(&self) -> bool {
+        *self == Value::None
     }
 }
 
@@ -61,7 +61,7 @@ impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Uninitialized => write!(f, "uninitialized"),
-            Value::Void => write!(f, "void"),
+            Value::None => write!(f, "none"),
             Value::Unit => write!(f, "unit"),
             Value::Bool(boolean) => write!(f, "{}", boolean),
             Value::Number(number) => write!(f, "{}", number),
@@ -139,7 +139,7 @@ impl std::fmt::Debug for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Uninitialized => f.write_str("Uninitialized"),
-            Value::Void => f.write_str("Void"),
+            Value::None => f.write_str("None"),
             Value::Unit => f.write_str("Unit"),
             Value::Bool(v) => fmt::Debug::fmt(v, f),
             Value::Number(v) => fmt::Debug::fmt(v, f),
@@ -257,11 +257,11 @@ pub fn get_built_in_function_value(
             param_name: Some("value".to_string()),
             body: FunctionBody::Fn(|value| {
                 let Some(value) = value else {
-                    return Value::Void;
+                    return Value::Unit;
                 };
 
                 print!("{}", value);
-                Value::Void
+                Value::Unit
             }),
             environment,
         },
@@ -270,11 +270,11 @@ pub fn get_built_in_function_value(
             body: FunctionBody::Fn(|value| {
                 let Some(value) = value else {
                     println!();
-                    return Value::Void;
+                    return Value::Unit;
                 };
 
                 println!("{}", value);
-                Value::Void
+                Value::Unit
             }),
             environment,
         },
@@ -282,11 +282,11 @@ pub fn get_built_in_function_value(
             param_name: Some("value".to_string()),
             body: FunctionBody::Fn(|value| {
                 let Some(value) = value else {
-                    return Value::Void;
+                    return Value::Unit;
                 };
 
                 eprint!("{}", value);
-                Value::Void
+                Value::Unit
             }),
             environment,
         },
@@ -295,11 +295,11 @@ pub fn get_built_in_function_value(
             body: FunctionBody::Fn(|value| {
                 let Some(value) = value else {
                     eprintln!();
-                    return Value::Void;
+                    return Value::Unit;
                 };
 
                 eprintln!("{}", value);
-                Value::Void
+                Value::Unit
             }),
             environment,
         },
@@ -333,12 +333,12 @@ pub fn get_built_in_function_value(
                 };
 
                 if arr.is_empty() {
-                    return Value::Void;
+                    return Value::option_none();
                 }
 
                 let random_index = rand::random_range(0..arr.len());
 
-                arr[random_index].clone()
+                Value::option_some(arr[random_index].clone())
             }),
             environment,
         },

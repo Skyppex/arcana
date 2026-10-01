@@ -106,7 +106,6 @@ impl TokenKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
-    Void,
     Unit,
     Int(IntLiteral<i64>),
     UInt(IntLiteral<u64>),
@@ -119,7 +118,6 @@ pub enum Literal {
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Void => write!(f, "void"),
             Literal::Unit => write!(f, "unit"),
             Literal::Int(v) => write!(f, "{}", v),
             Literal::UInt(v) => write!(f, "{}", v),

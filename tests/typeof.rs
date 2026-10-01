@@ -347,7 +347,7 @@ fn typeof_can_be_printed() {
     let result = evaluate_expression(input, create_env(), false);
 
     // Assert
-    assert_eq!(result, Value::Void);
+    assert_eq!(result, Value::None);
 }
 
 #[test]

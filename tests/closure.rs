@@ -3,9 +3,8 @@ mod common;
 use common::{create_env, create_typed_ast, evaluate_expression, StatementExt, VecStatementExt};
 use interpreter::{value::Number, Value};
 use shared::type_checker::{
-    Purity,
     model::{Typed, TypedExpression},
-    Function, Parameter, Type,
+    Function, Parameter, Purity, Type,
 };
 
 #[test]
@@ -47,7 +46,7 @@ fn closure_has_correct_type() {
             purity: Purity::Pure,
             identifier: None,
             param: None,
-            return_type: Box::new(Type::Void),
+            return_type: Box::new(Type::Never),
         })
     );
 }
@@ -189,7 +188,7 @@ fn closure_voids_body_if_return_type_is_void() {
     let value = evaluate_expression(input, create_env(), false);
 
     // Assert
-    assert_eq!(value, Value::Void);
+    assert_eq!(value, Value::None);
 }
 
 #[test]

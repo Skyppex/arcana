@@ -1022,12 +1022,7 @@ impl IndentDisplay for Expression {
                 let mut result = String::new();
                 result.push_str("<use-expr>");
                 indent.increase();
-                result.push_str(&indent_display_slice(
-                    &args,
-                    "arguments",
-                    "argument",
-                    indent,
-                ));
+                result.push_str(&indent_display_slice(args, "arguments", "argument", indent));
 
                 result.push_str(
                     format!("\n{}expr: {}", indent.dash(), expr.indent_display(indent)).as_str(),
@@ -1433,7 +1428,7 @@ impl IndentDisplay for FlagsMember {
         let mut result = String::new();
         result.push_str("<flags member>\n");
         indent.increase_leaf();
-        result.push_str(format!("{}identifier: {}\n", indent.dash(), &self.identifier).as_str());
+        result.push_str(format!("{}identifier: {}\n", indent.dash(), self.identifier).as_str());
         result.push_str(format!("{}value: {}", indent.dash_end(), self.value).as_str());
         indent.decrease();
         result
@@ -2127,7 +2122,7 @@ impl IndentDisplay for TypedStatement {
             }
             TypedStatement::Semi(e) => {
                 let mut result = String::new();
-                result.push_str(format!("<semi>: {}\n", Type::Void).as_str());
+                result.push_str(format!("<semi>: {}\n", Type::Never).as_str());
                 indent.increase();
                 indent.end_current();
                 result.push_str(
@@ -2577,7 +2572,7 @@ impl IndentDisplay for TypedExpression {
             }
             TypedExpression::Break(e) => {
                 let mut result = String::new();
-                result.push_str(format!("<break>: {}\n", Type::Void).as_str());
+                result.push_str(format!("<break>: {}\n", Type::Never).as_str());
                 indent.increase();
                 indent.end_current();
                 result.push_str(
@@ -2593,12 +2588,12 @@ impl IndentDisplay for TypedExpression {
             }
             TypedExpression::Continue => {
                 let mut result = String::new();
-                result.push_str(format!("<continue>: {}\n", Type::Void).as_str());
+                result.push_str(format!("<continue>: {}\n", Type::Never).as_str());
                 result
             }
             TypedExpression::Return(e) => {
                 let mut result = String::new();
-                result.push_str(format!("<return>: {}\n", Type::Void).as_str());
+                result.push_str(format!("<return>: {}\n", Type::Never).as_str());
                 indent.increase();
                 indent.end_current();
                 result.push_str(
@@ -2830,7 +2825,6 @@ impl IndentDisplay for type_checker::model::Index {
 impl IndentDisplay for type_checker::model::ValueLiteral {
     fn indent_display(&self, indent: &mut Indent) -> String {
         match self {
-            type_checker::model::ValueLiteral::Void => "Void".to_string(),
             type_checker::model::ValueLiteral::Unit => "Unit".to_string(),
             type_checker::model::ValueLiteral::Int(v) => format!("#{}", v),
             type_checker::model::ValueLiteral::UInt(v) => format!("#{}", v),

@@ -1,5 +1,5 @@
-use crate::type_checker::Purity;
 use crate::diagnostic::Diagnostic;
+use crate::type_checker::Purity;
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -94,7 +94,7 @@ impl TypeEnvironment {
             parent: None,
             modules: HashMap::new(),
             types: HashMap::from([
-                ("Void".to_string(), Type::Void),
+                ("Never".to_string(), Type::Never),
                 ("Unit".to_string(), Type::Unit),
                 ("Bool".to_string(), Type::Bool),
                 ("Int".to_string(), Type::Int),
@@ -786,7 +786,7 @@ impl TypeEnvironment {
                         identifier: pt.full_name(),
                         type_: Box::new(pt),
                     }),
-                    return_type: Box::new(return_type.unwrap_or(Type::Void)),
+                    return_type: Box::new(return_type.unwrap_or(Type::Never)),
                 }))
             }
         }

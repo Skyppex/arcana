@@ -484,7 +484,7 @@ pub enum Type {
 
     Unknown,
     Generic(GenericType),
-    Void,
+    Never,
     Unit,
     Int,
     UInt,
@@ -639,7 +639,7 @@ impl Type {
                 type_identifier, ..
             } => type_identifier.clone(),
             Type::Generic(name) => TypeIdentifier::Type(name.type_name.clone()),
-            Type::Void => TypeIdentifier::Type("Void".to_string()),
+            Type::Never => TypeIdentifier::Type("Never".to_string()),
             Type::Unit => TypeIdentifier::Type("Unit".to_string()),
             Type::Int => TypeIdentifier::Type("Int".to_string()),
             Type::UInt => TypeIdentifier::Type("UInt".to_string()),
@@ -668,7 +668,7 @@ impl Type {
                 type_identifier, ..
             } => type_identifier.into(),
             Type::Generic(name) => TypeAnnotation::Type(name.type_name.clone()),
-            Type::Void => TypeAnnotation::Type("Void".to_string()),
+            Type::Never => TypeAnnotation::Type("Never".to_string()),
             Type::Unit => TypeAnnotation::Type("Unit".to_string()),
             Type::Int => TypeAnnotation::Type("Int".to_string()),
             Type::UInt => TypeAnnotation::Type("UInt".to_string()),
@@ -1099,7 +1099,7 @@ impl FullName for Type {
             Type::AssociatedType { on, name, .. } => format!("{}::{}", on.full_name(), name),
             Type::Unknown => "{unknown}".to_string(),
             Type::Generic(GenericType { type_name }) => type_name.to_string(),
-            Type::Void => "Void".to_string(),
+            Type::Never => "Never".to_string(),
             Type::Unit => "Unit".to_string(),
             Type::Int => "Int".to_string(),
             Type::UInt => "UInt".to_string(),
@@ -1166,7 +1166,7 @@ impl FromStr for Type {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Void" => Ok(Type::Void),
+            "Never" => Ok(Type::Never),
             "Unit" => Ok(Type::Unit),
             "Int" => Ok(Type::Int),
             "UInt" => Ok(Type::UInt),
@@ -1189,7 +1189,7 @@ impl Display for Type {
             Type::AssociatedType { on, name, .. } => write!(f, "{}::{}", on, name),
             Type::Unknown => write!(f, "{{unknown}}"),
             Type::Generic(generic_type) => write!(f, "{}", generic_type.type_name),
-            Type::Void => write!(f, "Void"),
+            Type::Never => write!(f, "Never"),
             Type::Unit => write!(f, "Unit"),
             Type::Int => write!(f, "Int"),
             Type::UInt => write!(f, "UInt"),

@@ -31,9 +31,9 @@ pub fn evaluate(
     environment: Rcrc<Environment>,
 ) -> Result<Value, Diagnostic> {
     match typed_statement {
-        TypedStatement::None => Ok(Value::Void),
+        TypedStatement::None => Ok(Value::None),
         TypedStatement::Program { statements } => evaluate_program(statements, environment),
-        TypedStatement::ModuleDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::ModuleDeclaration { .. } => Ok(Value::None),
         TypedStatement::Use { use_item, .. } => {
             let imports = evaluate_use_item(use_item, ModPath::root(), environment.clone())?;
 
@@ -46,13 +46,13 @@ pub fn evaluate(
                 );
             }
 
-            Ok(Value::Void)
+            Ok(Value::None)
         }
-        TypedStatement::StructDeclaration { .. } => Ok(Value::Void),
-        TypedStatement::EnumDeclaration { .. } => Ok(Value::Void),
-        TypedStatement::UnionDeclaration { .. } => Ok(Value::Void),
-        TypedStatement::TypeAliasDeclaration { .. } => Ok(Value::Void),
-        TypedStatement::ProtocolDeclaration { .. } => Ok(Value::Void),
+        TypedStatement::StructDeclaration { .. } => Ok(Value::None),
+        TypedStatement::EnumDeclaration { .. } => Ok(Value::None),
+        TypedStatement::UnionDeclaration { .. } => Ok(Value::None),
+        TypedStatement::TypeAliasDeclaration { .. } => Ok(Value::None),
+        TypedStatement::ProtocolDeclaration { .. } => Ok(Value::None),
         TypedStatement::ImplementationDeclaration {
             type_annotation,
             functions,
@@ -66,7 +66,7 @@ pub fn evaluate(
         } => evaluate_function_declaration(environment, identifier, param, body),
         TypedStatement::Semi(s) => {
             evaluate(*s, environment)?;
-            Ok(Value::Void)
+            Ok(Value::None)
         }
         TypedStatement::Expression(e) => evaluate_expression(e, environment),
     }
@@ -147,7 +147,7 @@ fn evaluate_implementation_declaration(
             .add_static_member(&type_annotation, qualified, variable);
     }
 
-    Ok(Value::Void)
+    Ok(Value::None)
 }
 
 fn evaluate_function_declaration(
@@ -179,7 +179,7 @@ fn evaluate_function_declaration(
         .borrow_mut()
         .add_function(&identifier, function, false);
 
-    Ok(Value::Void)
+    Ok(Value::None)
 }
 
 pub(super) fn evaluate_expression(
@@ -187,7 +187,6 @@ pub(super) fn evaluate_expression(
     environment: Rcrc<Environment>,
 ) -> Result<Value, Diagnostic> {
     match typed_expression {
-        // TypedExpression::None => Ok(Value::Void),
         TypedExpression::VariableDeclaration {
             mutable,
             pattern,
@@ -280,7 +279,8 @@ fn evaluate_program(
     statements: Vec<TypedStatement>,
     environment: Rcrc<Environment>,
 ) -> Result<Value, Diagnostic> {
-    let mut value = Value::Void;
+    let mut value = Value::None;
+
     for statement in statements {
         value = evaluate(statement, environment.clone())?;
 
@@ -653,7 +653,7 @@ fn evaluate_member(member: Member, environment: Rcrc<Environment>) -> Result<Val
             .get_variable(&symbol)
             .or_else(|| get_built_in_function(&symbol, environment.clone()))
             .or_else(|| environment.borrow().get_function(&member))
-            .ok_or(format!("Variable '{}' not found", &member))?
+            .ok_or(format!("Variable '{}' not found", member))?
             .borrow()
             .value
             .clone()),
@@ -816,7 +816,6 @@ fn evaluate_literal(
     environment: Rcrc<Environment>,
 ) -> Result<Value, Diagnostic> {
     match literal {
-        ValueLiteral::Void => panic!("Void literals should never be evaluated"),
         ValueLiteral::Unit => Ok(Value::Unit),
         ValueLiteral::Int(v) => Ok(Value::Number(Number::Int(v))),
         ValueLiteral::UInt(v) => Ok(Value::Number(Number::UInt(v))),
@@ -964,29 +963,29 @@ fn evaluate_call(
     if let Some(Scope::Return(v)) = function_environment.borrow().get_scope(&ScopeType::Return) {
         match v {
             Some(v) => {
-                if type_ == Type::Void {
+                if type_ == Type::Never {
                     return Err(Diagnostic::error(
-                        "Cannot return a value from a void function",
+                        "Cannot return a value from a Never function",
                     ));
                 }
 
                 value = v.clone();
             }
             None => {
-                if type_ != Type::Void {
+                if type_ != Type::Never {
                     return Err(Diagnostic::error(format!(
-                        "Cannot return void from a non-void function. Expected type '{}', found type 'void'",
+                        "Cannot return void from a non-Never function. Expected type '{}', found type 'Never'",
                         type_
                     )));
                 }
 
-                value = Value::Void;
+                value = Value::None;
             }
         }
     }
 
-    if type_ == Type::Void {
-        return Ok(Value::Void);
+    if type_ == Type::Never {
+        return Ok(Value::None);
     }
 
     Ok(value)
@@ -1059,7 +1058,7 @@ fn evaluate_block(
     environment: Rcrc<Environment>,
 ) -> Result<Value, Diagnostic> {
     let block_environment = Rc::new(RefCell::new(Environment::new_parent(environment)));
-    let mut value = Value::Void;
+    let mut value = Value::Unit;
 
     for statement in statements {
         value = evaluate(statement, block_environment.clone())?;
@@ -1069,7 +1068,7 @@ fn evaluate_block(
             .get_scope(&ScopeType::Return)
             .is_some()
         {
-            value = Value::Void;
+            value = Value::Unit;
             break;
         }
     }
@@ -1094,7 +1093,7 @@ fn evaluate_loop(
         if let Some(Scope::Break(v)) = loop_environment.borrow().get_scope(&ScopeType::Break) {
             break_value = match v {
                 Some(v) => v.clone(),
-                None => Value::Void,
+                None => Value::Unit,
             };
 
             break 'outer;
@@ -1109,7 +1108,7 @@ fn evaluate_loop(
             .get_scope(&ScopeType::Return)
             .is_some()
         {
-            break_value = Value::Void;
+            break_value = Value::Unit;
             break 'outer;
         }
     }
@@ -1146,12 +1145,12 @@ fn evaluate_while(
                                 .get_scope(&ScopeType::Return)
                                 .is_some()
                             {
-                                value = Value::Void;
+                                value = Value::Unit;
                             }
 
                             value
                         }
-                        None => Value::Void,
+                        None => Value::Unit,
                     };
 
                     break;
@@ -1173,7 +1172,7 @@ fn evaluate_while(
                     None => Err("Cannot break with a value in a while loop without an else block (add an else block with 'else {}')".to_string()),
                     Some(_) => Ok(v.clone())
                 },
-                None => Ok(Value::Void)
+                None => Ok(Value::Unit)
             }?;
 
             break;
@@ -1188,7 +1187,7 @@ fn evaluate_while(
             .get_scope(&ScopeType::Return)
             .is_some()
         {
-            break_value = Value::Void;
+            break_value = Value::Unit;
             break;
         }
     }
@@ -1229,12 +1228,12 @@ fn evaluate_for(
                     .get_scope(&ScopeType::Return)
                     .is_some()
                 {
-                    value = Value::Void;
+                    value = Value::Unit;
                 }
 
                 return Ok(value);
             }
-            None => return Ok(Value::Void),
+            None => return Ok(Value::Unit),
         }
     }
 
@@ -1254,12 +1253,12 @@ fn evaluate_for(
                         .get_scope(&ScopeType::Return)
                         .is_some()
                     {
-                        value = Value::Void;
+                        value = Value::Unit;
                     }
 
                     value
                 }
-                None => Value::Void,
+                None => Value::Unit,
             };
 
             break;
@@ -1289,7 +1288,7 @@ fn evaluate_for(
                         None => Err("Cannot break with a value in a for loop without an else block (add an else block with 'else {}')".to_string()),
                         Some(_) => Ok(v.clone())
                     },
-                    None => Ok(Value::Void)
+                    None => Ok(Value::Unit)
                 }?;
 
             break;
@@ -1304,7 +1303,7 @@ fn evaluate_for(
             .get_scope(&ScopeType::Return)
             .is_some()
         {
-            break_value = Value::Void;
+            break_value = Value::Unit;
             break;
         }
     }
@@ -1326,13 +1325,13 @@ fn evaluate_break(
             environment
                 .borrow_mut()
                 .activate_scope(Scope::Break(Some(value)))?;
-            Ok(Value::Void)
+            Ok(Value::Unit)
         }
         None => {
             environment
                 .borrow_mut()
                 .activate_scope(Scope::Break(None))?;
-            Ok(Value::Void)
+            Ok(Value::Unit)
         }
     }
 }
@@ -1343,7 +1342,7 @@ fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, Diagnostic
     };
 
     environment.borrow_mut().activate_scope(Scope::Continue)?;
-    Ok(Value::Void)
+    Ok(Value::Unit)
 }
 
 fn evaluate_return(
@@ -1360,13 +1359,13 @@ fn evaluate_return(
             environment
                 .borrow_mut()
                 .activate_scope(Scope::Return(Some(value)))?;
-            Ok(Value::Void)
+            Ok(Value::Unit)
         }
         None => {
             environment
                 .borrow_mut()
                 .activate_scope(Scope::Return(None))?;
-            Ok(Value::Void)
+            Ok(Value::Unit)
         }
     }
 }

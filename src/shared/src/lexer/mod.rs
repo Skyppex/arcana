@@ -379,7 +379,6 @@ fn get_reserved_keyword(string: &str) -> Option<TokenKind> {
         "continue" => Some(TokenKind::Keyword(Keyword::Continue)),
 
         // Literals
-        "void" => Some(TokenKind::Literal(Literal::Void)),
         "unit" => Some(TokenKind::Literal(Literal::Unit)),
         "true" => Some(TokenKind::Literal(Literal::Bool(true))),
         "false" => Some(TokenKind::Literal(Literal::Bool(false))),

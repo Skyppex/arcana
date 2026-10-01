@@ -169,7 +169,7 @@ fn variable_declaration_adds_variable_to_environment() {
 
     // Assert
     assert!(environment.borrow().get_variable("x").is_some());
-    assert_eq!(value, Value::Void);
+    assert_eq!(value, Value::None);
 }
 
 #[test]
@@ -296,21 +296,21 @@ fn variable_declaration_function_type_is_used_to_infer_closure_parameter_types()
                 type_: Box::new(Type::Int)
             }),
             return_type: Box::new(Type::Function(shared::type_checker::Function {
-            purity: Purity::Pure,
+                purity: Purity::Pure,
                 identifier: None,
                 param: Some(shared::type_checker::Parameter {
                     identifier: "Float".to_string(),
                     type_: Box::new(Type::Float)
                 }),
                 return_type: Box::new(Type::Function(shared::type_checker::Function {
-            purity: Purity::Pure,
+                    purity: Purity::Pure,
                     identifier: None,
                     param: Some(shared::type_checker::Parameter {
                         identifier: "String".to_string(),
                         type_: Box::new(Type::String)
                     }),
                     return_type: Box::new(Type::Function(shared::type_checker::Function {
-            purity: Purity::Pure,
+                        purity: Purity::Pure,
                         identifier: None,
                         param: Some(shared::type_checker::Parameter {
                             identifier: "UInt".to_string(),

@@ -35,15 +35,16 @@ pub fn simplify(statement: TypedStatement) -> TypedStatement {
 /// 3. **It is not a loop.** A pure loop may never finish, and deleting it would
 ///    make the program terminate. Proving otherwise is out of scope.
 fn is_discardable(expression: &TypedExpression) -> bool {
-    purity_of(expression).is_pure() && !escapes(expression)
+    purity_of(expression).is_pure() && !escapes(expression) && !is_loop(expression)
 }
 
-/// Loops are never discarded, however pure — see [`is_discardable`].
+/// Whether evaluating this may never finish.
+///
+/// A pure loop that does terminate still cannot be deleted: proving it does is
+/// out of scope, and deleting a non-terminating loop would make the program
+/// terminate.
 fn is_loop(expression: &TypedExpression) -> bool {
-    matches!(
-        expression,
-        TypedExpression::Loop { .. } | TypedExpression::While { .. } | TypedExpression::For { .. }
-    )
+    matches!(expression, TypedExpression::Loop { .. })
 }
 
 /// The literal an expression's type says it is, when there is one.

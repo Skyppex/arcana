@@ -1,0 +1,15 @@
+let x = true;
+let y = false;
+
+let mut a = 5;
+
+let z = if x || y {
+    a += 5;
+    "yuh"
+} else {
+    a += 10;
+    "hun"
+}
+
+z:println()
+a

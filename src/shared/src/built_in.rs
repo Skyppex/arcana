@@ -47,7 +47,7 @@ impl BuiltInFunction {
                         identifier: "value".to_string(),
                         type_: Box::new(Type::Any),
                     }),
-                    return_type: Box::new(Type::Void),
+                    return_type: Box::new(Type::Never),
                 }),
             }),
             BuiltInFunctionType::PrintLn => Some(Self {
@@ -60,7 +60,7 @@ impl BuiltInFunction {
                         identifier: "value".to_string(),
                         type_: Box::new(Type::Any),
                     }),
-                    return_type: Box::new(Type::Void),
+                    return_type: Box::new(Type::Never),
                 }),
             }),
             BuiltInFunctionType::EPrint => Some(Self {
@@ -73,7 +73,7 @@ impl BuiltInFunction {
                         identifier: "value".to_string(),
                         type_: Box::new(Type::Any),
                     }),
-                    return_type: Box::new(Type::Void),
+                    return_type: Box::new(Type::Never),
                 }),
             }),
             BuiltInFunctionType::EPrintLn => Some(Self {
@@ -86,7 +86,7 @@ impl BuiltInFunction {
                         identifier: "value".to_string(),
                         type_: Box::new(Type::Any),
                     }),
-                    return_type: Box::new(Type::Void),
+                    return_type: Box::new(Type::Never),
                 }),
             }),
             BuiltInFunctionType::Drop => Some(Self {
@@ -99,7 +99,7 @@ impl BuiltInFunction {
                         identifier: "var".to_string(),
                         type_: Box::new(Type::Meta(Meta::Ident)),
                     }),
-                    return_type: Box::new(Type::Void),
+                    return_type: Box::new(Type::Never),
                 }),
             }),
             BuiltInFunctionType::Len => Some(Self {

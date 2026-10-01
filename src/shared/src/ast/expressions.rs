@@ -1844,7 +1844,6 @@ fn parse_rune(literal: &str) -> Result<char, Diagnostic> {
 
 fn to_expression_literal(literal: token::Literal, span: Span) -> Result<Expression, Diagnostic> {
     match literal {
-        token::Literal::Void => Err(Diagnostic::error("Void literals are not allowed")),
         token::Literal::Unit => Ok(ExpressionKind::Literal(ValueLiteral::Unit).at(span)),
         token::Literal::Int(literal) => {
             Ok(ExpressionKind::Literal(ValueLiteral::Int(literal.value)).at(span))

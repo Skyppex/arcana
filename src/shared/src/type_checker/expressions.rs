@@ -1,9 +1,6 @@
-use crate::type_checker::{
-    purity::{carry_body_purity, purity_of},
-    Purity,
-};
 use crate::ast::ExpressionKind;
 use crate::diagnostic::{Diagnostic, Span, Spanned};
+use crate::type_checker::purity::{carry_body_purity, purity_of};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
@@ -76,7 +73,7 @@ fn check_type_of(
             None => {
                 type_environment
                     .borrow_mut()
-                    .activate_scope(ScopeType::Break, Type::Void)?;
+                    .activate_scope(ScopeType::Break, Type::Never)?;
                 Ok(TypedExpression::Break(None))
             }
         },
@@ -95,7 +92,7 @@ fn check_type_of(
             None => {
                 type_environment
                     .borrow_mut()
-                    .activate_scope(ScopeType::Return, Type::Void)?;
+                    .activate_scope(ScopeType::Return, Type::Never)?;
                 Ok(TypedExpression::Return(None))
             }
         },
@@ -1233,7 +1230,7 @@ fn check_type_of(
                 )?);
             }
 
-            let mut type_ = Type::Void;
+            let mut type_ = Type::Never;
             for statement in typed_statements.clone() {
                 match statement {
                     TypedStatement::Expression(e) => {
@@ -1268,7 +1265,7 @@ fn check_type_of(
                 }
                 _ => Ok(TypedExpression::Loop {
                     body: Box::new(body),
-                    type_: Type::Void,
+                    type_: Type::Never,
                 }),
             }
         }
@@ -1312,7 +1309,7 @@ fn check_type_of(
                 .borrow()
                 .get_scope(&ScopeType::Break)
                 .map(|scope| scope.fold())
-                .unwrap_or(Ok(Type::Void))?;
+                .unwrap_or(Ok(Type::Never))?;
 
             match &else_body {
                 Some(else_body) => {
@@ -1321,7 +1318,7 @@ fn check_type_of(
                     // The loop yields a break value or, having run to
                     // completion, the else value — so its type has to cover
                     // both rather than only the one written last.
-                    type_ = if type_equals(&type_, &Type::Void) {
+                    type_ = if type_equals(&type_, &Type::Never) {
                         else_type
                     } else {
                         join_types(&type_, &else_type).ok_or(format!(
@@ -1331,7 +1328,7 @@ fn check_type_of(
                     };
                 }
                 None => {
-                    if !type_equals(&type_, &Type::Void) {
+                    if !type_equals(&type_, &Type::Never) {
                         return Err(Diagnostic::error(
                             "Must have an else block if the while block breaks with a value",
                         ));
@@ -1401,7 +1398,7 @@ fn check_type_of(
                 .borrow()
                 .get_scope(&ScopeType::Break)
                 .map(|scope| scope.fold())
-                .unwrap_or(Ok(Type::Void))?;
+                .unwrap_or(Ok(Type::Never))?;
 
             match &else_body {
                 Some(else_body) => {
@@ -1410,7 +1407,7 @@ fn check_type_of(
                     // The loop yields a break value or, having run to
                     // completion, the else value — so its type has to cover
                     // both rather than only the one written last.
-                    type_ = if type_equals(&type_, &Type::Void) {
+                    type_ = if type_equals(&type_, &Type::Never) {
                         else_type
                     } else {
                         join_types(&type_, &else_type).ok_or(format!(
@@ -1420,7 +1417,7 @@ fn check_type_of(
                     };
                 }
                 None => {
-                    if !type_equals(&type_, &Type::Void) {
+                    if !type_equals(&type_, &Type::Never) {
                         return Err(Diagnostic::error(
                             "Must have an else block if the for block breaks with a value",
                         ));
@@ -1436,7 +1433,7 @@ fn check_type_of(
                 type_: type_.clone(),
             })
         }
-        ExpressionKind::Use(UseExpr { args, expr }) => {
+        ExpressionKind::Use(UseExpr { expr, .. }) => {
             let typed_expr = check_type(expr, discovered_types, type_environment, context)?;
 
             let expr_type = typed_expr.get_type();
@@ -1453,7 +1450,7 @@ fn check_type_of(
                 ));
             };
 
-            let Type::Function(Function { param, .. }) = *type_ else {
+            let Type::Function(Function { .. }) = *type_ else {
                 return Err(Diagnostic::error(
                     "Last argument of a function in a use expression must be a function",
                 ));
@@ -2553,8 +2550,12 @@ fn check_type_param_propagation(
         )));
     }
 
-    let object_type_expression =
-        check_type(object, discovered_types, type_environment.clone(), context)?;
+    let object_type_expression = check_type(
+        object,
+        discovered_types,
+        type_environment.clone(),
+        context.clone(),
+    )?;
 
     let object_type = object_type_expression.get_type();
 
@@ -2585,16 +2586,20 @@ fn check_type_param_propagation(
     check_type_param_propagation_recurse(
         object_type.clone(),
         member,
+        discovered_types,
         type_environment,
         object_type_expression,
+        context,
     )
 }
 
 fn check_type_param_propagation_recurse(
     object_type: Type,
     member: &ast::Member,
+    discovered_types: &Vec<DiscoveredType>,
     type_environment: Rcrc<TypeEnvironment>,
     object_typed_expression: TypedExpression,
+    context: Option<Type>,
 ) -> Result<TypedExpression, Diagnostic> {
     match member.clone() {
         ast::Member::Identifier { symbol, .. } => {
@@ -2669,10 +2674,128 @@ fn check_type_param_propagation_recurse(
             //     type_: *return_type,
             // })
         }
-        ast::Member::StaticMemberAccess { .. } => todo!("Static member access"),
-        ast::Member::MemberAccess { .. } => todo!("Member access"),
-        ast::Member::ParamPropagation { .. } => todo!("Param propagation"),
-        ast::Member::Index { .. } => todo!("Index"),
+        ast::Member::StaticMemberAccess {
+            type_annotation,
+            member,
+            ..
+        } => {
+            let resolved = check_type_static_member_access(
+                &type_annotation,
+                discovered_types,
+                type_environment.clone(),
+                &member,
+                context,
+            )?;
+
+            let type_ = resolved.get_type();
+            let Type::Function(Function {
+                param, return_type, ..
+            }) = type_.clone()
+            else {
+                return Err(Diagnostic::error(format!(
+                    "{} is not a function",
+                    member.get_symbol()
+                )));
+            };
+
+            let Some(param) = param else {
+                return Err(Diagnostic::error(format!(
+                    "Function {} must have at least one parameter",
+                    member.get_symbol()
+                )));
+            };
+
+            if !type_equals(&param.type_, &object_type) {
+                return Err(Diagnostic::error(format!(
+                    "Function '{}' must be called on type {}. Found {}",
+                    member.get_symbol(),
+                    param.type_,
+                    object_type
+                )));
+            }
+
+            let body = TypedExpression::Call {
+                callee: Box::new(resolved),
+                argument: Some(Box::new(object_typed_expression)),
+                type_: *return_type.clone(),
+            };
+
+            Ok(TypedExpression::Closure {
+                param: None,
+                return_type: *return_type.clone(),
+                type_: Type::Function(Function {
+                    purity: purity_of(&body),
+                    identifier: None,
+                    param: None,
+                    return_type,
+                }),
+                body: Box::new(body),
+            })
+        }
+        ast::Member::MemberAccess { object, member, .. } => {
+            let resolved = check_type_member_access(
+                &object,
+                discovered_types,
+                type_environment.clone(),
+                &member,
+                context,
+            )?;
+
+            let type_ = resolved.get_type();
+            let Type::Function(Function {
+                param, return_type, ..
+            }) = type_.clone()
+            else {
+                return Err(Diagnostic::error(format!(
+                    "{} is not a function",
+                    member.get_symbol()
+                )));
+            };
+
+            let Some(param) = param else {
+                return Err(Diagnostic::error(format!(
+                    "Function {} must have at least one parameter",
+                    member.get_symbol()
+                )));
+            };
+
+            if !type_equals(&param.type_, &object_type) {
+                return Err(Diagnostic::error(format!(
+                    "Function '{}' must be called on type {}. Found {}",
+                    member.get_symbol(),
+                    param.type_,
+                    object_type
+                )));
+            }
+
+            let body = TypedExpression::Call {
+                callee: Box::new(resolved),
+                argument: Some(Box::new(object_typed_expression)),
+                type_: *return_type.clone(),
+            };
+
+            Ok(TypedExpression::Closure {
+                param: None,
+                return_type: *return_type.clone(),
+                type_: Type::Function(Function {
+                    purity: purity_of(&body),
+                    identifier: None,
+                    param: None,
+                    return_type,
+                }),
+                body: Box::new(body),
+            })
+        }
+        ast::Member::ParamPropagation { object, member, .. } => check_type_param_propagation(
+            &object,
+            &member,
+            discovered_types,
+            type_environment,
+            context,
+        ),
+        ast::Member::Index { object, index } => {
+            check_type_index(&object, &index, discovered_types, type_environment, context)
+        }
     }
 }
 
@@ -2910,40 +3033,27 @@ fn fold_literal_binop(
 ) -> Option<Type> {
     match (left, operator, right) {
         (LiteralType::IntValue(a), BinaryOperator::Add, LiteralType::IntValue(b)) => {
-            match a.checked_add(*b) {
-                Some(result) => Some(Type::int_literal(result)),
-                None => None,
-            }
+            a.checked_add(*b).map(Type::int_literal)
         }
         (LiteralType::IntValue(a), BinaryOperator::Subtract, LiteralType::IntValue(b)) => {
-            match a.checked_sub(*b) {
-                Some(result) => Some(Type::int_literal(result)),
-                None => None,
-            }
+            a.checked_sub(*b).map(Type::int_literal)
         }
         (LiteralType::IntValue(a), BinaryOperator::Multiply, LiteralType::IntValue(b)) => {
-            match a.checked_mul(*b) {
-                Some(result) => Some(Type::int_literal(result)),
-                None => None,
-            }
+            a.checked_mul(*b).map(Type::int_literal)
         }
         (LiteralType::IntValue(a), BinaryOperator::Divide, LiteralType::IntValue(b)) => {
             if *b == 0 {
                 return None;
             }
-            match a.checked_div(*b) {
-                Some(result) => Some(Type::int_literal(result)),
-                None => None,
-            }
+
+            a.checked_div(*b).map(Type::int_literal)
         }
         (LiteralType::IntValue(a), BinaryOperator::Modulo, LiteralType::IntValue(b)) => {
             if *b == 0 {
                 return None;
             }
-            match a.checked_rem(*b) {
-                Some(result) => Some(Type::int_literal(result)),
-                None => None,
-            }
+
+            a.checked_rem(*b).map(Type::int_literal)
         }
         (LiteralType::IntValue(a), BinaryOperator::BitwiseAnd, LiteralType::IntValue(b)) => {
             Some(Type::int_literal(a & b))
@@ -2958,49 +3068,38 @@ fn fold_literal_binop(
             if *b >= 64 {
                 return None;
             }
+
             Some(Type::int_literal(a << b))
         }
         (LiteralType::IntValue(a), BinaryOperator::BitwiseRightShift, LiteralType::IntValue(b)) => {
             if *b >= 64 {
                 return None;
             }
+
             Some(Type::int_literal(a >> b))
         }
         (LiteralType::UIntValue(a), BinaryOperator::Add, LiteralType::UIntValue(b)) => {
-            match a.checked_add(*b) {
-                Some(result) => Some(Type::uint_literal(result)),
-                None => None,
-            }
+            a.checked_add(*b).map(Type::uint_literal)
         }
         (LiteralType::UIntValue(a), BinaryOperator::Subtract, LiteralType::UIntValue(b)) => {
-            match a.checked_sub(*b) {
-                Some(result) => Some(Type::uint_literal(result)),
-                None => None,
-            }
+            a.checked_sub(*b).map(Type::uint_literal)
         }
         (LiteralType::UIntValue(a), BinaryOperator::Multiply, LiteralType::UIntValue(b)) => {
-            match a.checked_mul(*b) {
-                Some(result) => Some(Type::uint_literal(result)),
-                None => None,
-            }
+            a.checked_mul(*b).map(Type::uint_literal)
         }
         (LiteralType::UIntValue(a), BinaryOperator::Divide, LiteralType::UIntValue(b)) => {
             if *b == 0 {
                 return None;
             }
-            match a.checked_div(*b) {
-                Some(result) => Some(Type::uint_literal(result)),
-                None => None,
-            }
+
+            a.checked_div(*b).map(Type::uint_literal)
         }
         (LiteralType::UIntValue(a), BinaryOperator::Modulo, LiteralType::UIntValue(b)) => {
             if *b == 0 {
                 return None;
             }
-            match a.checked_rem(*b) {
-                Some(result) => Some(Type::uint_literal(result)),
-                None => None,
-            }
+
+            a.checked_rem(*b).map(Type::uint_literal)
         }
         (LiteralType::UIntValue(a), BinaryOperator::BitwiseAnd, LiteralType::UIntValue(b)) => {
             Some(Type::uint_literal(a & b))

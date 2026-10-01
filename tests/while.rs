@@ -39,7 +39,7 @@ fn while_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Void);
+    assert_eq!(expression.get_type(), Type::Never);
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn while_returns_void() {
     let value = evaluate_expression(input, create_env(), false);
 
     // Assert
-    assert_eq!(value, Value::Void);
+    assert_eq!(value, Value::None);
 }
 
 #[test]

@@ -20,7 +20,7 @@
 use crate::built_in::BuiltInFunction;
 
 use crate::type_checker::model::{
-    BinaryOperator, Block, Member, Typed, TypedExpression, TypedStatement, ValueLiteral,
+    BinaryOperator, Block, Index, Member, Typed, TypedExpression, TypedStatement, ValueLiteral,
 };
 use crate::type_checker::{Function, Purity, Type};
 
@@ -78,9 +78,11 @@ pub fn purity_of(expression: &TypedExpression) -> Purity {
             true_expression,
             false_expression,
             ..
-        } => purity_of(condition)
-            .and(purity_of(true_expression))
-            .and(false_expression.as_ref().map_or(Purity::Pure, |e| purity_of(e))),
+        } => purity_of(condition).and(purity_of(true_expression)).and(
+            false_expression
+                .as_ref()
+                .map_or(Purity::Pure, |e| purity_of(e)),
+        ),
 
         TypedExpression::Match {
             expression, arms, ..
@@ -156,11 +158,82 @@ fn purity_of_member(member: &Member) -> Purity {
 
         Member::BuiltInFunction(BuiltInFunction { function_type, .. }) => function_type.purity(),
 
-        // Indexing can be out of range, and deleting something that would have
-        // trapped is a behaviour change. An index known to be in range is
-        // deletable, which the literal types make cheap to check — a later
-        // refinement, like the one on `Assignment`.
-        Member::Index { .. } => Purity::Impure,
+        Member::Index { object, index, .. } => {
+            if index_is_in_bounds(object, index) {
+                purity_of(object)
+            } else {
+                Purity::Impure
+            }
+        }
+    }
+}
+
+/// Whether an index is provably within the bounds of a literal array.
+///
+/// Both the array and the index must be literals for this to be decidable.
+/// A literal array is a `Tuple` whose type is `Array`; a literal index is a
+/// `Literal` whose type carries an integer value. When both are known, the
+/// comparison is exact.
+fn index_is_in_bounds(object: &TypedExpression, index: &Index) -> bool {
+    let TypedExpression::Tuple {
+        elements, type_, ..
+    } = object
+    else {
+        return false;
+    };
+
+    if !matches!(type_.clone().unsubstitute(), Type::Array(_)) {
+        return false;
+    }
+
+    let len = elements.len() as u64;
+
+    match index {
+        Index::Value(idx) => {
+            let Some(ValueLiteral::UInt(idx_val)) =
+                ValueLiteral::try_from(idx.get_type().unsubstitute()).ok()
+            else {
+                return false;
+            };
+            idx_val < len
+        }
+        Index::Range {
+            start,
+            end,
+            inclusive,
+        } => {
+            let start_ok = start
+                .as_ref()
+                .map(|s| {
+                    ValueLiteral::try_from(s.get_type().unsubstitute())
+                        .ok()
+                        .and_then(|v| match v {
+                            ValueLiteral::UInt(u) => Some(u),
+                            ValueLiteral::Int(i) if i >= 0 => Some(i as u64),
+                            _ => None,
+                        })
+                        .map(|s| s < len)
+                        .unwrap_or(false)
+                })
+                .unwrap_or(true);
+
+            let end_ok = end
+                .as_ref()
+                .map(|e| {
+                    ValueLiteral::try_from(e.get_type().unsubstitute())
+                        .ok()
+                        .and_then(|v| match v {
+                            ValueLiteral::UInt(u) => Some(u),
+                            ValueLiteral::Int(i) if i >= 0 => Some(i as u64),
+                            _ => None,
+                        })
+                        .map(|e| if *inclusive { e < len } else { e <= len })
+                        .unwrap_or(false)
+                })
+                .unwrap_or(true);
+
+            start_ok && end_ok
+        }
     }
 }
 
@@ -180,20 +253,18 @@ fn purity_of_callee(callee_type: &Type) -> Purity {
 /// Only division and remainder can, and only by zero — which the right-hand
 /// side's literal type settles outright whenever it is known.
 fn purity_of_operator(operator: &BinaryOperator, right: &TypedExpression) -> Purity {
-    if !matches!(
-        operator,
-        BinaryOperator::Divide | BinaryOperator::Modulo
-    ) {
+    if !matches!(operator, BinaryOperator::Divide | BinaryOperator::Modulo) {
         return Purity::Pure;
     }
 
     let divisor = ValueLiteral::try_from(right.get_type().unsubstitute()).ok();
 
-    Purity::of(matches!(
+    Purity::of(
+        matches!(
         divisor,
         Some(ValueLiteral::Int(d)) if d != 0)
             | matches!(divisor, Some(ValueLiteral::UInt(d)) if d != 0)
-            | matches!(divisor, Some(ValueLiteral::Float(d)) if d != 0.0)
+            | matches!(divisor, Some(ValueLiteral::Float(d)) if d != 0.0),
     )
 }
 

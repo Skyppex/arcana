@@ -13,7 +13,7 @@ use common::{
 };
 
 use interpreter::{value::Number, Value};
-use shared::type_checker::model::{Typed, TypedExpression, TypedStatement, ValueLiteral};
+use shared::type_checker::model::{TypedExpression, TypedStatement, ValueLiteral};
 
 fn int(v: i64) -> Value {
     Value::Number(Number::Int(v))
@@ -324,7 +324,10 @@ fn a_division_by_a_known_non_zero_is_dropped() {
 fn creating_an_impure_closure_is_pure_but_calling_it_is_not() {
     // The binding is unused and its initializer only builds a closure, so the
     // statement goes.
-    assert_eq!(statement_count(r#"{ |x: Int| { "hi":println(); x } }; 2"#), 1);
+    assert_eq!(
+        statement_count(r#"{ |x: Int| { "hi":println(); x } }; 2"#),
+        1
+    );
 
     // Calling one does not.
     assert_eq!(

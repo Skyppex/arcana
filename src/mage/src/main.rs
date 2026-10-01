@@ -335,7 +335,7 @@ fn compile(
         eprintln!("{}", file.source);
     }
 
-    if print_result && !result.is_void() {
+    if print_result && !result.is_none_value() {
         println!("{result}");
     }
 
