@@ -95,6 +95,7 @@ impl TypeEnvironment {
             modules: HashMap::new(),
             types: HashMap::from([
                 ("Never".to_string(), Type::Never),
+                ("Void".to_string(), Type::Void),
                 ("Unit".to_string(), Type::Unit),
                 ("Bool".to_string(), Type::Bool),
                 ("Int".to_string(), Type::Int),
@@ -779,14 +780,14 @@ impl TypeEnvironment {
                 Ok(Type::Function(super::Function {
                     // Built from a signature alone, with no body to look
                     // at, so nothing can be concluded. Impure is the safe
-                    // answer: it only costs optimisation.
+                    // answer: it only costs optimization.
                     purity: Purity::Impure,
                     identifier: None,
                     param: param_type.map(|pt| Parameter {
                         identifier: pt.full_name(),
                         type_: Box::new(pt),
                     }),
-                    return_type: Box::new(return_type.unwrap_or(Type::Never)),
+                    return_type: Box::new(return_type.unwrap_or(Type::Void)),
                 }))
             }
         }

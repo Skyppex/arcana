@@ -73,7 +73,7 @@ fn check_type_of(
             None => {
                 type_environment
                     .borrow_mut()
-                    .activate_scope(ScopeType::Break, Type::Never)?;
+                    .activate_scope(ScopeType::Break, Type::Void)?;
                 Ok(TypedExpression::Break(None))
             }
         },
@@ -92,7 +92,7 @@ fn check_type_of(
             None => {
                 type_environment
                     .borrow_mut()
-                    .activate_scope(ScopeType::Return, Type::Never)?;
+                    .activate_scope(ScopeType::Return, Type::Void)?;
                 Ok(TypedExpression::Return(None))
             }
         },
@@ -484,6 +484,19 @@ fn check_type_of(
                 _ => None,
             };
 
+            // `Void` is the absence of a value, so there is nothing to bind.
+            // Calling a `Void` function as a statement is fine; it is only
+            // keeping the result that is not.
+            if type_ == Type::Void {
+                return Err(Diagnostic::error(format!(
+                    "`{}` has no value to bind",
+                    initializer
+                        .as_ref()
+                        .map(|i| i.to_string())
+                        .unwrap_or_else(|| "Void".to_string())
+                )));
+            }
+
             check_type_pattern(
                 pattern,
                 initializer.as_ref().map(|i| i.get_type()).as_ref(),
@@ -693,6 +706,14 @@ fn check_type_of(
                 type_environment.clone(),
                 None,
             )?;
+
+            // Same rule as a binding: there is no value to assign.
+            if initializer.get_type() == Type::Void {
+                return Err(Diagnostic::error(format!(
+                    "`{}` has no value to assign",
+                    initializer
+                )));
+            }
 
             let mut member_type = member.get_type();
 
@@ -1230,7 +1251,8 @@ fn check_type_of(
                 )?);
             }
 
-            let mut type_ = Type::Never;
+            let mut type_ = Type::Void;
+
             for statement in typed_statements.clone() {
                 match statement {
                     TypedStatement::Expression(e) => {
@@ -1309,7 +1331,7 @@ fn check_type_of(
                 .borrow()
                 .get_scope(&ScopeType::Break)
                 .map(|scope| scope.fold())
-                .unwrap_or(Ok(Type::Never))?;
+                .unwrap_or(Ok(Type::Void))?;
 
             match &else_body {
                 Some(else_body) => {
@@ -1318,7 +1340,7 @@ fn check_type_of(
                     // The loop yields a break value or, having run to
                     // completion, the else value — so its type has to cover
                     // both rather than only the one written last.
-                    type_ = if type_equals(&type_, &Type::Never) {
+                    type_ = if type_equals(&type_, &Type::Void) {
                         else_type
                     } else {
                         join_types(&type_, &else_type).ok_or(format!(
@@ -1328,7 +1350,7 @@ fn check_type_of(
                     };
                 }
                 None => {
-                    if !type_equals(&type_, &Type::Never) {
+                    if !type_equals(&type_, &Type::Void) {
                         return Err(Diagnostic::error(
                             "Must have an else block if the while block breaks with a value",
                         ));
@@ -1398,7 +1420,7 @@ fn check_type_of(
                 .borrow()
                 .get_scope(&ScopeType::Break)
                 .map(|scope| scope.fold())
-                .unwrap_or(Ok(Type::Never))?;
+                .unwrap_or(Ok(Type::Void))?;
 
             match &else_body {
                 Some(else_body) => {
@@ -1407,7 +1429,7 @@ fn check_type_of(
                     // The loop yields a break value or, having run to
                     // completion, the else value — so its type has to cover
                     // both rather than only the one written last.
-                    type_ = if type_equals(&type_, &Type::Never) {
+                    type_ = if type_equals(&type_, &Type::Void) {
                         else_type
                     } else {
                         join_types(&type_, &else_type).ok_or(format!(
@@ -1417,7 +1439,7 @@ fn check_type_of(
                     };
                 }
                 None => {
-                    if !type_equals(&type_, &Type::Never) {
+                    if !type_equals(&type_, &Type::Void) {
                         return Err(Diagnostic::error(
                             "Must have an else block if the for block breaks with a value",
                         ));

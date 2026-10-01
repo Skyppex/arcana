@@ -485,6 +485,7 @@ pub enum Type {
     Unknown,
     Generic(GenericType),
     Never,
+    Void,
     Unit,
     Int,
     UInt,
@@ -640,6 +641,7 @@ impl Type {
             } => type_identifier.clone(),
             Type::Generic(name) => TypeIdentifier::Type(name.type_name.clone()),
             Type::Never => TypeIdentifier::Type("Never".to_string()),
+            Type::Void => TypeIdentifier::Type("Void".to_string()),
             Type::Unit => TypeIdentifier::Type("Unit".to_string()),
             Type::Int => TypeIdentifier::Type("Int".to_string()),
             Type::UInt => TypeIdentifier::Type("UInt".to_string()),
@@ -669,6 +671,7 @@ impl Type {
             } => type_identifier.into(),
             Type::Generic(name) => TypeAnnotation::Type(name.type_name.clone()),
             Type::Never => TypeAnnotation::Type("Never".to_string()),
+            Type::Void => TypeAnnotation::Type("Void".to_string()),
             Type::Unit => TypeAnnotation::Type("Unit".to_string()),
             Type::Int => TypeAnnotation::Type("Int".to_string()),
             Type::UInt => TypeAnnotation::Type("UInt".to_string()),
@@ -1100,6 +1103,7 @@ impl FullName for Type {
             Type::Unknown => "{unknown}".to_string(),
             Type::Generic(GenericType { type_name }) => type_name.to_string(),
             Type::Never => "Never".to_string(),
+            Type::Void => "Void".to_string(),
             Type::Unit => "Unit".to_string(),
             Type::Int => "Int".to_string(),
             Type::UInt => "UInt".to_string(),
@@ -1167,6 +1171,7 @@ impl FromStr for Type {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Never" => Ok(Type::Never),
+            "Void" => Ok(Type::Void),
             "Unit" => Ok(Type::Unit),
             "Int" => Ok(Type::Int),
             "UInt" => Ok(Type::UInt),
@@ -1190,6 +1195,7 @@ impl Display for Type {
             Type::Unknown => write!(f, "{{unknown}}"),
             Type::Generic(generic_type) => write!(f, "{}", generic_type.type_name),
             Type::Never => write!(f, "Never"),
+            Type::Void => write!(f, "Void"),
             Type::Unit => write!(f, "Unit"),
             Type::Int => write!(f, "Int"),
             Type::UInt => write!(f, "UInt"),
@@ -1565,6 +1571,16 @@ pub fn type_equals(left: &Type, right: &Type) -> bool {
         (_, Type::Unknown) => false,
         (Type::Substitution { actual_type, .. }, right) => type_equals(actual_type, right),
         (left, Type::Substitution { actual_type, .. }) => type_equals(left, actual_type),
+
+        // `Never` is the type of something that does not finish, so it satisfies
+        // any expectation: there is no value for the expectation to be wrong
+        // about. This is what lets `if c { 1 } else { return 0 }` be an `Int`.
+        //
+        // The asymmetry is the whole point of the `Never`/`Void` split: `Void`
+        // gets none of this, because "there is no value here" is a fact about a
+        // value that does arrive, not about control never arriving.
+        (_, Type::Never) => true,
+
         (Type::Any, _) => true,
         (other, Type::Any) if other != &Type::Any => false,
         (Type::UInt, Type::Literal { name, type_ })
@@ -1785,6 +1801,14 @@ pub fn type_annotation_equals(left: &TypeAnnotation, right: &TypeAnnotation) -> 
 /// Used to give a match or an if-else the type of all its branches together,
 /// rather than the type of whichever branch happened to come first.
 pub fn join_types(left: &Type, right: &Type) -> Option<Type> {
+    // A branch that never finishes contributes nothing to the type of the whole,
+    // so the other branch decides it outright.
+    match (left, right) {
+        (Type::Never, Type::Never) => return Some(Type::Never),
+        (Type::Never, other) | (other, Type::Never) => return Some(other.clone()),
+        _ => {}
+    }
+
     // Two literals are never `type_equals` to each other, so they are settled
     // before the coverage checks below.
     if let (

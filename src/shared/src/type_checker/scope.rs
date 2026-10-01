@@ -15,8 +15,8 @@ impl Scope {
     }
 
     pub fn fold(&self) -> Result<Type, Diagnostic> {
-        let type_ = self.types.iter().try_fold(Type::Never, |acc, t| {
-            if acc == Type::Never || type_equals_coerce(&acc, t) {
+        let type_ = self.types.iter().try_fold(Type::Void, |acc, t| {
+            if acc == Type::Never || acc == Type::Void || type_equals_coerce(&acc, t) {
                 Ok(t.clone())
             } else {
                 Err(format!("Type mismatch in scope: {} != {}", acc, t))

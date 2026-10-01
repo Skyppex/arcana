@@ -94,6 +94,7 @@ impl From<Type> for TypeAnnotation {
             Type::Unknown => panic!("Cannot convert unknown type to type annotation"),
             Type::Generic(g) => TypeAnnotation::Type(g.type_name),
             Type::Never => TypeAnnotation::Type("Never".to_string()),
+            Type::Void => TypeAnnotation::Type("Void".to_string()),
             Type::Unit => TypeAnnotation::Type("Unit".to_string()),
             Type::Int => TypeAnnotation::Type("Int".to_string()),
             Type::UInt => TypeAnnotation::Type("UInt".to_string()),

@@ -2122,7 +2122,7 @@ impl IndentDisplay for TypedStatement {
             }
             TypedStatement::Semi(e) => {
                 let mut result = String::new();
-                result.push_str(format!("<semi>: {}\n", Type::Never).as_str());
+                result.push_str(format!("<semi>: {}\n", Type::Void).as_str());
                 indent.increase();
                 indent.end_current();
                 result.push_str(

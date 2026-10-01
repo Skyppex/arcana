@@ -151,7 +151,7 @@ pub fn discover_user_defined_types(
             param: param.clone(),
             return_type_annotation: return_type_annotation
                 .clone()
-                .unwrap_or(Type::Never.type_annotation()),
+                .unwrap_or(Type::Void.type_annotation()),
         }]),
         StatementKind::Semi(_) => Ok(vec![]),
         StatementKind::Expression(_) => Ok(vec![]),
@@ -1036,7 +1036,7 @@ fn check_type_of(
             let return_type = check_type_annotation(
                 &return_type_annotation
                     .clone()
-                    .unwrap_or(TypeAnnotation::Type(Type::Never.to_string())),
+                    .unwrap_or(TypeAnnotation::Type(Type::Void.to_string())),
                 discovered_types,
                 function_type_environment.clone(),
             )?;
@@ -1152,7 +1152,13 @@ fn check_type_of(
                 .map(|s| s.fold())
                 .unwrap_or_else(|| Ok(body_typed_expression.get_type()))?;
 
-            if !type_equals(&return_type, &Type::Never) && !type_equals(&return_type, &body_type) {
+            // Asking *is this type Never* has to be a direct comparison, not
+            // `type_equals`: `Never` satisfies every expectation, so
+            // `type_equals(t, Never)` is true for every `t` and would wave the
+            // whole check through.
+            let declared_nothing = return_type == Type::Never || return_type == Type::Void;
+
+            if !declared_nothing && !type_equals(&return_type, &body_type) {
                 return Err(Diagnostic::error(format!(
                     "Function body's return type {} does not match function return type {}",
                     body_type, return_type

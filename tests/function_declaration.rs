@@ -45,7 +45,7 @@ pub fn function_declaration_has_correct_type() {
             purity: Purity::Pure,
             identifier: Some(TypeIdentifier::Type("foo".to_string())),
             param: None,
-            return_type: Box::new(Type::Never),
+            return_type: Box::new(Type::Void),
         })
     );
 }

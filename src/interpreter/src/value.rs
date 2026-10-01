@@ -257,11 +257,11 @@ pub fn get_built_in_function_value(
             param_name: Some("value".to_string()),
             body: FunctionBody::Fn(|value| {
                 let Some(value) = value else {
-                    return Value::Unit;
+                    return Value::None;
                 };
 
                 print!("{}", value);
-                Value::Unit
+                Value::None
             }),
             environment,
         },
@@ -270,11 +270,11 @@ pub fn get_built_in_function_value(
             body: FunctionBody::Fn(|value| {
                 let Some(value) = value else {
                     println!();
-                    return Value::Unit;
+                    return Value::None;
                 };
 
                 println!("{}", value);
-                Value::Unit
+                Value::None
             }),
             environment,
         },
@@ -282,11 +282,11 @@ pub fn get_built_in_function_value(
             param_name: Some("value".to_string()),
             body: FunctionBody::Fn(|value| {
                 let Some(value) = value else {
-                    return Value::Unit;
+                    return Value::None;
                 };
 
                 eprint!("{}", value);
-                Value::Unit
+                Value::None
             }),
             environment,
         },
@@ -295,11 +295,11 @@ pub fn get_built_in_function_value(
             body: FunctionBody::Fn(|value| {
                 let Some(value) = value else {
                     eprintln!();
-                    return Value::Unit;
+                    return Value::None;
                 };
 
                 eprintln!("{}", value);
-                Value::Unit
+                Value::None
             }),
             environment,
         },

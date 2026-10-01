@@ -963,18 +963,18 @@ fn evaluate_call(
     if let Some(Scope::Return(v)) = function_environment.borrow().get_scope(&ScopeType::Return) {
         match v {
             Some(v) => {
-                if type_ == Type::Never {
+                if type_ == Type::Void {
                     return Err(Diagnostic::error(
-                        "Cannot return a value from a Never function",
+                        "Cannot return a value from a function that returns Void",
                     ));
                 }
 
                 value = v.clone();
             }
             None => {
-                if type_ != Type::Never {
+                if type_ != Type::Void {
                     return Err(Diagnostic::error(format!(
-                        "Cannot return void from a non-Never function. Expected type '{}', found type 'Never'",
+                        "Cannot return without a value from a function that returns '{}'",
                         type_
                     )));
                 }
@@ -984,7 +984,9 @@ fn evaluate_call(
         }
     }
 
-    if type_ == Type::Never {
+    // A function that returns `Void` has nothing to give back, whatever its body
+    // happened to compute on the way.
+    if type_ == Type::Void {
         return Ok(Value::None);
     }
 
@@ -1093,7 +1095,7 @@ fn evaluate_loop(
         if let Some(Scope::Break(v)) = loop_environment.borrow().get_scope(&ScopeType::Break) {
             break_value = match v {
                 Some(v) => v.clone(),
-                None => Value::Unit,
+                None => Value::None,
             };
 
             break 'outer;
@@ -1108,7 +1110,7 @@ fn evaluate_loop(
             .get_scope(&ScopeType::Return)
             .is_some()
         {
-            break_value = Value::Unit;
+            break_value = Value::None;
             break 'outer;
         }
     }
@@ -1145,12 +1147,12 @@ fn evaluate_while(
                                 .get_scope(&ScopeType::Return)
                                 .is_some()
                             {
-                                value = Value::Unit;
+                                value = Value::None;
                             }
 
                             value
                         }
-                        None => Value::Unit,
+                        None => Value::None,
                     };
 
                     break;
@@ -1172,7 +1174,7 @@ fn evaluate_while(
                     None => Err("Cannot break with a value in a while loop without an else block (add an else block with 'else {}')".to_string()),
                     Some(_) => Ok(v.clone())
                 },
-                None => Ok(Value::Unit)
+                None => Ok(Value::None)
             }?;
 
             break;
@@ -1187,7 +1189,7 @@ fn evaluate_while(
             .get_scope(&ScopeType::Return)
             .is_some()
         {
-            break_value = Value::Unit;
+            break_value = Value::None;
             break;
         }
     }
@@ -1228,12 +1230,12 @@ fn evaluate_for(
                     .get_scope(&ScopeType::Return)
                     .is_some()
                 {
-                    value = Value::Unit;
+                    value = Value::None;
                 }
 
                 return Ok(value);
             }
-            None => return Ok(Value::Unit),
+            None => return Ok(Value::None),
         }
     }
 
@@ -1253,12 +1255,12 @@ fn evaluate_for(
                         .get_scope(&ScopeType::Return)
                         .is_some()
                     {
-                        value = Value::Unit;
+                        value = Value::None;
                     }
 
                     value
                 }
-                None => Value::Unit,
+                None => Value::None,
             };
 
             break;
@@ -1288,7 +1290,7 @@ fn evaluate_for(
                         None => Err("Cannot break with a value in a for loop without an else block (add an else block with 'else {}')".to_string()),
                         Some(_) => Ok(v.clone())
                     },
-                    None => Ok(Value::Unit)
+                    None => Ok(Value::None)
                 }?;
 
             break;
@@ -1303,7 +1305,7 @@ fn evaluate_for(
             .get_scope(&ScopeType::Return)
             .is_some()
         {
-            break_value = Value::Unit;
+            break_value = Value::None;
             break;
         }
     }
@@ -1325,13 +1327,13 @@ fn evaluate_break(
             environment
                 .borrow_mut()
                 .activate_scope(Scope::Break(Some(value)))?;
-            Ok(Value::Unit)
+            Ok(Value::None)
         }
         None => {
             environment
                 .borrow_mut()
                 .activate_scope(Scope::Break(None))?;
-            Ok(Value::Unit)
+            Ok(Value::None)
         }
     }
 }
@@ -1342,7 +1344,7 @@ fn evaluate_continue(environment: Rcrc<Environment>) -> Result<Value, Diagnostic
     };
 
     environment.borrow_mut().activate_scope(Scope::Continue)?;
-    Ok(Value::Unit)
+    Ok(Value::None)
 }
 
 fn evaluate_return(

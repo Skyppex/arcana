@@ -93,7 +93,7 @@ impl Typed for TypedStatement {
     fn get_type(&self) -> Type {
         match self {
             TypedStatement::None => Type::Never,
-            TypedStatement::Program { .. } => Type::Never,
+            TypedStatement::Program { .. } => Type::Void,
             TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Use { type_, .. } => type_.clone(),
             TypedStatement::StructDeclaration(StructData { type_, .. }) => type_.clone(),
@@ -103,7 +103,7 @@ impl Typed for TypedStatement {
             TypedStatement::ProtocolDeclaration { type_, .. } => type_.clone(),
             TypedStatement::ImplementationDeclaration { type_, .. } => type_.clone(),
             TypedStatement::FunctionDeclaration { type_, .. } => type_.clone(),
-            TypedStatement::Semi { .. } => Type::Never,
+            TypedStatement::Semi { .. } => Type::Void,
             TypedStatement::Expression(e) => e.get_type(),
         }
     }
@@ -111,7 +111,7 @@ impl Typed for TypedStatement {
     fn get_deep_type(&self) -> Type {
         match self {
             TypedStatement::None => Type::Never,
-            TypedStatement::Program { .. } => Type::Never,
+            TypedStatement::Program { .. } => Type::Void,
             TypedStatement::ModuleDeclaration { type_, .. } => type_.clone(),
             TypedStatement::Use { type_, .. } => type_.clone(),
             TypedStatement::StructDeclaration(StructData { type_, .. }) => type_.clone(),

@@ -42,7 +42,7 @@ fn for_has_correct_type() {
         .nth_statement(0)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Never);
+    assert_eq!(expression.get_type(), Type::Void);
 }
 
 #[test]

@@ -45,7 +45,7 @@ fn call_has_void_return_type() {
         .nth_statement(1)
         .unwrap_expression();
 
-    assert_eq!(expression.get_type(), Type::Never);
+    assert_eq!(expression.get_type(), Type::Void);
 }
 
 #[test]

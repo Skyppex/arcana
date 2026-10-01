@@ -46,7 +46,7 @@ fn closure_has_correct_type() {
             purity: Purity::Pure,
             identifier: None,
             param: None,
-            return_type: Box::new(Type::Never),
+            return_type: Box::new(Type::Void),
         })
     );
 }
