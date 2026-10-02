@@ -14,5 +14,10 @@ glob = "0.3.1"
 serde = { version = "1.0.219", features = ["derive"] }
 toml = "0.8.20"
 
+[lib]
+name = "mage"
+path = "src/lib.rs"
+
 [[bin]]
 name = "mage"
+path = "src/main.rs"

@@ -1,7 +1,5 @@
 use crate::diagnostic::Diagnostic;
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use crate::{
     ast::{EnumVariant, Expression, Parameter, Statement},
@@ -284,36 +282,6 @@ pub const PRELUDE: &[&str] = &["Option", "Result"];
 /// The library declares `mod core;`, so its contents belong to that module
 /// rather than to whoever loads it; everything outside reaches them either
 /// through the prelude or by naming the module.
-pub fn register_core(
-    source_tokens: Vec<crate::lexer::token::Token>,
-    type_environment: Rcrc<TypeEnvironment>,
-) -> Result<(TypedStatement, Rcrc<TypeEnvironment>), Diagnostic> {
-    let Some((_, module_path, module)) = crate::ast::discover_module(source_tokens)? else {
-        return Err(Diagnostic::error(
-            "The core library must declare the module it belongs to",
-        ));
-    };
-
-    let core_type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
-        type_environment.borrow().allow_override_types,
-    )));
-
-    let typed = create_typed_ast(module, core_type_environment.clone())?;
-
-    type_environment
-        .borrow_mut()
-        .add_module(module_path.clone(), core_type_environment.clone());
-
-    for name in PRELUDE {
-        type_environment
-            .borrow_mut()
-            .add_symbol(&module_path, *name)
-            .map_err(|e| format!("The core library does not export `{name}`: {e}"))?;
-    }
-
-    Ok((typed, core_type_environment))
-}
-
 /// Puts the prelude names into `type_environment`, taking them from an already
 /// registered core library.
 ///
@@ -324,10 +292,10 @@ pub fn add_prelude(
     core_type_environment: &Rcrc<TypeEnvironment>,
 ) -> Result<(), Diagnostic> {
     for name in PRELUDE {
-        let type_ = core_type_environment
-            .borrow()
-            .get_type(*name)
-            .ok_or_else(|| format!("The core library does not export `{name}`"))?;
+        let type_ = core_type_environment.borrow().get_type(*name).ok_or_else(|| {
+            Diagnostic::error(format!("the core library does not export `{name}`"))
+                .note(format!("`{name}` is part of the prelude, so the core library has to declare it in `mod core`"))
+        })?;
 
         type_environment.borrow_mut().add_type(type_)?;
     }

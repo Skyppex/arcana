@@ -1,6 +1,6 @@
-pub mod lib::iterator;
+pub mod core::iterator;
 
-use lib::compare::{iterator::{Iterator}};
+use core::compare::{iterator::{Iterator}};
 
 pub struct Map<TIterator, TFunc> {
     iterator: TIterator,

@@ -1,4 +1,8 @@
 #![allow(dead_code, unused)]
+mod fixture;
+
+pub use fixture::Fixture;
+
 use std::{cell::RefCell, rc::Rc};
 
 use interpreter::{Environment, Value};
@@ -21,18 +25,16 @@ pub fn tokenize(input: &str) -> Vec<lexer::token::Token> {
 /// The checker resolves `Option` from the library rather than synthesising it,
 /// so anything that type checks an `if` without an else needs the library
 /// present — tests included.
+///
+/// This goes through the driver's own loader rather than reading core itself.
+/// The tests used to have a second strategy for finding core, which is how they
+/// kept passing while the binary could not start, and then stopped passing for
+/// a reason that had nothing to do with any test.
 pub fn core_type_environment() -> Rcrc<type_checker::TypeEnvironment> {
     let type_environment = Rc::new(RefCell::new(type_checker::TypeEnvironment::new(false)));
 
-    let core = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("core/lib.ar"),
-    )
-    .expect("failed to read core/lib.ar");
-
-    let tokens = lexer::tokenize(&core).expect("failed to tokenize the core library");
-
-    type_checker::register_core(tokens, type_environment.clone())
-        .expect("failed to register the core library");
+    mage::load_core(type_environment.clone(), create_env())
+        .unwrap_or_else(|error| panic!("failed to load the core library:\n{error}"));
 
     type_environment
 }

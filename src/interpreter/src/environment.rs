@@ -23,7 +23,7 @@ pub type Rcrc<T> = Rc<RefCell<T>>;
 #[derive(Clone, PartialEq, Default)]
 pub struct Environment {
     pub parent: Option<Rcrc<Environment>>,
-    pub modules: HashMap<ModPath, (Value, Rcrc<Environment>)>,
+    pub modules: HashMap<ModPath, Rcrc<Environment>>,
     pub variables: HashMap<String, Rcrc<Variable>>,
     pub functions: HashMap<String, Rcrc<Variable>>,
     pub static_members: HashMap<TypeAnnotation, HashMap<String, Rcrc<Variable>>>,
@@ -122,19 +122,20 @@ impl Environment {
         Ok(())
     }
 
-    pub fn add_module(
-        &mut self,
-        module_path: ModPath,
-        value: Value,
-        environment: Rcrc<Environment>,
-    ) {
-        self.modules.insert(module_path, (value, environment));
+    /// The environment a module's files evaluate into, created on first ask.
+    ///
+    /// A module is spread over as many files as it likes, so this has to hand
+    /// back the same environment every time rather than install a new one: an
+    /// `insert` here would mean the last file of a module silently replaced
+    /// every file before it.
+    pub fn module_env(&mut self, module_path: ModPath) -> Rcrc<Environment> {
+        self.modules
+            .entry(module_path)
+            .or_insert_with(|| Rc::new(RefCell::new(Environment::new())))
+            .clone()
     }
 
-    pub fn get_module<M: AsRef<ModPath>>(
-        &self,
-        module_path: M,
-    ) -> Option<(Value, Rcrc<Environment>)> {
+    pub fn get_module<M: AsRef<ModPath>>(&self, module_path: M) -> Option<Rcrc<Environment>> {
         self.modules.get(module_path.as_ref()).cloned().or_else(|| {
             self.parent
                 .as_ref()

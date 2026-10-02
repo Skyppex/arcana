@@ -1,4 +1,4 @@
-pub mod lib::iterator;
+pub mod core::iterator;
 
 pub proto Iterator {
     type Item;
@@ -6,6 +6,6 @@ pub proto Iterator {
 }
 
 pub proto DoubleSidedIterator 
-where imp: Iterator {
+where imp is Iterator {
     fun prev(self: Self): Option<Item>;
 }

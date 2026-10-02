@@ -27,11 +27,32 @@ impl Report {
 }
 
 /// A diagnostic that escapes without ever meeting its source still has to
-/// print. It renders as the bare message, which is what every error in the
-/// compiler looked like before spans existed.
+/// print. It renders as the message and its notes, which is what every error in
+/// the compiler looked like before spans existed.
+///
+/// The notes are not optional here: an error about the core library being
+/// missing says *what* is wrong in the message and *which path was tried, and
+/// why* in the notes, and the second half is the useful half.
 impl From<Diagnostic> for Report {
     fn from(diagnostic: Diagnostic) -> Self {
-        Report(format!("error: {diagnostic}"))
+        let mut out = format!("error: {diagnostic}");
+
+        for note in &diagnostic.notes {
+            out.push_str(&format!("\nnote: {note}"));
+        }
+
+        Report(out)
+    }
+}
+
+/// Prints as the report itself, not as `Report("…")`.
+///
+/// A `Report` only ever shows up in `Debug` when something unwrapped it — a
+/// test, or a panic — and that is exactly when the rendered error with its
+/// snippet is what someone needs to read.
+impl std::fmt::Debug for Report {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

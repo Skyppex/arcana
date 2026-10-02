@@ -47,7 +47,7 @@
           src = self;
           naersk = naerskLib;
           pkgConfig = pkgs.pkg-config;
-          inherit release;
+          inherit pkgs release;
         };
 
       checks = import ./checks.nix {

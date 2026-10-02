@@ -210,8 +210,33 @@ impl TypeEnvironment {
         Ok(())
     }
 
-    pub fn add_module(&mut self, module_path: ModPath, type_environment: Rcrc<Self>) {
-        self.modules.insert(module_path, type_environment);
+    /// The type environment a module's files are checked into, and whether this
+    /// call is what created it.
+    ///
+    /// A module is spread over as many files as it likes — and, once more than
+    /// one spell is loaded, over more than one spell — so this has to hand back
+    /// the same environment every time rather than install a new one. An
+    /// `insert` here would mean the last contributor silently replaced every
+    /// one before it, with glob order picking the survivor. Sharing one
+    /// environment from the start also leaves a genuine clash to `add_type`,
+    /// which already reports it.
+    ///
+    /// The flag exists because the prelude is put into a module environment
+    /// once, when it is made: adding it to one that already has it is reported
+    /// as `Option` being declared twice.
+    pub fn module_env(
+        &mut self,
+        module_path: ModPath,
+        allow_override_types: bool,
+    ) -> (Rcrc<Self>, bool) {
+        if let Some(existing) = self.modules.get(&module_path) {
+            return (existing.clone(), false);
+        }
+
+        let fresh = Rc::new(RefCell::new(TypeEnvironment::new(allow_override_types)));
+        self.modules.insert(module_path, fresh.clone());
+
+        (fresh, true)
     }
 
     pub fn get_module<M: AsRef<ModPath>>(&self, module_path: M) -> Option<Rcrc<Self>> {

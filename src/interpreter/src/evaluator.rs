@@ -83,7 +83,7 @@ fn evaluate_use_item(
                 return Ok(vec![]);
             }
 
-            let (_, mod_environment) = environment
+            let mod_environment = environment
                 .borrow()
                 .get_module(&module_path)
                 .ok_or(format!("Module '{}' not found", module_path))?;

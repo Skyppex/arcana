@@ -1,0 +1,7 @@
+pub mod core;
+
+enum Option<T> {
+    Some { value: T },
+    None
+}
+

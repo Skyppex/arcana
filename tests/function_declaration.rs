@@ -96,7 +96,7 @@ pub fn function_declaration_with_two_params_has_correct_type() {
                 type_: Box::new(Type::Int),
             }),
             return_type: Box::new(Type::Function(Function {
-            purity: Purity::Pure,
+                purity: Purity::Pure,
                 identifier: None,
                 param: Some(Parameter {
                     identifier: "Int".to_string(),
@@ -130,14 +130,14 @@ pub fn function_declaration_with_multiple_params_has_correct_type() {
                 type_: Box::new(Type::Int),
             }),
             return_type: Box::new(Type::Function(Function {
-            purity: Purity::Pure,
+                purity: Purity::Pure,
                 identifier: None,
                 param: Some(Parameter {
                     identifier: "Int".to_string(),
                     type_: Box::new(Type::Int),
                 }),
                 return_type: Box::new(Type::Function(Function {
-            purity: Purity::Pure,
+                    purity: Purity::Pure,
                     identifier: None,
                     param: Some(Parameter {
                         identifier: "Int".to_string(),

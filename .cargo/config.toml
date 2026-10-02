@@ -1,0 +1,12 @@
+# Where `mage` looks for the core library.
+#
+# `relative = true` resolves against this file's directory, so it is right for
+# `cargo run`, for `cargo test`, and inside the nix check sandbox where the
+# source is copied to an arbitrary path — none of which have a working
+# directory worth relying on.
+#
+# This also sets the variable while the binary is being built, which is what
+# `option_env!("ARCANA_CORE_LIB_PATH")` bakes in as a fallback so that running
+# ./target/debug/mage directly works without a wrapper.
+[env]
+ARCANA_CORE_LIB_PATH = { value = "core", relative = true }

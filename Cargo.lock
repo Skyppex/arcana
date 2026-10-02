@@ -68,6 +68,7 @@ dependencies = [
  "dirs",
  "glob",
  "interpreter",
+ "mage",
  "rand",
  "regex",
  "serde",

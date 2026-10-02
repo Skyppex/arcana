@@ -1,9 +1,7 @@
-enum Option<T> {
-    Some { value: T },
-    None
-}
+pub mod core;
 
 enum Result<TValue, TError> {
     Ok { value: TValue },
     Err { error: TError }
 }
+

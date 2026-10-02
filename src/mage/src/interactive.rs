@@ -7,7 +7,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::{cli::Cli, read_input, report::Report};
+use crate::{cli::Cli, driver::load_core, driver::read_input, report::Report};
 use interpreter::Environment;
 use shared::{
     diagnostic::SourceFile,
@@ -15,14 +15,14 @@ use shared::{
     types::ToKey,
 };
 
-pub(crate) fn interactive(args: &Cli) -> Result<(), Report> {
+pub fn interactive(args: &Cli) -> Result<(), Report> {
     let type_environment = Rc::new(RefCell::new(TypeEnvironment::new(
         args.behavior.override_types,
     )));
 
     let environment = Rc::new(RefCell::new(Environment::new()));
 
-    crate::load_core(type_environment.clone())?;
+    load_core(type_environment.clone(), environment.clone())?;
 
     loop {
         let mut input = String::new();

@@ -17,6 +17,7 @@ members = [
 [dependencies]
 clap = { version = "4.5.8", features = ["derive"] }
 shared = { path = "src/shared"}
+mage = { path = "src/mage"}
 interpreter = { path = "src/interpreter"}
 dirs = "5.0.1"
 glob = "0.3.1"
