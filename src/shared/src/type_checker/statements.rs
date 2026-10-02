@@ -16,7 +16,7 @@ use crate::{
         self, ImplementationDeclaration, ModPath, ModuleDeclaration, ProtocolDeclaration,
         Statement, StructData, UnionDeclaration, Use, UseItem,
     },
-    types::{ToKey, TypeAnnotation, TypeIdentifier},
+    types::{GenericConstraint, GenericType, ToKey, TypeAnnotation, TypeIdentifier},
 };
 
 use super::{
@@ -25,8 +25,8 @@ use super::{
     scope::ScopeType,
     type_checker::DiscoveredType,
     type_environment::TypeEnvironment,
-    type_equals, type_equals_coerce, DiscoveredEmbeddedStruct, EmbeddedStruct, Enum, Function,
-    Parameter, Protocol, Rcrc, Struct, StructField, Type, TypeAlias, Union,
+    type_equals, type_equals_coerce, DiscoveredEmbeddedStruct, EmbeddedStruct, Enum, FullName,
+    Function, Parameter, Protocol, Rcrc, Struct, StructField, Type, TypeAlias, Union,
 };
 
 pub fn discover_user_defined_types(
@@ -116,6 +116,7 @@ pub fn discover_user_defined_types(
         StatementKind::ProtocolDeclaration(ProtocolDeclaration {
             access_modifier: _,
             type_identifier,
+            where_clause: _,
             associated_types,
             functions,
         }) => Ok(vec![DiscoveredType::Protocol {
@@ -204,6 +205,175 @@ fn discover_types_from_use_item(
 /// Same arrangement as [`expressions::check_type`]: the span is attached once,
 /// here, and only fills a primary that is still empty — so an error from
 /// somewhere deeper keeps the tighter span it already has.
+/// Brings the associated types of a bound protocol into scope.
+///
+/// `proto DoubleSidedIterator where Self is Iterator` should be able to say
+/// `Option<Item>` without declaring `Item` again: the bound guarantees an
+/// `Iterator` implementation, and that implementation is what chose it. The
+/// name resolves to a projection on `Self`, which is the same thing the
+/// protocol's own associated types resolve to.
+fn inherit_associated_types(
+    constraint: &GenericConstraint,
+    self_type: &Type,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<(), Diagnostic> {
+    if constraint.generic.type_name != "Self" {
+        return Ok(());
+    }
+
+    for bound in &constraint.constraints {
+        let Ok(Type::Protocol(Protocol {
+            type_identifier,
+            associated_types,
+            ..
+        })) = type_environment.borrow().get_type_from_annotation(bound)
+        else {
+            continue;
+        };
+
+        for name in associated_types {
+            let projection = Type::AssociatedType {
+                on: Box::new(self_type.clone()),
+                protocol: type_identifier.name().to_owned(),
+                name: name.clone(),
+            };
+
+            type_environment
+                .borrow_mut()
+                .add_type_alias(name, projection);
+        }
+    }
+
+    Ok(())
+}
+
+/// Holds an implementation to the bounds its protocol declared, and brings what
+/// they guarantee into scope.
+///
+/// `proto DoubleSidedIterator where Self is Iterator` means an implementation
+/// may only be written for a type that already implements `Iterator`; a bound
+/// on one of the protocol's own parameters constrains the argument given for
+/// it. Both are checked here because an implementation is the first point at
+/// which `Self` and the arguments are known.
+///
+/// A satisfied bound also settles its associated types: `Item` inside
+/// `imp DoubleSidedIterator for Once<T>` is whatever `Once<T>`'s `Iterator`
+/// implementation chose. It is bound here rather than demanded of this
+/// implementation, which has no business choosing it a second time.
+fn check_protocol_bounds(
+    protocol_annotation: &TypeAnnotation,
+    protocol_type: &Type,
+    imp_type: &Type,
+    type_environment: Rcrc<TypeEnvironment>,
+) -> Result<(), Diagnostic> {
+    let Type::Protocol(Protocol {
+        type_identifier, ..
+    }) = protocol_type
+    else {
+        return Ok(());
+    };
+
+    let bounds = type_environment
+        .borrow()
+        .get_generic_constraints(&type_identifier.to_key());
+
+    if bounds.is_empty() {
+        return Ok(());
+    }
+
+    let mut arguments: HashMap<String, Type> = HashMap::new();
+
+    // A bound names a parameter, and the implementation gives arguments
+    // positionally, so pairing them needs the order the protocol declared. The
+    // protocol type reached here has already been instantiated and no longer
+    // remembers it; the declaration does.
+    let declaration = type_environment.borrow().get_type(type_identifier.to_key());
+
+    if let (
+        Some(Type::Protocol(Protocol {
+            type_identifier: TypeIdentifier::GenericType(_, parameters),
+            ..
+        })),
+        TypeAnnotation::ConcreteType(_, given),
+    ) = (declaration, protocol_annotation)
+    {
+        for (parameter, annotation) in parameters.iter().zip(given) {
+            let argument = type_environment
+                .borrow()
+                .get_type_from_annotation(annotation)?;
+
+            arguments.insert(parameter.type_name.clone(), argument);
+        }
+    }
+
+    for bound in bounds {
+        let name = bound.generic.type_name.clone();
+        let is_self = name == "Self";
+
+        let subject = if is_self {
+            imp_type.clone()
+        } else {
+            match arguments.get(&name) {
+                Some(argument) => argument.clone(),
+                // Nothing was given for it, so there is nothing to check
+                // against — the arity mismatch is reported elsewhere.
+                None => continue,
+            }
+        };
+
+        for constraint in &bound.constraints {
+            let Ok(Type::Protocol(Protocol {
+                type_identifier: required,
+                associated_types: required_associated_types,
+                ..
+            })) = type_environment
+                .borrow()
+                .get_type_from_annotation(constraint)
+            else {
+                continue;
+            };
+
+            if type_environment
+                .borrow()
+                .implements(&subject, required.name())
+            {
+                if is_self {
+                    for name in required_associated_types {
+                        let chosen = type_environment
+                            .borrow()
+                            .get_associated_type(&subject, &name);
+
+                        if let Some(chosen) = chosen {
+                            type_environment.borrow_mut().add_type_alias(name, chosen);
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            return Err(Diagnostic::error(if is_self {
+                format!(
+                    "`{}` cannot implement `{}` without implementing `{}`",
+                    subject.full_name(),
+                    type_identifier.name(),
+                    required.name()
+                )
+            } else {
+                format!(
+                    "`{}` requires `{}` to implement `{}`, and `{}` does not",
+                    type_identifier.name(),
+                    name,
+                    required.name(),
+                    subject.full_name()
+                )
+            }));
+        }
+    }
+
+    Ok(())
+}
+
 pub fn check_type(
     statement: &Statement,
     discovered_types: &Vec<DiscoveredType>,
@@ -623,6 +793,7 @@ fn check_type_of(
         StatementKind::ProtocolDeclaration(ProtocolDeclaration {
             access_modifier: _,
             type_identifier,
+            where_clause,
             associated_types,
             functions,
         }) => {
@@ -630,10 +801,14 @@ fn check_type_of(
                 type_environment.clone(),
             )));
 
-            let self_type = Type::Substitution {
-                type_identifier: TypeIdentifier::Type("Self".to_owned()),
-                actual_type: Box::new(Type::Unknown),
-            };
+            // Inside the declaration `Self` is a type parameter, not a
+            // substitution: nobody has chosen it yet, and a bound may be put on
+            // it exactly as on any other parameter. It only becomes a
+            // substitution in an `imp`, where it stands for the implementing
+            // type.
+            let self_type = Type::Generic(GenericType {
+                type_name: "Self".to_owned(),
+            });
 
             protocol_type_environment
                 .borrow_mut()
@@ -669,6 +844,28 @@ fn check_type_of(
                         .add_type(Type::Generic(generic.clone()))?;
                 }
             }
+
+            // The bounds hold inside the declaration, so whatever they require
+            // is available there: `where Self is Iterator` puts `Iterator`'s
+            // functions on `Self`, and its associated types in scope under
+            // their own names, exactly as if this protocol had declared them.
+            for constraint in where_clause {
+                protocol_type_environment
+                    .borrow_mut()
+                    .add_generic_constraint(constraint)?;
+
+                inherit_associated_types(
+                    constraint,
+                    &self_type,
+                    protocol_type_environment.clone(),
+                )?;
+            }
+
+            // Kept against the protocol so that an implementation can be held
+            // to them; nothing else knows what this protocol requires.
+            type_environment
+                .borrow_mut()
+                .add_generic_constraints(type_identifier.to_key(), where_clause.clone());
 
             let functions: Result<Vec<TypedStatement>, Diagnostic> = functions
                 .clone()
@@ -819,6 +1016,17 @@ fn check_type_of(
                     protocol_type
                 )));
             };
+
+            // A protocol may require things of whatever implements it, and of
+            // its own type arguments. This is the one place where both are
+            // known.
+            check_protocol_bounds(
+                protocol_annotation,
+                &protocol_type,
+                &imp_type,
+                implementation_type_environment.clone(),
+            )
+            .at(statement.span)?;
 
             let mut bound_associated_types = HashMap::new();
 

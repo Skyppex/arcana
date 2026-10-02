@@ -212,15 +212,45 @@ impl Environment {
         type_annotation: &TypeAnnotation,
         member_key: K,
     ) -> Option<Rcrc<Variable>> {
-        if let Some(static_members) = self.static_members.get(type_annotation) {
-            static_members.get(&member_key.to_key()).cloned()
-        } else if let Some(parent) = &self.parent {
+        let member_key = member_key.to_key();
+
+        if let Some(found) = self
+            .static_members
+            .get(type_annotation)
+            .and_then(|members| members.get(&member_key))
+        {
+            return Some(found.clone());
+        }
+
+        // An implementation written for `Map<TIter, TTo>` is reached on a value
+        // of type `Map<Once<Int>, Int>`: different annotations, the same
+        // implementation. The type checker already refuses a blanket
+        // implementation alongside one for a single instantiation, so a type
+        // constructor has at most one implementation of any protocol and
+        // matching on the name alone cannot reach the wrong one.
+        let name = type_annotation.name();
+
+        let mut by_constructor = self
+            .static_members
+            .iter()
+            .filter(|(annotation, members)| {
+                annotation.name() == name && members.contains_key(&member_key)
+            })
+            .collect::<Vec<_>>();
+
+        // `static_members` is a hash map, so a deterministic order has to be
+        // imposed rather than assumed.
+        by_constructor.sort_by_key(|(annotation, _)| annotation.to_key());
+
+        if let Some((_, members)) = by_constructor.first() {
+            return members.get(&member_key).cloned();
+        }
+
+        self.parent.as_ref().and_then(|parent| {
             parent
                 .borrow()
-                .get_static_member(type_annotation, member_key)
-        } else {
-            None
-        }
+                .get_static_member(type_annotation, &member_key)
+        })
     }
 
     pub fn set_variable(&mut self, member: Member, value: Value) -> Result<Value, Diagnostic> {

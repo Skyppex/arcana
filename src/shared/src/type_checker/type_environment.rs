@@ -17,7 +17,7 @@ use crate::{
 
 use super::{
     scope::{Scope, ScopeType},
-    DiscoveredType, FullName, Function, Parameter, Struct, Type,
+    DiscoveredType, Enum, FullName, Function, Parameter, Struct, StructField, Type,
 };
 
 pub type Rcrc<T> = Rc<RefCell<T>>;
@@ -421,7 +421,7 @@ impl TypeEnvironment {
             if let Some(records) = self.implementations.get(&key) {
                 for record in records.values() {
                     if let Some(bound) = record.associated_types.get(name) {
-                        return Some(bound.clone());
+                        return Some(self.specialise_associated_type(record, bound, type_));
                     }
                 }
             }
@@ -430,6 +430,43 @@ impl TypeEnvironment {
         self.parent
             .as_ref()
             .and_then(|parent| parent.borrow().get_associated_type(type_, name))
+    }
+
+    /// What an implementation chose for an associated type, with the
+    /// implementation's own type parameters replaced by the arguments of the
+    /// type being asked about.
+    ///
+    /// `imp<T> Iterator for Once<T> { type Item = T; }` records `Item = T`.
+    /// Asked about `Once<Int>` the answer has to be `Int`; the record is keyed
+    /// by the constructor, so without this the projection resolved to the
+    /// implementation's own parameter and stayed generic for ever.
+    ///
+    /// Only a choice that *is* a type parameter is specialised. A structural
+    /// one — `type Item = Array<T>` — is handed back as written, which is no
+    /// worse than before and is where to look when that case needs it.
+    fn specialise_associated_type(
+        &self,
+        record: &ImplementationRecord,
+        bound: &Type,
+        type_: &Type,
+    ) -> Type {
+        let Type::Generic(generic) = bound else {
+            return bound.clone();
+        };
+
+        let mut bindings = HashMap::new();
+
+        bind_scoped_generics(
+            &record.type_annotation,
+            &type_.type_annotation(),
+            &record.scoped_generics,
+            &mut bindings,
+        );
+
+        bindings
+            .get(&generic.type_name)
+            .and_then(|annotation| self.get_type_from_annotation(annotation).ok())
+            .unwrap_or_else(|| bound.clone())
     }
 
     /// Records an implementation written for a bare type parameter, which
@@ -1038,6 +1075,21 @@ impl TypeEnvironment {
         match type_ {
             Type::Array(inner) => return self.lookup_type(inner),
             Type::Tuple(types) => return types.iter().all(|t| self.lookup_type(t)),
+            // A function type is structural in the same way, and is never
+            // registered under a name of its own. Leaving it out meant a struct
+            // could hold a `fun(Int): Int` field but reading it back reported
+            // the field's own type as unknown.
+            Type::Function(function) => {
+                return function
+                    .param
+                    .as_ref()
+                    .is_none_or(|param| self.lookup_type(&param.type_))
+                    && self.lookup_type(&function.return_type);
+            }
+            // `T::Item` is known exactly when `T` is. The projection names
+            // whatever an implementation chose, which is not registered under
+            // this name and never could be.
+            Type::AssociatedType { on, .. } => return self.lookup_type(on),
             _ => {}
         }
 
@@ -1126,6 +1178,9 @@ fn substitute_self(type_: &Type, self_type: &Type) -> Type {
         Type::Substitution {
             type_identifier, ..
         } if type_identifier.name() == "Self" => self_type.clone(),
+        // A protocol declaration writes `Self` as a type parameter, so that is
+        // the form its signatures carry until an implementation settles it.
+        Type::Generic(GenericType { type_name }) if type_name == "Self" => self_type.clone(),
         Type::Function(Function {
             identifier,
             param,
@@ -1154,8 +1209,46 @@ fn substitute_self(type_: &Type, self_type: &Type) -> Type {
                 .map(|type_| substitute_self(type_, self_type))
                 .collect(),
         ),
+        // `Self` hides inside whatever a signature is built out of, not just at
+        // the top of it. A protocol returning `Option<Item>` carries the
+        // projection in the variant's field, so stopping at the enum left
+        // `Self::Item` behind for every method whose result was wrapped in
+        // anything at all.
+        Type::Enum(Enum {
+            type_identifier,
+            shared_fields,
+            members,
+        }) => Type::Enum(Enum {
+            type_identifier: type_identifier.clone(),
+            shared_fields: substitute_self_in_fields(shared_fields, self_type),
+            members: members
+                .iter()
+                .map(|(name, member)| (name.clone(), substitute_self(member, self_type)))
+                .collect(),
+        }),
+        Type::Struct(Struct {
+            type_identifier,
+            embedded_structs,
+            fields,
+        }) => Type::Struct(Struct {
+            type_identifier: type_identifier.clone(),
+            embedded_structs: embedded_structs.clone(),
+            fields: substitute_self_in_fields(fields, self_type),
+        }),
         other => other.clone(),
     }
+}
+
+fn substitute_self_in_fields(fields: &[StructField], self_type: &Type) -> Vec<StructField> {
+    fields
+        .iter()
+        .map(|field| StructField {
+            struct_name: field.struct_name.clone(),
+            field_name: field.field_name.clone(),
+            default_value: field.default_value.clone(),
+            field_type: substitute_self(&field.field_type, self_type),
+        })
+        .collect()
 }
 
 /// Whether two function types take the same argument, which is what makes two

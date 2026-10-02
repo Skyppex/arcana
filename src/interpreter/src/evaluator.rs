@@ -918,17 +918,77 @@ fn evaluate_closure(
     })
 }
 
+/// The implementation of `symbol` belonging to the runtime type of `value`.
+///
+/// A protocol method called on a value whose static type is still a type
+/// parameter cannot be resolved while checking: inside
+/// `imp<TIter, TTo> Iterator for Map<TIter, TTo>`, `self.iterator` is a `TIter`
+/// and nothing more. The value knows what it is, so the implementation is
+/// chosen here instead.
+///
+/// Returning `None` leaves the call to resolve the name as it always did, which
+/// is what ordinary functions want.
+fn dispatch_on_value(
+    symbol: &str,
+    value: &Value,
+    environment: &Rcrc<Environment>,
+) -> Option<Value> {
+    let type_name = match value {
+        Value::Struct(Struct { type_name, .. }) => type_name,
+        Value::Enum(Enum { type_name, .. }) => type_name,
+        _ => return None,
+    };
+
+    let annotation = TypeAnnotation::Type(type_name.clone());
+
+    let member = environment
+        .borrow()
+        .get_static_member(&annotation, symbol)?;
+
+    let value = member.borrow().value.clone();
+
+    matches!(value, Value::Function { .. }).then_some(value)
+}
+
 fn evaluate_call(
     callee: Box<TypedExpression>,
     argument: Option<Box<TypedExpression>>,
     type_: Type,
     environment: Rcrc<Environment>,
 ) -> Result<Value, Diagnostic> {
-    let callee_value = evaluate_expression(*callee, environment.clone())?;
+    // When the callee is a bare name the argument is evaluated first, so that a
+    // protocol method can be dispatched on what the value turns out to be. The
+    // reordering is safe only because a bare name has nothing to evaluate:
+    // anything else keeps the original order.
+    let bare_name = match callee.as_ref() {
+        TypedExpression::Member(Member::Identifier { symbol, .. }) if argument.is_some() => {
+            Some(symbol.clone())
+        }
+        _ => None,
+    };
 
-    let evaluated_arg = argument
-        .map(|arg| evaluate_expression(*arg, environment.clone()))
-        .transpose()?;
+    let (callee_value, evaluated_arg) = match bare_name {
+        Some(symbol) => {
+            let argument = argument.expect("a bare name is only taken with an argument");
+            let evaluated_arg = evaluate_expression(*argument, environment.clone())?;
+
+            let callee_value = match dispatch_on_value(&symbol, &evaluated_arg, &environment) {
+                Some(implementation) => implementation,
+                None => evaluate_expression(*callee, environment.clone())?,
+            };
+
+            (callee_value, Some(evaluated_arg))
+        }
+        None => {
+            let callee_value = evaluate_expression(*callee, environment.clone())?;
+
+            let evaluated_arg = argument
+                .map(|arg| evaluate_expression(*arg, environment.clone()))
+                .transpose()?;
+
+            (callee_value, evaluated_arg)
+        }
+    };
 
     let Value::Function {
         param_name,

@@ -404,6 +404,28 @@ fn check_field_patterns(
     Ok(checked)
 }
 
+/// Whether a pattern naming `pattern` is about the enum the matched value
+/// belongs to.
+///
+/// A pattern names a *variant*, not an instantiation: `Option::Some { value }`
+/// is as much about an `Option<Int>` as about an `Option<String>`, and the
+/// binding it introduces takes its type from the matched value either way. So a
+/// pattern that supplies no type arguments is asking about the enum by name.
+///
+/// One that does supply them — `Option<Int>::Some { .. }` — is asking for that
+/// instantiation and is compared in full, which is why this is not simply an
+/// arm on `type_annotation_equals`: there, `Option` and `Option<Int>` are
+/// genuinely different types and have to stay so.
+fn names_the_same_enum(pattern: &TypeAnnotation, value: &TypeAnnotation) -> bool {
+    if let (TypeAnnotation::Type(pattern_name), TypeAnnotation::ConcreteType(value_name, _)) =
+        (pattern, value)
+    {
+        return pattern_name == value_name;
+    }
+
+    type_annotation_equals(pattern, value)
+}
+
 fn check_variant_pattern(
     pattern: &Pattern,
     enum_annotation: Option<&TypeAnnotation>,
@@ -418,7 +440,7 @@ fn check_variant_pattern(
             let enum_annotation_of_type = TypeAnnotation::from(&enum_.type_identifier);
 
             if let Some(enum_annotation) = enum_annotation {
-                if !type_annotation_equals(enum_annotation, &enum_annotation_of_type) {
+                if !names_the_same_enum(enum_annotation, &enum_annotation_of_type) {
                     return Err(Diagnostic::error(format!(
                         "Pattern `{}` names enum {} but the matched value is {}",
                         pattern, enum_annotation, enum_annotation_of_type
@@ -438,7 +460,7 @@ fn check_variant_pattern(
             let enum_annotation_of_type = TypeAnnotation::from(enum_identifier.as_ref());
 
             if let Some(enum_annotation) = enum_annotation {
-                if !type_annotation_equals(enum_annotation, &enum_annotation_of_type) {
+                if !names_the_same_enum(enum_annotation, &enum_annotation_of_type) {
                     return Err(Diagnostic::error(format!(
                         "Pattern `{}` names enum {} but the matched value is {}",
                         pattern, enum_annotation, enum_annotation_of_type

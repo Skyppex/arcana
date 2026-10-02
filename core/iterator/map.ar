@@ -1,0 +1,27 @@
+pub mod core::iterator;
+
+// The mapper takes whatever the wrapped iterator yields. `TIterator::Item` is a
+// projection: it names the type that iterator's implementation chose, so the
+// element type needs no parameter of its own and no two parameters have to be
+// kept in step.
+pub struct Map<TIterator, TTo> {
+    iterator: TIterator,
+    mapper: fun(TIterator::Item): TTo
+}
+
+imp<TIterator, TTo> Iterator for Map<TIterator, TTo>
+where TIterator is Iterator {
+    type Item = TTo;
+
+    fun next(self: Self): Option<Item> => {
+        self.iterator:next() match
+        | Option::Some { value } => {
+            let mapped: Option<Item> = Option::Some { value: self.mapper(value) };
+            mapped
+        },
+        | Option::None => {
+            let done: Option<Item> = Option::None;
+            done
+        }
+    }
+}

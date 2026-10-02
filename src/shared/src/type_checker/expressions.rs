@@ -2581,11 +2581,15 @@ fn check_type_param_propagation(
 
     let object_type = object_type_expression.get_type();
 
-    let member_type = type_environment.borrow().get_type(member).or_else(|| {
-        type_environment
-            .borrow()
-            .get_static_member(&object_type, member)
-    });
+    // The object's own type is asked first. A protocol method is not a free
+    // function that happens to share a name, and two implementations of one
+    // protocol both provide `next`: consulting the environment first found
+    // whichever was declared last, so the body that ran had nothing to do with
+    // the value it was called on.
+    let member_type = type_environment
+        .borrow()
+        .get_static_member(&object_type, member)
+        .or_else(|| type_environment.borrow().get_type(member));
 
     let Some(Type::Function(Function { param, .. })) = member_type else {
         return Err(Diagnostic::error(format!("{} is not a function", member)));
@@ -2625,15 +2629,16 @@ fn check_type_param_propagation_recurse(
 ) -> Result<TypedExpression, Diagnostic> {
     match member.clone() {
         ast::Member::Identifier { symbol, .. } => {
-            let type_ = type_environment
+            // Same order as above, and for the same reason: what the object's
+            // type provides wins over anything of that name in scope.
+            let on_type = type_environment
                 .borrow()
-                .get_variable(&symbol)
+                .get_static_member(&object_type, &symbol);
+
+            let type_ = on_type
+                .clone()
+                .or_else(|| type_environment.borrow().get_variable(&symbol))
                 .or_else(|| type_environment.borrow().get_type(&symbol))
-                .or_else(|| {
-                    type_environment
-                        .borrow()
-                        .get_static_member(&object_type, &symbol)
-                })
                 .ok_or_else(|| {
                     format!(
                         "Unexpected member access: {} on type {}",
@@ -2665,11 +2670,34 @@ fn check_type_param_propagation_recurse(
 
             // This version will return a function requiring parens for it to be called
             // 16:sqrt will produce a closure that needs to be called. 16:sqrt() will produce 4
-            let body = TypedExpression::Call {
-                callee: Box::new(TypedExpression::Member(Member::Identifier {
+            // A member that came from the object's type is called through
+            // that type, not through its bare name: the name alone reaches
+            // whichever implementation was evaluated last.
+            //
+            // Only once the object's type is settled, though. While it is still
+            // a type parameter there is no implementation to name yet, so the
+            // call stays on the bare name and is resolved when the parameter
+            // has been instantiated.
+            let callee = match on_type {
+                Some(_) if !contains_generic(&object_type) => {
+                    TypedExpression::Member(Member::StaticMemberAccess {
+                        type_annotation: object_type.type_annotation(),
+                        member: Box::new(Member::Identifier {
+                            symbol: symbol.clone(),
+                            type_: type_.clone(),
+                        }),
+                        symbol: symbol.clone(),
+                        type_: type_.clone(),
+                    })
+                }
+                _ => TypedExpression::Member(Member::Identifier {
                     symbol: symbol.clone(),
                     type_: type_.clone(),
-                })),
+                }),
+            };
+
+            let body = TypedExpression::Call {
+                callee: Box::new(callee),
                 argument: Some(Box::new(object_typed_expression)),
                 type_: *return_type.clone(),
             };

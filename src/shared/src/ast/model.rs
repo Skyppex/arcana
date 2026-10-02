@@ -310,6 +310,12 @@ pub struct TypeAliasDeclaration {
 pub struct ProtocolDeclaration {
     pub access_modifier: Option<AccessModifier>,
     pub type_identifier: TypeIdentifier,
+    /// Bounds on the protocol's own type parameters, and on `Self`.
+    ///
+    /// `where Self is Iterator` says the protocol only applies to types that
+    /// already implement `Iterator`, which is what makes `Self` usable as an
+    /// iterator inside the declaration.
+    pub where_clause: Vec<GenericConstraint>,
     pub associated_types: Vec<AssociatedType>,
     pub functions: Vec<FunctionDeclaration>,
 }

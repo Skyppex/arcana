@@ -89,6 +89,20 @@ pub fn contains_generic(type_: &Type) -> bool {
         Type::Array(inner) => contains_generic(inner),
         Type::Tuple(types) => types.iter().any(contains_generic),
         Type::Substitution { actual_type, .. } => contains_generic(actual_type),
+        // A function type mentions its parameters in its signature, not at the
+        // top of itself. This gates whether a field is substituted at all, so
+        // leaving it out meant a field declared `fun(T): U` was copied through
+        // instantiation verbatim and stayed generic forever.
+        Type::Function(Function {
+            param, return_type, ..
+        }) => {
+            param
+                .as_ref()
+                .is_some_and(|param| contains_generic(&param.type_))
+                || contains_generic(return_type)
+        }
+        // `T::Item` is generic exactly while `T` is.
+        Type::AssociatedType { on, .. } => contains_generic(on),
         _ => false,
     }
 }
@@ -707,6 +721,18 @@ impl Type {
         context: Option<HashMap<&GenericType, &TypeAnnotation>>,
     ) -> Result<Type, Diagnostic> {
         match self {
+            // `Self` is a type parameter of the protocol that declared it, but
+            // it is never passed as a type argument: an implementation settles
+            // it, through `substitute_self`. So it is left standing here rather
+            // than demanding an argument nobody will ever supply.
+            Type::Generic(generic)
+                if generic.type_name == "Self"
+                    && context
+                        .as_ref()
+                        .is_none_or(|context| !context.contains_key(generic)) =>
+            {
+                Ok(self.clone())
+            }
             Type::Generic(generic) => {
                 let context = context.ok_or(format!(
                     "No type arguments available to substitute `{}` with",
@@ -794,6 +820,33 @@ impl Type {
                     .collect::<Result<Vec<Type>, Diagnostic>>()?;
 
                 Ok(Type::Tuple(cloned_types))
+            }
+            // `T::Item` under a substitution that settles `T`.
+            //
+            // Once `on` is a concrete type the projection is whatever that
+            // type's implementation chose; while it is still a parameter the
+            // projection stays symbolic, which is what lets a signature mention
+            // `I::Item` before anyone has picked an `I`. Without this arm the
+            // projection survived substitution untouched, so a field declared
+            // `fun(TIter::Item): TTo` never became `fun(Int): Int` no matter
+            // what `TIter` was instantiated with.
+            Type::AssociatedType { on, protocol, name } => {
+                let on = on.clone_with_concrete_types(
+                    concrete_types,
+                    discovered_types,
+                    type_environment.clone(),
+                    context,
+                )?;
+
+                if let Some(resolved) = type_environment.borrow().get_associated_type(&on, name) {
+                    return Ok(resolved);
+                }
+
+                Ok(Type::AssociatedType {
+                    on: Box::new(on),
+                    protocol: protocol.clone(),
+                    name: name.clone(),
+                })
             }
             Type::Struct(s) if !matches!(s.type_identifier, TypeIdentifier::MemberType(_, _)) => {
                 let TypeIdentifier::GenericType(name, generics) = s.type_identifier.clone() else {

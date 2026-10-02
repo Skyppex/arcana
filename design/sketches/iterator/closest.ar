@@ -1,0 +1,61 @@
+// NOT COMPILED — a sketch, kept out of `core/` deliberately.
+//
+// `Map` next door compiles and runs; this one needs four things the language
+// does not have yet:
+//
+//   - `for x in it` over an `Iterator`. `for` is wired to arrays only:
+//     "For iterable must be of type array".
+//   - `Ordering`. Nothing declares it. Its home is a `core::compare` module,
+//     which this one cannot `use`: a module gets a type environment with no
+//     parent, so sibling modules are invisible to each other.
+//   - `&mut Self` as a parameter type. `&` is a binary operator and never
+//     appears in type-annotation parsing.
+//   - `where TIter is Iterator<Self::Item = TType>` — an equality bound on an
+//     associated type. `where T is Proto` exists; constraining the projection
+//     does not. `Map` sidesteps this by writing `TIterator::Item` wherever the
+//     element type is meant, which is the better shape and may be enough here
+//     too.
+//
+// `pub mod iterator_extensions;` mid-file is also not a thing: a module header
+// is the first statement of a file and nothing else. Splitting a module across
+// files now works, so this becomes a file of its own declaring whichever module
+// it should belong to.
+
+
+pub struct Closest<TIterator, TType, TOperand> {
+    iterator: TIterator,
+    selector: fun(TType): TOperand,
+    comparer: fun(TOperand, TOperand): Ordering,
+}
+
+pub fun closest<TIter, TType, TOperand>(
+    self: TIter,
+    selector: fun(TType): TOperand,
+    comparer: fun(TOperand, TOperand): Ordering): Closest<Self, TType, TOperand>
+where TIter: Iterator<Self::Item = TType> {
+    Closest { self: self, selector: selector, comparer: comparer  }
+}
+
+imp<T, TIterator, TType, TOperand> Iterator for Closest<TIterator, TType, TOperand> {
+    type Item = T;
+
+    fun next(self: &mut Self): Option<Self::Item> => {
+        let mut closest = None;
+
+        for item in self.iterator => {
+            let closest_operand = closest match 
+            | Some { item: item } => self.selector(item),
+            | None => {
+                closest = Some(item);
+                continue;
+            };
+
+            let operand = self.selector(item);
+            let ordering = self.comparer(operand, closest_operand);
+
+            if ordering == Ordering::Less => closest = Some(item); 
+        }
+
+        closest
+    }
+}

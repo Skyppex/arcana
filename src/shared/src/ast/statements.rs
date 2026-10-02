@@ -885,12 +885,15 @@ fn parse_protocol_declaration(
 
     type_identifier.name().validate_type_identifier_name()?;
 
+    let where_clause = parse_where_clause(cursor)?;
+
     if cursor.first().kind == TokenKind::Semicolon {
         cursor.bump()?; // Consume the ;
 
         return Ok(StatementKind::ProtocolDeclaration(ProtocolDeclaration {
             access_modifier,
             type_identifier,
+            where_clause,
             associated_types: vec![],
             functions: vec![],
         })
@@ -960,6 +963,7 @@ fn parse_protocol_declaration(
     Ok(StatementKind::ProtocolDeclaration(ProtocolDeclaration {
         access_modifier,
         type_identifier,
+        where_clause,
         associated_types,
         functions,
     })

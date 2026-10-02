@@ -372,6 +372,7 @@ impl IndentDisplay for Statement {
             StatementKind::ProtocolDeclaration(ProtocolDeclaration {
                 access_modifier,
                 type_identifier,
+                where_clause: _,
                 associated_types,
                 functions,
             }) => {

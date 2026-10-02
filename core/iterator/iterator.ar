@@ -1,0 +1,14 @@
+pub mod core::iterator;
+
+pub proto Iterator {
+    type Item;
+    fun next(self: Self): Option<Item>;
+}
+
+// `where Self is Iterator` makes this protocol applicable only to types that
+// already iterate, which is also what puts `Item` in scope here: it is the one
+// their `Iterator` implementation chose, not a second one to pick.
+pub proto DoubleSidedIterator
+where Self is Iterator {
+    fun prev(self: Self): Option<Item>;
+}

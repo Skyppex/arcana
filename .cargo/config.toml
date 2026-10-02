@@ -10,3 +10,15 @@
 # ./target/debug/mage directly works without a wrapper.
 [env]
 ARCANA_CORE_LIB_PATH = { value = "core", relative = true }
+
+# Type checking recurses roughly in step with how nested the types are, and the
+# core library now carries `Map`, whose `imp` is deep enough to overflow the
+# 2 MiB the test harness gives a thread. `mage` itself has always sidestepped
+# this by running on a thread it sizes explicitly (`STACK_SIZE` in main.rs);
+# test threads are spawned by the harness, so the only way to size them is here.
+#
+# This is a prop, not a fix: the checker's stack use is the real problem, and a
+# core library that keeps growing will meet this limit again.
+[env.RUST_MIN_STACK]
+value = "8388608"
+force = false
